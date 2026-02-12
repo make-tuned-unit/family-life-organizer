@@ -1070,6 +1070,59 @@ app.post('/api/appointments', requireAuth, async (req, res) => {
   }
 });
 
-app.listen(PORT, () => {
-  console.log('Family Life Organizer running on port', PORT);
+// Initialize database on startup
+async function initializeDatabase() {
+  const db = new FamilyDB();
+  try {
+    // Create tables if they don't exist
+    db.db.exec(`
+      CREATE TABLE IF NOT EXISTS groceries (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        item TEXT NOT NULL,
+        category TEXT,
+        status TEXT DEFAULT 'active',
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+      
+      CREATE TABLE IF NOT EXISTS tasks (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        title TEXT NOT NULL,
+        category TEXT NOT NULL,
+        status TEXT DEFAULT 'active',
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+      
+      CREATE TABLE IF NOT EXISTS appointments (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        title TEXT NOT NULL,
+        appointment_date TEXT NOT NULL,
+        appointment_time TEXT,
+        location TEXT,
+        person_tags TEXT,
+        created_by TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+      
+      CREATE TABLE IF NOT EXISTS receipts (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        amount REAL NOT NULL,
+        merchant TEXT,
+        category TEXT,
+        receipt_date TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    console.log('✅ Database initialized');
+  } catch (err) {
+    console.error('❌ Database init error:', err.message);
+  } finally {
+    db.close();
+  }
+}
+
+// Start server after DB init
+initializeDatabase().then(() => {
+  app.listen(PORT, () => {
+    console.log('Family Life Organizer running on port', PORT);
+  });
 });
