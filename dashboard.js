@@ -227,12 +227,13 @@ app.get('/', requireAuth, async (req, res) => {
     const summary = await db.getDailySummary();
     const groceries = await db.getGroceries('needed');
     const tasks = await db.getTasks({ status: 'active' });
+    const appointments = await db.getAppointments();
     const tasksByCategory = {};
     tasks.forEach(task => {
       if (!tasksByCategory[task.category]) tasksByCategory[task.category] = [];
       tasksByCategory[task.category].push(task);
     });
-    res.send(renderDashboard(req.session.user, summary, groceries, tasksByCategory));
+    res.send(renderDashboard(req.session.user, summary, groceries, tasksByCategory, appointments));
   } catch (err) {
     res.status(500).send('Error: ' + err.message);
   } finally {
@@ -241,8 +242,10 @@ app.get('/', requireAuth, async (req, res) => {
 });
 
 // Render Dashboard
-function renderDashboard(user, summary, groceries, tasksByCategory) {
+function renderDashboard(user, summary, groceries, tasksByCategory, appointments) {
   const categories = Object.keys(tasksByCategory).sort();
+  const today = new Date().toISOString().split('T')[0];
+  const todayAppointments = appointments.filter(a => a.appointment_date === today);
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -563,6 +566,23 @@ function renderDashboard(user, summary, groceries, tasksByCategory) {
             `).join('') || '<p style="color:var(--gray-600);text-align:center;padding:32px">No items needed</p>'}
           </div>
         </div>
+        
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title">Today's Appointments</h3>
+          </div>
+          <div class="card-body">
+            ${todayAppointments.map(appt => `
+              <div class="list-item">
+                <div class="list-content">
+                  <strong>${appt.title}</strong>
+                  ${appt.appointment_time ? `<span style="color:var(--gray-500);margin-left:8px">${appt.appointment_time}</span>` : ''}
+                  ${appt.person_tags ? `<div style="margin-top:4px">${appt.person_tags.split(',').map(p => `<span class="badge" style="margin-right:4px">${p}</span>`).join('')}</div>` : ''}
+                </div>
+              </div>
+            `).join('') || '<p style="color:var(--gray-600);text-align:center;padding:32px">No appointments today</p>'}
+          </div>
+        </div>
       </div>
     </div>
     
@@ -570,13 +590,25 @@ function renderDashboard(user, summary, groceries, tasksByCategory) {
     <div id="calendar" class="tab-panel">
       <div class="card">
         <div class="card-header">
-          <h3 class="card-title">Family Calendar</h3>
+          <h3 class="card-title">Upcoming Appointments</h3>
         </div>
         <div class="card-body">
-          <p style="color:var(--gray-600);text-align:center;padding:48px">
-            📅 Calendar view coming soon!<br>
-            <small>Add appointments via the "Add" tab</small>
-          </p>
+          ${appointments
+            .filter(a => a.appointment_date >= today)
+            .sort((a, b) => a.appointment_date.localeCompare(b.appointment_date))
+            .slice(0, 10)
+            .map(appt => `
+              <div class="list-item">
+                <div class="list-content">
+                  <strong>${appt.title}</strong>
+                  <div style="color:var(--gray-500);font-size:13px;margin-top:2px">
+                    ${appt.appointment_date} ${appt.appointment_time ? 'at ' + appt.appointment_time : ''}
+                    ${appt.location ? '• ' + appt.location : ''}
+                  </div>
+                  ${appt.person_tags ? `<div style="margin-top:6px">${appt.person_tags.split(',').map(p => `<span class="badge" style="margin-right:4px">${p}</span>`).join('')}</div>` : ''}
+                </div>
+              </div>
+            `).join('') || '<p style="color:var(--gray-600);text-align:center;padding:32px">No upcoming appointments</p>'}
         </div>
       </div>
     </div>
@@ -687,9 +719,27 @@ function renderDashboard(user, summary, groceries, tasksByCategory) {
             <h3 class="card-title">Add Appointment</h3>
           </div>
           <div class="card-body">
-            <input type="text" class="form-input" id="apptTitle" placeholder="Event title">
+            <input type="text" class="form-input" id="apptTitle" placeholder="Event title (e.g., Dentist, School play)">
             <input type="date" class="form-input" id="apptDate">
             <input type="time" class="form-input" id="apptTime">
+            <input type="text" class="form-input" id="apptLocation" placeholder="Location (optional)">
+            <div style="margin-bottom:16px">
+              <label style="display:block;font-size:14px;color:var(--gray-600);margin-bottom:8px">Who's involved?</label>
+              <div style="display:flex;gap:16px;flex-wrap:wrap">
+                <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+                  <input type="checkbox" class="appt-person" value="Jesse"> Jesse
+                </label>
+                <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+                  <input type="checkbox" class="appt-person" value="Sophie"> Sophie
+                </label>
+                <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+                  <input type="checkbox" class="appt-person" value="Rowan"> Rowan
+                </label>
+                <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+                  <input type="checkbox" class="appt-person" value="Baby"> Baby
+                </label>
+              </div>
+            </div>
             <button class="btn btn-primary" onclick="addAppointment()">Add Appointment</button>
           </div>
         </div>
@@ -749,11 +799,26 @@ function renderDashboard(user, summary, groceries, tasksByCategory) {
     async function addAppointment() {
       const title = document.getElementById('apptTitle').value;
       const date = document.getElementById('apptDate').value;
-      if (!title || !date) return;
+      const time = document.getElementById('apptTime').value;
+      const location = document.getElementById('apptLocation').value;
+      const personCheckboxes = document.querySelectorAll('.appt-person:checked');
+      const person_tags = Array.from(personCheckboxes).map(cb => cb.value);
+      
+      if (!title || !date) {
+        alert('Please enter a title and date');
+        return;
+      }
+      
       await fetch('/api/appointments', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({title, appointment_date: date})
+        body: JSON.stringify({
+          title, 
+          appointment_date: date,
+          appointment_time: time,
+          location: location,
+          person_tags: person_tags
+        })
       });
       location.reload();
     }

@@ -66,6 +66,7 @@ CREATE TABLE IF NOT EXISTS appointments (
     location TEXT,
     with_person TEXT,
     category TEXT,
+    person_tags TEXT,
     reminder_sent BOOLEAN DEFAULT 0,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
