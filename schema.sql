@@ -92,9 +92,6 @@ CREATE TABLE IF NOT EXISTS message_log (
     FOREIGN KEY (task_id) REFERENCES tasks(id)
 );
 
--- Migration: Add person_tags to appointments if not exists
-ALTER TABLE appointments ADD COLUMN person_tags TEXT;
-
 -- Receipts and budget tracking
 CREATE TABLE IF NOT EXISTS receipts (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
