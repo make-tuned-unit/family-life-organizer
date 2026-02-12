@@ -9,8 +9,8 @@ const PORT = process.env.PORT || 3456;
 
 // Simple auth middleware
 const USERS = {
-  'jesse': { password: 'lauft2024', name: 'Jesse' },
-  'wife': { password: 'family2024', name: 'Wife' }
+  'jesse': { password: 'lauft2024', name: 'Jesse', avatar: '👨‍💼', color: '#667eea' },
+  'sophie': { password: 'family2024', name: 'Sophie', avatar: '👩‍⚕️', color: '#f093fb' }
 };
 
 // Middleware
@@ -44,76 +44,365 @@ app.get('/login', (req, res) => {
     <html>
     <head>
       <meta charset="UTF-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>Family Life Organizer - Login</title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+      <meta name="theme-color" content="#667eea">
+      <title>Family Life Organizer - Welcome</title>
       <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
+        
+        @keyframes gradientShift {
+          0% { background-position: 0% 50%; }
+          50% { background-position: 100% 50%; }
+          100% { background-position: 0% 50%; }
+        }
+        
+        @keyframes float {
+          0%, 100% { transform: translateY(0px); }
+          50% { transform: translateY(-10px); }
+        }
+        
+        @keyframes pulse {
+          0%, 100% { transform: scale(1); opacity: 0.8; }
+          50% { transform: scale(1.05); opacity: 1; }
+        }
+        
+        @keyframes slideUp {
+          from { opacity: 0; transform: translateY(30px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        
         body {
-          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+          background: linear-gradient(-45deg, #667eea, #764ba2, #f093fb, #f5576c);
+          background-size: 400% 400%;
+          animation: gradientShift 15s ease infinite;
           min-height: 100vh;
           display: flex;
           align-items: center;
           justify-content: center;
+          padding: 20px;
+          overflow-x: hidden;
         }
-        .login-box {
-          background: white;
-          padding: 40px;
-          border-radius: 16px;
-          box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        
+        .login-container {
+          animation: slideUp 0.6s ease-out;
           width: 100%;
-          max-width: 400px;
+          max-width: 420px;
         }
-        h1 { color: #333; margin-bottom: 8px; font-size: 28px; }
-        p.subtitle { color: #666; margin-bottom: 30px; }
-        .form-group { margin-bottom: 20px; }
-        label { display: block; margin-bottom: 8px; color: #555; font-weight: 500; }
-        input {
-          width: 100%;
-          padding: 12px;
-          border: 2px solid #e0e0e0;
-          border-radius: 8px;
+        
+        .login-card {
+          background: rgba(255, 255, 255, 0.95);
+          backdrop-filter: blur(20px);
+          -webkit-backdrop-filter: blur(20px);
+          border-radius: 24px;
+          padding: 48px 40px;
+          box-shadow: 0 25px 80px rgba(0,0,0,0.15), 0 10px 30px rgba(0,0,0,0.1);
+          border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+        
+        .app-header {
+          text-align: center;
+          margin-bottom: 40px;
+        }
+        
+        .app-icon {
+          font-size: 64px;
+          margin-bottom: 16px;
+          animation: float 3s ease-in-out infinite;
+          display: inline-block;
+        }
+        
+        .app-title {
+          font-size: 28px;
+          font-weight: 700;
+          background: linear-gradient(135deg, #667eea, #764ba2);
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+          background-clip: text;
+          margin-bottom: 8px;
+          letter-spacing: -0.5px;
+        }
+        
+        .app-subtitle {
+          color: #666;
           font-size: 16px;
-          transition: border-color 0.3s;
+          font-weight: 400;
         }
-        input:focus { outline: none; border-color: #667eea; }
-        button {
+        
+        .user-selector {
+          margin-bottom: 28px;
+        }
+        
+        .selector-label {
+          font-size: 14px;
+          font-weight: 600;
+          color: #444;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+          margin-bottom: 12px;
+          display: block;
+        }
+        
+        .user-options {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 12px;
+        }
+        
+        .user-option {
+          position: relative;
+          cursor: pointer;
+        }
+        
+        .user-option input {
+          position: absolute;
+          opacity: 0;
+          cursor: pointer;
+        }
+        
+        .user-card {
+          background: #f8f9fa;
+          border: 2px solid transparent;
+          border-radius: 16px;
+          padding: 20px;
+          text-align: center;
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        .user-option:hover .user-card {
+          background: #fff;
+          transform: translateY(-2px);
+          box-shadow: 0 8px 25px rgba(0,0,0,0.08);
+        }
+        
+        .user-option input:checked + .user-card {
+          border-color: #667eea;
+          background: linear-gradient(135deg, rgba(102, 126, 234, 0.1), rgba(118, 75, 162, 0.1));
+          box-shadow: 0 8px 30px rgba(102, 126, 234, 0.2);
+        }
+        
+        .user-avatar {
+          font-size: 48px;
+          margin-bottom: 8px;
+          display: block;
+        }
+        
+        .user-name {
+          font-weight: 600;
+          color: #333;
+          font-size: 16px;
+        }
+        
+        .password-section {
+          margin-bottom: 24px;
+        }
+        
+        .password-wrapper {
+          position: relative;
+        }
+        
+        .password-input {
           width: 100%;
-          padding: 14px;
+          padding: 16px 20px;
+          padding-right: 50px;
+          border: 2px solid #e8e8e8;
+          border-radius: 14px;
+          font-size: 17px;
+          transition: all 0.3s;
+          background: #fafafa;
+        }
+        
+        .password-input:focus {
+          outline: none;
+          border-color: #667eea;
+          background: #fff;
+          box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
+        }
+        
+        .password-toggle {
+          position: absolute;
+          right: 16px;
+          top: 50%;
+          transform: translateY(-50%);
+          background: none;
+          border: none;
+          font-size: 20px;
+          cursor: pointer;
+          opacity: 0.6;
+          transition: opacity 0.2s;
+          width: auto;
+          padding: 0;
+        }
+        
+        .password-toggle:hover {
+          opacity: 1;
+          transform: translateY(-50%);
+        }
+        
+        .signin-btn {
+          width: 100%;
+          padding: 18px;
           background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
           color: white;
           border: none;
-          border-radius: 8px;
-          font-size: 16px;
+          border-radius: 14px;
+          font-size: 17px;
           font-weight: 600;
           cursor: pointer;
-          transition: transform 0.2s;
+          transition: all 0.3s;
+          box-shadow: 0 8px 25px rgba(102, 126, 234, 0.3);
+          position: relative;
+          overflow: hidden;
         }
-        button:hover { transform: translateY(-2px); }
-        .error {
-          color: #e74c3c;
-          margin-top: 15px;
+        
+        .signin-btn::before {
+          content: '';
+          position: absolute;
+          top: 0;
+          left: -100%;
+          width: 100%;
+          height: 100%;
+          background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+          transition: left 0.5s;
+        }
+        
+        .signin-btn:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 12px 35px rgba(102, 126, 234, 0.4);
+        }
+        
+        .signin-btn:hover::before {
+          left: 100%;
+        }
+        
+        .signin-btn:active {
+          transform: translateY(0);
+        }
+        
+        .error-message {
+          background: #fee;
+          color: #c33;
+          padding: 14px 18px;
+          border-radius: 12px;
+          margin-bottom: 20px;
+          font-size: 14px;
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          animation: slideUp 0.3s ease;
+        }
+        
+        .error-icon {
+          font-size: 18px;
+        }
+        
+        .security-note {
           text-align: center;
+          margin-top: 24px;
+          color: #888;
+          font-size: 13px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 6px;
+        }
+        
+        .security-note::before {
+          content: '🔒';
+        }
+        
+        @media (max-width: 480px) {
+          .login-card {
+            padding: 36px 24px;
+            border-radius: 20px;
+          }
+          
+          .app-title {
+            font-size: 24px;
+          }
+          
+          .user-avatar {
+            font-size: 40px;
+          }
         }
       </style>
     </head>
     <body>
-      <div class="login-box">
-        <h1>🏠 Family Life</h1>
-        <p class="subtitle">Organize your household together</p>
-        <form method="POST" action="/login">
-          <div class="form-group">
-            <label>Username</label>
-            <input type="text" name="username" placeholder="jesse or wife" required>
+      <div class="login-container">
+        <div class="login-card">
+          <div class="app-header">
+            <div class="app-icon">🏠</div>
+            <h1 class="app-title">Family Life</h1>
+            <p class="app-subtitle">Organize your household together</p>
           </div>
-          <div class="form-group">
-            <label>Password</label>
-            <input type="password" name="password" placeholder="Enter password" required>
+          
+          ${req.query.error ? `
+          <div class="error-message">
+            <span class="error-icon">⚠️</span>
+            <span>Incorrect password. Please try again.</span>
           </div>
-          <button type="submit">Sign In</button>
-        </form>
-        ${req.query.error ? '<p class="error">Invalid credentials</p>' : ''}
+          ` : ''}
+          
+          <form method="POST" action="/login" id="loginForm">
+            <div class="user-selector">
+              <label class="selector-label">Who's signing in?</label>
+              <div class="user-options">
+                <label class="user-option">
+                  <input type="radio" name="username" value="jesse" checked>
+                  <div class="user-card">
+                    <span class="user-avatar">👨‍💼</span>
+                    <span class="user-name">Jesse</span>
+                  </div>
+                </label>
+                <label class="user-option">
+                  <input type="radio" name="username" value="sophie">
+                  <div class="user-card">
+                    <span class="user-avatar">👩‍⚕️</span>
+                    <span class="user-name">Sophie</span>
+                  </div>
+                </label>
+              </div>
+            </div>
+            
+            <div class="password-section">
+              <div class="password-wrapper">
+                <input type="password" name="password" class="password-input" placeholder="Enter your password" required autofocus>
+                <button type="button" class="password-toggle" onclick="togglePassword()">👁️</button>
+              </div>
+            </div>
+            
+            <button type="submit" class="signin-btn">Sign In</button>
+          </form>
+          
+          <div class="security-note">
+            Secure login for family members only
+          </div>
+        </div>
       </div>
+      
+      <script>
+        function togglePassword() {
+          const input = document.querySelector('.password-input');
+          const toggle = document.querySelector('.password-toggle');
+          if (input.type === 'password') {
+            input.type = 'text';
+            toggle.textContent = '🙈';
+          } else {
+            input.type = 'password';
+            toggle.textContent = '👁️';
+          }
+        }
+        
+        // Auto-focus password when user selection changes
+        document.querySelectorAll('input[name="username"]').forEach(radio => {
+          radio.addEventListener('change', () => {
+            document.querySelector('.password-input').focus();
+          });
+        });
+        
+        // Focus password on load
+        document.querySelector('.password-input').focus();
+      </script>
     </body>
     </html>
   `);
@@ -125,7 +414,7 @@ app.post('/login', (req, res) => {
   const user = USERS[username];
   
   if (user && user.password === password) {
-    req.session.user = { username, name: user.name };
+    req.session.user = { username, name: user.name, avatar: user.avatar, color: user.color };
     res.redirect('/');
   } else {
     res.redirect('/login?error=1');
