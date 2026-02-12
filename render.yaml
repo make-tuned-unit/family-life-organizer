@@ -9,6 +9,8 @@ services:
         value: production
       - key: PORT
         value: 10000
+      - key: RENDER_DISK_PATH
+        value: /opt/render/project/src/vault/family-life
     disk:
       name: family-data
       mountPath: /opt/render/project/src/vault/family-life
