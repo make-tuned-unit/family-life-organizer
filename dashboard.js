@@ -797,10 +797,11 @@ function renderDashboard(user, summary, groceries, tasksByCategory, appointments
     }
     
     async function addAppointment() {
-      const title = document.getElementById('apptTitle').value;
-      const date = document.getElementById('apptDate').value;
-      const time = document.getElementById('apptTime').value;
-      const location = document.getElementById('apptLocation').value;
+      const btn = event.target;
+      const title = document.getElementById('apptTitle')?.value;
+      const date = document.getElementById('apptDate')?.value;
+      const time = document.getElementById('apptTime')?.value;
+      const locationVal = document.getElementById('apptLocation')?.value;
       const personCheckboxes = document.querySelectorAll('.appt-person:checked');
       const person_tags = Array.from(personCheckboxes).map(cb => cb.value);
       
@@ -809,18 +810,36 @@ function renderDashboard(user, summary, groceries, tasksByCategory, appointments
         return;
       }
       
-      await fetch('/api/appointments', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({
-          title, 
-          appointment_date: date,
-          appointment_time: time,
-          location: location,
-          person_tags: person_tags
-        })
-      });
-      location.reload();
+      btn.disabled = true;
+      btn.textContent = 'Adding...';
+      
+      try {
+        const response = await fetch('/api/appointments', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({
+            title, 
+            appointment_date: date,
+            appointment_time: time,
+            location: locationVal,
+            person_tags: person_tags
+          })
+        });
+        
+        if (!response.ok) {
+          const err = await response.text();
+          alert('Error: ' + err);
+          btn.disabled = false;
+          btn.textContent = 'Add Appointment';
+          return;
+        }
+        
+        location.reload();
+      } catch (err) {
+        alert('Network error: ' + err.message);
+        btn.disabled = false;
+        btn.textContent = 'Add Appointment';
+      }
     }
   </script>
 </body>
