@@ -34,7 +34,14 @@ class FamilyDB {
     // Split and execute each statement
     const statements = schema.split(';').filter(s => s.trim());
     for (const stmt of statements) {
-      this.db.exec(stmt + ';');
+      try {
+        this.db.exec(stmt + ';');
+      } catch (err) {
+        // Ignore "already exists" errors - tables/columns already created
+        if (!err.message.includes('already exists') && !err.message.includes('duplicate')) {
+          console.error('Schema error:', err.message);
+        }
+      }
     }
   }
 
