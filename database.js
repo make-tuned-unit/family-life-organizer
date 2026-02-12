@@ -8,7 +8,10 @@ const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 const fs = require('fs');
 
-const DB_DIR = path.join(process.env.HOME, '.openclaw/workspace/vault/family-life');
+// Use Render disk path if available, otherwise use local path
+const DB_DIR = process.env.RENDER_DISK_PATH 
+  ? '/opt/render/project/src/vault/family-life'
+  : path.join(process.env.HOME || '/tmp', '.openclaw/workspace/vault/family-life');
 const DB_PATH = path.join(DB_DIR, 'family.db');
 
 // Ensure directory exists
