@@ -628,18 +628,36 @@ function renderDashboard(user, summary, groceries, tasksByCategory) {
         }
       </script>
       <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        
         * { box-sizing: border-box; margin: 0; padding: 0; }
+        
+        :root {
+          --primary: #4f46e5;
+          --primary-light: #6366f1;
+          --primary-dark: #4338ca;
+          --gray-50: #f9fafb;
+          --gray-100: #f3f4f6;
+          --gray-200: #e5e7eb;
+          --gray-300: #d1d5db;
+          --gray-600: #4b5563;
+          --gray-700: #374151;
+          --gray-800: #1f2937;
+          --gray-900: #111827;
+        }
+        
         body {
-          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-          background: #f5f7fa;
-          color: #333;
+          font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+          background: var(--gray-50);
+          color: var(--gray-800);
           line-height: 1.6;
         }
+        
         .header {
-          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          background: linear-gradient(135deg, var(--gray-900) 0%, var(--gray-800) 100%);
           color: white;
-          padding: 20px;
-          box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+          padding: 16px 24px;
+          box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
         }
         .header-content {
           max-width: 1200px;
@@ -648,72 +666,115 @@ function renderDashboard(user, summary, groceries, tasksByCategory) {
           justify-content: space-between;
           align-items: center;
         }
-        .header h1 { font-size: 24px; }
-        .header .user { opacity: 0.9; }
-        .header a { color: white; text-decoration: none; margin-left: 20px; }
+        .header h1 { 
+          font-size: 22px; 
+          font-weight: 700;
+          letter-spacing: -0.025em;
+        }
+        .header .user { 
+          font-size: 14px;
+          opacity: 0.8; 
+          margin-top: 2px;
+        }
+        .header a { 
+          color: white; 
+          text-decoration: none; 
+          margin-left: 20px;
+          font-size: 14px;
+          font-weight: 500;
+          padding: 8px 16px;
+          border-radius: 6px;
+          transition: background 0.2s;
+        }
+        .header a:hover {
+          background: rgba(255,255,255,0.1);
+        }
         
         .container {
           max-width: 1200px;
           margin: 0 auto;
-          padding: 20px;
+          padding: 24px;
         }
         
         .summary-cards {
           display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+          grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
           gap: 20px;
-          margin-bottom: 30px;
+          margin-bottom: 32px;
         }
         .card {
           background: white;
-          padding: 20px;
+          padding: 24px;
           border-radius: 12px;
-          box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+          box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+          border: 1px solid var(--gray-200);
           text-align: center;
+          transition: all 0.2s;
+        }
+        .card:hover {
+          box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+          transform: translateY(-2px);
         }
         .card-number {
           font-size: 36px;
-          font-weight: bold;
-          color: #667eea;
+          font-weight: 700;
+          color: var(--primary);
+          line-height: 1;
         }
         .card-label {
-          color: #666;
+          color: var(--gray-600);
           font-size: 14px;
-          margin-top: 5px;
+          margin-top: 8px;
+          font-weight: 500;
         }
         
         .section {
           background: white;
           border-radius: 12px;
-          padding: 20px;
-          margin-bottom: 20px;
-          box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+          padding: 24px;
+          margin-bottom: 24px;
+          box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+          border: 1px solid var(--gray-200);
         }
         .section h2 {
-          font-size: 20px;
-          margin-bottom: 15px;
-          color: #333;
+          font-size: 18px;
+          font-weight: 600;
+          margin-bottom: 20px;
+          color: var(--gray-900);
         }
         
         .add-form {
           display: flex;
-          gap: 10px;
+          gap: 12px;
           margin-bottom: 20px;
         }
         .add-form input, .add-form select {
-          padding: 10px;
-          border: 2px solid #e0e0e0;
+          padding: 10px 14px;
+          border: 1px solid var(--gray-300);
           border-radius: 8px;
           font-size: 14px;
+          font-family: inherit;
+          transition: all 0.2s;
+        }
+        .add-form input:focus, .add-form select:focus {
+          outline: none;
+          border-color: var(--primary);
+          box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
         }
         .add-form input { flex: 1; }
         .add-form button {
           padding: 10px 20px;
-          background: #667eea;
+          background: var(--primary);
           color: white;
           border: none;
           border-radius: 8px;
           cursor: pointer;
+          font-weight: 600;
+          font-size: 14px;
+          transition: all 0.2s;
+        }
+        .add-form button:hover {
+          background: var(--primary-dark);
         }
         
         .item-list {
@@ -722,53 +783,84 @@ function renderDashboard(user, summary, groceries, tasksByCategory) {
         .item {
           display: flex;
           align-items: center;
-          padding: 12px;
-          border-bottom: 1px solid #f0f0f0;
-          transition: background 0.2s;
+          padding: 14px 16px;
+          border-bottom: 1px solid var(--gray-100);
+          transition: background 0.15s;
+          border-radius: 6px;
+          margin-bottom: 4px;
         }
-        .item:hover { background: #f9f9f9; }
-        .item:last-child { border-bottom: none; }
+        .item:hover { 
+          background: var(--gray-50); 
+        }
+        .item:last-child { 
+          border-bottom: none;
+          margin-bottom: 0;
+        }
         .item-checkbox {
           width: 20px;
           height: 20px;
-          margin-right: 12px;
+          margin-right: 14px;
           cursor: pointer;
+          accent-color: var(--primary);
         }
-        .item-text { flex: 1; }
+        .item-text { 
+          flex: 1;
+          font-size: 15px;
+        }
         .item-category {
           font-size: 12px;
-          color: #666;
-          background: #f0f0f0;
+          color: var(--gray-600);
+          background: var(--gray-100);
           padding: 4px 10px;
           border-radius: 20px;
           margin-left: 10px;
+          font-weight: 500;
         }
         
         .category-section {
-          margin-bottom: 30px;
+          margin-bottom: 28px;
+        }
+        .category-section:last-child {
+          margin-bottom: 0;
         }
         .category-title {
-          font-size: 18px;
-          color: #667eea;
-          margin-bottom: 10px;
+          font-size: 16px;
+          font-weight: 600;
+          color: var(--primary);
+          margin-bottom: 12px;
           text-transform: capitalize;
         }
         
         .tabs {
           display: flex;
-          gap: 10px;
-          margin-bottom: 20px;
-          border-bottom: 2px solid #e0e0e0;
+          gap: 4px;
+          margin-bottom: 24px;
+          background: white;
+          padding: 6px;
+          border-radius: 10px;
+          box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+          border: 1px solid var(--gray-200);
         }
         .tab {
           padding: 10px 20px;
           cursor: pointer;
-          border-bottom: 2px solid transparent;
-          margin-bottom: -2px;
+          border-radius: 8px;
+          font-size: 14px;
+          font-weight: 500;
+          color: var(--gray-600);
+          transition: all 0.2s;
+          border: none;
+          background: transparent;
+          font-family: inherit;
+        }
+        .tab:hover {
+          background: var(--gray-50);
+          color: var(--gray-800);
         }
         .tab.active {
-          border-bottom-color: #667eea;
-          color: #667eea;
+          background: var(--primary);
+          color: white;
+          box-shadow: 0 2px 4px rgba(79, 70, 229, 0.2);
         }
         .tab-content { display: none; }
         .tab-content.active { display: block; }
@@ -917,12 +1009,12 @@ function renderDashboard(user, summary, groceries, tasksByCategory) {
         </div>
         
         <div class="tabs">
-          <div class="tab active" onclick="showTab('overview')">Overview</div>
-          <div class="tab" onclick="showTab('calendar')">📅 Calendar</div>
-          <div class="tab" onclick="showTab('budget')">💰 Budget</div>
-          <div class="tab" onclick="showTab('groceries')">🛒 Groceries</div>
-          <div class="tab" onclick="showTab('tasks')">📋 Tasks</div>
-          <div class="tab" onclick="showTab('add')">➕ Add New</div>
+          <button class="tab active" onclick="showTab('overview', this)">Overview</button>
+          <button class="tab" onclick="showTab('calendar', this)">📅 Calendar</button>
+          <button class="tab" onclick="showTab('budget', this)">💰 Budget</button>
+          <button class="tab" onclick="showTab('groceries', this)">🛒 Groceries</button>
+          <button class="tab" onclick="showTab('tasks', this)">📋 Tasks</button>
+          <button class="tab" onclick="showTab('add', this)">➕ Add New</button>
         </div>
         
         <div id="overview" class="tab-content active">
@@ -1123,10 +1215,12 @@ function renderDashboard(user, summary, groceries, tasksByCategory) {
       </div>
       
       <script>
-        function showTab(tabName) {
+        // Fixed tab switching - uses clicked element or finds parent tab
+        function showTab(tabName, clickedEl) {
+          const tab = clickedEl || event.target.closest('.tab') || event.target;
           document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
           document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
-          event.target.classList.add('active');
+          tab.classList.add('active');
           document.getElementById(tabName).classList.add('active');
           if (tabName === 'calendar') {
             loadCalendar();
