@@ -11,6 +11,10 @@ services:
         value: 10000
       - key: RENDER_DISK_PATH
         value: /opt/render/project/src/vault/family-life
+      - key: GMAIL_USER
+        value: redacted@example.com
+      - key: GMAIL_APP_PASSWORD
+        value: REDACTED-GMAIL-APP-PASSWORD
     disk:
       name: family-data
       mountPath: /opt/render/project/src/vault/family-life
