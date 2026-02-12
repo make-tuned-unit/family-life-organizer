@@ -449,6 +449,95 @@ function renderDashboard(user, summary, groceries, tasksByCategory, appointments
     @media (max-width: 768px) {
       .two-column { grid-template-columns: 1fr; }
       .nav-tab-text { display: none; }
+      .stats-grid { grid-template-columns: repeat(2, 1fr); gap: 12px; }
+      .stat-card { padding: 16px; }
+      .stat-value { font-size: 24px; }
+      .stat-icon { width: 36px; height: 36px; font-size: 18px; }
+      .card-header { padding: 16px; }
+      .card-body { padding: 16px; }
+      .form-input, .form-select { padding: 14px; font-size: 16px; }
+      .btn { padding: 14px 20px; width: 100%; margin-bottom: 8px; }
+      .main-content { padding: 16px; }
+      .header-content { padding: 12px 16px; }
+      .brand h1 { font-size: 18px; }
+    }
+    
+    /* Calendar Grid Styles */
+    .calendar-grid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 4px;
+    }
+    .calendar-day-header {
+      text-align: center;
+      padding: 12px 4px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--gray-500);
+      text-transform: uppercase;
+    }
+    .calendar-day {
+      aspect-ratio: 1;
+      border: 1px solid var(--gray-200);
+      border-radius: 8px;
+      padding: 6px;
+      min-height: 80px;
+      display: flex;
+      flex-direction: column;
+      background: white;
+    }
+    .calendar-day.other-month {
+      background: var(--gray-50);
+      color: var(--gray-400);
+    }
+    .calendar-day.today {
+      border-color: var(--primary);
+      border-width: 2px;
+      background: #eef2ff;
+    }
+    .calendar-day-number {
+      font-weight: 600;
+      font-size: 14px;
+      margin-bottom: 4px;
+    }
+    .calendar-day.today .calendar-day-number {
+      color: var(--primary);
+    }
+    .calendar-event {
+      font-size: 10px;
+      padding: 2px 4px;
+      background: var(--primary);
+      color: white;
+      border-radius: 4px;
+      margin-bottom: 2px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .calendar-event-dot {
+      width: 6px;
+      height: 6px;
+      background: var(--primary);
+      border-radius: 50%;
+      display: inline-block;
+      margin-right: 4px;
+    }
+    @media (max-width: 640px) {
+      .calendar-day {
+        min-height: 50px;
+        padding: 4px;
+      }
+      .calendar-day-header {
+        padding: 8px 2px;
+        font-size: 10px;
+      }
+      .calendar-day-number {
+        font-size: 12px;
+      }
+      .calendar-event {
+        font-size: 8px;
+        padding: 1px 2px;
+      }
     }
   </style>
 </head>
@@ -508,7 +597,7 @@ function renderDashboard(user, summary, groceries, tasksByCategory, appointments
         <div class="stat-card">
           <div class="stat-header">
             <div>
-              <div class="stat-value">${summary.appointments_today}</div>
+              <div class="stat-value">${todayAppointments.length}</div>
               <div class="stat-label">Appointments</div>
             </div>
             <div class="stat-icon" style="background:#fce7f3">📅</div>
@@ -589,26 +678,18 @@ function renderDashboard(user, summary, groceries, tasksByCategory, appointments
     <!-- Calendar Tab -->
     <div id="calendar" class="tab-panel">
       <div class="card">
-        <div class="card-header">
-          <h3 class="card-title">Upcoming Appointments</h3>
+        <div class="card-header" style="flex-wrap:wrap;gap:12px">
+          <h3 class="card-title" id="calendarTitle">Calendar</h3>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-secondary" onclick="changeMonth(-1)">← Prev</button>
+            <button class="btn btn-secondary" onclick="changeMonth(1)">Next →</button>
+            <button class="btn btn-primary" onclick="goToToday()">Today</button>
+          </div>
         </div>
         <div class="card-body">
-          ${appointments
-            .filter(a => a.appointment_date >= today)
-            .sort((a, b) => a.appointment_date.localeCompare(b.appointment_date))
-            .slice(0, 10)
-            .map(appt => `
-              <div class="list-item">
-                <div class="list-content">
-                  <strong>${appt.title}</strong>
-                  <div style="color:var(--gray-500);font-size:13px;margin-top:2px">
-                    ${appt.appointment_date} ${appt.appointment_time ? 'at ' + appt.appointment_time : ''}
-                    ${appt.location ? '• ' + appt.location : ''}
-                  </div>
-                  ${appt.person_tags ? `<div style="margin-top:6px">${appt.person_tags.split(',').map(p => `<span class="badge" style="margin-right:4px">${p}</span>`).join('')}</div>` : ''}
-                </div>
-              </div>
-            `).join('') || '<p style="color:var(--gray-600);text-align:center;padding:32px">No upcoming appointments</p>'}
+          <div class="calendar-grid" id="calendarGrid">
+            <!-- Calendar generated by JS -->
+          </div>
         </div>
       </div>
     </div>
@@ -841,6 +922,89 @@ function renderDashboard(user, summary, groceries, tasksByCategory, appointments
         btn.textContent = 'Add Appointment';
       }
     }
+    
+    // Calendar Functions
+    let currentCalendarDate = new Date();
+    const appointmentsData = ${JSON.stringify(appointments)};
+    
+    function renderCalendar() {
+      const year = currentCalendarDate.getFullYear();
+      const month = currentCalendarDate.getMonth();
+      const firstDay = new Date(year, month, 1);
+      const lastDay = new Date(year, month + 1, 0);
+      const daysInMonth = lastDay.getDate();
+      const startDayOfWeek = firstDay.getDay();
+      
+      // Update title
+      const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 
+                          'July', 'August', 'September', 'October', 'November', 'December'];
+      document.getElementById('calendarTitle').textContent = `${monthNames[month]} ${year}`;
+      
+      let html = '';
+      
+      // Day headers
+      const dayHeaders = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+      dayHeaders.forEach(day => {
+        html += `<div class="calendar-day-header">${day}</div>`;
+      });
+      
+      // Empty cells before start of month
+      for (let i = 0; i < startDayOfWeek; i++) {
+        html += `<div class="calendar-day other-month"></div>`;
+      }
+      
+      // Days of month
+      const today = new Date().toISOString().split('T')[0];
+      for (let day = 1; day <= daysInMonth; day++) {
+        const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        const isToday = dateStr === today;
+        const dayAppointments = appointmentsData.filter(a => a.appointment_date === dateStr);
+        
+        html += `<div class="calendar-day ${isToday ? 'today' : ''}">`;
+        html += `<div class="calendar-day-number">${day}</div>`;
+        
+        if (dayAppointments.length > 0) {
+          dayAppointments.slice(0, 2).forEach(appt => {
+            html += `<div class="calendar-event" title="${appt.title}">${appt.title}</div>`;
+          });
+          if (dayAppointments.length > 2) {
+            html += `<div style="font-size:10px;color:var(--gray-500)">+${dayAppointments.length - 2} more</div>`;
+          }
+        }
+        
+        html += `</div>`;
+      }
+      
+      document.getElementById('calendarGrid').innerHTML = html;
+    }
+    
+    function changeMonth(delta) {
+      currentCalendarDate.setMonth(currentCalendarDate.getMonth() + delta);
+      renderCalendar();
+    }
+    
+    function goToToday() {
+      currentCalendarDate = new Date();
+      renderCalendar();
+    }
+    
+    // Initialize calendar when tab is shown
+    const originalSwitchTab = switchTab;
+    switchTab = function(tabName, btn) {
+      originalSwitchTab(tabName, btn);
+      if (tabName === 'calendar') {
+        renderCalendar();
+      }
+    };
+    
+    // Also update stats on load
+    document.addEventListener('DOMContentLoaded', function() {
+      // Update appointments count
+      const today = new Date().toISOString().split('T')[0];
+      const todayApptCount = appointmentsData.filter(a => a.appointment_date === today).length;
+      const apptCard = document.querySelector('.stat-card:nth-child(2) .stat-value');
+      if (apptCard) apptCard.textContent = todayApptCount;
+    });
   </script>
 </body>
 </html>`;
