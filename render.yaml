@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: family-life-organizer
+    env: node
+    buildCommand: npm install
+    startCommand: node dashboard.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+    disk:
+      name: family-data
+      mountPath: /opt/render/project/src/vault/family-life
+      sizeGB: 1
