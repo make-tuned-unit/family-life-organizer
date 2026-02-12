@@ -7,10 +7,10 @@ const FamilyDB = require('./database');
 const app = express();
 const PORT = process.env.PORT || 3456;
 
-// Simple auth middleware
+// Users config
 const USERS = {
-  'jesse': { password: 'lauft2024', name: 'Jesse', avatar: '👨‍💼', color: '#667eea' },
-  'sophie': { password: 'family2024', name: 'Sophie', avatar: '👩‍⚕️', color: '#f093fb' }
+  'jesse': { password: 'lauft2024', name: 'Jesse', avatar: '👨‍💼' },
+  'sophie': { password: 'family2024', name: 'Sophie', avatar: '👩‍⚕️' }
 };
 
 // Middleware
@@ -22,8 +22,6 @@ app.use(session({
   saveUninitialized: false,
   cookie: { secure: false }
 }));
-
-// Static files
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Auth middleware
@@ -35,386 +33,181 @@ function requireAuth(req, res, next) {
   }
 }
 
-// Routes
-
-// Login page
+// Login page - Modern Design
 app.get('/login', (req, res) => {
-  res.send(`
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <meta charset="UTF-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-      <meta name="theme-color" content="#667eea">
-      <title>Family Life Organizer - Welcome</title>
-      <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        
-        @keyframes gradientShift {
-          0% { background-position: 0% 50%; }
-          50% { background-position: 100% 50%; }
-          100% { background-position: 0% 50%; }
-        }
-        
-        @keyframes float {
-          0%, 100% { transform: translateY(0px); }
-          50% { transform: translateY(-10px); }
-        }
-        
-        @keyframes pulse {
-          0%, 100% { transform: scale(1); opacity: 0.8; }
-          50% { transform: scale(1.05); opacity: 1; }
-        }
-        
-        @keyframes slideUp {
-          from { opacity: 0; transform: translateY(30px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        
-        body {
-          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
-          background: linear-gradient(-45deg, #667eea, #764ba2, #f093fb, #f5576c);
-          background-size: 400% 400%;
-          animation: gradientShift 15s ease infinite;
-          min-height: 100vh;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          padding: 20px;
-          overflow-x: hidden;
-        }
-        
-        .login-container {
-          animation: slideUp 0.6s ease-out;
-          width: 100%;
-          max-width: 420px;
-        }
-        
-        .login-card {
-          background: rgba(255, 255, 255, 0.95);
-          backdrop-filter: blur(20px);
-          -webkit-backdrop-filter: blur(20px);
-          border-radius: 24px;
-          padding: 48px 40px;
-          box-shadow: 0 25px 80px rgba(0,0,0,0.15), 0 10px 30px rgba(0,0,0,0.1);
-          border: 1px solid rgba(255, 255, 255, 0.3);
-        }
-        
-        .app-header {
-          text-align: center;
-          margin-bottom: 40px;
-        }
-        
-        .app-icon {
-          font-size: 64px;
-          margin-bottom: 16px;
-          animation: float 3s ease-in-out infinite;
-          display: inline-block;
-        }
-        
-        .app-title {
-          font-size: 28px;
-          font-weight: 700;
-          background: linear-gradient(135deg, #667eea, #764ba2);
-          -webkit-background-clip: text;
-          -webkit-text-fill-color: transparent;
-          background-clip: text;
-          margin-bottom: 8px;
-          letter-spacing: -0.5px;
-        }
-        
-        .app-subtitle {
-          color: #666;
-          font-size: 16px;
-          font-weight: 400;
-        }
-        
-        .user-selector {
-          margin-bottom: 28px;
-        }
-        
-        .selector-label {
-          font-size: 14px;
-          font-weight: 600;
-          color: #444;
-          text-transform: uppercase;
-          letter-spacing: 0.5px;
-          margin-bottom: 12px;
-          display: block;
-        }
-        
-        .user-options {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 12px;
-        }
-        
-        .user-option {
-          position: relative;
-          cursor: pointer;
-        }
-        
-        .user-option input {
-          position: absolute;
-          opacity: 0;
-          cursor: pointer;
-        }
-        
-        .user-card {
-          background: #f8f9fa;
-          border: 2px solid transparent;
-          border-radius: 16px;
-          padding: 20px;
-          text-align: center;
-          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-        
-        .user-option:hover .user-card {
-          background: #fff;
-          transform: translateY(-2px);
-          box-shadow: 0 8px 25px rgba(0,0,0,0.08);
-        }
-        
-        .user-option input:checked + .user-card {
-          border-color: #667eea;
-          background: linear-gradient(135deg, rgba(102, 126, 234, 0.1), rgba(118, 75, 162, 0.1));
-          box-shadow: 0 8px 30px rgba(102, 126, 234, 0.2);
-        }
-        
-        .user-avatar {
-          font-size: 48px;
-          margin-bottom: 8px;
-          display: block;
-        }
-        
-        .user-name {
-          font-weight: 600;
-          color: #333;
-          font-size: 16px;
-        }
-        
-        .password-section {
-          margin-bottom: 24px;
-        }
-        
-        .password-wrapper {
-          position: relative;
-        }
-        
-        .password-input {
-          width: 100%;
-          padding: 16px 20px;
-          padding-right: 50px;
-          border: 2px solid #e8e8e8;
-          border-radius: 14px;
-          font-size: 17px;
-          transition: all 0.3s;
-          background: #fafafa;
-        }
-        
-        .password-input:focus {
-          outline: none;
-          border-color: #667eea;
-          background: #fff;
-          box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
-        }
-        
-        .password-toggle {
-          position: absolute;
-          right: 16px;
-          top: 50%;
-          transform: translateY(-50%);
-          background: none;
-          border: none;
-          font-size: 20px;
-          cursor: pointer;
-          opacity: 0.6;
-          transition: opacity 0.2s;
-          width: auto;
-          padding: 0;
-        }
-        
-        .password-toggle:hover {
-          opacity: 1;
-          transform: translateY(-50%);
-        }
-        
-        .signin-btn {
-          width: 100%;
-          padding: 18px;
-          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-          color: white;
-          border: none;
-          border-radius: 14px;
-          font-size: 17px;
-          font-weight: 600;
-          cursor: pointer;
-          transition: all 0.3s;
-          box-shadow: 0 8px 25px rgba(102, 126, 234, 0.3);
-          position: relative;
-          overflow: hidden;
-        }
-        
-        .signin-btn::before {
-          content: '';
-          position: absolute;
-          top: 0;
-          left: -100%;
-          width: 100%;
-          height: 100%;
-          background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
-          transition: left 0.5s;
-        }
-        
-        .signin-btn:hover {
-          transform: translateY(-2px);
-          box-shadow: 0 12px 35px rgba(102, 126, 234, 0.4);
-        }
-        
-        .signin-btn:hover::before {
-          left: 100%;
-        }
-        
-        .signin-btn:active {
-          transform: translateY(0);
-        }
-        
-        .error-message {
-          background: #fee;
-          color: #c33;
-          padding: 14px 18px;
-          border-radius: 12px;
-          margin-bottom: 20px;
-          font-size: 14px;
-          display: flex;
-          align-items: center;
-          gap: 10px;
-          animation: slideUp 0.3s ease;
-        }
-        
-        .error-icon {
-          font-size: 18px;
-        }
-        
-        .security-note {
-          text-align: center;
-          margin-top: 24px;
-          color: #888;
-          font-size: 13px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 6px;
-        }
-        
-        .security-note::before {
-          content: '🔒';
-        }
-        
-        @media (max-width: 480px) {
-          .login-card {
-            padding: 36px 24px;
-            border-radius: 20px;
-          }
-          
-          .app-title {
-            font-size: 24px;
-          }
-          
-          .user-avatar {
-            font-size: 40px;
-          }
-        }
-      </style>
-    </head>
-    <body>
-      <div class="login-container">
-        <div class="login-card">
-          <div class="app-header">
-            <div class="app-icon">🏠</div>
-            <h1 class="app-title">Family Life</h1>
-            <p class="app-subtitle">Organize your household together</p>
-          </div>
-          
-          ${req.query.error ? `
-          <div class="error-message">
-            <span class="error-icon">⚠️</span>
-            <span>Incorrect password. Please try again.</span>
-          </div>
-          ` : ''}
-          
-          <form method="POST" action="/login" id="loginForm">
-            <div class="user-selector">
-              <label class="selector-label">Who's signing in?</label>
-              <div class="user-options">
-                <label class="user-option">
-                  <input type="radio" name="username" value="jesse" checked>
-                  <div class="user-card">
-                    <span class="user-avatar">👨‍💼</span>
-                    <span class="user-name">Jesse</span>
-                  </div>
-                </label>
-                <label class="user-option">
-                  <input type="radio" name="username" value="sophie">
-                  <div class="user-card">
-                    <span class="user-avatar">👩‍⚕️</span>
-                    <span class="user-name">Sophie</span>
-                  </div>
-                </label>
-              </div>
+  res.send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Family Life - Sign In</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', sans-serif;
+      background: linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #4338ca 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .login-card {
+      background: white;
+      border-radius: 24px;
+      padding: 48px;
+      width: 100%;
+      max-width: 420px;
+      box-shadow: 0 25px 80px rgba(0,0,0,0.3);
+    }
+    .brand {
+      text-align: center;
+      margin-bottom: 40px;
+    }
+    .brand-icon {
+      width: 64px;
+      height: 64px;
+      background: linear-gradient(135deg, #6366f1, #ec4899);
+      border-radius: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 32px;
+      margin: 0 auto 16px;
+    }
+    .brand h1 { font-size: 24px; font-weight: 700; color: #1e293b; }
+    .brand p { color: #64748b; margin-top: 8px; }
+    .user-selector { margin-bottom: 28px; }
+    .selector-label {
+      font-size: 14px;
+      font-weight: 600;
+      color: #374151;
+      margin-bottom: 12px;
+      display: block;
+    }
+    .user-options {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+    .user-option {
+      position: relative;
+      cursor: pointer;
+    }
+    .user-option input {
+      position: absolute;
+      opacity: 0;
+    }
+    .user-card {
+      border: 2px solid #e5e7eb;
+      border-radius: 16px;
+      padding: 24px;
+      text-align: center;
+      transition: all 0.2s;
+    }
+    .user-option:hover .user-card {
+      border-color: #d1d5db;
+    }
+    .user-option input:checked + .user-card {
+      border-color: #6366f1;
+      background: #eef2ff;
+    }
+    .user-avatar {
+      font-size: 40px;
+      margin-bottom: 8px;
+    }
+    .user-name {
+      font-weight: 600;
+      color: #1f2937;
+    }
+    .password-section { margin-bottom: 24px; }
+    .password-input {
+      width: 100%;
+      padding: 16px;
+      border: 2px solid #e5e7eb;
+      border-radius: 12px;
+      font-size: 16px;
+      transition: all 0.2s;
+    }
+    .password-input:focus {
+      outline: none;
+      border-color: #6366f1;
+    }
+    .signin-btn {
+      width: 100%;
+      padding: 16px;
+      background: linear-gradient(135deg, #6366f1, #4f46e5);
+      color: white;
+      border: none;
+      border-radius: 12px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .signin-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 25px rgba(99, 102, 241, 0.4);
+    }
+    .error {
+      background: #fee2e2;
+      color: #dc2626;
+      padding: 12px 16px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      font-size: 14px;
+      text-align: center;
+    }
+    @media (max-width: 480px) {
+      .login-card { padding: 32px 24px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="login-card">
+    <div class="brand">
+      <div class="brand-icon">🏠</div>
+      <h1>Family Life</h1>
+      <p>Organize your household together</p>
+    </div>
+    ${req.query.error ? '<div class="error">Incorrect password. Please try again.</div>' : ''}
+    <form method="POST" action="/login">
+      <div class="user-selector">
+        <label class="selector-label">Who's signing in?</label>
+        <div class="user-options">
+          <label class="user-option">
+            <input type="radio" name="username" value="jesse" checked>
+            <div class="user-card">
+              <div class="user-avatar">👨‍💼</div>
+              <div class="user-name">Jesse</div>
             </div>
-            
-            <div class="password-section">
-              <div class="password-wrapper">
-                <input type="password" name="password" class="password-input" placeholder="Enter your password" required autofocus>
-                <button type="button" class="password-toggle" onclick="togglePassword()">👁️</button>
-              </div>
+          </label>
+          <label class="user-option">
+            <input type="radio" name="username" value="sophie">
+            <div class="user-card">
+              <div class="user-avatar">👩‍⚕️</div>
+              <div class="user-name">Sophie</div>
             </div>
-            
-            <button type="submit" class="signin-btn">Sign In</button>
-          </form>
-          
-          <div class="security-note">
-            Secure login for family members only
-          </div>
+          </label>
         </div>
       </div>
-      
-      <script>
-        function togglePassword() {
-          const input = document.querySelector('.password-input');
-          const toggle = document.querySelector('.password-toggle');
-          if (input.type === 'password') {
-            input.type = 'text';
-            toggle.textContent = '🙈';
-          } else {
-            input.type = 'password';
-            toggle.textContent = '👁️';
-          }
-        }
-        
-        // Auto-focus password when user selection changes
-        document.querySelectorAll('input[name="username"]').forEach(radio => {
-          radio.addEventListener('change', () => {
-            document.querySelector('.password-input').focus();
-          });
-        });
-        
-        // Focus password on load
-        document.querySelector('.password-input').focus();
-      </script>
-    </body>
-    </html>
-  `);
+      <div class="password-section">
+        <input type="password" name="password" class="password-input" placeholder="Enter your password" required>
+      </div>
+      <button type="submit" class="signin-btn">Sign In</button>
+    </form>
+  </div>
+</body>
+</html>`);
 });
 
 // Login POST
 app.post('/login', (req, res) => {
   const { username, password } = req.body;
   const user = USERS[username];
-  
   if (user && user.password === password) {
-    req.session.user = { username, name: user.name, avatar: user.avatar, color: user.color };
+    req.session.user = { username, name: user.name, avatar: user.avatar };
     res.redirect('/');
   } else {
     res.redirect('/login?error=1');
@@ -427,84 +220,559 @@ app.get('/logout', (req, res) => {
   res.redirect('/login');
 });
 
-// Main dashboard
+// Dashboard
 app.get('/', requireAuth, async (req, res) => {
   const db = new FamilyDB();
-  
   try {
     const summary = await db.getDailySummary();
     const groceries = await db.getGroceries('needed');
     const tasks = await db.getTasks({ status: 'active' });
-    
-    // Group tasks by category
     const tasksByCategory = {};
-    for (const task of tasks) {
-      if (!tasksByCategory[task.category]) {
-        tasksByCategory[task.category] = [];
-      }
+    tasks.forEach(task => {
+      if (!tasksByCategory[task.category]) tasksByCategory[task.category] = [];
       tasksByCategory[task.category].push(task);
-    }
-    
+    });
     res.send(renderDashboard(req.session.user, summary, groceries, tasksByCategory));
   } catch (err) {
-    console.error(err);
-    res.status(500).send('Error loading dashboard');
+    res.status(500).send('Error: ' + err.message);
   } finally {
     db.close();
   }
 });
 
-// API: Add item
-app.post('/api/add', requireAuth, async (req, res) => {
-  const { type, data } = req.body;
-  const db = new FamilyDB();
-  
-  try {
-    let result;
-    if (type === 'grocery') {
-      result = await db.addGrocery(data.item, data.category, data.quantity);
-    } else if (type === 'task') {
-      result = await db.addTask(data);
+// Render Dashboard
+function renderDashboard(user, summary, groceries, tasksByCategory) {
+  const categories = Object.keys(tasksByCategory).sort();
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Family Life Organizer</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --primary: #6366f1;
+      --primary-dark: #4f46e5;
+      --gray-50: #f8fafc;
+      --gray-100: #f1f5f9;
+      --gray-200: #e2e8f0;
+      --gray-300: #cbd5e1;
+      --gray-600: #475569;
+      --gray-800: #1e293b;
+      --gray-900: #0f172a;
     }
-    res.json({ success: true, result });
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
-  } finally {
-    db.close();
-  }
-});
-
-// API: Complete item
-app.post('/api/complete', requireAuth, async (req, res) => {
-  const { type, id } = req.body;
-  const db = new FamilyDB();
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--gray-50);
+      color: var(--gray-800);
+    }
+    .header {
+      background: linear-gradient(135deg, #1e1b4b 0%, #312e81 100%);
+      color: white;
+      padding: 16px 24px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .header-content {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .brand { display: flex; align-items: center; gap: 12px; }
+    .brand-icon {
+      width: 40px; height: 40px;
+      background: linear-gradient(135deg, var(--primary), #ec4899);
+      border-radius: 12px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px;
+    }
+    .brand h1 { font-size: 20px; font-weight: 700; }
+    .user-menu { display: flex; align-items: center; gap: 16px; }
+    .user-badge {
+      display: flex; align-items: center; gap: 8px;
+      padding: 8px 16px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 9999px;
+      font-size: 14px;
+    }
+    .logout-btn {
+      padding: 8px 16px;
+      background: rgba(255,255,255,0.1);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      cursor: pointer;
+    }
+    .nav-tabs {
+      background: white;
+      border-bottom: 1px solid var(--gray-200);
+      position: sticky;
+      top: 72px;
+      z-index: 99;
+    }
+    .nav-tabs-content {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 24px;
+      display: flex;
+      gap: 4px;
+    }
+    .nav-tab {
+      padding: 16px 20px;
+      background: none;
+      border: none;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -1px;
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--gray-600);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .nav-tab.active {
+      color: var(--primary);
+      border-bottom-color: var(--primary);
+    }
+    .main-content {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+    .tab-panel {
+      display: none;
+      animation: fadeIn 0.3s ease;
+    }
+    .tab-panel.active { display: block; }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 20px;
+      margin-bottom: 32px;
+    }
+    .stat-card {
+      background: white;
+      border-radius: 16px;
+      padding: 24px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    .stat-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+    .stat-icon {
+      width: 48px; height: 48px;
+      border-radius: 12px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 24px;
+    }
+    .stat-value { font-size: 32px; font-weight: 700; }
+    .stat-label { font-size: 14px; color: var(--gray-600); margin-top: 4px; }
+    .card {
+      background: white;
+      border-radius: 16px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+      overflow: hidden;
+    }
+    .card-header {
+      padding: 20px 24px;
+      border-bottom: 1px solid var(--gray-100);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .card-title { font-size: 18px; font-weight: 600; }
+    .card-body { padding: 24px; }
+    .form-input, .form-select {
+      width: 100%;
+      padding: 12px 16px;
+      border: 1px solid var(--gray-300);
+      border-radius: 10px;
+      font-size: 15px;
+      margin-bottom: 12px;
+    }
+    .btn {
+      padding: 12px 24px;
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+      color: white;
+    }
+    .list-item {
+      display: flex;
+      align-items: center;
+      padding: 16px;
+      border-bottom: 1px solid var(--gray-100);
+    }
+    .list-item:last-child { border-bottom: none; }
+    .checkbox {
+      width: 22px; height: 22px;
+      border: 2px solid var(--gray-300);
+      border-radius: 6px;
+      margin-right: 16px;
+      cursor: pointer;
+    }
+    .list-content { flex: 1; }
+    .badge {
+      padding: 4px 12px;
+      border-radius: 9999px;
+      font-size: 12px;
+      background: var(--gray-100);
+      color: var(--gray-600);
+    }
+    .two-column {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+    }
+    @media (max-width: 768px) {
+      .two-column { grid-template-columns: 1fr; }
+      .nav-tab-text { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <header class="header">
+    <div class="header-content">
+      <div class="brand">
+        <div class="brand-icon">🏠</div>
+        <h1>Family Life</h1>
+      </div>
+      <div class="user-menu">
+        <div class="user-badge">
+          <span>${user.avatar}</span>
+          <span>${user.name}</span>
+        </div>
+        <button class="logout-btn" onclick="location.href='/logout'">Sign Out</button>
+      </div>
+    </div>
+  </header>
   
+  <nav class="nav-tabs">
+    <div class="nav-tabs-content">
+      <button class="nav-tab active" onclick="switchTab('overview', this)">
+        <span>📊</span><span class="nav-tab-text">Overview</span>
+      </button>
+      <button class="nav-tab" onclick="switchTab('calendar', this)">
+        <span>📅</span><span class="nav-tab-text">Calendar</span>
+      </button>
+      <button class="nav-tab" onclick="switchTab('budget', this)">
+        <span>💰</span><span class="nav-tab-text">Budget</span>
+      </button>
+      <button class="nav-tab" onclick="switchTab('groceries', this)">
+        <span>🛒</span><span class="nav-tab-text">Groceries</span>
+      </button>
+      <button class="nav-tab" onclick="switchTab('tasks', this)">
+        <span>✓</span><span class="nav-tab-text">Tasks</span>
+      </button>
+      <button class="nav-tab" onclick="switchTab('add', this)">
+        <span>+</span><span class="nav-tab-text">Add</span>
+      </button>
+    </div>
+  </nav>
+  
+  <main class="main-content">
+    <!-- Overview Tab -->
+    <div id="overview" class="tab-panel active">
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-header">
+            <div>
+              <div class="stat-value">${summary.tasks_today}</div>
+              <div class="stat-label">Tasks Today</div>
+            </div>
+            <div class="stat-icon" style="background:#dbeafe">📋</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-header">
+            <div>
+              <div class="stat-value">${summary.appointments_today}</div>
+              <div class="stat-label">Appointments</div>
+            </div>
+            <div class="stat-icon" style="background:#fce7f3">📅</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-header">
+            <div>
+              <div class="stat-value">${summary.groceries_needed}</div>
+              <div class="stat-label">Groceries</div>
+            </div>
+            <div class="stat-icon" style="background:#d1fae5">🛒</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-header">
+            <div>
+              <div class="stat-value">${summary.overdue_tasks}</div>
+              <div class="stat-label">Overdue</div>
+            </div>
+            <div class="stat-icon" style="background:#ffedd5">⚠️</div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="two-column">
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title">Quick Tasks</h3>
+          </div>
+          <div class="card-body">
+            ${categories.slice(0, 3).map(cat => `
+              <h4 style="font-size:14px;color:var(--gray-600);margin:16px 0 8px">${cat}</h4>
+              ${tasksByCategory[cat].slice(0, 2).map(task => `
+                <div class="list-item">
+                  <div class="checkbox" onclick="completeTask(${task.id})"></div>
+                  <div class="list-content">${task.title}</div>
+                </div>
+              `).join('')}
+            `).join('') || '<p style="color:var(--gray-600);text-align:center;padding:32px">No tasks for today!</p>'}
+          </div>
+        </div>
+        
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title">Grocery List</h3>
+          </div>
+          <div class="card-body">
+            ${groceries.slice(0, 5).map(item => `
+              <div class="list-item">
+                <div class="checkbox" onclick="completeGrocery(${item.id})"></div>
+                <div class="list-content">${item.item}</div>
+                ${item.category ? `<span class="badge">${item.category}</span>` : ''}
+              </div>
+            `).join('') || '<p style="color:var(--gray-600);text-align:center;padding:32px">No items needed</p>'}
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Calendar Tab -->
+    <div id="calendar" class="tab-panel">
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">Family Calendar</h3>
+        </div>
+        <div class="card-body">
+          <p style="color:var(--gray-600);text-align:center;padding:48px">
+            📅 Calendar view coming soon!<br>
+            <small>Add appointments via the "Add" tab</small>
+          </p>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Budget Tab -->
+    <div id="budget" class="tab-panel">
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">Household Budget</h3>
+        </div>
+        <div class="card-body">
+          <p style="background:#eef2ff;padding:16px;border-radius:12px;margin-bottom:24px">
+            📧 Forward receipts to: <strong>jhenrymalcolm@gmail.com</strong>
+          </p>
+          <div class="two-column">
+            <div>
+              <h4 style="margin-bottom:16px">Add Receipt</h4>
+              <input type="number" class="form-input" placeholder="Amount ($)">
+              <input type="text" class="form-input" placeholder="Merchant">
+              <select class="form-select">
+                <option>Select category...</option>
+                <option>Groceries</option>
+                <option>Dining</option>
+                <option>Gas</option>
+                <option>Household</option>
+              </select>
+              <button class="btn btn-primary">Add Receipt</button>
+            </div>
+            <div>
+              <h4 style="margin-bottom:16px">Recent</h4>
+              <p style="color:var(--gray-600);text-align:center;padding:32px">No receipts yet</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Groceries Tab -->
+    <div id="groceries" class="tab-panel">
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">Grocery List</h3>
+        </div>
+        <div class="card-body">
+          <div style="display:flex;gap:12px;margin-bottom:24px">
+            <input type="text" class="form-input" id="groceryInput" placeholder="Add item..." style="flex:1;margin:0">
+            <button class="btn btn-primary" onclick="addGrocery()">Add</button>
+          </div>
+          ${groceries.map(item => `
+            <div class="list-item">
+              <div class="checkbox" onclick="completeGrocery(${item.id})"></div>
+              <div class="list-content">${item.item}</div>
+              ${item.category ? `<span class="badge">${item.category}</span>` : ''}
+            </div>
+          `).join('') || '<p style="color:var(--gray-600);text-align:center;padding:32px">No items needed</p>'}
+        </div>
+      </div>
+    </div>
+    
+    <!-- Tasks Tab -->
+    <div id="tasks" class="tab-panel">
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">All Tasks</h3>
+        </div>
+        <div class="card-body">
+          ${categories.map(cat => `
+            <h4 style="font-size:14px;color:var(--gray-600);margin:24px 0 12px;text-transform:capitalize">${cat}</h4>
+            ${tasksByCategory[cat].map(task => `
+              <div class="list-item">
+                <div class="checkbox" onclick="completeTask(${task.id})"></div>
+                <div class="list-content">${task.title}</div>
+                ${task.due_date ? `<span class="badge">${task.due_date}</span>` : ''}
+              </div>
+            `).join('')}
+          `).join('') || '<p style="color:var(--gray-600);text-align:center;padding:32px">No tasks yet!</p>'}
+        </div>
+      </div>
+    </div>
+    
+    <!-- Add Tab -->
+    <div id="add" class="tab-panel">
+      <div class="two-column">
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title">Add Task</h3>
+          </div>
+          <div class="card-body">
+            <input type="text" class="form-input" id="taskTitle" placeholder="What needs to be done?">
+            <select class="form-select" id="taskCategory">
+              <option value="">Select category...</option>
+              <option value="groceries">Groceries</option>
+              <option value="appointments">Appointments</option>
+              <option value="home">Home</option>
+              <option value="automotive">Automotive</option>
+              <option value="travel">Travel</option>
+              <option value="finances">Finances</option>
+              <option value="childcare">Childcare</option>
+              <option value="health">Health</option>
+            </select>
+            <input type="date" class="form-input" id="taskDate">
+            <button class="btn btn-primary" onclick="addTask()">Add Task</button>
+          </div>
+        </div>
+        
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title">Add Appointment</h3>
+          </div>
+          <div class="card-body">
+            <input type="text" class="form-input" id="apptTitle" placeholder="Event title">
+            <input type="date" class="form-input" id="apptDate">
+            <input type="time" class="form-input" id="apptTime">
+            <button class="btn btn-primary" onclick="addAppointment()">Add Appointment</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+  
+  <script>
+    function switchTab(tabName, btn) {
+      document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+      document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+      document.getElementById(tabName).classList.add('active');
+      btn.classList.add('active');
+    }
+    
+    async function completeTask(id) {
+      await fetch('/api/complete', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({type: 'task', id})
+      });
+      location.reload();
+    }
+    
+    async function completeGrocery(id) {
+      await fetch('/api/complete', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({type: 'grocery', id})
+      });
+      location.reload();
+    }
+    
+    async function addGrocery() {
+      const item = document.getElementById('groceryInput').value;
+      if (!item) return;
+      await fetch('/api/add', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({type: 'grocery', data: {item}})
+      });
+      location.reload();
+    }
+    
+    async function addTask() {
+      const title = document.getElementById('taskTitle').value;
+      const category = document.getElementById('taskCategory').value;
+      if (!title || !category) return;
+      await fetch('/api/add', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({type: 'task', data: {title, category}})
+      });
+      location.reload();
+    }
+    
+    async function addAppointment() {
+      const title = document.getElementById('apptTitle').value;
+      const date = document.getElementById('apptDate').value;
+      if (!title || !date) return;
+      await fetch('/api/appointments', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({title, appointment_date: date})
+      });
+      location.reload();
+    }
+  </script>
+</body>
+</html>`;
+}
+
+// API Routes
+app.post('/api/add', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
   try {
-    if (type === 'task') {
-      await db.completeTask(id);
-    } else if (type === 'grocery') {
-      await db.purchaseGrocery(id);
+    const { type, data } = req.body;
+    if (type === 'grocery') {
+      await db.addGrocery(data);
+    } else if (type === 'task') {
+      await db.addTask({...data, status: 'active'});
     }
     res.json({ success: true });
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
-  } finally {
-    db.close();
-  }
-});
-
-// API: Get data
-app.get('/api/data', requireAuth, async (req, res) => {
-  const db = new FamilyDB();
-  
-  try {
-    const [summary, groceries, tasks] = await Promise.all([
-      db.getDailySummary(),
-      db.getGroceries('needed'),
-      db.getTasks({ status: 'active' })
-    ]);
-    
-    res.json({ summary, groceries, tasks });
   } catch (err) {
     res.status(500).json({ error: err.message });
   } finally {
@@ -512,43 +780,40 @@ app.get('/api/data', requireAuth, async (req, res) => {
   }
 });
 
-// API: Appointments
+app.post('/api/complete', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const { type, id } = req.body;
+    if (type === 'grocery') {
+      await db.completeGrocery(id);
+    } else if (type === 'task') {
+      await db.completeTask(id);
+    }
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+app.get('/api/data', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const summary = await db.getDailySummary();
+    const groceries = await db.getGroceries('needed');
+    res.json({ summary, groceries });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
 app.post('/api/appointments', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
-    const result = await db.addAppointment(req.body);
-    res.json({ success: true, result });
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
-  } finally {
-    db.close();
-  }
-});
-
-app.get('/api/appointments', requireAuth, async (req, res) => {
-  const db = new FamilyDB();
-  try {
-    const { year, month, person } = req.query;
-    let appointments;
-    if (year && month) {
-      appointments = await db.getAppointmentsByMonth(parseInt(year), parseInt(month));
-    } else if (person) {
-      appointments = await db.getAppointments({ person });
-    } else {
-      appointments = await db.getAppointments();
-    }
-    res.json({ success: true, appointments });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  } finally {
-    db.close();
-  }
-});
-
-app.delete('/api/appointments/:id', requireAuth, async (req, res) => {
-  const db = new FamilyDB();
-  try {
-    await db.deleteAppointment(req.params.id);
+    await db.addAppointment(req.body);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -557,1157 +822,6 @@ app.delete('/api/appointments/:id', requireAuth, async (req, res) => {
   }
 });
 
-// API: Receipts
-app.post('/api/receipts', requireAuth, async (req, res) => {
-  const db = new FamilyDB();
-  try {
-    const result = await db.addReceipt(req.body);
-    res.json({ success: true, result });
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
-  } finally {
-    db.close();
-  }
-});
-
-app.get('/api/receipts', requireAuth, async (req, res) => {
-  const db = new FamilyDB();
-  try {
-    const { month, category } = req.query;
-    const receipts = await db.getReceipts({ month, category });
-    res.json({ success: true, receipts });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  } finally {
-    db.close();
-  }
-});
-
-app.get('/api/budget', requireAuth, async (req, res) => {
-  const db = new FamilyDB();
-  try {
-    const { month } = req.query;
-    const summary = await db.getBudgetSummary(month || new Date().toISOString().slice(0, 7));
-    res.json({ success: true, summary });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  } finally {
-    db.close();
-  }
-});
-
-function renderDashboard(user, summary, groceries, tasksByCategory) {
-  const categories = Object.keys(tasksByCategory).sort();
-  
-  return `
-    <!DOCTYPE html>
-    <html lang="en">
-    <head>
-      <meta charset="UTF-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-      <meta name="theme-color" content="#667eea">
-      <meta name="apple-mobile-web-app-capable" content="yes">
-      <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-      <meta name="apple-mobile-web-app-title" content="FamilyLife">
-      <meta name="description" content="Organize your household together">
-      <link rel="manifest" href="/manifest.json">
-      <link rel="apple-touch-icon" href="/icon-192x192.png">
-      <title>Family Life Organizer</title>
-      <script>
-        // Register Service Worker
-        if ('serviceWorker' in navigator) {
-          window.addEventListener('load', () => {
-            navigator.serviceWorker.register('/sw.js')
-              .then((registration) => {
-                console.log('SW registered:', registration.scope);
-              })
-              .catch((error) => {
-                console.log('SW registration failed:', error);
-              });
-          });
-        }
-      </script>
-      <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-        
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        
-        :root {
-          --primary: #4f46e5;
-          --primary-light: #6366f1;
-          --primary-dark: #4338ca;
-          --gray-50: #f9fafb;
-          --gray-100: #f3f4f6;
-          --gray-200: #e5e7eb;
-          --gray-300: #d1d5db;
-          --gray-600: #4b5563;
-          --gray-700: #374151;
-          --gray-800: #1f2937;
-          --gray-900: #111827;
-        }
-        
-        body {
-          font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-          background: var(--gray-50);
-          color: var(--gray-800);
-          line-height: 1.6;
-        }
-        
-        .header {
-          background: linear-gradient(135deg, var(--gray-900) 0%, var(--gray-800) 100%);
-          color: white;
-          padding: 16px 24px;
-          box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
-        }
-        .header-content {
-          max-width: 1200px;
-          margin: 0 auto;
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-        }
-        .header h1 { 
-          font-size: 22px; 
-          font-weight: 700;
-          letter-spacing: -0.025em;
-        }
-        .header .user { 
-          font-size: 14px;
-          opacity: 0.8; 
-          margin-top: 2px;
-        }
-        .header a { 
-          color: white; 
-          text-decoration: none; 
-          margin-left: 20px;
-          font-size: 14px;
-          font-weight: 500;
-          padding: 8px 16px;
-          border-radius: 6px;
-          transition: background 0.2s;
-        }
-        .header a:hover {
-          background: rgba(255,255,255,0.1);
-        }
-        
-        .container {
-          max-width: 1200px;
-          margin: 0 auto;
-          padding: 24px;
-        }
-        
-        .summary-cards {
-          display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-          gap: 20px;
-          margin-bottom: 32px;
-        }
-        .card {
-          background: white;
-          padding: 24px;
-          border-radius: 12px;
-          box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-          border: 1px solid var(--gray-200);
-          text-align: center;
-          transition: all 0.2s;
-        }
-        .card:hover {
-          box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-          transform: translateY(-2px);
-        }
-        .card-number {
-          font-size: 36px;
-          font-weight: 700;
-          color: var(--primary);
-          line-height: 1;
-        }
-        .card-label {
-          color: var(--gray-600);
-          font-size: 14px;
-          margin-top: 8px;
-          font-weight: 500;
-        }
-        
-        .section {
-          background: white;
-          border-radius: 12px;
-          padding: 24px;
-          margin-bottom: 24px;
-          box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-          border: 1px solid var(--gray-200);
-        }
-        .section h2 {
-          font-size: 18px;
-          font-weight: 600;
-          margin-bottom: 20px;
-          color: var(--gray-900);
-        }
-        
-        .add-form {
-          display: flex;
-          gap: 12px;
-          margin-bottom: 20px;
-        }
-        .add-form input, .add-form select {
-          padding: 10px 14px;
-          border: 1px solid var(--gray-300);
-          border-radius: 8px;
-          font-size: 14px;
-          font-family: inherit;
-          transition: all 0.2s;
-        }
-        .add-form input:focus, .add-form select:focus {
-          outline: none;
-          border-color: var(--primary);
-          box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
-        }
-        .add-form input { flex: 1; }
-        .add-form button {
-          padding: 10px 20px;
-          background: var(--primary);
-          color: white;
-          border: none;
-          border-radius: 8px;
-          cursor: pointer;
-          font-weight: 600;
-          font-size: 14px;
-          transition: all 0.2s;
-        }
-        .add-form button:hover {
-          background: var(--primary-dark);
-        }
-        
-        .item-list {
-          list-style: none;
-        }
-        .item {
-          display: flex;
-          align-items: center;
-          padding: 14px 16px;
-          border-bottom: 1px solid var(--gray-100);
-          transition: background 0.15s;
-          border-radius: 6px;
-          margin-bottom: 4px;
-        }
-        .item:hover { 
-          background: var(--gray-50); 
-        }
-        .item:last-child { 
-          border-bottom: none;
-          margin-bottom: 0;
-        }
-        .item-checkbox {
-          width: 20px;
-          height: 20px;
-          margin-right: 14px;
-          cursor: pointer;
-          accent-color: var(--primary);
-        }
-        .item-text { 
-          flex: 1;
-          font-size: 15px;
-        }
-        .item-category {
-          font-size: 12px;
-          color: var(--gray-600);
-          background: var(--gray-100);
-          padding: 4px 10px;
-          border-radius: 20px;
-          margin-left: 10px;
-          font-weight: 500;
-        }
-        
-        .category-section {
-          margin-bottom: 28px;
-        }
-        .category-section:last-child {
-          margin-bottom: 0;
-        }
-        .category-title {
-          font-size: 16px;
-          font-weight: 600;
-          color: var(--primary);
-          margin-bottom: 12px;
-          text-transform: capitalize;
-        }
-        
-        .tabs {
-          display: flex;
-          gap: 4px;
-          margin-bottom: 24px;
-          background: white;
-          padding: 6px;
-          border-radius: 10px;
-          box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-          border: 1px solid var(--gray-200);
-        }
-        .tab {
-          padding: 10px 20px;
-          cursor: pointer;
-          border-radius: 8px;
-          font-size: 14px;
-          font-weight: 500;
-          color: var(--gray-600);
-          transition: all 0.2s;
-          border: none;
-          background: transparent;
-          font-family: inherit;
-        }
-        .tab:hover {
-          background: var(--gray-50);
-          color: var(--gray-800);
-        }
-        .tab.active {
-          background: var(--primary);
-          color: white;
-          box-shadow: 0 2px 4px rgba(79, 70, 229, 0.2);
-        }
-        .tab-content { display: none; }
-        .tab-content.active { display: block; }
-        
-        /* Calendar Styles */
-        .calendar-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          margin-bottom: 20px;
-        }
-        .calendar-nav {
-          display: flex;
-          gap: 10px;
-          align-items: center;
-        }
-        .calendar-nav button {
-          padding: 8px 16px;
-          background: #667eea;
-          color: white;
-          border: none;
-          border-radius: 6px;
-          cursor: pointer;
-        }
-        .calendar-grid {
-          display: grid;
-          grid-template-columns: repeat(7, 1fr);
-          gap: 1px;
-          background: #e0e0e0;
-          border: 1px solid #e0e0e0;
-          border-radius: 8px;
-          overflow: hidden;
-        }
-        .calendar-day-header {
-          background: #f5f5f5;
-          padding: 10px;
-          text-align: center;
-          font-weight: 600;
-          font-size: 12px;
-          text-transform: uppercase;
-        }
-        .calendar-day {
-          background: white;
-          min-height: 100px;
-          padding: 8px;
-          position: relative;
-        }
-        .calendar-day.other-month {
-          background: #fafafa;
-          color: #999;
-        }
-        .calendar-day-number {
-          font-weight: 600;
-          margin-bottom: 4px;
-        }
-        .calendar-day.today .calendar-day-number {
-          background: #667eea;
-          color: white;
-          width: 28px;
-          height: 28px;
-          border-radius: 50%;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-        }
-        .calendar-event {
-          font-size: 11px;
-          padding: 2px 6px;
-          margin: 2px 0;
-          border-radius: 4px;
-          cursor: pointer;
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
-        }
-        .person-tag {
-          display: inline-block;
-          width: 8px;
-          height: 8px;
-          border-radius: 50%;
-          margin-right: 4px;
-        }
-        .person-jesse { background: #667eea; }
-        .person-sophie { background: #f093fb; }
-        .person-rowan { background: #4facfe; }
-        .person-baby { background: #43e97b; }
-        .person-filter {
-          display: flex;
-          gap: 15px;
-          margin-bottom: 20px;
-          flex-wrap: wrap;
-        }
-        .person-filter label {
-          display: flex;
-          align-items: center;
-          gap: 6px;
-          cursor: pointer;
-        }
-        .appointment-form {
-          background: #f9f9f9;
-          padding: 20px;
-          border-radius: 8px;
-          margin-bottom: 20px;
-        }
-        
-        @media (max-width: 768px) {
-          .summary-cards { grid-template-columns: repeat(2, 1fr); }
-          .add-form { flex-direction: column; }
-          .calendar-day { min-height: 60px; font-size: 12px; }
-          .calendar-event { font-size: 9px; }
-        }
-      </style>
-    </head>
-    <body>
-      <div class="header">
-        <div class="header-content">
-          <div>
-            <h1>🏠 Family Life Organizer</h1>
-            <span class="user">Welcome, ${user.name}</span>
-          </div>
-          <div>
-            <a href="/">Dashboard</a>
-            <a href="/logout">Logout</a>
-          </div>
-        </div>
-      </div>
-      
-      <div class="container">
-        <div class="summary-cards">
-          <div class="card">
-            <div class="card-number">${summary.tasks_today}</div>
-            <div class="card-label">Tasks Today</div>
-          </div>
-          <div class="card">
-            <div class="card-number">${summary.appointments_today}</div>
-            <div class="card-label">Appointments</div>
-          </div>
-          <div class="card">
-            <div class="card-number">${summary.groceries_needed}</div>
-            <div class="card-label">Groceries Needed</div>
-          </div>
-          <div class="card">
-            <div class="card-number">${summary.overdue_tasks}</div>
-            <div class="card-label">Overdue</div>
-          </div>
-        </div>
-        
-        <div class="tabs">
-          <button class="tab active" onclick="showTab('overview', this)">Overview</button>
-          <button class="tab" onclick="showTab('calendar', this)">📅 Calendar</button>
-          <button class="tab" onclick="showTab('budget', this)">💰 Budget</button>
-          <button class="tab" onclick="showTab('groceries', this)">🛒 Groceries</button>
-          <button class="tab" onclick="showTab('tasks', this)">📋 Tasks</button>
-          <button class="tab" onclick="showTab('add', this)">➕ Add New</button>
-        </div>
-        
-        <div id="overview" class="tab-content active">
-          <div class="section">
-            <h2>Your Household at a Glance</h2>
-            <p style="color: #666; margin-bottom: 20px;">
-              ${summary.tasks_today === 0 && summary.groceries_needed === 0 
-                ? "Great job! You're all caught up. 🎉" 
-                : "Here's what needs attention today."}
-            </p>
-            
-            ${categories.map(cat => `
-              <div class="category-section">
-                <h3 class="category-title">${cat}</h3>
-                <ul class="item-list">
-                  ${tasksByCategory[cat].slice(0, 3).map(task => `
-                    <li class="item">
-                      <input type="checkbox" class="item-checkbox" onchange="completeTask(${task.id})">
-                      <span class="item-text">${task.title}</span>
-                      ${task.due_date ? `<span style="color: #999; font-size: 12px;">Due: ${task.due_date}</span>` : ''}
-                    </li>
-                  `).join('')}
-                  ${tasksByCategory[cat].length > 3 ? `<li style="padding: 10px; color: #667eea; cursor: pointer;">+ ${tasksByCategory[cat].length - 3} more...</li>` : ''}
-                </ul>
-              </div>
-            `).join('')}
-          </div>
-        </div>
-        
-        <div id="calendar" class="tab-content">
-          <div class="section">
-            <h2>📅 Family Calendar</h2>
-            
-            <div class="appointment-form">
-              <h3>Add Appointment/Event</h3>
-              <div class="add-form" style="flex-direction: column;">
-                <input type="text" id="apptTitle" placeholder="Event title (e.g., Dentist, School play)">
-                <input type="date" id="apptDate">
-                <input type="time" id="apptTime">
-                <input type="text" id="apptLocation" placeholder="Location (optional)">
-                <div style="display: flex; gap: 15px; flex-wrap: wrap;">
-                  <label><input type="checkbox" class="person-check" value="Jesse"> <span class="person-tag person-jesse"></span>Jesse</label>
-                  <label><input type="checkbox" class="person-check" value="Sophie"> <span class="person-tag person-sophie"></span>Sophie</label>
-                  <label><input type="checkbox" class="person-check" value="Rowan"> <span class="person-tag person-rowan"></span>Rowan</label>
-                  <label><input type="checkbox" class="person-check" value="Baby"> <span class="person-tag person-baby"></span>Baby</label>
-                </div>
-                <button onclick="addAppointment()">Add to Calendar</button>
-              </div>
-            </div>
-            
-            <div class="person-filter">
-              <label><input type="checkbox" id="filter-all" checked onchange="loadCalendar()"> Show All</label>
-              <label><input type="checkbox" class="filter-person" value="Jesse" onchange="loadCalendar()"> <span class="person-tag person-jesse"></span>Jesse</label>
-              <label><input type="checkbox" class="filter-person" value="Sophie" onchange="loadCalendar()"> <span class="person-tag person-sophie"></span>Sophie</label>
-              <label><input type="checkbox" class="filter-person" value="Rowan" onchange="loadCalendar()"> <span class="person-tag person-rowan"></span>Rowan</label>
-              <label><input type="checkbox" class="filter-person" value="Baby" onchange="loadCalendar()"> <span class="person-tag person-baby"></span>Baby</label>
-            </div>
-            
-            <div class="calendar-header">
-              <div class="calendar-nav">
-                <button onclick="changeMonth(-1)">← Prev</button>
-                <h3 id="calendarMonthYear">Loading...</h3>
-                <button onclick="changeMonth(1)">Next →</button>
-              </div>
-              <button onclick="goToToday()">Today</button>
-            </div>
-            
-            <div class="calendar-grid" id="calendarGrid">
-              <!-- Calendar generated by JS -->
-            </div>
-          </div>
-        </div>
-        
-        <div id="budget" class="tab-content">
-          <div class="section">
-            <h2>💰 Household Budget</h2>
-            
-            <div class="calendar-header">
-              <div class="calendar-nav">
-                <button onclick="changeBudgetMonth(-1)">← Prev</button>
-                <h3 id="budgetMonthYear">Loading...</h3>
-                <button onclick="changeBudgetMonth(1)">Next →</button>
-              </div>
-            </div>
-            
-            <div id="budgetSummary" style="margin-bottom: 30px;">
-              <!-- Budget bars generated by JS -->
-            </div>
-            
-            <div class="add-form" style="flex-direction: column; margin-bottom: 30px;">
-              <h3>Add Receipt</h3>
-              <input type="number" id="receiptAmount" placeholder="Amount ($)" step="0.01">
-              <input type="text" id="receiptMerchant" placeholder="Merchant/Store">
-              <input type="date" id="receiptDate">
-              <select id="receiptCategory">
-                <option value="">Select category...</option>
-                <option value="Groceries">Groceries</option>
-                <option value="Dining Out">Dining Out</option>
-                <option value="Gas/Transport">Gas/Transport</option>
-                <option value="Household">Household</option>
-                <option value="Health">Health</option>
-                <option value="Entertainment">Entertainment</option>
-                <option value="Kids">Kids</option>
-                <option value="Other">Other</option>
-              </select>
-              <input type="text" id="receiptNotes" placeholder="Notes (optional)">
-              <button onclick="addReceipt()">Add Receipt</button>
-            </div>
-            
-            <div style="background: #f9f9f9; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
-              <h3>📧 Email Receipts</h3>
-              <p style="color: #666; margin: 10px 0;">
-                Forward receipt emails to: <strong>jhenrymalcolm@gmail.com</strong><br>
-                They'll be automatically processed and added to your budget.
-              </p>
-            </div>
-            
-            <h3>Recent Receipts</h3>
-            <div id="receiptList">
-              <!-- Receipts generated by JS -->
-            </div>
-          </div>
-        </div>
-        
-        <div id="groceries" class="tab-content">
-          <div class="section">
-            <h2>🛒 Grocery List</h2>
-            <div class="add-form">
-              <input type="text" id="groceryInput" placeholder="Add item (e.g., eggs, milk)...">
-              <select id="groceryCategory">
-                <option value="">Category</option>
-                <option value="produce">Produce</option>
-                <option value="dairy">Dairy</option>
-                <option value="meat">Meat</option>
-                <option value="pantry">Pantry</option>
-                <option value="frozen">Frozen</option>
-                <option value="other">Other</option>
-              </select>
-              <button onclick="addGrocery()">Add</button>
-            </div>
-            <ul class="item-list" id="groceryList">
-              ${groceries.map(item => `
-                <li class="item">
-                  <input type="checkbox" class="item-checkbox" onchange="completeGrocery(${item.id})">
-                  <span class="item-text">${item.item}</span>
-                  ${item.category ? `<span class="item-category">${item.category}</span>` : ''}
-                </li>
-              `).join('')}
-              ${groceries.length === 0 ? '<li style="padding: 20px; color: #999; text-align: center;">No items needed</li>' : ''}
-            </ul>
-          </div>
-        </div>
-        
-        <div id="tasks" class="tab-content">
-          <div class="section">
-            <h2>📋 All Tasks</h2>
-            ${categories.map(cat => `
-              <div class="category-section">
-                <h3 class="category-title">${cat}</h3>
-                <ul class="item-list">
-                  ${tasksByCategory[cat].map(task => `
-                    <li class="item">
-                      <input type="checkbox" class="item-checkbox" onchange="completeTask(${task.id})">
-                      <span class="item-text">${task.title}</span>
-                      ${task.due_date ? `<span style="color: #999; font-size: 12px; margin-left: 10px;">${task.due_date}</span>` : ''}
-                    </li>
-                  `).join('')}
-                </ul>
-              </div>
-            `).join('')}
-          </div>
-        </div>
-        
-        <div id="add" class="tab-content">
-          <div class="section">
-            <h2>➕ Add New Item</h2>
-            <div class="add-form" style="flex-direction: column;">
-              <input type="text" id="newTaskTitle" placeholder="What needs to be done?">
-              <select id="newTaskCategory">
-                <option value="">Select category...</option>
-                <option value="groceries">Groceries</option>
-                <option value="appointments">Appointments</option>
-                <option value="home">Home</option>
-                <option value="automotive">Automotive</option>
-                <option value="travel">Travel</option>
-                <option value="finances">Finances</option>
-                <option value="childcare">Childcare</option>
-                <option value="dates">Dates</option>
-                <option value="health">Health</option>
-                <option value="family">Family</option>
-                <option value="reminders">Reminders</option>
-              </select>
-              <input type="date" id="newTaskDate">
-              <button onclick="addTask()">Add Task</button>
-            </div>
-          </div>
-        </div>
-      </div>
-      
-      <script>
-        // Fixed tab switching - uses clicked element or finds parent tab
-        function showTab(tabName, clickedEl) {
-          const tab = clickedEl || event.target.closest('.tab') || event.target;
-          document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-          document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
-          tab.classList.add('active');
-          document.getElementById(tabName).classList.add('active');
-          if (tabName === 'calendar') {
-            loadCalendar();
-          }
-          if (tabName === 'budget') {
-            loadBudget();
-          }
-        }
-        
-        function showError(message) {
-          alert('Error: ' + message);
-        }
-        
-        async function addGrocery() {
-          const input = document.getElementById('groceryInput');
-          const category = document.getElementById('groceryCategory');
-          const item = input.value.trim();
-          const btn = event.target;
-          
-          if (!item) {
-            showError('Please enter an item');
-            return;
-          }
-          
-          btn.disabled = true;
-          btn.textContent = 'Adding...';
-          
-          try {
-            const response = await fetch('/api/add', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                type: 'grocery',
-                data: { item, category: category.value }
-              })
-            });
-            
-            if (response.ok) {
-              input.value = '';
-              category.value = '';
-              btn.disabled = false;
-              btn.textContent = 'Add';
-              await refreshGroceryList();
-            } else {
-              const err = await response.text();
-              showError('Failed to add: ' + err);
-              btn.disabled = false;
-              btn.textContent = 'Add';
-            }
-          } catch (err) {
-            showError('Network error: ' + err.message);
-            btn.disabled = false;
-            btn.textContent = 'Add';
-          }
-        }
-        
-        async function refreshGroceryList() {
-          try {
-            const response = await fetch('/api/data');
-            const data = await response.json();
-            
-            const list = document.getElementById('groceryList');
-            if (data.groceries.length === 0) {
-              list.innerHTML = '<li style="padding: 20px; color: #999; text-align: center;">No items needed</li>';
-            } else {
-              list.innerHTML = data.groceries.map(item => 
-                '<li class="item">' +
-                  '<input type="checkbox" class="item-checkbox" onchange="completeGrocery(' + item.id + ')">' +
-                  '<span class="item-text">' + item.item + '</span>' +
-                  (item.category ? '<span class="item-category">' + item.category + '</span>' : '') +
-                '</li>'
-              ).join('');
-            }
-            
-            // Update summary card
-            const summaryCards = document.querySelectorAll('.card-number');
-            if (summaryCards[2]) {
-              summaryCards[2].textContent = data.summary.groceries_needed;
-            }
-          } catch (err) {
-            showError('Failed to refresh list: ' + err.message);
-          }
-        }
-        
-        async function completeGrocery(id) {
-          try {
-            await fetch('/api/complete', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ type: 'grocery', id })
-            });
-            await refreshGroceryList();
-          } catch (err) {
-            showError('Failed to complete: ' + err.message);
-          }
-        }
-        
-        async function addTask() {
-          const title = document.getElementById('newTaskTitle').value;
-          const category = document.getElementById('newTaskCategory').value;
-          const due_date = document.getElementById('newTaskDate').value;
-          const btn = event.target;
-          
-          if (!title) {
-            showError('Please enter a title');
-            return;
-          }
-          if (!category) {
-            showError('Please select a category');
-            return;
-          }
-          
-          btn.disabled = true;
-          btn.textContent = 'Adding...';
-          
-          try {
-            const response = await fetch('/api/add', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                type: 'task',
-                data: { title, category, due_date }
-              })
-            });
-            
-            if (response.ok) {
-              location.reload();
-            } else {
-              const err = await response.text();
-              showError('Failed to add: ' + err);
-              btn.disabled = false;
-              btn.textContent = 'Add Task';
-            }
-          } catch (err) {
-            showError('Network error: ' + err.message);
-            btn.disabled = false;
-            btn.textContent = 'Add Task';
-          }
-        }
-        
-        async function completeTask(id) {
-          try {
-            await fetch('/api/complete', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ type: 'task', id })
-            });
-            location.reload();
-          } catch (err) {
-            showError('Failed to complete: ' + err.message);
-          }
-        }
-        
-        // Calendar functions
-        let currentCalendarDate = new Date();
-        let calendarAppointments = [];
-        
-        function getMonthName(month) {
-          const names = ['January', 'February', 'March', 'April', 'May', 'June',
-                         'July', 'August', 'September', 'October', 'November', 'December'];
-          return names[month];
-        }
-        
-        function getDayName(day) {
-          const names = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-          return names[day];
-        }
-        
-        async function loadCalendar() {
-          const year = currentCalendarDate.getFullYear();
-          const month = currentCalendarDate.getMonth();
-          
-          document.getElementById('calendarMonthYear').textContent = 
-            getMonthName(month) + ' ' + year;
-          
-          try {
-            const response = await fetch('/api/appointments?year=' + year + '&month=' + (month + 1));
-            const data = await response.json();
-            calendarAppointments = data.appointments || [];
-            renderCalendar(year, month);
-          } catch (err) {
-            showError('Failed to load calendar: ' + err.message);
-          }
-        }
-        
-        function renderCalendar(year, month) {
-          const firstDay = new Date(year, month, 1);
-          const lastDay = new Date(year, month + 1, 0);
-          const startPadding = firstDay.getDay();
-          const daysInMonth = lastDay.getDate();
-          
-          const prevMonthLastDay = new Date(year, month, 0).getDate();
-          const today = new Date();
-          
-          // Get selected filters
-          const showAll = document.getElementById('filter-all').checked;
-          const selectedPersons = showAll ? [] : 
-            Array.from(document.querySelectorAll('.filter-person:checked')).map(cb => cb.value);
-          
-          let html = '';
-          
-          // Day headers
-          for (let i = 0; i < 7; i++) {
-            html += '<div class="calendar-day-header">' + getDayName(i) + '</div>';
-          }
-          
-          // Previous month padding
-          for (let i = startPadding - 1; i >= 0; i--) {
-            html += '<div class="calendar-day other-month">' + (prevMonthLastDay - i) + '</div>';
-          }
-          
-          // Current month days
-          for (let day = 1; day <= daysInMonth; day++) {
-            const dateStr = year + '-' + String(month + 1).padStart(2, '0') + '-' + String(day).padStart(2, '0');
-            const isToday = today.getFullYear() === year && today.getMonth() === month && today.getDate() === day;
-            
-            // Find appointments for this day
-            let dayEvents = calendarAppointments.filter(a => a.appointment_date === dateStr);
-            
-            // Filter by person if needed
-            if (selectedPersons.length > 0) {
-              dayEvents = dayEvents.filter(a => {
-                if (!a.person_tags) return false;
-                return selectedPersons.some(p => a.person_tags.includes(p));
-              });
-            }
-            
-            html += '<div class="calendar-day' + (isToday ? ' today' : '') + '">';
-            html += '<div class="calendar-day-number">' + day + '</div>';
-            
-            dayEvents.slice(0, 3).forEach(event => {
-              const time = event.appointment_time ? event.appointment_time.substring(0, 5) + ' ' : '';
-              let tagsHtml = '';
-              if (event.person_tags) {
-                event.person_tags.split(',').forEach(tag => {
-                  const colorClass = 'person-' + tag.toLowerCase();
-                  tagsHtml += '<span class="person-tag ' + colorClass + '"></span>';
-                });
-              }
-              html += '<div class="calendar-event" style="background: #e8f0fe;" onclick="deleteAppointment(' + event.id + ')">';
-              html += tagsHtml + time + event.title;
-              html += '</div>';
-            });
-            
-            if (dayEvents.length > 3) {
-              html += '<div style="font-size: 10px; color: #999;">+' + (dayEvents.length - 3) + ' more</div>';
-            }
-            
-            html += '</div>';
-          }
-          
-          // Next month padding
-          const endPadding = (7 - ((startPadding + daysInMonth) % 7)) % 7;
-          for (let i = 1; i <= endPadding; i++) {
-            html += '<div class="calendar-day other-month">' + i + '</div>';
-          }
-          
-          document.getElementById('calendarGrid').innerHTML = html;
-        }
-        
-        function changeMonth(delta) {
-          currentCalendarDate.setMonth(currentCalendarDate.getMonth() + delta);
-          loadCalendar();
-        }
-        
-        function goToToday() {
-          currentCalendarDate = new Date();
-          loadCalendar();
-        }
-        
-        async function addAppointment() {
-          const title = document.getElementById('apptTitle').value;
-          const date = document.getElementById('apptDate').value;
-          const time = document.getElementById('apptTime').value;
-          const location = document.getElementById('apptLocation').value;
-          
-          if (!title || !date) {
-            showError('Please enter a title and date');
-            return;
-          }
-          
-          const persons = Array.from(document.querySelectorAll('.person-check:checked')).map(cb => cb.value);
-          
-          try {
-            const response = await fetch('/api/appointments', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                title,
-                appointment_date: date,
-                appointment_time: time || null,
-                location: location || null,
-                person_tags: persons
-              })
-            });
-            
-            if (response.ok) {
-              document.getElementById('apptTitle').value = '';
-              document.getElementById('apptDate').value = '';
-              document.getElementById('apptTime').value = '';
-              document.getElementById('apptLocation').value = '';
-              document.querySelectorAll('.person-check').forEach(cb => cb.checked = false);
-              await loadCalendar();
-            } else {
-              showError('Failed to add appointment');
-            }
-          } catch (err) {
-            showError('Error adding appointment: ' + err.message);
-          }
-        }
-        
-        async function deleteAppointment(id) {
-          if (!confirm('Delete this appointment?')) return;
-          
-          try {
-            await fetch('/api/appointments/' + id, { method: 'DELETE' });
-            await loadCalendar();
-          } catch (err) {
-            showError('Failed to delete: ' + err.message);
-          }
-        }
-        
-        // Budget functions
-        let currentBudgetMonth = new Date();
-        
-        function getMonthYearString(date) {
-          return date.toISOString().slice(0, 7); // YYYY-MM
-        }
-        
-        async function loadBudget() {
-          const monthStr = getMonthYearString(currentBudgetMonth);
-          document.getElementById('budgetMonthYear').textContent = 
-            currentBudgetMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-          
-          try {
-            // Load budget summary
-            const budgetRes = await fetch('/api/budget?month=' + monthStr);
-            const budgetData = await budgetRes.json();
-            
-            // Load receipts
-            const receiptsRes = await fetch('/api/receipts?month=' + monthStr);
-            const receiptsData = await receiptsRes.json();
-            
-            renderBudgetSummary(budgetData.summary);
-            renderReceiptList(receiptsData.receipts);
-          } catch (err) {
-            showError('Failed to load budget: ' + err.message);
-          }
-        }
-        
-        function renderBudgetSummary(categories) {
-          const container = document.getElementById('budgetSummary');
-          if (!categories || categories.length === 0) {
-            container.innerHTML = '<p style="color: #999;">No budget data</p>';
-            return;
-          }
-          
-          let html = '';
-          let totalBudget = 0;
-          let totalSpent = 0;
-          
-          categories.forEach(cat => {
-            totalBudget += cat.monthly_limit || 0;
-            totalSpent += cat.spent || 0;
-            const percent = cat.monthly_limit ? (cat.spent / cat.monthly_limit * 100) : 0;
-            const color = cat.color || '#667eea';
-            
-            html += '<div style="margin-bottom: 15px;">';
-            html += '<div style="display: flex; justify-content: space-between; margin-bottom: 5px;">';
-            html += '<span>' + cat.category + '</span>';
-            html += '<span>$' + cat.spent.toFixed(2) + ' / $' + (cat.monthly_limit || 0).toFixed(2) + '</span>';
-            html += '</div>';
-            html += '<div style="background: #e0e0e0; height: 20px; border-radius: 10px; overflow: hidden;">';
-            html += '<div style="background: ' + color + '; width: ' + Math.min(percent, 100) + '%; height: 100%;"></div>';
-            html += '</div>';
-            html += '</div>';
-          });
-          
-          // Total summary
-          html += '<div style="margin-top: 20px; padding-top: 20px; border-top: 2px solid #e0e0e0;">';
-          html += '<div style="display: flex; justify-content: space-between; font-weight: bold;">';
-          html += '<span>Total</span>';
-          html += '<span>$' + totalSpent.toFixed(2) + ' / $' + totalBudget.toFixed(2) + '</span>';
-          html += '</div>';
-          html += '</div>';
-          
-          container.innerHTML = html;
-        }
-        
-        function renderReceiptList(receipts) {
-          const container = document.getElementById('receiptList');
-          if (!receipts || receipts.length === 0) {
-            container.innerHTML = '<p style="color: #999;">No receipts this month</p>';
-            return;
-          }
-          
-          let html = '<div class="item-list">';
-          receipts.forEach(r => {
-            html += '<div class="item" style="justify-content: space-between;">';
-            html += '<div>';
-            html += '<strong>' + r.merchant + '</strong><br>';
-            html += '<small style="color: #999;">' + r.date + ' · ' + r.category + '</small>';
-            html += '</div>';
-            html += '<div style="font-weight: bold; color: #667eea;">$' + parseFloat(r.amount).toFixed(2) + '</div>';
-            html += '</div>';
-          });
-          html += '</div>';
-          
-          container.innerHTML = html;
-        }
-        
-        function changeBudgetMonth(delta) {
-          currentBudgetMonth.setMonth(currentBudgetMonth.getMonth() + delta);
-          loadBudget();
-        }
-        
-        async function addReceipt() {
-          const amount = document.getElementById('receiptAmount').value;
-          const merchant = document.getElementById('receiptMerchant').value;
-          const date = document.getElementById('receiptDate').value;
-          const category = document.getElementById('receiptCategory').value;
-          const notes = document.getElementById('receiptNotes').value;
-          const btn = event.target;
-          
-          if (!amount || !merchant || !date || !category) {
-            showError('Please fill in all fields');
-            return;
-          }
-          
-          btn.disabled = true;
-          btn.textContent = 'Adding...';
-          
-          try {
-            const response = await fetch('/api/receipts', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                amount: parseFloat(amount),
-                merchant,
-                date,
-                category,
-                notes
-              })
-            });
-            
-            if (response.ok) {
-              // Clear form
-              document.getElementById('receiptAmount').value = '';
-              document.getElementById('receiptMerchant').value = '';
-              document.getElementById('receiptDate').value = '';
-              document.getElementById('receiptCategory').value = '';
-              document.getElementById('receiptNotes').value = '';
-              btn.disabled = false;
-              btn.textContent = 'Add Receipt';
-              await loadBudget();
-            } else {
-              showError('Failed to add receipt');
-              btn.disabled = false;
-              btn.textContent = 'Add Receipt';
-            }
-          } catch (err) {
-            showError('Error: ' + err.message);
-            btn.disabled = false;
-            btn.textContent = 'Add Receipt';
-          }
-        }
-        
-        // Load calendar when tab is shown
-        document.addEventListener('DOMContentLoaded', function() {
-          // Check if we're on calendar tab
-          const calendarTab = document.querySelector('[onclick="showTab(\'calendar\')"]');
-          if (calendarTab && calendarTab.classList.contains('active')) {
-            loadCalendar();
-          }
-          // Check if we're on budget tab
-          const budgetTab = document.querySelector('[onclick="showTab(\'budget\')"]');
-          if (budgetTab && budgetTab.classList.contains('active')) {
-            loadBudget();
-          }
-        });
-      </script>
-    </body>
-    </html>
-  `;
-}
-
 app.listen(PORT, () => {
-  console.log(`Family Life Organizer dashboard running at http://localhost:${PORT}`);
-  console.log('Login with: jesse / lauft2024  or  wife / family2024');
+  console.log('Family Life Organizer running on port', PORT);
 });
