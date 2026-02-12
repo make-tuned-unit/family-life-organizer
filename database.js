@@ -221,6 +221,74 @@ class FamilyDB {
     });
   }
 
+  // Receipt operations
+  addReceipt(receipt) {
+    return new Promise((resolve, reject) => {
+      this.db.run(
+        'INSERT INTO receipts (amount, merchant, date, category, payment_method, image_path, notes, processed_by, email_id, added_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [
+          receipt.amount,
+          receipt.merchant,
+          receipt.date,
+          receipt.category || 'Other',
+          receipt.payment_method || null,
+          receipt.image_path || null,
+          receipt.notes || null,
+          receipt.processed_by || 'manual',
+          receipt.email_id || null,
+          receipt.added_by || 'jesse'
+        ],
+        function(err) {
+          if (err) reject(err);
+          else resolve({ id: this.lastID, ...receipt });
+        }
+      );
+    });
+  }
+
+  getReceipts(filters = {}) {
+    return new Promise((resolve, reject) => {
+      let sql = 'SELECT * FROM receipts WHERE 1=1';
+      const params = [];
+
+      if (filters.month) {
+        sql += ' AND strftime("%Y-%m", date) = ?';
+        params.push(filters.month);
+      }
+      if (filters.category) {
+        sql += ' AND category = ?';
+        params.push(filters.category);
+      }
+
+      sql += ' ORDER BY date DESC, created_at DESC';
+
+      this.db.all(sql, params, (err, rows) => {
+        if (err) reject(err);
+        else resolve(rows);
+      });
+    });
+  }
+
+  getBudgetSummary(month) {
+    return new Promise((resolve, reject) => {
+      const sql = `
+        SELECT 
+          c.name as category,
+          c.monthly_limit,
+          c.color,
+          COALESCE(SUM(r.amount), 0) as spent
+        FROM budget_categories c
+        LEFT JOIN receipts r ON c.name = r.category AND strftime('%Y-%m', r.date) = ?
+        GROUP BY c.name
+        ORDER BY c.name
+      `;
+      this.db.all(sql, [month], (err, rows) => {
+        if (err) reject(err);
+        else resolve(rows);
+      });
+    });
+  }
+
   // Memory operations
   addMemory(type, key, value, expires_at = null) {
     return new Promise((resolve, reject) => {
