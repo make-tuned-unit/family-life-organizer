@@ -11,6 +11,10 @@ services:
         value: 10000
       - key: RENDER_DISK_PATH
         value: /opt/render/project/src/vault/family-life
+      - key: GMAIL_USER
+        value: jhenrymalcolm@gmail.com
+      - key: GMAIL_APP_PASSWORD
+        value: qkbe yywm aied mbmo
     disk:
       name: family-data
       mountPath: /opt/render/project/src/vault/family-life
