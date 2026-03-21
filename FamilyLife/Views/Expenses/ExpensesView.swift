@@ -49,9 +49,9 @@ struct ExpensesView: View {
                                 .foregroundStyle(.secondary)
                         }
                     }
-                    .padding()
-                    .glassEffect(.regular.tint(.teal.opacity(0.1)), in: .rect(cornerRadius: 16))
-                    .padding(.horizontal)
+                    .padding(DesignTokens.Spacing.cardPadding)
+                    .flCard(tint: TabAccent.expenses.color)
+                    .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
                 }
 
                 // Budget categories
@@ -183,8 +183,8 @@ struct BudgetCategoryRow: View {
             }
             .frame(height: 8)
         }
-        .padding()
-        .glassEffect(.regular.tint(hexColor.opacity(0.1)), in: .rect(cornerRadius: 16))
+        .padding(DesignTokens.Spacing.cardPadding)
+        .flCard(tint: hexColor)
     }
 }
 
@@ -213,8 +213,8 @@ struct ReceiptRow: View {
             Text("$\(receipt.amount, specifier: "%.2f")")
                 .font(.subheadline.bold())
         }
-        .padding(12)
-        .glassEffect(.regular, in: .rect(cornerRadius: 16))
+        .padding(DesignTokens.Spacing.cardPadding)
+        .flCard(tint: TabAccent.expenses.color)
     }
 }
 

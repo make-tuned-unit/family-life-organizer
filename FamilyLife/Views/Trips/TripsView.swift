@@ -175,8 +175,7 @@ struct ActiveTripCard: View {
                     Label("Arrived", systemImage: "checkmark.circle.fill")
                         .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.borderedProminent)
-                .tint(.green)
+                .buttonStyle(.flPrimary(tint: .green))
 
                 Button(role: .destructive) {
                     Task { await viewModel.cancelTrip(trip.id, api: api) }
@@ -184,12 +183,12 @@ struct ActiveTripCard: View {
                     Label("Cancel", systemImage: "xmark.circle.fill")
                         .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.bordered)
+                .buttonStyle(.flSecondary)
             }
         }
-        .padding()
-        .glassEffect(.regular.tint(.teal.opacity(0.15)), in: .rect(cornerRadius: 16))
-        .padding(.horizontal)
+        .padding(DesignTokens.Spacing.cardPadding)
+        .flCard(tint: TabAccent.trips.color)
+        .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
     }
 }
 
@@ -224,8 +223,8 @@ struct TripHistoryRow: View {
                     .foregroundStyle(.secondary)
             }
         }
-        .padding(12)
-        .glassEffect(.regular, in: .rect(cornerRadius: 16))
+        .padding(DesignTokens.Spacing.cardPadding)
+        .flCard(tint: TabAccent.trips.color)
     }
 
     private func formatDuration(from: String, to: String) -> String {
