@@ -94,7 +94,7 @@ enum TabAccent {
                         .frame(height: 32)
                         .cornerRadius(8)
                         .overlay(
-                            Text("\(tab)")
+                            Text(tab.description)
                                 .font(.caption2)
                                 .foregroundStyle(.white)
                         )
