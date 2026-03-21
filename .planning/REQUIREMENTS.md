@@ -15,9 +15,9 @@
 
 ### Performance
 
-- [ ] **PERF-01**: DateFormatters are cached as static properties, not allocated per-row in scroll views
-- [ ] **PERF-02**: All scrollable lists with >10 items use LazyVStack instead of VStack
-- [ ] **PERF-03**: Force-unwrap operators replaced with safe unwrapping (guard/optional chaining) across all files
+- [x] **PERF-01**: DateFormatters are cached as static properties, not allocated per-row in scroll views
+- [x] **PERF-02**: All scrollable lists with >10 items use LazyVStack instead of VStack
+- [x] **PERF-03**: Force-unwrap operators replaced with safe unwrapping (guard/optional chaining) across all files
 
 ### Interaction Polish
 
@@ -126,9 +126,9 @@
 | DS-03 | Phase 1 | Complete |
 | DS-04 | Phase 1 | Complete |
 | DS-05 | Phase 1 | Pending |
-| PERF-01 | Phase 1 | Pending |
-| PERF-02 | Phase 1 | Pending |
-| PERF-03 | Phase 1 | Pending |
+| PERF-01 | Phase 1 | Complete |
+| PERF-02 | Phase 1 | Complete |
+| PERF-03 | Phase 1 | Complete |
 | INT-01 | Phase 2 | Pending |
 | INT-02 | Phase 2 | Pending |
 | INT-03 | Phase 2 | Pending |
