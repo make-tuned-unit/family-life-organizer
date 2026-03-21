@@ -10,27 +10,27 @@ See: .planning/PROJECT.md (updated 2026-03-20)
 ## Current Position
 
 Phase: 1 of 5 (Design System Foundation)
-Plan: 0 of ? in current phase
-Status: Ready to plan
-Last activity: 2026-03-20 — Roadmap created
+Plan: 1 of 4 in current phase
+Status: In progress
+Last activity: 2026-03-21 — Completed 01-01 (DesignTokens + FLCardModifier)
 
-Progress: [░░░░░░░░░░] 0%
+Progress: [█░░░░░░░░░] 5%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 0
-- Average duration: -
-- Total execution time: 0 hours
+- Total plans completed: 1
+- Average duration: ~1 min
+- Total execution time: ~1 min
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| - | - | - | - |
+| 01-design-system-foundation | 1 | ~1 min | ~1 min |
 
 **Recent Trend:**
-- Last 5 plans: none yet
+- Last 5 plans: 01-01 (~1 min)
 - Trend: -
 
 *Updated after each plan completion*
@@ -45,6 +45,9 @@ Recent decisions affecting current work:
 - Design system first: Consistency requires shared foundation before per-screen work — prevents hardcoded drift across all 8 tabs
 - Apple-native aesthetic: All components use iOS 26 Liquid Glass (`.glassEffect()`) — no UIKit-era `.ultraThinMaterial` patterns
 - No third-party deps: Design system implemented entirely through Swift namespaces, SwiftUI ViewModifier/ButtonStyle protocols
+- FLCardModifier is the only file that calls `.glassEffect()` directly — all glass surfaces route through `.flCard()`
+- TabAccent enum is the canonical source for per-tab colors (not inline Color literals in views)
+- DesignTokens.CornerRadius.chip = 999 avoids capsule vs. rect decision at call sites
 
 ### Pending Todos
 
@@ -57,6 +60,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-20
-Stopped at: Roadmap created, ready to plan Phase 1
+Last session: 2026-03-21
+Stopped at: Completed 01-01-PLAN.md (DesignTokens + FLCardModifier)
 Resume file: None
