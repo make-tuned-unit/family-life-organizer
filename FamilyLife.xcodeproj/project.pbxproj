@@ -67,6 +67,12 @@
 		AA00003A /* FoodKitchenView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00003A; };
 		AA00003B /* DesignTokens.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00003B; };
 		AA00003C /* FLCardModifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00003C; };
+		AA00003D /* SectionHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00003D; };
+		AA00003E /* BadgeLabel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00003E; };
+		AA00003F /* StatPill.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00003F; };
+		AA000040 /* FilterChip.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000040; };
+		AA000041 /* ButtonStyles.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000041; };
+		AA000042 /* DateFormatters.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000042; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -130,6 +136,12 @@
 		BB00003A /* FoodKitchenView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FoodKitchenView.swift; sourceTree = "<group>"; };
 		BB00003B /* DesignTokens.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignTokens.swift; sourceTree = "<group>"; };
 		BB00003C /* FLCardModifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FLCardModifier.swift; sourceTree = "<group>"; };
+		BB00003D /* SectionHeader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SectionHeader.swift; sourceTree = "<group>"; };
+		BB00003E /* BadgeLabel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BadgeLabel.swift; sourceTree = "<group>"; };
+		BB00003F /* StatPill.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatPill.swift; sourceTree = "<group>"; };
+		BB000040 /* FilterChip.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilterChip.swift; sourceTree = "<group>"; };
+		BB000041 /* ButtonStyles.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ButtonStyles.swift; sourceTree = "<group>"; };
+		BB000042 /* DateFormatters.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DateFormatters.swift; sourceTree = "<group>"; };
 		CC000001 /* FamilyLife.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = FamilyLife.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -343,6 +355,12 @@
 				BB000039 /* AmbientBackground.swift */,
 				BB00003B /* DesignTokens.swift */,
 				BB00003C /* FLCardModifier.swift */,
+				BB00003D /* SectionHeader.swift */,
+				BB00003E /* BadgeLabel.swift */,
+				BB00003F /* StatPill.swift */,
+				BB000040 /* FilterChip.swift */,
+				BB000041 /* ButtonStyles.swift */,
+				BB000042 /* DateFormatters.swift */,
 			);
 			path = Components;
 			sourceTree = "<group>";
@@ -476,6 +494,12 @@
 				AA00003A /* FoodKitchenView.swift in Sources */,
 				AA00003B /* DesignTokens.swift in Sources */,
 				AA00003C /* FLCardModifier.swift in Sources */,
+				AA00003D /* SectionHeader.swift in Sources */,
+				AA00003E /* BadgeLabel.swift in Sources */,
+				AA00003F /* StatPill.swift in Sources */,
+				AA000040 /* FilterChip.swift in Sources */,
+				AA000041 /* ButtonStyles.swift in Sources */,
+				AA000042 /* DateFormatters.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
