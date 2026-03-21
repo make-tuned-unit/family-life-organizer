@@ -15,11 +15,13 @@ struct FLCardModifier: ViewModifier {
     var interactive: Bool = false
 
     func body(content: Content) -> some View {
-        let effect: GlassEffectStyle = interactive
-            ? .regular.tint(tint.opacity(DesignTokens.Opacity.interactiveTint)).interactive()
-            : .regular.tint(tint.opacity(DesignTokens.Opacity.cardTint))
-        content
-            .glassEffect(effect, in: .rect(cornerRadius: DesignTokens.CornerRadius.card))
+        if interactive {
+            content
+                .glassEffect(.regular.tint(tint.opacity(DesignTokens.Opacity.interactiveTint)).interactive(), in: .rect(cornerRadius: DesignTokens.CornerRadius.card))
+        } else {
+            content
+                .glassEffect(.regular.tint(tint.opacity(DesignTokens.Opacity.cardTint)), in: .rect(cornerRadius: DesignTokens.CornerRadius.card))
+        }
     }
 }
 

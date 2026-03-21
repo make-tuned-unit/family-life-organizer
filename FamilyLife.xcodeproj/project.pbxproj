@@ -1,0 +1,696 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		AA000001 /* FamilyLifeApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000001; };
+		AA000002 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000002; };
+		AA000003 /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000003; };
+		AA000004 /* FLTask.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000004; };
+		AA000005 /* Grocery.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000005; };
+		AA000006 /* Appointment.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000006; };
+		AA000007 /* Receipt.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000007; };
+		AA000008 /* BudgetCategory.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000008; };
+		AA000009 /* APIService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000009; };
+		AA00000A /* AuthService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00000A; };
+		AA00000B /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00000B; };
+		AA00000C /* HomeViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00000C; };
+		AA00000D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = BB00000D; };
+		AA00000E /* CalendarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00000E; };
+		AA00000F /* CalendarViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00000F; };
+		AA000010 /* AddAppointmentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000010; };
+		AA000011 /* GroceryListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000011; };
+		AA000012 /* PantryItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000012; };
+		AA000013 /* ExpensesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000013; };
+		AA000014 /* ExpensesViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000014; };
+		AA000015 /* PantryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000015; };
+		AA000016 /* PantryViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000016; };
+		AA000017 /* AddPantryItemView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000017; };
+		AA000018 /* CookView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000018; };
+		AA000019 /* CookViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000019; };
+		AA00001A /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00001A; };
+		AA00001B /* AddTaskView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00001B; };
+		AA00001C /* AddReceiptView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00001C; };
+		AA00001D /* ReceiptScannerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00001D; };
+		AA00001E /* Trip.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00001E; };
+		AA00001F /* LocationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00001F; };
+		AA000020 /* NotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000020; };
+		AA000021 /* TripsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000021; };
+		AA000022 /* TripsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000022; };
+		AA000023 /* NewTripView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000023; };
+		AA000024 /* FamilyAddressesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000024; };
+		AA000025 /* Rivalry.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000025; };
+		AA000026 /* HealthKitManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000026; };
+		AA000027 /* RivalriesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000027; };
+		AA000028 /* StartRivalryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000028; };
+		AA000029 /* RivalryDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000029; };
+		AA00002A /* LogProgressView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00002A; };
+		AA00002B /* LeaderboardCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00002B; };
+		AA00002C /* Decision.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00002C; };
+		AA00002D /* WeekView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00002D; };
+		AA00002E /* DecisionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00002E; };
+		AA00002F /* NewDecisionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00002F; };
+		AA000030 /* DecisionDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000030; };
+		AA000031 /* Gift.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000031; };
+		AA000032 /* GiftsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000032; };
+		AA000033 /* PersonGiftListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000033; };
+		AA000034 /* AddGiftPersonView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000034; };
+		AA000035 /* AddGiftIdeaView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000035; };
+		AA000036 /* AddSpecialEventView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000036; };
+		AA000037 /* EditAppointmentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000037; };
+		AA000038 /* EditPantryItemView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000038; };
+		AA000039 /* AmbientBackground.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000039; };
+		AA00003A /* FoodKitchenView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00003A; };
+		AA00003B /* DesignTokens.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00003B; };
+		AA00003C /* FLCardModifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00003C; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		BB000001 /* FamilyLifeApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FamilyLifeApp.swift; sourceTree = "<group>"; };
+		BB000002 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		BB000003 /* LoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
+		BB000004 /* FLTask.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FLTask.swift; sourceTree = "<group>"; };
+		BB000005 /* Grocery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Grocery.swift; sourceTree = "<group>"; };
+		BB000006 /* Appointment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Appointment.swift; sourceTree = "<group>"; };
+		BB000007 /* Receipt.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Receipt.swift; sourceTree = "<group>"; };
+		BB000008 /* BudgetCategory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BudgetCategory.swift; sourceTree = "<group>"; };
+		BB000009 /* APIService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIService.swift; sourceTree = "<group>"; };
+		BB00000A /* AuthService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthService.swift; sourceTree = "<group>"; };
+		BB00000B /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
+		BB00000C /* HomeViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeViewModel.swift; sourceTree = "<group>"; };
+		BB00000D /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		BB00000E /* CalendarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarView.swift; sourceTree = "<group>"; };
+		BB00000F /* CalendarViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarViewModel.swift; sourceTree = "<group>"; };
+		BB000010 /* AddAppointmentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddAppointmentView.swift; sourceTree = "<group>"; };
+		BB000011 /* GroceryListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroceryListView.swift; sourceTree = "<group>"; };
+		BB000012 /* PantryItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PantryItem.swift; sourceTree = "<group>"; };
+		BB000013 /* ExpensesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExpensesView.swift; sourceTree = "<group>"; };
+		BB000014 /* ExpensesViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExpensesViewModel.swift; sourceTree = "<group>"; };
+		BB000015 /* PantryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PantryView.swift; sourceTree = "<group>"; };
+		BB000016 /* PantryViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PantryViewModel.swift; sourceTree = "<group>"; };
+		BB000017 /* AddPantryItemView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddPantryItemView.swift; sourceTree = "<group>"; };
+		BB000018 /* CookView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CookView.swift; sourceTree = "<group>"; };
+		BB000019 /* CookViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CookViewModel.swift; sourceTree = "<group>"; };
+		BB00001A /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		BB00001B /* AddTaskView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddTaskView.swift; sourceTree = "<group>"; };
+		BB00001C /* AddReceiptView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddReceiptView.swift; sourceTree = "<group>"; };
+		BB00001D /* ReceiptScannerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReceiptScannerView.swift; sourceTree = "<group>"; };
+		BB00001E /* Trip.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Trip.swift; sourceTree = "<group>"; };
+		BB00001F /* LocationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocationService.swift; sourceTree = "<group>"; };
+		BB000020 /* NotificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationService.swift; sourceTree = "<group>"; };
+		BB000021 /* TripsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripsView.swift; sourceTree = "<group>"; };
+		BB000022 /* TripsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripsViewModel.swift; sourceTree = "<group>"; };
+		BB000023 /* NewTripView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewTripView.swift; sourceTree = "<group>"; };
+		BB000024 /* FamilyAddressesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FamilyAddressesView.swift; sourceTree = "<group>"; };
+		BB000025 /* Rivalry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Rivalry.swift; sourceTree = "<group>"; };
+		BB000026 /* HealthKitManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthKitManager.swift; sourceTree = "<group>"; };
+		BB000027 /* RivalriesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RivalriesView.swift; sourceTree = "<group>"; };
+		BB000028 /* StartRivalryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StartRivalryView.swift; sourceTree = "<group>"; };
+		BB000029 /* RivalryDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RivalryDetailView.swift; sourceTree = "<group>"; };
+		BB00002A /* LogProgressView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogProgressView.swift; sourceTree = "<group>"; };
+		BB00002B /* LeaderboardCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LeaderboardCard.swift; sourceTree = "<group>"; };
+		BB00002C /* Decision.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Decision.swift; sourceTree = "<group>"; };
+		BB00002D /* WeekView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeekView.swift; sourceTree = "<group>"; };
+		BB00002E /* DecisionsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecisionsView.swift; sourceTree = "<group>"; };
+		BB00002F /* NewDecisionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewDecisionView.swift; sourceTree = "<group>"; };
+		BB000030 /* DecisionDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecisionDetailView.swift; sourceTree = "<group>"; };
+		BB000031 /* Gift.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Gift.swift; sourceTree = "<group>"; };
+		BB000032 /* GiftsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GiftsView.swift; sourceTree = "<group>"; };
+		BB000033 /* PersonGiftListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersonGiftListView.swift; sourceTree = "<group>"; };
+		BB000034 /* AddGiftPersonView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddGiftPersonView.swift; sourceTree = "<group>"; };
+		BB000035 /* AddGiftIdeaView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddGiftIdeaView.swift; sourceTree = "<group>"; };
+		BB000036 /* AddSpecialEventView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddSpecialEventView.swift; sourceTree = "<group>"; };
+		BB000037 /* EditAppointmentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditAppointmentView.swift; sourceTree = "<group>"; };
+		BB000038 /* EditPantryItemView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditPantryItemView.swift; sourceTree = "<group>"; };
+		BB000039 /* AmbientBackground.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AmbientBackground.swift; sourceTree = "<group>"; };
+		BB00003A /* FoodKitchenView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FoodKitchenView.swift; sourceTree = "<group>"; };
+		BB00003B /* DesignTokens.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignTokens.swift; sourceTree = "<group>"; };
+		BB00003C /* FLCardModifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FLCardModifier.swift; sourceTree = "<group>"; };
+		CC000001 /* FamilyLife.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = FamilyLife.app; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		DD000001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		EE000001 = {
+			isa = PBXGroup;
+			children = (
+				EE000002 /* FamilyLife */,
+				EE000003 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		EE000003 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				CC000001 /* FamilyLife.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		EE000002 /* FamilyLife */ = {
+			isa = PBXGroup;
+			children = (
+				EE000004 /* App */,
+				EE000005 /* Models */,
+				EE000006 /* Services */,
+				EE000007 /* Views */,
+				EE000008 /* Resources */,
+			);
+			path = FamilyLife;
+			sourceTree = "<group>";
+		};
+		EE000004 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				BB000001 /* FamilyLifeApp.swift */,
+				BB000002 /* ContentView.swift */,
+				BB000003 /* LoginView.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		EE000005 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				BB000004 /* FLTask.swift */,
+				BB000005 /* Grocery.swift */,
+				BB000006 /* Appointment.swift */,
+				BB000007 /* Receipt.swift */,
+				BB000008 /* BudgetCategory.swift */,
+				BB000012 /* PantryItem.swift */,
+				BB00001E /* Trip.swift */,
+				BB000025 /* Rivalry.swift */,
+				BB00002C /* Decision.swift */,
+				BB000031 /* Gift.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		EE000006 /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				BB000009 /* APIService.swift */,
+				BB00000A /* AuthService.swift */,
+				BB00001F /* LocationService.swift */,
+				BB000020 /* NotificationService.swift */,
+				BB000026 /* HealthKitManager.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		EE000007 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				EE000009 /* Home */,
+				EE00000A /* Calendar */,
+				EE00000B /* Expenses */,
+				EE00000C /* Pantry */,
+				EE00000D /* Cook */,
+				EE00000E /* Trips */,
+				EE00000F /* Rivalries */,
+				EE000010 /* Decisions */,
+				EE000011 /* Gifts */,
+				EE000012 /* Components */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		EE000009 /* Home */ = {
+			isa = PBXGroup;
+			children = (
+				BB00000B /* HomeView.swift */,
+				BB00000C /* HomeViewModel.swift */,
+				BB000011 /* GroceryListView.swift */,
+				BB00001A /* SettingsView.swift */,
+				BB00001B /* AddTaskView.swift */,
+				BB00003A /* FoodKitchenView.swift */,
+			);
+			path = Home;
+			sourceTree = "<group>";
+		};
+		EE00000A /* Calendar */ = {
+			isa = PBXGroup;
+			children = (
+				BB00000E /* CalendarView.swift */,
+				BB00000F /* CalendarViewModel.swift */,
+				BB000010 /* AddAppointmentView.swift */,
+				BB00002D /* WeekView.swift */,
+				BB000037 /* EditAppointmentView.swift */,
+			);
+			path = Calendar;
+			sourceTree = "<group>";
+		};
+		EE00000B /* Expenses */ = {
+			isa = PBXGroup;
+			children = (
+				BB000013 /* ExpensesView.swift */,
+				BB000014 /* ExpensesViewModel.swift */,
+				BB00001C /* AddReceiptView.swift */,
+				BB00001D /* ReceiptScannerView.swift */,
+			);
+			path = Expenses;
+			sourceTree = "<group>";
+		};
+		EE00000C /* Pantry */ = {
+			isa = PBXGroup;
+			children = (
+				BB000015 /* PantryView.swift */,
+				BB000016 /* PantryViewModel.swift */,
+				BB000017 /* AddPantryItemView.swift */,
+				BB000038 /* EditPantryItemView.swift */,
+			);
+			path = Pantry;
+			sourceTree = "<group>";
+		};
+		EE00000D /* Cook */ = {
+			isa = PBXGroup;
+			children = (
+				BB000018 /* CookView.swift */,
+				BB000019 /* CookViewModel.swift */,
+			);
+			path = Cook;
+			sourceTree = "<group>";
+		};
+		EE000011 /* Gifts */ = {
+			isa = PBXGroup;
+			children = (
+				BB000032 /* GiftsView.swift */,
+				BB000033 /* PersonGiftListView.swift */,
+				BB000034 /* AddGiftPersonView.swift */,
+				BB000035 /* AddGiftIdeaView.swift */,
+				BB000036 /* AddSpecialEventView.swift */,
+			);
+			path = Gifts;
+			sourceTree = "<group>";
+		};
+		EE000010 /* Decisions */ = {
+			isa = PBXGroup;
+			children = (
+				BB00002E /* DecisionsView.swift */,
+				BB00002F /* NewDecisionView.swift */,
+				BB000030 /* DecisionDetailView.swift */,
+			);
+			path = Decisions;
+			sourceTree = "<group>";
+		};
+		EE00000F /* Rivalries */ = {
+			isa = PBXGroup;
+			children = (
+				BB000027 /* RivalriesView.swift */,
+				BB000028 /* StartRivalryView.swift */,
+				BB000029 /* RivalryDetailView.swift */,
+				BB00002A /* LogProgressView.swift */,
+				BB00002B /* LeaderboardCard.swift */,
+			);
+			path = Rivalries;
+			sourceTree = "<group>";
+		};
+		EE00000E /* Trips */ = {
+			isa = PBXGroup;
+			children = (
+				BB000021 /* TripsView.swift */,
+				BB000022 /* TripsViewModel.swift */,
+				BB000023 /* NewTripView.swift */,
+				BB000024 /* FamilyAddressesView.swift */,
+			);
+			path = Trips;
+			sourceTree = "<group>";
+		};
+		EE000008 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				BB00000D /* Assets.xcassets */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+		EE000012 /* Components */ = {
+			isa = PBXGroup;
+			children = (
+				BB000039 /* AmbientBackground.swift */,
+				BB00003B /* DesignTokens.swift */,
+				BB00003C /* FLCardModifier.swift */,
+			);
+			path = Components;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		FF000001 /* FamilyLife */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = FF000010 /* Build configuration list for PBXNativeTarget "FamilyLife" */;
+			buildPhases = (
+				FF000002 /* Sources */,
+				DD000001 /* Frameworks */,
+				FF000003 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = FamilyLife;
+			productName = FamilyLife;
+			productReference = CC000001 /* FamilyLife.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		FF000099 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1600;
+				LastUpgradeCheck = 1600;
+				ORGANIZATIONNAME = "Atlas Atlantic";
+				TargetAttributes = {
+					FF000001 = {
+						CreatedOnToolsVersion = 16.0;
+					};
+				};
+			};
+			buildConfigurationList = FF000020 /* Build configuration list for PBXProject "FamilyLife" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = EE000001;
+			productRefGroup = EE000003 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				FF000001 /* FamilyLife */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		FF000003 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AA00000D /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		FF000002 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AA000001 /* FamilyLifeApp.swift in Sources */,
+				AA000002 /* ContentView.swift in Sources */,
+				AA000003 /* LoginView.swift in Sources */,
+				AA000004 /* FLTask.swift in Sources */,
+				AA000005 /* Grocery.swift in Sources */,
+				AA000006 /* Appointment.swift in Sources */,
+				AA000007 /* Receipt.swift in Sources */,
+				AA000008 /* BudgetCategory.swift in Sources */,
+				AA000009 /* APIService.swift in Sources */,
+				AA00000A /* AuthService.swift in Sources */,
+				AA00000B /* HomeView.swift in Sources */,
+				AA00000C /* HomeViewModel.swift in Sources */,
+				AA00000E /* CalendarView.swift in Sources */,
+				AA00000F /* CalendarViewModel.swift in Sources */,
+				AA000010 /* AddAppointmentView.swift in Sources */,
+				AA000011 /* GroceryListView.swift in Sources */,
+				AA000012 /* PantryItem.swift in Sources */,
+				AA000013 /* ExpensesView.swift in Sources */,
+				AA000014 /* ExpensesViewModel.swift in Sources */,
+				AA000015 /* PantryView.swift in Sources */,
+				AA000016 /* PantryViewModel.swift in Sources */,
+				AA000017 /* AddPantryItemView.swift in Sources */,
+				AA000018 /* CookView.swift in Sources */,
+				AA000019 /* CookViewModel.swift in Sources */,
+				AA00001A /* SettingsView.swift in Sources */,
+				AA00001B /* AddTaskView.swift in Sources */,
+				AA00001C /* AddReceiptView.swift in Sources */,
+				AA00001D /* ReceiptScannerView.swift in Sources */,
+				AA00001E /* Trip.swift in Sources */,
+				AA00001F /* LocationService.swift in Sources */,
+				AA000020 /* NotificationService.swift in Sources */,
+				AA000021 /* TripsView.swift in Sources */,
+				AA000022 /* TripsViewModel.swift in Sources */,
+				AA000023 /* NewTripView.swift in Sources */,
+				AA000024 /* FamilyAddressesView.swift in Sources */,
+				AA000025 /* Rivalry.swift in Sources */,
+				AA000026 /* HealthKitManager.swift in Sources */,
+				AA000027 /* RivalriesView.swift in Sources */,
+				AA000028 /* StartRivalryView.swift in Sources */,
+				AA000029 /* RivalryDetailView.swift in Sources */,
+				AA00002A /* LogProgressView.swift in Sources */,
+				AA00002B /* LeaderboardCard.swift in Sources */,
+				AA00002C /* Decision.swift in Sources */,
+				AA00002D /* WeekView.swift in Sources */,
+				AA00002E /* DecisionsView.swift in Sources */,
+				AA00002F /* NewDecisionView.swift in Sources */,
+				AA000030 /* DecisionDetailView.swift in Sources */,
+				AA000031 /* Gift.swift in Sources */,
+				AA000032 /* GiftsView.swift in Sources */,
+				AA000033 /* PersonGiftListView.swift in Sources */,
+				AA000034 /* AddGiftPersonView.swift in Sources */,
+				AA000035 /* AddGiftIdeaView.swift in Sources */,
+				AA000036 /* AddSpecialEventView.swift in Sources */,
+				AA000037 /* EditAppointmentView.swift in Sources */,
+				AA000038 /* EditPantryItemView.swift in Sources */,
+				AA000039 /* AmbientBackground.swift in Sources */,
+				AA00003A /* FoodKitchenView.swift in Sources */,
+				AA00003B /* DesignTokens.swift in Sources */,
+				AA00003C /* FLCardModifier.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		FF000011 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_ASSET_PATHS = "";
+				DEVELOPMENT_TEAM = "";
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "FamilyLife uses your step count to track fitness rivalries and show daily activity on your dashboard.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "FamilyLife uses your location during trips to share ETA with family members.";
+				INFOPLIST_KEY_NSCameraUsageDescription = "FamilyLife uses your camera to scan receipts.";
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.atlasatlantic.familylife;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		FF000012 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_ASSET_PATHS = "";
+				DEVELOPMENT_TEAM = "";
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "FamilyLife uses your step count to track fitness rivalries and show daily activity on your dashboard.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "FamilyLife uses your location during trips to share ETA with family members.";
+				INFOPLIST_KEY_NSCameraUsageDescription = "FamilyLife uses your camera to scan receipts.";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.atlasatlantic.familylife;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		FF000021 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		FF000022 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_VERSION = 5.0;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		FF000010 /* Build configuration list for PBXNativeTarget "FamilyLife" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				FF000011 /* Debug */,
+				FF000012 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		FF000020 /* Build configuration list for PBXProject "FamilyLife" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				FF000021 /* Debug */,
+				FF000022 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = FF000099 /* Project object */;
+}
