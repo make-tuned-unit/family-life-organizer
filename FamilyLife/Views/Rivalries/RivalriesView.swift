@@ -76,8 +76,7 @@ struct RivalriesView: View {
                         Button("Start a Rivalry") {
                             showingStartRivalry = true
                         }
-                        .buttonStyle(.borderedProminent)
-                        .tint(.teal)
+                        .buttonStyle(.flPrimary(tint: TabAccent.rivalries.color))
                     }
                     .padding(.top, 40)
                 }
@@ -164,8 +163,8 @@ struct RivalryCard: View {
                     .foregroundStyle(.secondary)
             }
         }
-        .padding()
-        .glassEffect(.regular.tint(challengeColor.opacity(0.15)), in: .rect(cornerRadius: 16))
+        .padding(DesignTokens.Spacing.cardPadding)
+        .flCard(tint: TabAccent.rivalries.color)
     }
 
     private var challengeColor: Color {

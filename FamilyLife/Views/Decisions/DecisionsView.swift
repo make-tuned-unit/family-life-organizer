@@ -30,11 +30,11 @@ struct DecisionsView: View {
                 ScrollView(.horizontal, showsIndicators: false) {
                     GlassEffectContainer(spacing: 6) {
                         HStack(spacing: 6) {
-                            FilterChip(label: "All", isSelected: filterType == nil) {
+                            FilterChip(label: "All", isSelected: filterType == nil, tint: TabAccent.decisions.color) {
                                 filterType = nil
                             }
                             ForEach(DecisionType.allCases) { type in
-                                FilterChip(label: type.displayName, icon: type.icon, isSelected: filterType == type) {
+                                FilterChip(label: type.displayName, icon: type.icon, isSelected: filterType == type, tint: TabAccent.decisions.color) {
                                     filterType = filterType == type ? nil : type
                                 }
                             }
@@ -53,8 +53,7 @@ struct DecisionsView: View {
                         Button("Share Something") {
                             showingNewDecision = true
                         }
-                        .buttonStyle(.borderedProminent)
-                        .tint(.teal)
+                        .buttonStyle(.flPrimary(tint: TabAccent.decisions.color))
                     }
                     .padding(.top, 40)
                 }
@@ -201,8 +200,8 @@ struct DecisionCard: View {
                 }
             }
         }
-        .padding()
-        .glassEffect(.regular.tint(.teal.opacity(0.1)), in: .rect(cornerRadius: 16))
+        .padding(DesignTokens.Spacing.cardPadding)
+        .flCard(tint: TabAccent.decisions.color)
     }
 }
 
