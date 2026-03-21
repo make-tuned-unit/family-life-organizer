@@ -86,7 +86,7 @@ Plans:
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Design System Foundation | 2/4 | In Progress|  |
+| 1. Design System Foundation | 3/4 | In Progress|  |
 | 2. Interaction Layer | 0/? | Not started | - |
 | 3. Home and Calendar Polish | 0/? | Not started | - |
 | 4. Pantry and Expenses Polish | 0/? | Not started | - |
