@@ -24,7 +24,13 @@ This milestone is a design polish pass on a functional 8-tab iOS app. The work f
   3. `SectionHeader`, `BadgeLabel`, and `StatPill` components exist in `Views/Components/` and are used by at least one view each
   4. All add/edit forms use a shared button style from `ButtonStyles.swift` — three distinct CTA variants no longer coexist
   5. All scrollable lists use `LazyVStack` and `DateFormatter` instances are cached as static properties, not allocated per row
-**Plans**: TBD
+**Plans**: 4 plans
+
+Plans:
+- [ ] 01-01-PLAN.md — Create DesignTokens.swift and FLCardModifier.swift (foundational contracts)
+- [ ] 01-02-PLAN.md — Create shared components: SectionHeader, BadgeLabel, StatPill, FilterChip, ButtonStyles
+- [ ] 01-03-PLAN.md — Performance fixes: static DateFormatters, LazyVStack migration, force-unwrap removal
+- [ ] 01-04-PLAN.md — Migrate all view files to use design system tokens and components
 
 ### Phase 2: Interaction Layer
 **Goal**: The app feels alive — taps confirm with haptics, lists animate, sheets feel native, loading states are informative, and errors are always surfaced to the user
@@ -80,7 +86,7 @@ This milestone is a design polish pass on a functional 8-tab iOS app. The work f
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Design System Foundation | 0/? | Not started | - |
+| 1. Design System Foundation | 0/4 | Planned | - |
 | 2. Interaction Layer | 0/? | Not started | - |
 | 3. Home and Calendar Polish | 0/? | Not started | - |
 | 4. Pantry and Expenses Polish | 0/? | Not started | - |
@@ -88,3 +94,4 @@ This milestone is a design polish pass on a functional 8-tab iOS app. The work f
 
 ---
 *Roadmap created: 2026-03-20*
+*Phase 1 planned: 2026-03-20 — 4 plans, 3 waves*
