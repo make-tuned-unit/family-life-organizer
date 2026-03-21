@@ -244,8 +244,8 @@ struct PersonRow: View {
                 .font(.caption)
                 .foregroundStyle(.tertiary)
         }
-        .padding(12)
-        .glassEffect(.regular, in: .rect(cornerRadius: 16))
+        .padding(DesignTokens.Spacing.cardPadding)
+        .flCard(tint: TabAccent.gifts.color)
     }
 }
 
@@ -270,8 +270,8 @@ struct EventRow: View {
                     .foregroundStyle(days <= 7 ? .red : .secondary)
             }
         }
-        .padding(12)
-        .glassEffect(.regular, in: .rect(cornerRadius: 16))
+        .padding(DesignTokens.Spacing.cardPadding)
+        .flCard(tint: TabAccent.gifts.color)
     }
 
     private var eventIcon: String {
