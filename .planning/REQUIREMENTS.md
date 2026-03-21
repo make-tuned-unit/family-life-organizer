@@ -140,30 +140,30 @@
 | HOME-01 | Phase 3 | Pending |
 | HOME-02 | Phase 3 | Pending |
 | HOME-03 | Phase 3 | Pending |
-| CAL-01 | Phase 4 | Pending |
-| CAL-02 | Phase 4 | Pending |
-| CAL-03 | Phase 4 | Pending |
-| PANT-01 | Phase 5 | Pending |
-| PANT-02 | Phase 5 | Pending |
-| PANT-03 | Phase 5 | Pending |
-| EXP-01 | Phase 6 | Pending |
-| EXP-02 | Phase 6 | Pending |
-| EXP-03 | Phase 6 | Pending |
-| COOK-01 | Phase 7 | Pending |
-| COOK-02 | Phase 7 | Pending |
-| COOK-03 | Phase 7 | Pending |
-| TRIP-01 | Phase 8 | Pending |
-| TRIP-02 | Phase 8 | Pending |
-| TRIP-03 | Phase 8 | Pending |
-| RIV-01 | Phase 9 | Pending |
-| RIV-02 | Phase 9 | Pending |
-| RIV-03 | Phase 9 | Pending |
-| DEC-01 | Phase 10 | Pending |
-| DEC-02 | Phase 10 | Pending |
-| DEC-03 | Phase 10 | Pending |
-| GIFT-01 | Phase 11 | Pending |
-| GIFT-02 | Phase 11 | Pending |
-| GIFT-03 | Phase 11 | Pending |
+| CAL-01 | Phase 3 | Pending |
+| CAL-02 | Phase 3 | Pending |
+| CAL-03 | Phase 3 | Pending |
+| PANT-01 | Phase 4 | Pending |
+| PANT-02 | Phase 4 | Pending |
+| PANT-03 | Phase 4 | Pending |
+| EXP-01 | Phase 4 | Pending |
+| EXP-02 | Phase 4 | Pending |
+| EXP-03 | Phase 4 | Pending |
+| COOK-01 | Phase 5 | Pending |
+| COOK-02 | Phase 5 | Pending |
+| COOK-03 | Phase 5 | Pending |
+| TRIP-01 | Phase 5 | Pending |
+| TRIP-02 | Phase 5 | Pending |
+| TRIP-03 | Phase 5 | Pending |
+| RIV-01 | Phase 5 | Pending |
+| RIV-02 | Phase 5 | Pending |
+| RIV-03 | Phase 5 | Pending |
+| DEC-01 | Phase 5 | Pending |
+| DEC-02 | Phase 5 | Pending |
+| DEC-03 | Phase 5 | Pending |
+| GIFT-01 | Phase 5 | Pending |
+| GIFT-02 | Phase 5 | Pending |
+| GIFT-03 | Phase 5 | Pending |
 
 **Coverage:**
 - v1 requirements: 39 total
@@ -172,4 +172,4 @@
 
 ---
 *Requirements defined: 2026-03-20*
-*Last updated: 2026-03-20 after initial definition*
+*Last updated: 2026-03-20 — traceability updated to reflect 5-phase roadmap structure*
