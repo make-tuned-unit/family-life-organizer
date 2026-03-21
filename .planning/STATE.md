@@ -10,27 +10,27 @@ See: .planning/PROJECT.md (updated 2026-03-20)
 ## Current Position
 
 Phase: 1 of 5 (Design System Foundation)
-Plan: 1 of 4 in current phase
+Plan: 2 of 4 in current phase
 Status: In progress
-Last activity: 2026-03-21 — Completed 01-01 (DesignTokens + FLCardModifier)
+Last activity: 2026-03-21 — Completed 01-02 (SectionHeader, BadgeLabel, StatPill, FilterChip, ButtonStyles)
 
-Progress: [█░░░░░░░░░] 5%
+Progress: [██░░░░░░░░] 10%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 1
-- Average duration: ~1 min
-- Total execution time: ~1 min
+- Total plans completed: 2
+- Average duration: ~2.5 min
+- Total execution time: ~5 min
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| 01-design-system-foundation | 1 | ~1 min | ~1 min |
+| 01-design-system-foundation | 2 | ~5 min | ~2.5 min |
 
 **Recent Trend:**
-- Last 5 plans: 01-01 (~1 min)
+- Last 5 plans: 01-01 (~1 min), 01-02 (~4 min)
 - Trend: -
 
 *Updated after each plan completion*
@@ -48,6 +48,10 @@ Recent decisions affecting current work:
 - FLCardModifier is the only file that calls `.glassEffect()` directly — all glass surfaces route through `.flCard()`
 - TabAccent enum is the canonical source for per-tab colors (not inline Color literals in views)
 - DesignTokens.CornerRadius.chip = 999 avoids capsule vs. rect decision at call sites
+- BadgeSemantic enum centralizes semantic color mapping (overdue/expiringSoon/done/info/custom)
+- ButtonStyle.makeBody uses .glassEffect() directly — View extension modifiers like .flCard() are not callable within ButtonStyle context
+- FilterChip includes optional icon: param to support existing DecisionsView usage patterns
+- Duplicate local StatPill/FilterChip structs removed from HomeView/DecisionsView when Components versions created
 
 ### Pending Todos
 
@@ -61,5 +65,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-03-21
-Stopped at: Completed 01-01-PLAN.md (DesignTokens + FLCardModifier)
+Stopped at: Completed 01-02-PLAN.md (SectionHeader, BadgeLabel, StatPill, FilterChip, ButtonStyles)
 Resume file: None
