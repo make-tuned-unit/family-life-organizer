@@ -9,8 +9,8 @@
 
 - [x] **DS-01**: App has a centralized DesignTokens file defining spacing, corner radius, and color constants used across all views
 - [x] **DS-02**: App has a shared `.flCard(tint:)` ViewModifier that replaces all ad-hoc glass effect implementations
-- [ ] **DS-03**: App has reusable SectionHeader, BadgeLabel, and StatPill components extracted to Views/Components/
-- [ ] **DS-04**: App has shared ButtonStyles (primary, secondary, destructive) used consistently across all forms
+- [x] **DS-03**: App has reusable SectionHeader, BadgeLabel, and StatPill components extracted to Views/Components/
+- [x] **DS-04**: App has shared ButtonStyles (primary, secondary, destructive) used consistently across all forms
 - [ ] **DS-05**: All views use design tokens for spacing and colors — no raw magic numbers or `.opacity()` fills
 
 ### Performance
@@ -123,8 +123,8 @@
 |-------------|-------|--------|
 | DS-01 | Phase 1 | Complete |
 | DS-02 | Phase 1 | Complete |
-| DS-03 | Phase 1 | Pending |
-| DS-04 | Phase 1 | Pending |
+| DS-03 | Phase 1 | Complete |
+| DS-04 | Phase 1 | Complete |
 | DS-05 | Phase 1 | Pending |
 | PERF-01 | Phase 1 | Pending |
 | PERF-02 | Phase 1 | Pending |
