@@ -241,8 +241,8 @@ struct HomeView: View {
                                 }
                             }
                             .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(12)
-                            .glassEffect(.regular.tint(.orange.opacity(0.1)), in: .rect(cornerRadius: 16))
+                            .padding(DesignTokens.Spacing.cardGap)
+                            .flCard(tint: .orange)
                         }
 
                         // Active trip
@@ -267,8 +267,8 @@ struct HomeView: View {
                                     }
                                 }
                                 .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(12)
-                                .glassEffect(.regular.tint(.blue.opacity(0.1)), in: .rect(cornerRadius: 16))
+                                .padding(DesignTokens.Spacing.cardGap)
+                                .flCard(tint: TabAccent.trips.color)
                             }
                             .buttonStyle(.plain)
                         }
@@ -390,7 +390,7 @@ struct FeatureTile: View {
         }
         .frame(maxWidth: .infinity)
         .frame(height: 72)
-        .glassEffect(.regular.tint(color.opacity(0.1)).interactive(), in: .rect(cornerRadius: 16))
+        .flCard(tint: color, interactive: true)
     }
 }
 
@@ -420,8 +420,8 @@ struct AppointmentRow: View {
             }
             Spacer()
         }
-        .padding(12)
-        .glassEffect(.regular.tint(.purple.opacity(0.1)), in: .rect(cornerRadius: 16))
+        .padding(DesignTokens.Spacing.cardPadding)
+        .flCard(tint: TabAccent.calendar.color)
     }
 }
 
@@ -452,8 +452,8 @@ struct TaskRow: View {
                     .foregroundStyle(.orange)
             }
         }
-        .padding(12)
-        .glassEffect(.regular.tint(.blue.opacity(0.1)), in: .rect(cornerRadius: 16))
+        .padding(DesignTokens.Spacing.cardPadding)
+        .flCard(tint: .blue)
     }
 }
 
@@ -479,8 +479,8 @@ struct GroceryRow: View {
                     .glassEffect(.regular, in: .capsule)
             }
         }
-        .padding(12)
-        .glassEffect(.regular.tint(.green.opacity(0.1)), in: .rect(cornerRadius: 16))
+        .padding(DesignTokens.Spacing.cardPadding)
+        .flCard(tint: .green)
     }
 }
 
