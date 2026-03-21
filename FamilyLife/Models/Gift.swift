@@ -31,7 +31,7 @@ final class GiftPerson {
             var comps = cal.dateComponents([.month, .day], from: parsed)
             comps.year = year
             if let date = cal.date(from: comps) {
-                let adjusted = date < now ? cal.date(byAdding: .year, value: 1, to: date)! : date
+                let adjusted = date < now ? (cal.date(byAdding: .year, value: 1, to: date) ?? date) : date
                 events.append(("Birthday", adjusted))
             }
         }
@@ -39,7 +39,7 @@ final class GiftPerson {
             var comps = cal.dateComponents([.month, .day], from: parsed)
             comps.year = year
             if let date = cal.date(from: comps) {
-                let adjusted = date < now ? cal.date(byAdding: .year, value: 1, to: date)! : date
+                let adjusted = date < now ? (cal.date(byAdding: .year, value: 1, to: date) ?? date) : date
                 events.append(("Anniversary", adjusted))
             }
         }
