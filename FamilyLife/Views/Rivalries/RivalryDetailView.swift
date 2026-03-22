@@ -331,9 +331,9 @@ struct EntryRow: View {
                 .font(.caption2)
                 .foregroundStyle(.tertiary)
         }
-        .padding(10)
+        .padding(DesignTokens.Spacing.inset)
         .background(.fill.tertiary)
-        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .clipShape(RoundedRectangle(cornerRadius: DesignTokens.Spacing.inset))
     }
 }
 
@@ -393,8 +393,8 @@ struct WinOverlay: View {
                         .foregroundStyle(.black)
                         .clipShape(RoundedRectangle(cornerRadius: 14))
                 }
-                .padding(.horizontal, 40)
-                .padding(.top, 10)
+                .padding(.horizontal, DesignTokens.Spacing.large)
+                .padding(.top, DesignTokens.Spacing.inset)
             }
         }
         .transition(.opacity)
