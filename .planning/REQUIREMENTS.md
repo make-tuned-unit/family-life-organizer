@@ -11,7 +11,7 @@
 - [x] **DS-02**: App has a shared `.flCard(tint:)` ViewModifier that replaces all ad-hoc glass effect implementations
 - [x] **DS-03**: App has reusable SectionHeader, BadgeLabel, and StatPill components extracted to Views/Components/
 - [x] **DS-04**: App has shared ButtonStyles (primary, secondary, destructive) used consistently across all forms
-- [ ] **DS-05**: All views use design tokens for spacing and colors — no raw magic numbers or `.opacity()` fills
+- [x] **DS-05**: All views use design tokens for spacing and colors — no raw magic numbers or `.opacity()` fills
 
 ### Performance
 
@@ -125,7 +125,7 @@
 | DS-02 | Phase 1 | Complete |
 | DS-03 | Phase 1 | Complete |
 | DS-04 | Phase 1 | Complete |
-| DS-05 | Phase 1 | Pending |
+| DS-05 | Phase 1 | Complete |
 | PERF-01 | Phase 1 | Complete |
 | PERF-02 | Phase 1 | Complete |
 | PERF-03 | Phase 1 | Complete |
