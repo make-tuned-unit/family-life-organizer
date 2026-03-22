@@ -86,7 +86,7 @@ struct ExpensesView: View {
                 // Empty state for receipts
                 if viewModel.receipts.isEmpty && !viewModel.isLoading {
                     ContentUnavailableView("No Receipts", systemImage: "receipt", description: Text("Scan or add a receipt"))
-                        .padding(.top, 20)
+                        .padding(.top, DesignTokens.Spacing.bottomBuffer)
                 }
             }
             .padding(.vertical)

@@ -78,7 +78,7 @@ struct RivalriesView: View {
                         }
                         .buttonStyle(.flPrimary(tint: TabAccent.rivalries.color))
                     }
-                    .padding(.top, 40)
+                    .padding(.top, DesignTokens.Spacing.large)
                 }
             }
             .padding(.vertical)
@@ -208,9 +208,9 @@ struct StatusBadge: View {
     var body: some View {
         Text(status.rawValue.capitalized)
             .font(.caption2.weight(.medium))
-            .padding(.horizontal, 8)
-            .padding(.vertical, 3)
-            .background(statusColor.opacity(0.15))
+            .padding(.horizontal, DesignTokens.Spacing.chipPadding)
+            .padding(.vertical, DesignTokens.Spacing.tinyLabel)
+            .background(statusColor.opacity(DesignTokens.Opacity.badgeFill)) // DS-05: replaced raw opacity fill
             .foregroundStyle(statusColor)
             .clipShape(Capsule())
     }

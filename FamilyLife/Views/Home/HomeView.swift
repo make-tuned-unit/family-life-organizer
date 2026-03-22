@@ -50,7 +50,7 @@ struct HomeView: View {
                 grocerySection
             }
             .padding(.horizontal)
-            .padding(.bottom, 20)
+            .padding(.bottom, DesignTokens.Spacing.bottomBuffer)
         }
         .background { AmbientBackground(style: .home) }
         .refreshable {
@@ -151,7 +151,7 @@ struct HomeView: View {
         Text("\(greeting), \(auth.currentUser?.name ?? "Family")")
             .font(.title.bold())
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.top, 8)
+            .padding(.top, DesignTokens.Spacing.sectionTop)
     }
 
     // MARK: - Stats Row
@@ -313,8 +313,8 @@ struct HomeView: View {
                     Spacer()
                     Text("\(viewModel.activeTasks.count)")
                         .font(.caption.weight(.semibold))
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 3)
+                        .padding(.horizontal, DesignTokens.Spacing.chipPadding)
+                        .padding(.vertical, DesignTokens.Spacing.tinyLabel)
                         .glassEffect(.regular.tint(.blue.opacity(0.2)), in: .capsule)
                 }
                 ForEach(grouped.keys.sorted(), id: \.self) { category in
@@ -474,8 +474,8 @@ struct GroceryRow: View {
             if let category = grocery.category {
                 Text(category)
                     .font(.caption2)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 3)
+                    .padding(.horizontal, DesignTokens.Spacing.chipPadding)
+                    .padding(.vertical, DesignTokens.Spacing.tinyLabel)
                     .glassEffect(.regular, in: .capsule)
             }
         }

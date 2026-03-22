@@ -54,8 +54,8 @@ struct LeaderboardCard: View {
                                 .foregroundStyle(.teal)
                         }
                     }
-                    .padding(.vertical, 8)
-                    .padding(.horizontal, 12)
+                    .padding(.vertical, DesignTokens.Spacing.rowVertical)
+                    .padding(.horizontal, DesignTokens.Spacing.cardGap)
                 }
                 .buttonStyle(.plain)
 

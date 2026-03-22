@@ -42,7 +42,7 @@ struct CookView: View {
                             .foregroundStyle(.secondary)
                     }
                     .frame(maxWidth: .infinity)
-                    .padding(.top, 40)
+                    .padding(.top, DesignTokens.Spacing.large)
                 }
 
                 // Recipe cards

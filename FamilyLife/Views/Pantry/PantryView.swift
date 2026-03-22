@@ -59,15 +59,15 @@ struct PantryView: View {
                     } label: {
                         Text(location)
                             .font(.subheadline.weight(.medium))
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 8)
+                            .padding(.horizontal, DesignTokens.Spacing.rowHorizontal)
+                            .padding(.vertical, DesignTokens.Spacing.rowVertical)
                             .glassEffect(.regular.tint(viewModel.selectedLocation == location ? .teal : .clear).interactive(), in: .capsule)
                             .foregroundStyle(viewModel.selectedLocation == location ? .white : .primary)
                     }
                 }
             }
             .padding(.horizontal)
-            .padding(.vertical, 8)
+            .padding(.vertical, DesignTokens.Spacing.rowVertical)
         }
     }
 
@@ -77,11 +77,11 @@ struct PantryView: View {
                 .foregroundStyle(.secondary)
             TextField("Search pantry...", text: $viewModel.searchText)
         }
-        .padding(10)
+        .padding(DesignTokens.Spacing.inset)
         .background(.fill.tertiary)
-        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .clipShape(RoundedRectangle(cornerRadius: DesignTokens.Spacing.inset))
         .padding(.horizontal)
-        .padding(.bottom, 8)
+        .padding(.bottom, DesignTokens.Spacing.rowVertical)
     }
 
     @ViewBuilder
@@ -172,9 +172,9 @@ struct ExpiryBadge: View {
     var body: some View {
         Text(status.0)
             .font(.caption2.weight(.medium))
-            .padding(.horizontal, 8)
-            .padding(.vertical, 3)
-            .background(status.1.opacity(0.15))
+            .padding(.horizontal, DesignTokens.Spacing.chipPadding)
+            .padding(.vertical, DesignTokens.Spacing.tinyLabel)
+            .background(status.1.opacity(DesignTokens.Opacity.badgeFill)) // DS-05: replaced raw opacity fill
             .foregroundStyle(status.1)
             .clipShape(Capsule())
     }

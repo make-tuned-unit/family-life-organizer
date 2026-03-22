@@ -42,7 +42,7 @@ struct WeekView: View {
                     .frame(maxWidth: .infinity)
                 }
             }
-            .padding(.vertical, 8)
+            .padding(.vertical, DesignTokens.Spacing.rowVertical)
 
             Divider()
 
@@ -111,7 +111,7 @@ struct AgendaRow: View {
             }
             Spacer()
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, DesignTokens.Spacing.chipVerticalPadding)
     }
 
     private var categoryColor: Color {
