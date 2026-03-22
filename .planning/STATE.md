@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-last_updated: "2026-03-22T00:04:09.775Z"
+last_updated: "2026-03-22T00:59:26Z"
 progress:
-  total_phases: 1
+  total_phases: 5
   completed_phases: 1
-  total_plans: 4
-  completed_plans: 4
+  total_plans: 5
+  completed_plans: 5
 ---
 
 # Project State
@@ -23,9 +23,9 @@ See: .planning/PROJECT.md (updated 2026-03-20)
 ## Current Position
 
 Phase: 1 of 5 (Design System Foundation) — COMPLETE
-Plan: 4 of 4 in current phase — all plans complete
+Plan: 5 of 5 in current phase — all plans complete
 Status: Phase complete — ready for Phase 2
-Last activity: 2026-03-21 — Completed 01-04 (design system migration to all view files)
+Last activity: 2026-03-22 — Completed 01-05 (DS-05 gap closure: replaced all raw padding literals and opacity fills)
 
 Progress: [████░░░░░░] 20%
 
@@ -40,10 +40,10 @@ Progress: [████░░░░░░] 20%
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| 01-design-system-foundation | 4 | ~38 min | ~9 min |
+| 01-design-system-foundation | 5 | ~48 min | ~9 min |
 
 **Recent Trend:**
-- Last 5 plans: 01-01 (~1 min), 01-02 (~4 min), 01-03 (~20 min), 01-04 (~13 min)
+- Last 5 plans: 01-01 (~1 min), 01-02 (~4 min), 01-03 (~20 min), 01-04 (~13 min), 01-05 (~10 min)
 - Trend: stable
 
 *Updated after each plan completion*
@@ -70,6 +70,8 @@ Recent decisions affecting current work:
 - Dictionary subscript force-unwraps use guard let with inline error state, not default fallback — crash-safe for user actions
 - [Phase 01]: FLCardModifier is sole caller of .glassEffect on rect surfaces — verified zero inline calls remain in any view file after Plan 04
 - [Phase 01]: LeaderboardCard.swift omitted from plan file list but contained rect glassEffect — caught by final audit grep and auto-fixed
+- [Phase 01 Plan 05]: statusColor.opacity(DesignTokens.Opacity.badgeFill) is correct pattern when color is dynamically computed — only tokenize the opacity value
+- [Phase 01 Plan 05]: DS-05 now SATISFIED — zero raw numeric padding literals, zero raw opacity fills in all view files; Phase 1 verification 8/8
 
 ### Pending Todos
 
@@ -82,6 +84,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-21
-Stopped at: Completed 01-04-PLAN.md (design system migration to all 14 view files — Phase 1 complete)
+Last session: 2026-03-22
+Stopped at: Completed 01-05-PLAN.md (DS-05 gap closure — Phase 1 fully locked, 8/8 truths verified)
 Resume file: None
