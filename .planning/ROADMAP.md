@@ -6,7 +6,7 @@ This milestone is a design polish pass on a functional 8-tab iOS app. The work f
 
 ## Phases
 
-- [ ] **Phase 1: Design System Foundation** - Establish shared tokens, styles, and components that all screen work depends on
+- [x] **Phase 1: Design System Foundation** - Establish shared tokens, styles, and components that all screen work depends on (completed 2026-03-22)
 - [ ] **Phase 2: Interaction Layer** - Apply haptics, animations, sheet detents, skeleton loading, and error surfacing across all tabs
 - [ ] **Phase 3: Home and Calendar Polish** - Bring the two primary screens to full design system compliance and fix navigation model
 - [ ] **Phase 4: Pantry and Expenses Polish** - Address the two tabs with the most structural visual debt
@@ -86,7 +86,7 @@ Plans:
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Design System Foundation | 3/4 | In Progress|  |
+| 1. Design System Foundation | 4/4 | Complete   | 2026-03-22 |
 | 2. Interaction Layer | 0/? | Not started | - |
 | 3. Home and Calendar Polish | 0/? | Not started | - |
 | 4. Pantry and Expenses Polish | 0/? | Not started | - |
