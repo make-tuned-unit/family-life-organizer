@@ -82,7 +82,7 @@ struct GiftsView: View {
                             .buttonStyle(.borderedProminent)
                             .tint(.teal)
                     }
-                    .padding(.top, 40)
+                    .padding(.top, DesignTokens.Spacing.large)
                 }
             }
             .padding(.vertical)
@@ -145,7 +145,7 @@ struct GiftsView: View {
                             .font(.subheadline.bold())
                             .foregroundStyle(item.days <= 7 ? .red : item.days <= 30 ? .orange : .secondary)
                     }
-                    .padding(12)
+                    .padding(DesignTokens.Spacing.cardGap)
                     .background(Color(.tertiarySystemFill))
                     .clipShape(RoundedRectangle(cornerRadius: 12))
                     .padding(.horizontal)
@@ -234,9 +234,9 @@ struct PersonRow: View {
             if ideaCount > 0 {
                 Text("\(ideaCount) ideas")
                     .font(.caption2)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 3)
-                    .background(.teal.opacity(0.15))
+                    .padding(.horizontal, DesignTokens.Spacing.chipPadding)
+                    .padding(.vertical, DesignTokens.Spacing.tinyLabel)
+                    .background(TabAccent.gifts.color.opacity(DesignTokens.Opacity.badgeFill)) // DS-05: replaced raw opacity fill
                     .foregroundStyle(.teal)
                     .clipShape(Capsule())
             }

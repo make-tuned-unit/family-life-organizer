@@ -13,6 +13,15 @@ enum DesignTokens {
         static let cardPadding: CGFloat = 14      // Inside card content padding
         static let chipPadding: CGFloat = 8       // Inside badge/chip horizontal padding
         static let chipVerticalPadding: CGFloat = 4 // Inside badge/chip vertical padding
+        static let tinyLabel: CGFloat = 3         // Tight vertical padding on inline status labels
+        static let inset: CGFloat = 10            // Small inset padding on detail card content
+        static let large: CGFloat = 40            // Large top offset for empty-state centering
+        static let sectionTop: CGFloat = 8        // Small top gap between minor sections
+        static let rowVertical: CGFloat = 8       // Vertical padding on list/row items
+        static let bottomBuffer: CGFloat = 20     // Scroll bottom buffer
+        static let rowHorizontal: CGFloat = 16    // Horizontal padding on list rows / filter pills
+        static let chipVerticalTight: CGFloat = 2 // Very tight vertical padding on compact chips
+        static let chipVerticalMed: CGFloat = 6   // Medium vertical padding on reaction chips
     }
 
     enum CornerRadius {

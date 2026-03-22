@@ -55,7 +55,7 @@ struct DecisionsView: View {
                         }
                         .buttonStyle(.flPrimary(tint: TabAccent.decisions.color))
                     }
-                    .padding(.top, 40)
+                    .padding(.top, DesignTokens.Spacing.large)
                 }
 
                 ForEach(filteredActive) { decision in
@@ -139,9 +139,9 @@ struct DecisionCard: View {
                 if decision.status == .resolved {
                     Text("Resolved")
                         .font(.caption2.weight(.medium))
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(.green.opacity(0.15))
+                        .padding(.horizontal, DesignTokens.Spacing.chipVerticalMed)
+                        .padding(.vertical, DesignTokens.Spacing.chipVerticalTight)
+                        .background(BadgeSemantic.done.color.opacity(DesignTokens.Opacity.badgeFill)) // DS-05: replaced raw opacity fill
                         .foregroundStyle(.green)
                         .clipShape(Capsule())
                 }
@@ -223,12 +223,12 @@ struct PollOptionRow: View {
             Text("\(votes)")
                 .font(.caption.bold())
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 4)
+        .padding(.horizontal, DesignTokens.Spacing.chipPadding)
+        .padding(.vertical, DesignTokens.Spacing.chipVerticalPadding)
         .background {
             GeometryReader { geo in
                 RoundedRectangle(cornerRadius: 4)
-                    .fill(.teal.opacity(0.15))
+                    .fill(TabAccent.decisions.color.opacity(DesignTokens.Opacity.badgeFill)) // DS-05: replaced raw opacity fill
                     .frame(width: geo.size.width * progress)
             }
         }
