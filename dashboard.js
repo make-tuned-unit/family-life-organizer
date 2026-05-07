@@ -29,9 +29,27 @@ function requireAuth(req, res, next) {
   if (req.session.user) {
     next();
   } else {
-    res.redirect('/login');
+    // Return JSON 401 for API requests, redirect for browser
+    const isApi = req.path.startsWith('/api/');
+    if (isApi) {
+      res.status(401).json({ error: 'Not authenticated' });
+    } else {
+      res.redirect('/login');
+    }
   }
 }
+
+// JSON API login for mobile clients
+app.post('/api/auth/login', (req, res) => {
+  const { username, password } = req.body;
+  const user = USERS[username];
+  if (user && user.password === password) {
+    req.session.user = username;
+    res.json({ success: true, user: { username, name: user.name, avatar: user.avatar } });
+  } else {
+    res.status(401).json({ error: 'Invalid credentials' });
+  }
+});
 
 // Login page - Modern Design
 app.get('/login', (req, res) => {
@@ -938,41 +956,41 @@ function renderDashboard(user, summary, groceries, tasksByCategory, appointments
       // Update title
       const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 
                           'July', 'August', 'September', 'October', 'November', 'December'];
-      document.getElementById('calendarTitle').textContent = `${monthNames[month]} ${year}`;
+      document.getElementById('calendarTitle').textContent = monthNames[month] + ' ' + year;
       
       let html = '';
       
       // Day headers
       const dayHeaders = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
       dayHeaders.forEach(day => {
-        html += `<div class="calendar-day-header">${day}</div>`;
+        html += '<div class="calendar-day-header">' + day + '</div>';
       });
-      
+
       // Empty cells before start of month
       for (let i = 0; i < startDayOfWeek; i++) {
-        html += `<div class="calendar-day other-month"></div>`;
+        html += '<div class="calendar-day other-month"></div>';
       }
-      
+
       // Days of month
       const today = new Date().toISOString().split('T')[0];
       for (let day = 1; day <= daysInMonth; day++) {
-        const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        const dateStr = year + '-' + String(month + 1).padStart(2, '0') + '-' + String(day).padStart(2, '0');
         const isToday = dateStr === today;
         const dayAppointments = appointmentsData.filter(a => a.appointment_date === dateStr);
-        
-        html += `<div class="calendar-day ${isToday ? 'today' : ''}">`;
-        html += `<div class="calendar-day-number">${day}</div>`;
-        
+
+        html += '<div class="calendar-day ' + (isToday ? 'today' : '') + '">';
+        html += '<div class="calendar-day-number">' + day + '</div>';
+
         if (dayAppointments.length > 0) {
           dayAppointments.slice(0, 2).forEach(appt => {
-            html += `<div class="calendar-event" title="${appt.title}">${appt.title}</div>`;
+            html += '<div class="calendar-event" title="' + appt.title + '">' + appt.title + '</div>';
           });
           if (dayAppointments.length > 2) {
-            html += `<div style="font-size:10px;color:var(--gray-500)">+${dayAppointments.length - 2} more</div>`;
+            html += '<div style="font-size:10px;color:var(--gray-500)">+' + (dayAppointments.length - 2) + ' more</div>';
           }
         }
-        
-        html += `</div>`;
+
+        html += '</div>';
       }
       
       document.getElementById('calendarGrid').innerHTML = html;
@@ -1033,7 +1051,7 @@ app.post('/api/complete', requireAuth, async (req, res) => {
   try {
     const { type, id } = req.body;
     if (type === 'grocery') {
-      await db.completeGrocery(id);
+      await db.purchaseGrocery(id);
     } else if (type === 'task') {
       await db.completeTask(id);
     }
@@ -1062,6 +1080,800 @@ app.post('/api/appointments', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
     await db.addAppointment(req.body);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+// === Mobile API Endpoints ===
+
+// Tasks
+app.get('/api/tasks', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const filters = {};
+    if (req.query.status) filters.status = req.query.status;
+    if (req.query.category) filters.category = req.query.category;
+    if (req.query.assigned_to) filters.assigned_to = req.query.assigned_to;
+    const tasks = await db.getTasks(filters);
+    res.json(tasks);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+// Appointments - list with filters
+app.get('/api/appointments', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const filters = {};
+    if (req.query.date_from) filters.date_from = req.query.date_from;
+    if (req.query.date_to) filters.date_to = req.query.date_to;
+    if (req.query.person) filters.person = req.query.person;
+    const appointments = await db.getAppointments(filters);
+    res.json(appointments);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+// Appointments - by month
+app.get('/api/appointments/:year/:month', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const year = parseInt(req.params.year);
+    const month = parseInt(req.params.month);
+    const appointments = await db.getAppointmentsByMonth(year, month);
+    res.json(appointments);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+// Appointments - delete
+app.delete('/api/appointments/:id', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    await db.deleteAppointment(req.params.id);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+app.put('/api/appointments/:id', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    await db.updateAppointment(req.params.id, req.body);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+// Groceries
+app.get('/api/groceries', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const status = req.query.status || 'needed';
+    const groceries = await db.getGroceries(status);
+    res.json(groceries);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+// Receipts
+app.get('/api/receipts', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const filters = {};
+    if (req.query.month) filters.month = req.query.month;
+    if (req.query.category) filters.category = req.query.category;
+    const receipts = await db.getReceipts(filters);
+    res.json(receipts);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+// Budget summary by month
+app.get('/api/budget/:month', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const budget = await db.getBudgetSummary(req.params.month);
+    res.json(budget);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+// Receipts - save
+app.post('/api/receipts', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const result = await db.addReceipt(req.body);
+    res.json({ success: true, id: result.id });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+// Receipts - scan with Claude Vision
+app.post('/api/receipts/scan', requireAuth, async (req, res) => {
+  try {
+    const { image } = req.body;
+
+    if (!process.env.ANTHROPIC_API_KEY) {
+      // Mock scan result when no API key
+      res.json({
+        merchant: "Sample Store",
+        date: new Date().toISOString().split('T')[0],
+        total: 42.50,
+        category: "Groceries",
+        items: [
+          { name: "Milk", price: 4.99, quantity: "1" },
+          { name: "Bread", price: 3.49, quantity: "1" },
+          { name: "Eggs", price: 5.99, quantity: "1" },
+          { name: "Chicken Breast", price: 12.99, quantity: "1" },
+          { name: "Apples", price: 6.49, quantity: "1 bag" },
+          { name: "Rice", price: 8.55, quantity: "1" }
+        ]
+      });
+      return;
+    }
+
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': process.env.ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01'
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1500,
+        messages: [{
+          role: 'user',
+          content: [
+            { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: image } },
+            { type: 'text', text: 'Extract receipt data. Return ONLY valid JSON: {"merchant":"store name","date":"YYYY-MM-DD","total":0.00,"category":"Groceries|Dining Out|Gas/Transport|Household|Health|Entertainment|Kids|Other","items":[{"name":"item","price":0.00,"quantity":"1"}]}' }
+          ]
+        }]
+      })
+    });
+
+    const data = await response.json();
+    const text = data.content[0].text;
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      res.json(JSON.parse(jsonMatch[0]));
+    } else {
+      res.status(500).json({ error: 'Could not parse receipt' });
+    }
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Receipts - save scanned receipt (dual save: expenses + pantry)
+app.post('/api/receipts/save', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const { merchant, date, total, category, items, add_to_pantry } = req.body;
+
+    // Save receipt
+    const receipt = await db.addReceipt({
+      amount: total,
+      merchant,
+      date,
+      category: category || 'Other',
+      processed_by: 'scan',
+      added_by: req.session.user || 'jesse'
+    });
+
+    // Add items to pantry if requested
+    if (add_to_pantry && items && items.length > 0) {
+      for (const item of items) {
+        await db.addPantryItem({
+          item: item.name,
+          category: category === 'Groceries' ? guessItemCategory(item.name) : 'Other',
+          location: guessLocation(item.name),
+          quantity: item.quantity || '1',
+          receipt_id: receipt.id,
+          added_by: req.session.user || 'jesse'
+        });
+      }
+    }
+
+    res.json({ success: true, receipt_id: receipt.id, pantry_items: items ? items.length : 0 });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+app.delete('/api/receipts/:id', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    await db.deleteReceipt(req.params.id);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+// Helper: guess pantry category from item name
+function guessItemCategory(name) {
+  const n = name.toLowerCase();
+  if (/milk|cheese|yogurt|butter|cream/.test(n)) return 'Dairy';
+  if (/chicken|beef|pork|fish|salmon|shrimp|meat/.test(n)) return 'Meat';
+  if (/apple|banana|tomato|lettuce|onion|potato|carrot|fruit|vegetable/.test(n)) return 'Produce';
+  if (/bread|bagel|muffin|roll|bun/.test(n)) return 'Bakery';
+  if (/frozen|ice cream|pizza/.test(n)) return 'Frozen';
+  if (/rice|pasta|flour|sugar|cereal|oat/.test(n)) return 'Dry Goods';
+  if (/water|juice|soda|coffee|tea|beer|wine/.test(n)) return 'Beverages';
+  if (/chip|cookie|cracker|candy|snack/.test(n)) return 'Snacks';
+  if (/soap|detergent|paper|tissue|cleaner/.test(n)) return 'Household';
+  return 'Other';
+}
+
+// Helper: guess storage location from item name
+function guessLocation(name) {
+  const n = name.toLowerCase();
+  if (/milk|cheese|yogurt|butter|cream|chicken|beef|fish|egg|juice/.test(n)) return 'fridge';
+  if (/frozen|ice cream/.test(n)) return 'freezer';
+  if (/banana|apple|bread|potato|onion|tomato/.test(n)) return 'counter';
+  return 'pantry';
+}
+
+// Pantry CRUD
+app.get('/api/pantry', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const filters = {};
+    if (req.query.location) filters.location = req.query.location;
+    if (req.query.category) filters.category = req.query.category;
+    const items = await db.getPantry(filters);
+    res.json(items);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+app.post('/api/pantry', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const result = await db.addPantryItem(req.body);
+    res.json({ success: true, id: result.id });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+app.put('/api/pantry/:id', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    await db.updatePantryItem(req.params.id, req.body);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+app.delete('/api/pantry/:id', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    await db.deletePantryItem(req.params.id);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+// Cook - recipe suggestions (requires ANTHROPIC_API_KEY env var)
+app.post('/api/cook/suggest', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const pantryItems = await db.getPantry();
+    const pantryList = pantryItems.map(i => i.item + ' (' + (i.quantity || 1) + (i.unit ? ' ' + i.unit : '') + ')').join(', ');
+    const query = req.body.query || 'What can I make for dinner?';
+
+    // If no API key, return mock recipes
+    if (!process.env.ANTHROPIC_API_KEY) {
+      res.json({
+        recipes: [
+          {
+            name: "Quick Pasta",
+            cook_time: 20,
+            difficulty: "Easy",
+            servings: 4,
+            ingredients: pantryItems.slice(0, 4).map(i => ({ name: i.item, quantity: i.quantity, available: true }))
+              .concat([{ name: "Parmesan cheese", quantity: "1/2 cup", available: false }]),
+            steps: ["Boil water and cook pasta", "Sauté garlic in olive oil", "Combine and season", "Serve with parmesan"]
+          },
+          {
+            name: "Simple Stir Fry",
+            cook_time: 15,
+            difficulty: "Easy",
+            servings: 4,
+            ingredients: pantryItems.slice(0, 3).map(i => ({ name: i.item, quantity: i.quantity, available: true }))
+              .concat([{ name: "Soy sauce", quantity: "2 tbsp", available: false }]),
+            steps: ["Heat oil in wok", "Add vegetables and stir fry", "Add sauce", "Serve over rice"]
+          },
+          {
+            name: "Family Salad Bowl",
+            cook_time: 10,
+            difficulty: "Easy",
+            servings: 4,
+            ingredients: pantryItems.slice(0, 5).map(i => ({ name: i.item, quantity: i.quantity, available: true }))
+              .concat([{ name: "Feta cheese", quantity: "1/4 cup", available: false }]),
+            steps: ["Wash and chop vegetables", "Prepare dressing", "Toss together", "Top with cheese and serve"]
+          }
+        ]
+      });
+      return;
+    }
+
+    // Call Claude API for real suggestions
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': process.env.ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01'
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 2000,
+        messages: [{
+          role: 'user',
+          content: `You are a helpful cooking assistant for a family. Here is what's in their pantry: ${pantryList}
+
+Their question: ${query}
+
+Suggest exactly 3 recipes. Return ONLY valid JSON with this structure:
+{"recipes": [{"name": "...", "cook_time": 20, "difficulty": "Easy|Medium|Hard", "servings": 4, "ingredients": [{"name": "...", "quantity": "...", "available": true/false}], "steps": ["step 1", "step 2"]}]}
+
+Mark ingredients as available:true if they're in the pantry list, available:false if not.`
+        }]
+      })
+    });
+
+    const data = await response.json();
+    const text = data.content[0].text;
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      res.json(JSON.parse(jsonMatch[0]));
+    } else {
+      res.status(500).json({ error: 'Could not parse recipe response' });
+    }
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+// Cook - deduct ingredients from pantry
+app.post('/api/cook/deduct', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const { ingredients } = req.body;
+    const pantryItems = await db.getPantry();
+    for (const name of ingredients) {
+      const match = pantryItems.find(p => p.item.toLowerCase() === name.toLowerCase());
+      if (match) {
+        const qty = parseInt(match.quantity) || 1;
+        if (qty <= 1) {
+          await db.deletePantryItem(match.id);
+        } else {
+          await db.updatePantryItem(match.id, { quantity: String(qty - 1) });
+        }
+      }
+    }
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+// Trips
+app.get('/api/trips', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const filters = {};
+    if (req.query.status) filters.status = req.query.status;
+    if (req.query.traveler) filters.traveler = req.query.traveler;
+    const trips = await db.getTrips(filters);
+    res.json(trips);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+app.post('/api/trips', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const result = await db.createTrip(req.body);
+    res.json({ success: true, id: result.id });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+app.put('/api/trips/:id', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    await db.updateTrip(req.params.id, req.body);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+app.post('/api/trips/:id/arrive', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    await db.arriveTrip(req.params.id);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+app.post('/api/trips/:id/cancel', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    await db.cancelTrip(req.params.id);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+// Family addresses
+app.get('/api/addresses', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const addresses = await db.getFamilyAddresses();
+    res.json(addresses);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+app.post('/api/addresses', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const result = await db.addFamilyAddress(req.body);
+    res.json({ success: true, id: result.id });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+app.delete('/api/addresses/:id', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    await db.deleteFamilyAddress(req.params.id);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+// Decisions
+app.get('/api/decisions', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const decisions = await db.getDecisions({ status: req.query.status });
+    res.json(decisions);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+app.post('/api/decisions', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const result = await db.addDecision(req.body);
+    res.json({ success: true, id: result.id });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+app.put('/api/decisions/:id', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    await db.updateDecision(req.params.id, req.body);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+app.get('/api/decisions/:id/reactions', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const reactions = await db.getDecisionReactions(req.params.id);
+    res.json(reactions);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+app.post('/api/decisions/:id/reactions', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const { member_name, reaction_type, poll_choice } = req.body;
+    await db.replaceDecisionReaction(req.params.id, member_name, reaction_type, poll_choice);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+app.get('/api/decisions/:id/comments', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const comments = await db.getDecisionComments(req.params.id);
+    res.json(comments);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+app.post('/api/decisions/:id/comments', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    await db.addDecisionComment(req.params.id, req.body.member_name, req.body.text);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+// Rivalries
+app.get('/api/rivalries', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const rivalries = await db.getRivalries({ status: req.query.status });
+    res.json(rivalries);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+app.post('/api/rivalries', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const result = await db.addRivalry(req.body);
+    res.json({ success: true, id: result.id });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+app.put('/api/rivalries/:id', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    await db.updateRivalry(req.params.id, req.body);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+app.get('/api/rivalries/:id/entries', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const entries = await db.getRivalryEntries(req.params.id);
+    res.json(entries);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+app.post('/api/rivalries/:id/entries', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const entry = { ...req.body, rivalry_id: Number(req.params.id) };
+    await db.addRivalryEntry(entry);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+app.get('/api/rivalries/leaderboard', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const rows = await db.getRivalryLeaderboard();
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+// Gifts
+app.get('/api/gifts/people', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const people = await db.getGiftPeople();
+    res.json(people);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+app.post('/api/gifts/people', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const result = await db.addGiftPerson(req.body);
+    res.json({ success: true, id: result.id });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+app.get('/api/gifts/ideas', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const ideas = await db.getGiftIdeas(req.query.person_id ? Number(req.query.person_id) : null);
+    res.json(ideas);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+app.post('/api/gifts/ideas', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const result = await db.addGiftIdea(req.body);
+    res.json({ success: true, id: result.id });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+app.put('/api/gifts/ideas/:id', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    await db.updateGiftIdea(req.params.id, req.body);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+app.delete('/api/gifts/ideas/:id', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    await db.deleteGiftIdea(req.params.id);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+app.get('/api/gifts/events', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const events = await db.getSpecialEvents();
+    res.json(events);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+app.post('/api/gifts/events', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const result = await db.addSpecialEvent(req.body);
+    res.json({ success: true, id: result.id });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+app.delete('/api/gifts/events/:id', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    await db.deleteSpecialEvent(req.params.id);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
