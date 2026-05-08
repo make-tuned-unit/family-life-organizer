@@ -264,12 +264,19 @@ struct HomeView: View {
                 VStack(spacing: 0) {
                     ForEach(Array(viewModel.todayAppointments.prefix(3).enumerated()), id: \.element.id) { index, appt in
                         if index > 0 { GlassDivider() }
-                        WarmAgendaRow(
-                            time: appt.appointment_time ?? "",
-                            title: appt.title,
-                            subtitle: appt.location ?? "",
-                            tagInitial: appt.person_tags.flatMap { $0.first.map(String.init) }
-                        )
+                        NavigationLink {
+                            EventDetailView(appointment: appt) {
+                                await viewModel.loadAll(api: api)
+                            }
+                        } label: {
+                            WarmAgendaRow(
+                                time: appt.appointment_time ?? "",
+                                title: appt.title,
+                                subtitle: appt.location ?? "",
+                                tagInitial: appt.person_tags.flatMap { $0.first.map(String.init) }
+                            )
+                        }
+                        .buttonStyle(.plain)
                     }
                     if viewModel.todayAppointments.count < 3 {
                         ForEach(Array(viewModel.activeTasks.prefix(3 - viewModel.todayAppointments.count).enumerated()), id: \.element.id) { _, task in

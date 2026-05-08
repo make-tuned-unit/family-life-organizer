@@ -12,7 +12,7 @@ struct CalendarView: View {
     @Environment(APIService.self) private var api
     @State private var viewModel = CalendarViewModel()
     @State private var showingAddAppointment = false
-    @State private var appointmentToEdit: AppointmentResponse?
+    @State private var selectedEvent: AppointmentResponse?
     @State private var displayMode: CalendarDisplayMode = .month
     @State private var showingCareCascade = false
 
@@ -70,9 +70,11 @@ struct CalendarView: View {
         .sheet(isPresented: $showingCareCascade) {
             NavigationStack { CareCascadeView() }
         }
-        .sheet(item: $appointmentToEdit) { appt in
-            EditAppointmentView(appointment: appt) {
-                Task { await viewModel.loadMonth(api: api) }
+        .sheet(item: $selectedEvent) { appt in
+            NavigationStack {
+                EventDetailView(appointment: appt) {
+                    await viewModel.loadMonth(api: api)
+                }
             }
         }
         .overlay {
@@ -248,7 +250,7 @@ struct CalendarView: View {
             } else {
                 VStack(spacing: 10) {
                     ForEach(dayAppointments) { appt in
-                        Button { appointmentToEdit = appt } label: {
+                        Button { selectedEvent = appt } label: {
                             CalendarEventCard(appointment: appt)
                         }
                         .buttonStyle(.plain)
@@ -320,7 +322,7 @@ struct CalendarView: View {
             } else {
                 VStack(spacing: 10) {
                     ForEach(dayAppointments) { appt in
-                        Button { appointmentToEdit = appt } label: {
+                        Button { selectedEvent = appt } label: {
                             CalendarEventCard(appointment: appt)
                         }
                         .buttonStyle(.plain)
