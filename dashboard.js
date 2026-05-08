@@ -15,8 +15,8 @@ const LEGACY_USERS = {
 };
 
 // Middleware
-app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: true }));
+app.use(bodyParser.json({ limit: '10mb' }));
+app.use(bodyParser.urlencoded({ extended: true, limit: '10mb' }));
 app.use(session({
   secret: '***REMOVED***',
   resave: false,
@@ -2580,6 +2580,7 @@ async function initializeDatabase() {
 // Start server after DB init
 initializeDatabase().then(() => {
   app.listen(PORT, () => {
-    console.log('Family Life Organizer running on port', PORT);
+    console.log('Kinrows running on port', PORT);
+    console.log('AI features:', process.env.ANTHROPIC_API_KEY ? 'ENABLED' : 'DISABLED (no ANTHROPIC_API_KEY)');
   });
 });
