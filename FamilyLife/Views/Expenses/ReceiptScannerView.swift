@@ -1,9 +1,15 @@
 import SwiftUI
 import PhotosUI
+import AVFoundation
 
 struct ReceiptScannerView: View {
     @Environment(APIService.self) private var api
     @Environment(\.dismiss) private var dismiss
+
+    /// If set, scanned receipt is saved as a project expense instead of a budget receipt
+    var projectId: Int?
+    var projectName: String?
+    var onProjectExpenseSaved: (() async -> Void)?
 
     @State private var selectedPhoto: PhotosPickerItem?
     @State private var imageData: Data?
@@ -13,16 +19,16 @@ struct ReceiptScannerView: View {
     @State private var error: String?
     @State private var addToPantry = true
     @State private var showingCamera = false
-    @State private var showingSourcePicker = true
+    @State private var cameraPermissionDenied = false
+
+    private var isProjectMode: Bool { projectId != nil }
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 20) {
-                    if showingSourcePicker && imageData == nil && !isScanning {
+                    if imageData == nil && !isScanning {
                         sourcePickerSection
-                    } else if imageData == nil && !isScanning {
-                        photoPickerSection
                     }
 
                     if isScanning {
@@ -48,6 +54,25 @@ struct ReceiptScannerView: View {
                         .padding(.horizontal)
                     }
 
+                    if cameraPermissionDenied {
+                        VStack(spacing: 8) {
+                            Text("Camera access denied")
+                                .font(.subheadline.weight(.semibold))
+                            Text("Go to Settings > Kinrows to enable camera access.")
+                                .font(.caption)
+                                .foregroundStyle(WarmPalette.ink3)
+                            Button("Open Settings") {
+                                if let url = URL(string: UIApplication.openSettingsURLString) {
+                                    UIApplication.shared.open(url)
+                                }
+                            }
+                            .font(.subheadline.weight(.medium))
+                        }
+                        .padding()
+                        .glassEffect(.regular.tint(.white.opacity(0.03)), in: .rect(cornerRadius: 16))
+                        .padding(.horizontal)
+                    }
+
                     if let result = scanResult {
                         scanResultSection(result)
                     }
@@ -55,7 +80,7 @@ struct ReceiptScannerView: View {
                 .padding(.vertical)
             }
             .background { AmbientBackground(style: .expenses) }
-            .navigationTitle("Scan Receipt")
+            .navigationTitle(isProjectMode ? "Scan for \(projectName ?? "Project")" : "Scan Receipt")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -64,10 +89,9 @@ struct ReceiptScannerView: View {
                 }
             }
             .onChange(of: selectedPhoto) { loadAndScan() }
-            .fullScreenCover(isPresented: $showingCamera) {
+            .sheet(isPresented: $showingCamera) {
                 CameraView { data in
                     imageData = data
-                    showingSourcePicker = false
                     scanImage(data)
                 }
                 .ignoresSafeArea()
@@ -75,11 +99,16 @@ struct ReceiptScannerView: View {
         }
     }
 
-    // MARK: - Source Picker (Camera vs Library)
+    // MARK: - Source Picker
 
     private var sourcePickerSection: some View {
         VStack(spacing: 14) {
-            Text("Scan a receipt")
+            Image(systemName: "doc.text.viewfinder")
+                .font(.system(size: 44))
+                .foregroundStyle(TabAccent.expenses.color)
+                .padding(.bottom, 4)
+
+            Text(isProjectMode ? "Scan receipt for \(projectName ?? "project")" : "Scan a receipt")
                 .font(.system(size: 22, weight: .bold))
                 .foregroundStyle(WarmPalette.ink1)
             Text("Take a photo or choose from your library. AI will extract the merchant, items, and total.")
@@ -90,7 +119,7 @@ struct ReceiptScannerView: View {
                 .padding(.bottom, 8)
 
             // Camera button
-            Button { showingCamera = true } label: {
+            Button { requestCameraAndShow() } label: {
                 HStack(spacing: 12) {
                     Image(systemName: "camera.fill")
                         .font(.system(size: 20))
@@ -105,7 +134,7 @@ struct ReceiptScannerView: View {
             }
             .padding(.horizontal, 22)
 
-            // Photo library button
+            // Photo library
             PhotosPicker(selection: $selectedPhoto, matching: .images) {
                 HStack(spacing: 12) {
                     Image(systemName: "photo.on.rectangle")
@@ -123,31 +152,10 @@ struct ReceiptScannerView: View {
         .padding(.top, 20)
     }
 
-    private var photoPickerSection: some View {
-        PhotosPicker(selection: $selectedPhoto, matching: .images) {
-            VStack(spacing: 16) {
-                Image(systemName: "camera.viewfinder")
-                    .font(.system(size: 48))
-                    .foregroundStyle(TabAccent.home.color)
-                Text("Select Receipt Photo")
-                    .font(.headline)
-                Text("Take a photo or choose from library")
-                    .font(.caption)
-                    .foregroundStyle(WarmPalette.ink3)
-            }
-            .frame(maxWidth: .infinity)
-            .frame(height: 200)
-            .background(WarmPalette.ink1.opacity(0.06))
-            .clipShape(RoundedRectangle(cornerRadius: 16))
-        }
-        .padding(.horizontal)
-    }
-
     // MARK: - Scan Results
 
     private func scanResultSection(_ result: ScanResult) -> some View {
         VStack(alignment: .leading, spacing: 16) {
-            // Summary
             HStack {
                 VStack(alignment: .leading) {
                     Text(result.merchant).font(.headline)
@@ -162,7 +170,19 @@ struct ReceiptScannerView: View {
             .background(WarmPalette.ink1.opacity(0.06))
             .clipShape(RoundedRectangle(cornerRadius: 12))
 
-            // Items
+            if isProjectMode {
+                HStack(spacing: 8) {
+                    Image(systemName: "hammer.fill")
+                        .foregroundStyle(AccentTheme.sage.color)
+                    Text("Saving to: \(projectName ?? "Project")")
+                        .font(.subheadline.weight(.medium))
+                }
+                .padding(10)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(AccentTheme.sage.color.opacity(0.1))
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+            }
+
             Text("Items Found").font(.headline)
             ForEach(Array(result.items.enumerated()), id: \.offset) { _, item in
                 HStack {
@@ -177,7 +197,6 @@ struct ReceiptScannerView: View {
                 .padding(.vertical, DesignTokens.Spacing.chipVerticalPadding)
             }
 
-            // Category
             HStack {
                 Text("Category").font(.subheadline.weight(.medium))
                 Spacer()
@@ -189,28 +208,28 @@ struct ReceiptScannerView: View {
                     .clipShape(Capsule())
             }
 
-            Toggle("Also add items to Pantry", isOn: $addToPantry).font(.subheadline)
+            if !isProjectMode {
+                Toggle("Also add items to Pantry", isOn: $addToPantry).font(.subheadline)
+            }
 
-            // Save
             Button { save() } label: {
                 if isSaving {
                     ProgressView().frame(maxWidth: .infinity)
                 } else {
-                    Text("Save Receipt\(addToPantry ? " & Stock Pantry" : "")")
+                    Text(isProjectMode ? "Add to Project" : "Save Receipt\(addToPantry ? " & Stock Pantry" : "")")
                         .font(.headline).frame(maxWidth: .infinity)
                 }
             }
             .buttonStyle(.borderedProminent)
-            .tint(TabAccent.home.color)
+            .tint(isProjectMode ? AccentTheme.sage.color : TabAccent.home.color)
             .controlSize(.large)
             .disabled(isSaving)
 
-            // Retake
             Button {
                 imageData = nil
                 scanResult = nil
-                showingSourcePicker = true
                 selectedPhoto = nil
+                error = nil
             } label: {
                 Text("Scan another")
                     .font(.system(size: 14, weight: .medium))
@@ -223,9 +242,31 @@ struct ReceiptScannerView: View {
 
     // MARK: - Actions
 
+    private func requestCameraAndShow() {
+        guard UIImagePickerController.isSourceTypeAvailable(.camera) else {
+            error = "Camera not available on this device."
+            return
+        }
+
+        switch AVCaptureDevice.authorizationStatus(for: .video) {
+        case .authorized:
+            showingCamera = true
+        case .notDetermined:
+            AVCaptureDevice.requestAccess(for: .video) { granted in
+                DispatchQueue.main.async {
+                    if granted { showingCamera = true }
+                    else { cameraPermissionDenied = true }
+                }
+            }
+        case .denied, .restricted:
+            cameraPermissionDenied = true
+        @unknown default:
+            showingCamera = true
+        }
+    }
+
     private func loadAndScan() {
         guard let selectedPhoto else { return }
-        showingSourcePicker = false
         Task {
             guard let data = try? await selectedPhoto.loadTransferable(type: Data.self) else { return }
             imageData = data
@@ -251,7 +292,20 @@ struct ReceiptScannerView: View {
         isSaving = true
         Task {
             do {
-                try await api.saveScannedReceipt(result: result, addToPantry: addToPantry)
+                if let projectId {
+                    // Save as project expense
+                    let expenseData: [String: Any] = [
+                        "description": "\(result.merchant) - \(result.category)",
+                        "amount": result.total,
+                        "category": result.category,
+                        "notes": result.items.map(\.name).joined(separator: ", ")
+                    ]
+                    let _ = try await api.addProjectExpense(projectId: projectId, expense: expenseData)
+                    await onProjectExpenseSaved?()
+                } else {
+                    // Save as budget receipt
+                    try await api.saveScannedReceipt(result: result, addToPantry: addToPantry)
+                }
                 dismiss()
             } catch {
                 self.error = "Failed to save: \(error.localizedDescription)"
@@ -261,7 +315,7 @@ struct ReceiptScannerView: View {
     }
 }
 
-// MARK: - Camera View (UIImagePickerController wrapper)
+// MARK: - Camera View
 
 struct CameraView: UIViewControllerRepresentable {
     let onCapture: (Data) -> Void
@@ -275,16 +329,11 @@ struct CameraView: UIViewControllerRepresentable {
 
     func updateUIViewController(_ uiViewController: UIImagePickerController, context: Context) {}
 
-    func makeCoordinator() -> Coordinator {
-        Coordinator(onCapture: onCapture)
-    }
+    func makeCoordinator() -> Coordinator { Coordinator(onCapture: onCapture) }
 
     class Coordinator: NSObject, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
         let onCapture: (Data) -> Void
-
-        init(onCapture: @escaping (Data) -> Void) {
-            self.onCapture = onCapture
-        }
+        init(onCapture: @escaping (Data) -> Void) { self.onCapture = onCapture }
 
         func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey: Any]) {
             if let image = info[.originalImage] as? UIImage,
