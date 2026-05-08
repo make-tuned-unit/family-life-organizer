@@ -2331,6 +2331,19 @@ app.delete('/api/projects/:projectId/expenses/:id', requireAuth, async (req, res
   }
 });
 
+// Activity feed (unified home feed)
+app.get('/api/activity', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const feed = await db.getActivityFeed(parseInt(req.query.limit) || 20);
+    res.json(feed);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
 // ============================================
 // Lists
 // ============================================

@@ -74,7 +74,8 @@ struct FloatingTabBar: View {
                             if selectedTab == tab {
                                 Circle()
                                     .fill(.clear)
-                                    .glassEffect(.regular.tint(accentColor(for: tab).opacity(0.12)), in: .circle)
+                                    .glassEffect(.regular.tint(accentColor(for: tab).opacity(0.2)), in: .circle)
+                                    .shadow(color: accentColor(for: tab).opacity(0.25), radius: 8, y: 2)
                             }
                         }
                 }

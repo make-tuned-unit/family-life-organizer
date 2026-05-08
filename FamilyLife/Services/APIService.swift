@@ -559,6 +559,23 @@ final class APIService {
         let _: SuccessResponse = try await delete("/api/projects/\(projectId)/expenses/\(expenseId)")
     }
 
+    // MARK: - Activity Feed
+
+    struct ActivityItem: Codable, Identifiable {
+        var id: String { "\(feed_type)-\(ref_id)-\(created_at ?? "")" }
+        let feed_type: String   // decision | event | coverage | post
+        let ref_id: Int
+        let title: String?
+        let body: String?
+        let author: String?
+        let status: String?
+        let created_at: String?
+    }
+
+    func fetchActivity(limit: Int = 20) async throws -> [ActivityItem] {
+        try await get("/api/activity", queryParams: ["limit": String(limit)])
+    }
+
     // MARK: - Lists
 
     struct ListResponse: Codable, Identifiable {

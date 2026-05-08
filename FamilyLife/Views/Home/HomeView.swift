@@ -8,6 +8,7 @@ struct HomeView: View {
     @State private var showingAddTask = false
     @State private var showingSettings = false
     @State private var todaySteps: Int?
+    @State private var activityFeed: [APIService.ActivityItem] = []
     @State private var activeTrips: [TripResponse] = []
     @State private var healthKit = HealthKitManager()
 
@@ -33,7 +34,7 @@ struct HomeView: View {
                 heroFocusCard
                 statsGrid
                 upNextSection
-                quickActions
+                activityFeedSection
             }
             .padding(.bottom, DesignTokens.Spacing.bottomBuffer)
         }
@@ -82,6 +83,7 @@ struct HomeView: View {
             }
         }
         do { activeTrips = try await api.fetchTrips(status: "active") } catch {}
+        do { activityFeed = try await api.fetchActivity() } catch {}
     }
 
     private var errorAlertIsPresented: Binding<Bool> {
@@ -297,70 +299,23 @@ struct HomeView: View {
         }
     }
 
-    // MARK: - Quick Actions (replaces Henry suggestion)
+    // MARK: - Activity Feed
 
-    private var quickActions: some View {
-        VStack(spacing: 10) {
-            Button { selectedTab = .lists } label: {
-                quickActionRow(
-                    icon: "list.bullet.rectangle.fill",
-                    title: "\(viewModel.summary?.groceries_needed ?? 0) items on grocery list",
-                    subtitle: "Tap to view and add",
-                    color: TabAccent.home.color
-                )
-            }
-            .buttonStyle(.plain)
+    @ViewBuilder
+    private var activityFeedSection: some View {
+        if !activityFeed.isEmpty {
+            WarmSectionHeader(title: "Feed")
+                .padding(.bottom, 8)
 
-            Button { selectedTab = .decisions } label: {
-                quickActionRow(
-                    icon: "bubble.left.and.bubble.right.fill",
-                    title: "What's for dinner?",
-                    subtitle: "Post an idea or ask the family",
-                    color: TabAccent.decisions.color
-                )
+            VStack(spacing: 8) {
+                ForEach(activityFeed.prefix(10)) { item in
+                    ActivityFeedCard(item: item, selectedTab: $selectedTab)
+                }
             }
-            .buttonStyle(.plain)
-
-            Button { selectedTab = .more } label: {
-                quickActionRow(
-                    icon: "ellipsis.circle.fill",
-                    title: "Budget, Rivalries, Gifts & more",
-                    subtitle: "All your other tools",
-                    color: WarmPalette.ink3
-                )
-            }
-            .buttonStyle(.plain)
+            .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
+            .padding(.bottom, 18)
         }
-        .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
-        .padding(.bottom, 18)
     }
-
-    private func quickActionRow(icon: String, title: String, subtitle: String, color: Color) -> some View {
-        HStack(spacing: 12) {
-            Image(systemName: icon)
-                .font(.system(size: 18, weight: .medium))
-                .foregroundStyle(color)
-                .frame(width: 36, height: 36)
-                .background(color.opacity(0.15))
-                .clipShape(Circle())
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(WarmPalette.ink1)
-                Text(subtitle)
-                    .font(.system(size: 13))
-                    .foregroundStyle(WarmPalette.ink3)
-            }
-            Spacer()
-            Image(systemName: "chevron.right")
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(WarmPalette.ink4)
-        }
-        .padding(14)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
-    }
-
-    // miniCard removed — quick actions now use quickActionRow
 }
 
 // MARK: - Row Components
@@ -450,6 +405,115 @@ struct GroceryRow: View {
         }
         .padding(DesignTokens.Spacing.cardPadding)
         .flCard(tint: WarmPalette.good)
+    }
+}
+
+// MARK: - Activity Feed Card
+
+struct ActivityFeedCard: View {
+    let item: APIService.ActivityItem
+    @Binding var selectedTab: MainTab
+
+    var body: some View {
+        Button { navigate() } label: {
+            HStack(spacing: 12) {
+                Image(systemName: iconName)
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(accentColor)
+                    .frame(width: 32, height: 32)
+                    .background(accentColor.opacity(0.15))
+                    .clipShape(Circle())
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(headline)
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(WarmPalette.ink1)
+                        .lineLimit(1)
+                    if let sub = subtitle {
+                        Text(sub)
+                            .font(.system(size: 12))
+                            .foregroundStyle(WarmPalette.ink3)
+                            .lineLimit(1)
+                    }
+                }
+
+                Spacer()
+
+                Text(typeBadge)
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(accentColor)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .glassEffect(.regular.tint(accentColor.opacity(0.08)), in: .capsule)
+            }
+            .padding(12)
+            .glassEffect(.regular.tint(.white.opacity(0.03)), in: .rect(cornerRadius: 16))
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var headline: String {
+        switch item.feed_type {
+        case "decision":
+            return "\(item.author ?? "Someone") posted: \(item.title ?? "a decision")"
+        case "event":
+            return item.title ?? "Upcoming event"
+        case "coverage":
+            return "Coverage: \(item.title ?? "request")"
+        case "post":
+            return "\(item.author ?? "Someone"): \(item.title ?? item.body ?? "shared something")"
+        default:
+            return item.title ?? "Activity"
+        }
+    }
+
+    private var subtitle: String? {
+        switch item.feed_type {
+        case "decision": return "Tap to vote or comment"
+        case "event": return item.body // location
+        case "coverage":
+            return item.status == "approved" ? "Confirmed - book your time" : "Waiting for reply"
+        case "post": return item.body
+        default: return nil
+        }
+    }
+
+    private var iconName: String {
+        switch item.feed_type {
+        case "decision": "bubble.left.and.bubble.right.fill"
+        case "event": "calendar"
+        case "coverage": "arrow.triangle.swap"
+        case "post": "text.bubble.fill"
+        default: "bell.fill"
+        }
+    }
+
+    private var accentColor: Color {
+        switch item.feed_type {
+        case "decision": TabAccent.decisions.color
+        case "event": TabAccent.calendar.color
+        case "coverage": TabAccent.care.color
+        case "post": AccentTheme.ocean.color
+        default: WarmPalette.ink3
+        }
+    }
+
+    private var typeBadge: String {
+        switch item.feed_type {
+        case "decision": "Decision"
+        case "event": "Event"
+        case "coverage": "Coverage"
+        case "post": "Post"
+        default: "Update"
+        }
+    }
+
+    private func navigate() {
+        switch item.feed_type {
+        case "decision": selectedTab = .decisions
+        case "event": selectedTab = .calendar
+        default: break
+        }
     }
 }
 

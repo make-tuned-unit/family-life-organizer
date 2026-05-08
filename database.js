@@ -666,37 +666,19 @@ class FamilyDB {
     return new Promise((resolve, reject) => {
       const sql = `
         WITH participants AS (
-          SELECT initiator_name AS member_name FROM rivalries
-          UNION ALL
-          SELECT opponent_name AS member_name FROM rivalries
-        ),
-        completions AS (
-          SELECT initiator_name AS member_name, COUNT(*) AS completed_count
-          FROM rivalries
-          WHERE status = 'completed'
-          GROUP BY initiator_name
-          UNION ALL
-          SELECT opponent_name AS member_name, COUNT(*) AS completed_count
-          FROM rivalries
-          WHERE status = 'completed'
-          GROUP BY opponent_name
-        ),
-        wins AS (
-          SELECT winner_name AS member_name, COUNT(*) AS wins_count, COALESCE(SUM(point_value), 0) AS points
-          FROM rivalries
-          WHERE status = 'completed' AND winner_name IS NOT NULL
-          GROUP BY winner_name
+          SELECT DISTINCT member_name FROM (
+            SELECT initiator_name AS member_name FROM rivalries
+            UNION
+            SELECT opponent_name AS member_name FROM rivalries
+          )
         )
         SELECT
           p.member_name,
-          COALESCE(SUM(c.completed_count), 0) AS rivalries_completed,
-          COALESCE(SUM(w.wins_count), 0) AS rivalries_won,
-          COALESCE(SUM(w.points), 0) AS total_points
+          (SELECT COUNT(*) FROM rivalries WHERE status = 'completed' AND (initiator_name = p.member_name OR opponent_name = p.member_name)) AS rivalries_completed,
+          (SELECT COUNT(*) FROM rivalries WHERE status = 'completed' AND winner_name = p.member_name) AS rivalries_won,
+          COALESCE((SELECT SUM(point_value) FROM rivalries WHERE status = 'completed' AND winner_name = p.member_name), 0) AS total_points
         FROM participants p
-        LEFT JOIN completions c ON c.member_name = p.member_name
-        LEFT JOIN wins w ON w.member_name = p.member_name
-        GROUP BY p.member_name
-        ORDER BY total_points DESC, rivalries_won DESC, member_name ASC
+        ORDER BY total_points DESC, rivalries_won DESC, p.member_name ASC
       `;
       this.db.all(sql, [], (err, rows) => err ? reject(err) : resolve(rows));
     });
@@ -1223,6 +1205,38 @@ class FamilyDB {
   }
 
   // Get daily summary
+  // Unified activity feed — merges recent decisions, events, coverage, and posts
+  getActivityFeed(limit = 20) {
+    return new Promise((resolve, reject) => {
+      const sql = `
+        SELECT 'decision' as feed_type, id as ref_id, title, NULL as body,
+          creator_name as author, status, created_at
+        FROM decisions WHERE status = 'active'
+        UNION ALL
+        SELECT 'event' as feed_type, id as ref_id, title, location as body,
+          person_tags as author, 'upcoming' as status,
+          created_at
+        FROM appointments WHERE appointment_date >= date('now') AND appointment_date <= date('now', '+7 days')
+        UNION ALL
+        SELECT 'coverage' as feed_type, cr.id as ref_id, cr.reason as title, cr.note as body,
+          u.name as author, cr.status,
+          cr.created_at
+        FROM coverage_requests cr
+        JOIN users u ON u.id = cr.requester_id
+        WHERE cr.status IN ('pending', 'approved')
+        UNION ALL
+        SELECT 'post' as feed_type, fp.id as ref_id, fp.title, fp.body,
+          u.name as author, fp.post_type as status,
+          fp.created_at
+        FROM feed_posts fp
+        JOIN users u ON u.id = fp.author_id
+        ORDER BY created_at DESC
+        LIMIT ?
+      `;
+      this.db.all(sql, [limit], (err, rows) => err ? reject(err) : resolve(rows));
+    });
+  }
+
   getDailySummary() {
     return new Promise((resolve, reject) => {
       const sql = `
