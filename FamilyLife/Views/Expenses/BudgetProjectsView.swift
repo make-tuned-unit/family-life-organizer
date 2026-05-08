@@ -38,6 +38,8 @@ final class BudgetProjectStore {
         error = nil
         do {
             projects = try await api.fetchProjects()
+        } catch is CancellationError {
+            // Ignore — task was cancelled by view dismissal
         } catch {
             self.error = error.localizedDescription
         }
@@ -324,14 +326,15 @@ struct ProjectDetailView: View {
                     }
                 }
             }
-            .sheet(isPresented: $showingScanReceipt) {
+            .sheet(isPresented: $showingScanReceipt, onDismiss: {
+                Task {
+                    await store.loadAll(api: api)
+                    await loadExpenses()
+                }
+            }) {
                 ReceiptScannerView(
                     projectId: projectID,
-                    projectName: project.name,
-                    onProjectExpenseSaved: {
-                        await store.loadAll(api: api)
-                        await loadExpenses()
-                    }
+                    projectName: project.name
                 )
             }
             .task { await loadExpenses() }
