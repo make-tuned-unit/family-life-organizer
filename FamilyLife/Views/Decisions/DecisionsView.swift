@@ -1,207 +1,336 @@
 import SwiftUI
-import SwiftData
 
 struct DecisionsView: View {
-    @Environment(\.dismiss) private var dismiss
-    @Environment(\.modelContext) private var modelContext
-    @Query(sort: \Decision.createdAt, order: .reverse)
-    private var allDecisions: [Decision]
+    var showsDismissButton = false
 
+    @Environment(\.dismiss) private var dismiss
+    @Environment(APIService.self) private var api
+
+    @State private var decisions: [DecisionResponse] = []
     @State private var showingNewDecision = false
     @State private var filterType: DecisionType?
+    @State private var error: String?
+    @State private var isLoading = false
 
-    private var activeDecisions: [Decision] {
-        allDecisions.filter { $0.status == .active }
+    private var activeDecisions: [DecisionResponse] {
+        decisions.filter { $0.status == DecisionStatus.active.rawValue }
     }
 
-    private var resolvedDecisions: [Decision] {
-        allDecisions.filter { $0.status == .resolved || $0.status == .expired }
+    private var resolvedDecisions: [DecisionResponse] {
+        decisions.filter { $0.status == DecisionStatus.resolved.rawValue || $0.status == DecisionStatus.expired.rawValue }
     }
 
-    private var filteredActive: [Decision] {
-        guard let filter = filterType else { return activeDecisions }
-        return activeDecisions.filter { $0.decisionType == filter }
+    private var filteredActive: [DecisionResponse] {
+        guard let filterType else { return activeDecisions }
+        return activeDecisions.filter { $0.decision_type == filterType.rawValue }
     }
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 16) {
-                // Filter chips
-                ScrollView(.horizontal, showsIndicators: false) {
-                    GlassEffectContainer(spacing: 6) {
-                        HStack(spacing: 6) {
-                            FilterChip(label: "All", isSelected: filterType == nil, tint: TabAccent.decisions.color) {
-                                filterType = nil
-                            }
-                            ForEach(DecisionType.allCases) { type in
-                                FilterChip(label: type.displayName, icon: type.icon, isSelected: filterType == type, tint: TabAccent.decisions.color) {
-                                    filterType = filterType == type ? nil : type
-                                }
-                            }
-                        }
-                    }
-                    .padding(.horizontal)
-                }
-
-                // Active decisions
-                if filteredActive.isEmpty && resolvedDecisions.isEmpty {
-                    ContentUnavailableView {
-                        Label("No Decisions Yet", systemImage: "bubble.left.and.bubble.right.fill")
-                    } description: {
-                        Text("Share something with your family for input!")
-                    } actions: {
-                        Button("Share Something") {
-                            showingNewDecision = true
-                        }
-                        .buttonStyle(.flPrimary(tint: TabAccent.decisions.color))
-                    }
-                    .padding(.top, DesignTokens.Spacing.large)
-                }
-
-                ForEach(filteredActive) { decision in
-                    NavigationLink {
-                        DecisionDetailView(decision: decision)
-                    } label: {
-                        DecisionCard(decision: decision)
-                    }
-                    .buttonStyle(.plain)
-                    .padding(.horizontal)
-                }
-
-                // Resolved
-                if !resolvedDecisions.isEmpty {
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("Resolved")
-                            .font(.headline)
-                            .foregroundStyle(.secondary)
-                            .padding(.horizontal)
-
-                        ForEach(resolvedDecisions.prefix(5)) { decision in
-                            NavigationLink {
-                                DecisionDetailView(decision: decision)
-                            } label: {
-                                DecisionCard(decision: decision)
-                            }
-                            .buttonStyle(.plain)
-                            .opacity(0.6)
-                            .padding(.horizontal)
-                        }
-                    }
-                }
+        ScrollView(showsIndicators: false) {
+            VStack(spacing: 0) {
+                headerSection
+                filterChips
+                askAIBanner
+                activeList
+                resolvedList
             }
-            .padding(.vertical)
+            .padding(.bottom, DesignTokens.Spacing.bottomBuffer)
         }
         .background { AmbientBackground(style: .decisions) }
-        .navigationTitle("What do you think?")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackgroundVisibility(.hidden, for: .navigationBar)
         .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
-                Button("Done") { dismiss() }
+            if showsDismissButton {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Done") { dismiss() }
+                        .foregroundStyle(WarmPalette.ink2)
+                }
             }
             ToolbarItem(placement: .topBarTrailing) {
-                Button { showingNewDecision = true } label: {
-                    Image(systemName: "plus")
+                GlassIconButton(systemName: "plus") {
+                    showingNewDecision = true
                 }
             }
         }
         .sheet(isPresented: $showingNewDecision) {
-            NewDecisionView()
+            NewDecisionView { await loadDecisions() }
         }
+        .refreshable { await loadDecisions() }
+        .overlay {
+            if isLoading && decisions.isEmpty { ProgressView() }
+        }
+        .alert("Couldn't load decisions", isPresented: errorAlertIsPresented) {
+            Button("OK") { error = nil }
+        } message: {
+            Text(error ?? "An unexpected error occurred.")
+        }
+        .task { await loadDecisions() }
+    }
+
+    // MARK: - Header
+
+    private var headerSection: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("\(activeDecisions.count) ACTIVE")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(WarmPalette.ink3)
+                    .tracking(0.4)
+                Text("Decisions")
+                    .font(.system(size: 28, weight: .bold))
+                    .foregroundStyle(WarmPalette.ink1)
+            }
+            Spacer()
+        }
+        .padding(.horizontal, 22)
+        .padding(.top, 14)
+        .padding(.bottom, 12)
+    }
+
+    // MARK: - Filter Chips
+
+    private var filterChips: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                WarmChip(label: "All", isActive: filterType == nil) {
+                    filterType = nil
+                }
+                ForEach(DecisionType.allCases) { type in
+                    WarmChip(label: type.displayName, isActive: filterType == type) {
+                        filterType = filterType == type ? nil : type
+                    }
+                }
+            }
+            .padding(.horizontal, 22)
+        }
+        .padding(.bottom, 14)
+    }
+
+    // MARK: - Ask AI Banner
+
+    private var askAIBanner: some View {
+        Button { showingNewDecision = true } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "fork.knife")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(TabAccent.decisions.color)
+                    .frame(width: 36, height: 36)
+                    .background(TabAccent.decisions.color.opacity(0.15))
+                    .clipShape(Circle())
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("What's for dinner?")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(WarmPalette.ink1)
+                    Text("Post a recipe idea or ask AI for suggestions")
+                        .font(.system(size: 13))
+                        .foregroundStyle(WarmPalette.ink3)
+                }
+
+                Spacer()
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(WarmPalette.ink4)
+            }
+            .padding(14)
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
+        }
+        .buttonStyle(.plain)
+        .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
+        .padding(.bottom, 14)
+    }
+
+    // MARK: - Active Decisions
+
+    @ViewBuilder
+    private var activeList: some View {
+        if filteredActive.isEmpty && resolvedDecisions.isEmpty && !isLoading {
+            WarmEmptyState(
+                title: "No decisions yet",
+                systemImage: "bubble.left.and.bubble.right.fill",
+                description: "Share something with your family for input"
+            )
+        } else {
+            ForEach(filteredActive) { decision in
+                NavigationLink {
+                    DecisionDetailView(decision: decision)
+                } label: {
+                    DecisionCard(decision: decision)
+                }
+                .buttonStyle(.plain)
+                .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
+                .padding(.bottom, 10)
+            }
+        }
+    }
+
+    // MARK: - Resolved
+
+    @ViewBuilder
+    private var resolvedList: some View {
+        if !resolvedDecisions.isEmpty {
+            WarmSectionHeader(title: "Resolved")
+                .padding(.top, 8)
+                .padding(.bottom, 8)
+
+            ForEach(resolvedDecisions.prefix(5)) { decision in
+                NavigationLink {
+                    DecisionDetailView(decision: decision)
+                } label: {
+                    DecisionCard(decision: decision)
+                }
+                .buttonStyle(.plain)
+                .opacity(0.6)
+                .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
+                .padding(.bottom, 10)
+            }
+        }
+    }
+
+    private func loadDecisions() async {
+        isLoading = true
+        error = nil
+        do {
+            decisions = try await api.fetchDecisions()
+        } catch {
+            decisions = []
+            self.error = error.localizedDescription
+        }
+        isLoading = false
+    }
+
+    private var errorAlertIsPresented: Binding<Bool> {
+        Binding(get: { error != nil }, set: { if !$0 { error = nil } })
     }
 }
 
-// MARK: - Decision Card
+// MARK: - Decision Card (warm glass)
 
 struct DecisionCard: View {
-    let decision: Decision
-    @Query private var allReactions: [DecisionReaction]
-    @Query private var allComments: [DecisionComment]
+    @Environment(APIService.self) private var api
+    let decision: DecisionResponse
 
-    private var reactions: [DecisionReaction] {
-        allReactions.filter { $0.decisionID == decision.id }
-    }
-
-    private var comments: [DecisionComment] {
-        allComments.filter { $0.decisionID == decision.id }
-    }
+    @State private var reactions: [DecisionReactionResponse] = []
+    @State private var comments: [DecisionCommentResponse] = []
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            // Header
-            HStack {
+            // Meta row
+            HStack(spacing: 8) {
                 Image(systemName: decision.decisionType.icon)
-                    .foregroundStyle(.teal)
-                Text(decision.creatorName)
-                    .font(.caption.weight(.semibold))
-                Text(decision.createdAt, style: .relative)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
+                    .font(.system(size: 14))
+                    .foregroundStyle(TabAccent.decisions.color)
+                Text(decision.creator_name)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(WarmPalette.ink1)
+                if let createdAt = decision.relativeCreatedAtText {
+                    Text(createdAt)
+                        .font(.system(size: 11))
+                        .foregroundStyle(WarmPalette.ink3)
+                }
                 Spacer()
-                if decision.status == .resolved {
+                if decision.status == DecisionStatus.resolved.rawValue {
                     Text("Resolved")
-                        .font(.caption2.weight(.medium))
-                        .padding(.horizontal, DesignTokens.Spacing.chipVerticalMed)
-                        .padding(.vertical, DesignTokens.Spacing.chipVerticalTight)
-                        .background(BadgeSemantic.done.color.opacity(DesignTokens.Opacity.badgeFill)) // DS-05: replaced raw opacity fill
-                        .foregroundStyle(.green)
-                        .clipShape(Capsule())
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(WarmPalette.good)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(WarmPalette.good.opacity(0.15), in: Capsule())
                 }
             }
 
             // Title
             Text(decision.title)
-                .font(.subheadline.weight(.medium))
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(WarmPalette.ink1)
                 .multilineTextAlignment(.leading)
 
-            // Body preview
+            // Body
             if let body = decision.body, !body.isEmpty {
                 Text(body)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(.system(size: 13))
+                    .foregroundStyle(WarmPalette.ink2)
                     .lineLimit(2)
             }
 
             // Link
-            if let url = decision.linkURL, !url.isEmpty {
+            if let url = decision.link_url, !url.isEmpty {
                 HStack(spacing: 4) {
                     Image(systemName: "link")
                     Text(url)
                         .lineLimit(1)
                 }
-                .font(.caption)
-                .foregroundStyle(.blue)
+                .font(.system(size: 13))
+                .foregroundStyle(AccentTheme.ocean.color)
             }
 
-            // Poll options preview
-            if decision.decisionType == .poll && !decision.pollOptions.isEmpty {
+            // Poll
+            if decision.decisionType == .poll && !decision.poll_options.isEmpty {
                 VStack(spacing: 4) {
-                    ForEach(Array(decision.pollOptions.enumerated()), id: \.offset) { idx, option in
-                        let voteCount = reactions.filter { $0.pollChoice == idx }.count
-                        PollOptionRow(option: option, votes: voteCount, totalVotes: reactions.filter { $0.reactionType == "vote" }.count)
+                    ForEach(Array(decision.poll_options.enumerated()), id: \.offset) { idx, option in
+                        let voteCount = reactions.filter { $0.poll_choice == idx }.count
+                        PollOptionRow(option: option, votes: voteCount, totalVotes: reactions.filter { $0.reaction_type == "vote" }.count)
                     }
                 }
             }
 
-            // Reactions + comments summary
+            // Reactions footer
             HStack(spacing: 12) {
-                let thumbsUp = reactions.filter { $0.reactionType == "thumbsUp" }.count
-                let thumbsDown = reactions.filter { $0.reactionType == "thumbsDown" }.count
-                let hearts = reactions.filter { $0.reactionType == "heart" }.count
+                let thumbsUp = reactions.filter { $0.reaction_type == "thumbsUp" }.count
+                let thumbsDown = reactions.filter { $0.reaction_type == "thumbsDown" }.count
+                let hearts = reactions.filter { $0.reaction_type == "heart" }.count
 
-                if thumbsUp > 0 { Label("\(thumbsUp)", systemImage: "hand.thumbsup.fill").font(.caption2) }
-                if thumbsDown > 0 { Label("\(thumbsDown)", systemImage: "hand.thumbsdown.fill").font(.caption2) }
-                if hearts > 0 { Label("\(hearts)", systemImage: "heart.fill").font(.caption2).foregroundStyle(.red) }
+                if thumbsUp > 0 { Label("\(thumbsUp)", systemImage: "hand.thumbsup.fill").font(.system(size: 11)) }
+                if thumbsDown > 0 { Label("\(thumbsDown)", systemImage: "hand.thumbsdown.fill").font(.system(size: 11)) }
+                if hearts > 0 { Label("\(hearts)", systemImage: "heart.fill").font(.system(size: 11)).foregroundStyle(AccentTheme.rose.color) }
 
                 Spacer()
 
                 if !comments.isEmpty {
                     Label("\(comments.count)", systemImage: "bubble.left.fill")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
+                        .font(.system(size: 11))
+                        .foregroundStyle(WarmPalette.ink3)
                 }
             }
         }
-        .padding(DesignTokens.Spacing.cardPadding)
-        .flCard(tint: TabAccent.decisions.color)
+        .padding(16)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
+        .task { await loadMeta() }
+    }
+
+    private func loadMeta() async {
+        do {
+            async let fetchedReactions = api.fetchDecisionReactions(id: decision.id)
+            async let fetchedComments = api.fetchDecisionComments(id: decision.id)
+            reactions = try await fetchedReactions
+            comments = try await fetchedComments
+        } catch {}
+    }
+}
+
+// MARK: - Extensions (unchanged)
+
+extension DecisionResponse {
+    var decisionType: DecisionType {
+        DecisionType(rawValue: decision_type) ?? .text
+    }
+
+    var relativeCreatedAtText: String? {
+        guard let created_at, let date = ISO8601DateFormatter.flexible.date(from: created_at) else { return nil }
+        return date.formatted(.relative(presentation: .named))
+    }
+
+    var createdDate: Date? {
+        guard let created_at else { return nil }
+        return ISO8601DateFormatter.flexible.date(from: created_at)
+    }
+}
+
+extension DecisionCommentResponse {
+    var createdDate: Date? {
+        guard let created_at else { return nil }
+        return ISO8601DateFormatter.flexible.date(from: created_at)
     }
 }
 
@@ -210,36 +339,56 @@ struct PollOptionRow: View {
     let votes: Int
     let totalVotes: Int
 
-    private var progress: Double {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Text(option)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(WarmPalette.ink1)
+                Spacer()
+                Text("\(votes)")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(WarmPalette.ink3)
+            }
+            WarmProgressBar(progress: fillFraction, color: TabAccent.decisions.color, height: 6)
+        }
+        .padding(.vertical, 2)
+    }
+
+    private var fillFraction: Double {
         guard totalVotes > 0 else { return 0 }
         return Double(votes) / Double(totalVotes)
     }
+}
+
+struct ReactionButton: View {
+    let emoji: String
+    let type: String
+    let count: Int
+    let isSelected: Bool
+    let action: () -> Void
 
     var body: some View {
-        HStack {
-            Text(option)
-                .font(.caption)
-            Spacer()
-            Text("\(votes)")
-                .font(.caption.bold())
-        }
-        .padding(.horizontal, DesignTokens.Spacing.chipPadding)
-        .padding(.vertical, DesignTokens.Spacing.chipVerticalPadding)
-        .background {
-            GeometryReader { geo in
-                RoundedRectangle(cornerRadius: 4)
-                    .fill(TabAccent.decisions.color.opacity(DesignTokens.Opacity.badgeFill)) // DS-05: replaced raw opacity fill
-                    .frame(width: geo.size.width * progress)
+        Button(action: action) {
+            HStack(spacing: 8) {
+                Image(systemName: emoji)
+                    .font(.system(size: 14, weight: .semibold))
+                Text("\(count)")
+                    .font(.system(size: 14, weight: .semibold))
             }
+            .foregroundStyle(isSelected ? WarmPalette.cream1 : TabAccent.decisions.color)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .background(isSelected ? TabAccent.decisions.color : TabAccent.decisions.color.opacity(0.12))
+            .clipShape(Capsule())
         }
-        .background(Color(.quaternarySystemFill))
-        .clipShape(RoundedRectangle(cornerRadius: 6))
+        .buttonStyle(.plain)
     }
 }
 
 #Preview {
     NavigationStack {
         DecisionsView()
+            .environment(APIService())
     }
-    .modelContainer(for: [Decision.self, DecisionReaction.self, DecisionComment.self])
 }

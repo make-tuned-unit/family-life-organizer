@@ -145,8 +145,8 @@ struct BudgetProjectsView: View {
             }
         }
         .background { AmbientBackground(style: .expenses) }
-        .navigationTitle("Projects")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackgroundVisibility(.hidden, for: .navigationBar)
         .overlay {
             if store.isLoading && store.projects.isEmpty { ProgressView() }
         }

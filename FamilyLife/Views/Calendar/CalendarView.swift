@@ -44,6 +44,7 @@ struct CalendarView: View {
         }
         .background { AmbientBackground(style: .calendar) }
         .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackgroundVisibility(.hidden, for: .navigationBar)
         .toolbar {
             if showsDismissButton {
                 ToolbarItem(placement: .topBarLeading) {
