@@ -1239,6 +1239,150 @@ class FamilyDB {
     });
   }
 
+  // ============================================
+  // Coverage / Care Cascade
+  // ============================================
+
+  createCoverageRequest(req) {
+    return new Promise((resolve, reject) => {
+      this.db.run(
+        'INSERT INTO coverage_requests (requester_id, reason, note) VALUES (?, ?, ?)',
+        [req.requester_id, req.reason, req.note || null],
+        function(err) {
+          if (err) reject(err);
+          else resolve({ id: this.lastID });
+        }
+      );
+    });
+  }
+
+  addCoverageWindow(win) {
+    return new Promise((resolve, reject) => {
+      this.db.run(
+        'INSERT INTO coverage_windows (request_id, window_date, start_time, end_time, description) VALUES (?, ?, ?, ?, ?)',
+        [win.request_id, win.window_date, win.start_time, win.end_time, win.description || null],
+        function(err) {
+          if (err) reject(err);
+          else resolve({ id: this.lastID });
+        }
+      );
+    });
+  }
+
+  addCoverageRecipient(rec) {
+    return new Promise((resolve, reject) => {
+      const token = require('crypto').randomBytes(16).toString('hex');
+      this.db.run(
+        'INSERT INTO coverage_recipients (request_id, contact_id, invite_token) VALUES (?, ?, ?)',
+        [rec.request_id, rec.contact_id, token],
+        function(err) {
+          if (err) reject(err);
+          else resolve({ id: this.lastID, invite_token: token });
+        }
+      );
+    });
+  }
+
+  getCoverageRequests(userId) {
+    return new Promise((resolve, reject) => {
+      this.db.all(`
+        SELECT cr.*,
+          (SELECT COUNT(*) FROM coverage_approvals WHERE request_id = cr.id) as approval_count,
+          (SELECT COUNT(*) FROM coverage_recipients WHERE request_id = cr.id) as recipient_count
+        FROM coverage_requests cr
+        WHERE cr.requester_id = ?
+        ORDER BY cr.id DESC
+      `, [userId], (err, rows) => err ? reject(err) : resolve(rows));
+    });
+  }
+
+  getCoverageRequestById(id) {
+    return new Promise((resolve, reject) => {
+      this.db.get('SELECT * FROM coverage_requests WHERE id = ?', [id], (err, row) => err ? reject(err) : resolve(row));
+    });
+  }
+
+  getCoverageWindows(requestId) {
+    return new Promise((resolve, reject) => {
+      this.db.all('SELECT * FROM coverage_windows WHERE request_id = ? ORDER BY window_date, start_time', [requestId], (err, rows) => err ? reject(err) : resolve(rows));
+    });
+  }
+
+  getCoverageRecipients(requestId) {
+    return new Promise((resolve, reject) => {
+      this.db.all(`
+        SELECT cr.*, c.name as contact_name, c.phone as contact_phone, c.avatar_initial
+        FROM coverage_recipients cr
+        JOIN contacts c ON c.id = cr.contact_id
+        WHERE cr.request_id = ?
+      `, [requestId], (err, rows) => err ? reject(err) : resolve(rows));
+    });
+  }
+
+  getRecipientByToken(token) {
+    return new Promise((resolve, reject) => {
+      this.db.get(`
+        SELECT cr.*, c.name as contact_name,
+          creq.reason, creq.note, creq.requester_id,
+          u.name as requester_name
+        FROM coverage_recipients cr
+        JOIN contacts c ON c.id = cr.contact_id
+        JOIN coverage_requests creq ON creq.id = cr.request_id
+        JOIN users u ON u.id = creq.requester_id
+        WHERE cr.invite_token = ?
+      `, [token], (err, row) => err ? reject(err) : resolve(row));
+    });
+  }
+
+  approveCoverage(approval) {
+    return new Promise((resolve, reject) => {
+      this.db.serialize(() => {
+        // Insert approval
+        this.db.run(
+          `INSERT INTO coverage_approvals (request_id, recipient_id, window_id, approved_date, approved_start, approved_end, helper_note)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+          [approval.request_id, approval.recipient_id, approval.window_id, approval.approved_date, approval.approved_start, approval.approved_end, approval.helper_note || null],
+          function(err) {
+            if (err) return reject(err);
+            const approvalId = this.lastID;
+
+            // Update recipient status
+            this.db.run('UPDATE coverage_recipients SET status = ? WHERE id = ?', ['approved', approval.recipient_id]);
+
+            // Update request status
+            this.db.run('UPDATE coverage_requests SET status = ? WHERE id = ?', ['approved', approval.request_id]);
+
+            resolve({ id: approvalId });
+          }.bind(this)
+        );
+      });
+    });
+  }
+
+  getCoverageApprovals(requestId) {
+    return new Promise((resolve, reject) => {
+      this.db.all(`
+        SELECT ca.*, c.name as helper_name, c.avatar_initial,
+          cw.window_date, cw.start_time as proposed_start, cw.end_time as proposed_end
+        FROM coverage_approvals ca
+        JOIN coverage_recipients cr ON cr.id = ca.recipient_id
+        JOIN contacts c ON c.id = cr.contact_id
+        JOIN coverage_windows cw ON cw.id = ca.window_id
+        WHERE ca.request_id = ?
+        ORDER BY ca.approved_date, ca.approved_start
+      `, [requestId], (err, rows) => err ? reject(err) : resolve(rows));
+    });
+  }
+
+  cancelCoverageRequest(id) {
+    return new Promise((resolve, reject) => {
+      this.db.run('UPDATE coverage_requests SET status = ? WHERE id = ?', ['cancelled', id], (err) => {
+        if (err) reject(err);
+        else resolve({ id, status: 'cancelled' });
+      });
+    });
+  }
+
   close() {
     this.db.close();
   }
