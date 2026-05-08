@@ -1,23 +1,24 @@
 import SwiftUI
-import SwiftData
 
 struct GiftsView: View {
-    @Environment(\.dismiss) private var dismiss
-    @Environment(\.modelContext) private var modelContext
-    @Query(sort: \GiftPerson.name) private var people: [GiftPerson]
-    @Query(sort: \SpecialEvent.date) private var events: [SpecialEvent]
-    @Query private var allIdeas: [GiftIdea]
+    var showsDismissButton = false
 
+    @Environment(\.dismiss) private var dismiss
+    @Environment(APIService.self) private var api
+
+    @State private var people: [GiftPersonResponse] = []
+    @State private var events: [SpecialEventResponse] = []
+    @State private var allIdeas: [GiftIdeaResponse] = []
     @State private var showingAddPerson = false
     @State private var showingAddEvent = false
+    @State private var error: String?
+    @State private var isLoading = false
 
     var body: some View {
         ScrollView {
             VStack(spacing: 20) {
-                // Upcoming events
                 upcomingSection
 
-                // People
                 if !people.isEmpty {
                     VStack(alignment: .leading, spacing: 12) {
                         HStack {
@@ -35,7 +36,7 @@ struct GiftsView: View {
                             NavigationLink {
                                 PersonGiftListView(person: person)
                             } label: {
-                                PersonRow(person: person, ideaCount: allIdeas.filter { $0.personID == person.id }.count)
+                                PersonRowRemote(person: person, ideaCount: allIdeas.filter { $0.person_id == person.id }.count)
                             }
                             .buttonStyle(.plain)
                             .padding(.horizontal)
@@ -43,7 +44,6 @@ struct GiftsView: View {
                     }
                 }
 
-                // Standalone events
                 if !standaloneEvents.isEmpty {
                     VStack(alignment: .leading, spacing: 12) {
                         HStack {
@@ -58,29 +58,33 @@ struct GiftsView: View {
                         .padding(.horizontal)
 
                         ForEach(standaloneEvents) { event in
-                            EventRow(event: event)
-                                .padding(.horizontal)
-                                .swipeActions(edge: .trailing) {
-                                    Button(role: .destructive) {
-                                        modelContext.delete(event)
-                                    } label: {
-                                        Label("Delete", systemImage: "trash")
-                                    }
-                                }
+                            EventRowRemote(event: event) {
+                                await deleteEvent(event.id)
+                            }
+                            .padding(.horizontal)
                         }
                     }
                 }
 
-                // Empty state
-                if people.isEmpty && events.isEmpty {
+                if people.isEmpty && events.isEmpty && !isLoading {
                     ContentUnavailableView {
                         Label("Gift Lists", systemImage: "gift.fill")
                     } description: {
                         Text("Add people and track gift ideas, birthdays, and special events")
                     } actions: {
-                        Button("Add a Person") { showingAddPerson = true }
-                            .buttonStyle(.borderedProminent)
-                            .tint(.teal)
+                        Button { showingAddPerson = true } label: {
+                            HStack(spacing: 8) {
+                                Image(systemName: "person.badge.plus")
+                                    .font(.system(size: 14))
+                                Text("Add a Person")
+                                    .font(.system(size: 15, weight: .semibold))
+                            }
+                            .foregroundStyle(WarmPalette.cream1)
+                            .padding(.horizontal, 20)
+                            .padding(.vertical, 12)
+                            .background(WarmPalette.ink1)
+                            .clipShape(Capsule())
+                        }
                     }
                     .padding(.top, DesignTokens.Spacing.large)
                 }
@@ -89,9 +93,12 @@ struct GiftsView: View {
         }
         .background { AmbientBackground(style: .gifts) }
         .navigationTitle("Gifts & Events")
+        .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
-                Button("Done") { dismiss() }
+            if showsDismissButton {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Done") { dismiss() }
+                }
             }
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
@@ -107,15 +114,35 @@ struct GiftsView: View {
             }
         }
         .sheet(isPresented: $showingAddPerson) {
-            AddGiftPersonView()
+            AddGiftPersonView {
+                await loadAll()
+            }
         }
         .sheet(isPresented: $showingAddEvent) {
-            AddSpecialEventView()
+            AddSpecialEventView {
+                await loadAll()
+            }
+        }
+        .refreshable {
+            await loadAll()
+        }
+        .overlay {
+            if isLoading && people.isEmpty && events.isEmpty {
+                ProgressView()
+            }
+        }
+        .alert("Couldn’t load gifts", isPresented: errorAlertIsPresented) {
+            Button("OK") { error = nil }
+        } message: {
+            Text(error ?? "An unexpected error occurred.")
+        }
+        .task {
+            await loadAll()
         }
     }
 
-    private var standaloneEvents: [SpecialEvent] {
-        events.filter { $0.personID == nil }.sorted { ($0.daysUntil ?? 999) < ($1.daysUntil ?? 999) }
+    private var standaloneEvents: [SpecialEventResponse] {
+        events.filter { $0.person_id == nil }.sorted { ($0.daysUntil ?? 999) < ($1.daysUntil ?? 999) }
     }
 
     @ViewBuilder
@@ -138,7 +165,7 @@ struct GiftsView: View {
                                 .font(.subheadline.weight(.medium))
                             Text(item.sublabel)
                                 .font(.caption)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(WarmPalette.ink3)
                         }
                         Spacer()
                         Text(item.countdown)
@@ -146,7 +173,7 @@ struct GiftsView: View {
                             .foregroundStyle(item.days <= 7 ? .red : item.days <= 30 ? .orange : .secondary)
                     }
                     .padding(DesignTokens.Spacing.cardGap)
-                    .background(Color(.tertiarySystemFill))
+                    .background(WarmPalette.ink1.opacity(0.06))
                     .clipShape(RoundedRectangle(cornerRadius: 12))
                     .padding(.horizontal)
                 }
@@ -176,7 +203,7 @@ struct GiftsView: View {
                         countdown: days == 0 ? "Today!" : "\(days)d",
                         days: days,
                         icon: eventName == "Birthday" ? "birthday.cake.fill" : "heart.fill",
-                        color: eventName == "Birthday" ? .purple : .pink
+                        color: eventName == "Birthday" ? AccentTheme.mauve.color : AccentTheme.rose.color
                     ))
                 }
             }
@@ -186,11 +213,11 @@ struct GiftsView: View {
             if let days = event.daysUntil, days <= 90 {
                 items.append(UpcomingItem(
                     label: event.title,
-                    sublabel: event.eventType.capitalized,
+                    sublabel: event.event_type.capitalized,
                     countdown: days == 0 ? "Today!" : "\(days)d",
                     days: days,
-                    icon: eventIcon(event.eventType),
-                    color: .teal
+                    icon: eventIcon(event.event_type),
+                    color: TabAccent.home.color
                 ))
             }
         }
@@ -206,17 +233,46 @@ struct GiftsView: View {
         default: "calendar.circle.fill"
         }
     }
+
+    private func loadAll() async {
+        isLoading = true
+        error = nil
+        do {
+            async let fetchedPeople = api.fetchGiftPeople()
+            async let fetchedEvents = api.fetchSpecialEvents()
+            async let fetchedIdeas = api.fetchGiftIdeas()
+            people = try await fetchedPeople
+            events = try await fetchedEvents
+            allIdeas = try await fetchedIdeas
+        } catch {
+            self.error = error.localizedDescription
+        }
+        isLoading = false
+    }
+
+    private func deleteEvent(_ id: Int) async {
+        do {
+            try await api.deleteSpecialEvent(id: id)
+            await loadAll()
+        } catch {
+            self.error = error.localizedDescription
+        }
+    }
+
+    private var errorAlertIsPresented: Binding<Bool> {
+        Binding(get: { error != nil }, set: { if !$0 { error = nil } })
+    }
 }
 
-struct PersonRow: View {
-    let person: GiftPerson
+struct PersonRowRemote: View {
+    let person: GiftPersonResponse
     let ideaCount: Int
 
     var body: some View {
         HStack(spacing: 12) {
             Image(systemName: "person.circle.fill")
                 .font(.title2)
-                .foregroundStyle(.teal)
+                .foregroundStyle(TabAccent.home.color)
             VStack(alignment: .leading, spacing: 2) {
                 Text(person.name)
                     .font(.subheadline.weight(.medium))
@@ -224,11 +280,11 @@ struct PersonRow: View {
                     Text(person.relationship.capitalized)
                     if let (event, _) = person.upcomingEvent {
                         Text("· \(event) coming up")
-                            .foregroundStyle(.purple)
+                            .foregroundStyle(AccentTheme.mauve.color)
                     }
                 }
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(WarmPalette.ink3)
             }
             Spacer()
             if ideaCount > 0 {
@@ -236,38 +292,43 @@ struct PersonRow: View {
                     .font(.caption2)
                     .padding(.horizontal, DesignTokens.Spacing.chipPadding)
                     .padding(.vertical, DesignTokens.Spacing.tinyLabel)
-                    .background(TabAccent.gifts.color.opacity(DesignTokens.Opacity.badgeFill)) // DS-05: replaced raw opacity fill
-                    .foregroundStyle(.teal)
+                    .background(TabAccent.gifts.color.opacity(DesignTokens.Opacity.badgeFill))
+                    .foregroundStyle(TabAccent.home.color)
                     .clipShape(Capsule())
             }
             Image(systemName: "chevron.right")
                 .font(.caption)
-                .foregroundStyle(.tertiary)
+                .foregroundStyle(WarmPalette.ink4)
         }
         .padding(DesignTokens.Spacing.cardPadding)
         .flCard(tint: TabAccent.gifts.color)
     }
 }
 
-struct EventRow: View {
-    let event: SpecialEvent
+struct EventRowRemote: View {
+    let event: SpecialEventResponse
+    let onDelete: () async -> Void
 
     var body: some View {
         HStack(spacing: 12) {
             Image(systemName: eventIcon)
-                .foregroundStyle(.purple)
+                .font(.title3)
+                .foregroundStyle(TabAccent.home.color)
             VStack(alignment: .leading, spacing: 2) {
                 Text(event.title)
                     .font(.subheadline.weight(.medium))
-                Text("\(event.eventType.capitalized) · \(formattedDate)")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                HStack(spacing: 8) {
+                    Text(event.event_type.capitalized)
+                    Text("· \(formattedDate)")
+                }
+                .font(.caption)
+                .foregroundStyle(WarmPalette.ink3)
             }
             Spacer()
-            if let days = event.daysUntil {
-                Text(days == 0 ? "Today" : "\(days)d")
-                    .font(.caption.bold())
-                    .foregroundStyle(days <= 7 ? .red : .secondary)
+            Button(role: .destructive) {
+                Task { await onDelete() }
+            } label: {
+                Image(systemName: "trash")
             }
         }
         .padding(DesignTokens.Spacing.cardPadding)
@@ -275,7 +336,7 @@ struct EventRow: View {
     }
 
     private var eventIcon: String {
-        switch event.eventType {
+        switch event.event_type {
         case "birthday": "birthday.cake.fill"
         case "anniversary": "heart.fill"
         case "holiday": "star.fill"
@@ -284,14 +345,57 @@ struct EventRow: View {
     }
 
     private var formattedDate: String {
-        guard let d = DateFormatter.monthDay.date(from: event.date) else { return event.date }
-        return DateFormatter.shortMonthDay.string(from: d)
+        guard let date = DateFormatter.monthDay.date(from: event.date) else { return event.date }
+        return DateFormatter.longMonthDay.string(from: date)
+    }
+}
+
+private extension GiftPersonResponse {
+    var upcomingEvent: (String, Date)? {
+        let cal = Calendar.current
+        let now = Date()
+        let year = cal.component(.year, from: now)
+
+        var options: [(String, Date)] = []
+        if let birthday, let parsed = DateFormatter.monthDay.date(from: birthday) {
+            var comps = cal.dateComponents([.month, .day], from: parsed)
+            comps.year = year
+            if let date = cal.date(from: comps) {
+                options.append(("Birthday", date < now ? cal.date(byAdding: .year, value: 1, to: date) ?? date : date))
+            }
+        }
+        if let anniversary, let parsed = DateFormatter.monthDay.date(from: anniversary) {
+            var comps = cal.dateComponents([.month, .day], from: parsed)
+            comps.year = year
+            if let date = cal.date(from: comps) {
+                options.append(("Anniversary", date < now ? cal.date(byAdding: .year, value: 1, to: date) ?? date : date))
+            }
+        }
+        return options.min(by: { $0.1 < $1.1 })
+    }
+}
+
+private extension SpecialEventResponse {
+    var nextOccurrence: Date? {
+        let cal = Calendar.current
+        let now = Date()
+        let year = cal.component(.year, from: now)
+        guard let parsed = DateFormatter.monthDay.date(from: date) else { return nil }
+        var comps = cal.dateComponents([.month, .day], from: parsed)
+        comps.year = year
+        guard let candidate = cal.date(from: comps) else { return nil }
+        return candidate < now ? cal.date(byAdding: .year, value: 1, to: candidate) : candidate
+    }
+
+    var daysUntil: Int? {
+        guard let nextOccurrence else { return nil }
+        return Calendar.current.dateComponents([.day], from: Date(), to: nextOccurrence).day
     }
 }
 
 #Preview {
     NavigationStack {
         GiftsView()
+            .environment(APIService())
     }
-    .modelContainer(for: [GiftPerson.self, GiftIdea.self, SpecialEvent.self])
 }
