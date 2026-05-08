@@ -25,6 +25,15 @@ class FamilyDB {
     this.init();
   }
 
+  parseJSONList(value) {
+    if (!value) return [];
+    try {
+      return JSON.parse(value);
+    } catch {
+      return [];
+    }
+  }
+
   init() {
     const schema = fs.readFileSync(
       path.join(__dirname, 'schema.sql'), 
@@ -228,6 +237,22 @@ class FamilyDB {
     });
   }
 
+  updateAppointment(id, updates) {
+    return new Promise((resolve, reject) => {
+      const fields = [];
+      const params = [];
+      for (const [key, value] of Object.entries(updates)) {
+        fields.push(`${key} = ?`);
+        params.push(value);
+      }
+      params.push(id);
+      this.db.run(`UPDATE appointments SET ${fields.join(', ')} WHERE id = ?`, params, (err) => {
+        if (err) reject(err);
+        else resolve({ id, ...updates });
+      });
+    });
+  }
+
   // Receipt operations
   addReceipt(receipt) {
     return new Promise((resolve, reject) => {
@@ -276,6 +301,15 @@ class FamilyDB {
     });
   }
 
+  deleteReceipt(id) {
+    return new Promise((resolve, reject) => {
+      this.db.run('DELETE FROM receipts WHERE id = ?', [id], (err) => {
+        if (err) reject(err);
+        else resolve({ id, deleted: true });
+      });
+    });
+  }
+
   getBudgetSummary(month) {
     return new Promise((resolve, reject) => {
       const sql = `
@@ -292,6 +326,483 @@ class FamilyDB {
       this.db.all(sql, [month], (err, rows) => {
         if (err) reject(err);
         else resolve(rows);
+      });
+    });
+  }
+
+  // Pantry operations
+  addPantryItem(item) {
+    return new Promise((resolve, reject) => {
+      this.db.run(
+        'INSERT INTO pantry (item, category, location, quantity, unit, expiry_date, receipt_id, added_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        [item.item, item.category || null, item.location || 'pantry', item.quantity || '1', item.unit || null, item.expiry_date || null, item.receipt_id || null, item.added_by || 'jesse'],
+        function(err) {
+          if (err) reject(err);
+          else resolve({ id: this.lastID, ...item });
+        }
+      );
+    });
+  }
+
+  getPantry(filters = {}) {
+    return new Promise((resolve, reject) => {
+      let sql = 'SELECT * FROM pantry WHERE 1=1';
+      const params = [];
+      if (filters.location) { sql += ' AND location = ?'; params.push(filters.location); }
+      if (filters.category) { sql += ' AND category = ?'; params.push(filters.category); }
+      sql += ' ORDER BY category, item';
+      this.db.all(sql, params, (err, rows) => {
+        if (err) reject(err);
+        else resolve(rows);
+      });
+    });
+  }
+
+  updatePantryItem(id, updates) {
+    return new Promise((resolve, reject) => {
+      const fields = [];
+      const params = [];
+      for (const [key, value] of Object.entries(updates)) {
+        fields.push(`${key} = ?`);
+        params.push(value);
+      }
+      fields.push('updated_at = CURRENT_TIMESTAMP');
+      params.push(id);
+      this.db.run(`UPDATE pantry SET ${fields.join(', ')} WHERE id = ?`, params, (err) => {
+        if (err) reject(err);
+        else resolve({ id, ...updates });
+      });
+    });
+  }
+
+  deletePantryItem(id) {
+    return new Promise((resolve, reject) => {
+      this.db.run('DELETE FROM pantry WHERE id = ?', [id], (err) => {
+        if (err) reject(err);
+        else resolve({ id, deleted: true });
+      });
+    });
+  }
+
+  // Trip operations
+  createTrip(trip) {
+    return new Promise((resolve, reject) => {
+      this.db.run(
+        'INSERT INTO trips (traveler, origin, origin_lat, origin_lng, destination, destination_lat, destination_lng, purpose, status, eta_minutes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [trip.traveler, trip.origin || null, trip.origin_lat || null, trip.origin_lng || null, trip.destination, trip.destination_lat || null, trip.destination_lng || null, trip.purpose || null, 'active', trip.eta_minutes || null],
+        function(err) {
+          if (err) reject(err);
+          else resolve({ id: this.lastID, ...trip });
+        }
+      );
+    });
+  }
+
+  getTrips(filters = {}) {
+    return new Promise((resolve, reject) => {
+      let sql = 'SELECT * FROM trips WHERE 1=1';
+      const params = [];
+      if (filters.status) { sql += ' AND status = ?'; params.push(filters.status); }
+      if (filters.traveler) { sql += ' AND traveler = ?'; params.push(filters.traveler); }
+      sql += ' ORDER BY created_at DESC';
+      this.db.all(sql, params, (err, rows) => {
+        if (err) reject(err);
+        else resolve(rows);
+      });
+    });
+  }
+
+  updateTrip(id, updates) {
+    return new Promise((resolve, reject) => {
+      const fields = [];
+      const params = [];
+      for (const [key, value] of Object.entries(updates)) {
+        fields.push(`${key} = ?`);
+        params.push(value);
+      }
+      params.push(id);
+      this.db.run(`UPDATE trips SET ${fields.join(', ')} WHERE id = ?`, params, (err) => {
+        if (err) reject(err);
+        else resolve({ id, ...updates });
+      });
+    });
+  }
+
+  arriveTrip(id) {
+    return new Promise((resolve, reject) => {
+      this.db.run(
+        'UPDATE trips SET status = "arrived", arrived_at = CURRENT_TIMESTAMP WHERE id = ?',
+        [id], (err) => {
+          if (err) reject(err);
+          else resolve({ id, status: 'arrived' });
+        }
+      );
+    });
+  }
+
+  cancelTrip(id) {
+    return new Promise((resolve, reject) => {
+      this.db.run('UPDATE trips SET status = "cancelled" WHERE id = ?', [id], (err) => {
+        if (err) reject(err);
+        else resolve({ id, status: 'cancelled' });
+      });
+    });
+  }
+
+  // Family address operations
+  addFamilyAddress(addr) {
+    return new Promise((resolve, reject) => {
+      this.db.run(
+        'INSERT INTO family_addresses (name, address, lat, lng, radius_meters, created_by) VALUES (?, ?, ?, ?, ?, ?)',
+        [addr.name, addr.address || null, addr.lat, addr.lng, addr.radius_meters || 500, addr.created_by || 'jesse'],
+        function(err) {
+          if (err) reject(err);
+          else resolve({ id: this.lastID, ...addr });
+        }
+      );
+    });
+  }
+
+  getFamilyAddresses() {
+    return new Promise((resolve, reject) => {
+      this.db.all('SELECT * FROM family_addresses ORDER BY name', (err, rows) => {
+        if (err) reject(err);
+        else resolve(rows);
+      });
+    });
+  }
+
+  deleteFamilyAddress(id) {
+    return new Promise((resolve, reject) => {
+      this.db.run('DELETE FROM family_addresses WHERE id = ?', [id], (err) => {
+        if (err) reject(err);
+        else resolve({ id, deleted: true });
+      });
+    });
+  }
+
+  // Decision operations
+  addDecision(decision) {
+    return new Promise((resolve, reject) => {
+      this.db.run(
+        `INSERT INTO decisions (title, decision_type, body, link_url, photo_data, poll_options, creator_name, status, expires_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          decision.title,
+          decision.decision_type,
+          decision.body || null,
+          decision.link_url || null,
+          decision.photo_data || null,
+          JSON.stringify(decision.poll_options || []),
+          decision.creator_name || 'Jesse',
+          decision.status || 'active',
+          decision.expires_at || null
+        ],
+        function(err) {
+          if (err) reject(err);
+          else resolve({ id: this.lastID, ...decision });
+        }
+      );
+    });
+  }
+
+  getDecisions(filters = {}) {
+    return new Promise((resolve, reject) => {
+      let sql = 'SELECT * FROM decisions WHERE 1=1';
+      const params = [];
+      if (filters.status) { sql += ' AND status = ?'; params.push(filters.status); }
+      sql += ' ORDER BY datetime(created_at) DESC';
+      this.db.all(sql, params, (err, rows) => {
+        if (err) reject(err);
+        else resolve(rows.map(row => ({ ...row, poll_options: this.parseJSONList(row.poll_options) })));
+      });
+    });
+  }
+
+  updateDecision(id, updates) {
+    return new Promise((resolve, reject) => {
+      const fields = [];
+      const params = [];
+      for (const [key, value] of Object.entries(updates)) {
+        fields.push(`${key} = ?`);
+        params.push(key === 'poll_options' ? JSON.stringify(value || []) : value);
+      }
+      params.push(id);
+      this.db.run(`UPDATE decisions SET ${fields.join(', ')} WHERE id = ?`, params, (err) => {
+        if (err) reject(err);
+        else resolve({ id, ...updates });
+      });
+    });
+  }
+
+  getDecisionReactions(decisionId) {
+    return new Promise((resolve, reject) => {
+      this.db.all(
+        'SELECT * FROM decision_reactions WHERE decision_id = ? ORDER BY datetime(created_at) ASC',
+        [decisionId],
+        (err, rows) => err ? reject(err) : resolve(rows)
+      );
+    });
+  }
+
+  replaceDecisionReaction(decisionId, memberName, reactionType, pollChoice = null) {
+    return new Promise((resolve, reject) => {
+      this.db.serialize(() => {
+        const deleteSql = reactionType === 'vote'
+          ? 'DELETE FROM decision_reactions WHERE decision_id = ? AND member_name = ? AND reaction_type = "vote"'
+          : 'DELETE FROM decision_reactions WHERE decision_id = ? AND member_name = ? AND reaction_type != "vote"';
+
+        this.db.run(deleteSql, [decisionId, memberName], (deleteErr) => {
+          if (deleteErr) return reject(deleteErr);
+
+          this.db.run(
+            'INSERT INTO decision_reactions (decision_id, member_name, reaction_type, poll_choice) VALUES (?, ?, ?, ?)',
+            [decisionId, memberName, reactionType, pollChoice],
+            function(insertErr) {
+              if (insertErr) reject(insertErr);
+              else resolve({ id: this.lastID, decision_id: decisionId, member_name: memberName, reaction_type: reactionType, poll_choice: pollChoice });
+            }
+          );
+        });
+      });
+    });
+  }
+
+  getDecisionComments(decisionId) {
+    return new Promise((resolve, reject) => {
+      this.db.all(
+        'SELECT * FROM decision_comments WHERE decision_id = ? ORDER BY datetime(created_at) ASC',
+        [decisionId],
+        (err, rows) => err ? reject(err) : resolve(rows)
+      );
+    });
+  }
+
+  addDecisionComment(decisionId, memberName, text) {
+    return new Promise((resolve, reject) => {
+      this.db.run(
+        'INSERT INTO decision_comments (decision_id, member_name, text) VALUES (?, ?, ?)',
+        [decisionId, memberName, text],
+        function(err) {
+          if (err) reject(err);
+          else resolve({ id: this.lastID, decision_id: decisionId, member_name: memberName, text });
+        }
+      );
+    });
+  }
+
+  // Rivalry operations
+  addRivalry(rivalry) {
+    return new Promise((resolve, reject) => {
+      this.db.run(
+        `INSERT INTO rivalries (title, challenge_type, initiator_name, opponent_name, start_date, end_date, status, point_value, winner_name)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          rivalry.title,
+          rivalry.challenge_type,
+          rivalry.initiator_name,
+          rivalry.opponent_name,
+          rivalry.start_date,
+          rivalry.end_date,
+          rivalry.status || 'active',
+          rivalry.point_value || 100,
+          rivalry.winner_name || null
+        ],
+        function(err) {
+          if (err) reject(err);
+          else resolve({ id: this.lastID, ...rivalry });
+        }
+      );
+    });
+  }
+
+  getRivalries(filters = {}) {
+    return new Promise((resolve, reject) => {
+      let sql = 'SELECT * FROM rivalries WHERE 1=1';
+      const params = [];
+      if (filters.status) { sql += ' AND status = ?'; params.push(filters.status); }
+      sql += ' ORDER BY datetime(created_at) DESC';
+      this.db.all(sql, params, (err, rows) => err ? reject(err) : resolve(rows));
+    });
+  }
+
+  updateRivalry(id, updates) {
+    return new Promise((resolve, reject) => {
+      const fields = [];
+      const params = [];
+      for (const [key, value] of Object.entries(updates)) {
+        fields.push(`${key} = ?`);
+        params.push(value);
+      }
+      params.push(id);
+      this.db.run(`UPDATE rivalries SET ${fields.join(', ')} WHERE id = ?`, params, (err) => {
+        if (err) reject(err);
+        else resolve({ id, ...updates });
+      });
+    });
+  }
+
+  getRivalryEntries(rivalryId) {
+    return new Promise((resolve, reject) => {
+      this.db.all(
+        'SELECT * FROM rivalry_entries WHERE rivalry_id = ? ORDER BY datetime(logged_at) DESC',
+        [rivalryId],
+        (err, rows) => err ? reject(err) : resolve(rows)
+      );
+    });
+  }
+
+  addRivalryEntry(entry) {
+    return new Promise((resolve, reject) => {
+      this.db.run(
+        `INSERT INTO rivalry_entries (rivalry_id, member_name, value, note, is_verified)
+         VALUES (?, ?, ?, ?, ?)`,
+        [entry.rivalry_id, entry.member_name, entry.value, entry.note || null, entry.is_verified ? 1 : 0],
+        function(err) {
+          if (err) reject(err);
+          else resolve({ id: this.lastID, ...entry });
+        }
+      );
+    });
+  }
+
+  getRivalryLeaderboard() {
+    return new Promise((resolve, reject) => {
+      const sql = `
+        WITH participants AS (
+          SELECT initiator_name AS member_name FROM rivalries
+          UNION ALL
+          SELECT opponent_name AS member_name FROM rivalries
+        ),
+        completions AS (
+          SELECT initiator_name AS member_name, COUNT(*) AS completed_count
+          FROM rivalries
+          WHERE status = 'completed'
+          GROUP BY initiator_name
+          UNION ALL
+          SELECT opponent_name AS member_name, COUNT(*) AS completed_count
+          FROM rivalries
+          WHERE status = 'completed'
+          GROUP BY opponent_name
+        ),
+        wins AS (
+          SELECT winner_name AS member_name, COUNT(*) AS wins_count, COALESCE(SUM(point_value), 0) AS points
+          FROM rivalries
+          WHERE status = 'completed' AND winner_name IS NOT NULL
+          GROUP BY winner_name
+        )
+        SELECT
+          p.member_name,
+          COALESCE(SUM(c.completed_count), 0) AS rivalries_completed,
+          COALESCE(SUM(w.wins_count), 0) AS rivalries_won,
+          COALESCE(SUM(w.points), 0) AS total_points
+        FROM participants p
+        LEFT JOIN completions c ON c.member_name = p.member_name
+        LEFT JOIN wins w ON w.member_name = p.member_name
+        GROUP BY p.member_name
+        ORDER BY total_points DESC, rivalries_won DESC, member_name ASC
+      `;
+      this.db.all(sql, [], (err, rows) => err ? reject(err) : resolve(rows));
+    });
+  }
+
+  // Gift operations
+  addGiftPerson(person) {
+    return new Promise((resolve, reject) => {
+      this.db.run(
+        'INSERT INTO gift_people (name, relationship, birthday, anniversary, notes) VALUES (?, ?, ?, ?, ?)',
+        [person.name, person.relationship || 'other', person.birthday || null, person.anniversary || null, person.notes || null],
+        function(err) {
+          if (err) reject(err);
+          else resolve({ id: this.lastID, ...person });
+        }
+      );
+    });
+  }
+
+  getGiftPeople() {
+    return new Promise((resolve, reject) => {
+      this.db.all('SELECT * FROM gift_people ORDER BY name', (err, rows) => err ? reject(err) : resolve(rows));
+    });
+  }
+
+  addGiftIdea(idea) {
+    return new Promise((resolve, reject) => {
+      this.db.run(
+        `INSERT INTO gift_ideas (person_id, title, notes, link_url, estimated_price, status, for_event)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [idea.person_id, idea.title, idea.notes || null, idea.link_url || null, idea.estimated_price || null, idea.status || 'idea', idea.for_event || null],
+        function(err) {
+          if (err) reject(err);
+          else resolve({ id: this.lastID, ...idea });
+        }
+      );
+    });
+  }
+
+  getGiftIdeas(personId = null) {
+    return new Promise((resolve, reject) => {
+      let sql = 'SELECT * FROM gift_ideas';
+      const params = [];
+      if (personId != null) {
+        sql += ' WHERE person_id = ?';
+        params.push(personId);
+      }
+      sql += ' ORDER BY datetime(created_at) DESC';
+      this.db.all(sql, params, (err, rows) => err ? reject(err) : resolve(rows));
+    });
+  }
+
+  updateGiftIdea(id, updates) {
+    return new Promise((resolve, reject) => {
+      const fields = [];
+      const params = [];
+      for (const [key, value] of Object.entries(updates)) {
+        fields.push(`${key} = ?`);
+        params.push(value);
+      }
+      params.push(id);
+      this.db.run(`UPDATE gift_ideas SET ${fields.join(', ')} WHERE id = ?`, params, (err) => {
+        if (err) reject(err);
+        else resolve({ id, ...updates });
+      });
+    });
+  }
+
+  deleteGiftIdea(id) {
+    return new Promise((resolve, reject) => {
+      this.db.run('DELETE FROM gift_ideas WHERE id = ?', [id], (err) => {
+        if (err) reject(err);
+        else resolve({ id, deleted: true });
+      });
+    });
+  }
+
+  addSpecialEvent(event) {
+    return new Promise((resolve, reject) => {
+      this.db.run(
+        `INSERT INTO special_events (person_id, title, date, is_recurring, event_type, notes)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        [event.person_id || null, event.title, event.date, event.is_recurring ? 1 : 0, event.event_type || 'custom', event.notes || null],
+        function(err) {
+          if (err) reject(err);
+          else resolve({ id: this.lastID, ...event });
+        }
+      );
+    });
+  }
+
+  getSpecialEvents() {
+    return new Promise((resolve, reject) => {
+      this.db.all('SELECT * FROM special_events ORDER BY date', (err, rows) => err ? reject(err) : resolve(rows));
+    });
+  }
+
+  deleteSpecialEvent(id) {
+    return new Promise((resolve, reject) => {
+      this.db.run('DELETE FROM special_events WHERE id = ?', [id], (err) => {
+        if (err) reject(err);
+        else resolve({ id, deleted: true });
       });
     });
   }
