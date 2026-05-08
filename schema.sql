@@ -410,6 +410,68 @@ CREATE INDEX IF NOT EXISTS idx_feed_posts_created_at ON feed_posts(created_at);
 CREATE INDEX IF NOT EXISTS idx_feed_reactions_post_id ON feed_reactions(post_id);
 CREATE INDEX IF NOT EXISTS idx_feed_comments_post_id ON feed_comments(post_id);
 
+-- ============================================
+-- Coverage / Care Cascade
+-- ============================================
+
+-- A coverage request sent by a user to their care team
+CREATE TABLE IF NOT EXISTS coverage_requests (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    requester_id INTEGER NOT NULL,
+    reason TEXT NOT NULL,               -- 'kids' | 'dog' | 'house' | custom text
+    note TEXT,
+    status TEXT DEFAULT 'pending',      -- pending | approved | expired | cancelled
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (requester_id) REFERENCES users(id)
+);
+
+-- Candidate time windows proposed by the requester
+CREATE TABLE IF NOT EXISTS coverage_windows (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    request_id INTEGER NOT NULL,
+    window_date TEXT NOT NULL,           -- YYYY-MM-DD
+    start_time TEXT NOT NULL,            -- HH:MM
+    end_time TEXT NOT NULL,              -- HH:MM
+    description TEXT,                    -- e.g. "Jesse: 2 meetings"
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (request_id) REFERENCES coverage_requests(id) ON DELETE CASCADE
+);
+
+-- Which contacts were asked (the care team for this request)
+CREATE TABLE IF NOT EXISTS coverage_recipients (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    request_id INTEGER NOT NULL,
+    contact_id INTEGER NOT NULL,
+    invite_token TEXT UNIQUE,            -- unique token for the approval link
+    status TEXT DEFAULT 'pending',       -- pending | viewed | approved | declined
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (request_id) REFERENCES coverage_requests(id) ON DELETE CASCADE,
+    FOREIGN KEY (contact_id) REFERENCES contacts(id)
+);
+
+-- An approval from a care team member (they pick a window + confirm their time)
+CREATE TABLE IF NOT EXISTS coverage_approvals (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    request_id INTEGER NOT NULL,
+    recipient_id INTEGER NOT NULL,       -- which coverage_recipient approved
+    window_id INTEGER NOT NULL,          -- which proposed window they picked
+    approved_date TEXT NOT NULL,          -- YYYY-MM-DD (may match window or differ)
+    approved_start TEXT NOT NULL,         -- HH:MM
+    approved_end TEXT NOT NULL,           -- HH:MM
+    helper_note TEXT,                     -- e.g. "Thursday works, we'll bring lunch"
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (request_id) REFERENCES coverage_requests(id) ON DELETE CASCADE,
+    FOREIGN KEY (recipient_id) REFERENCES coverage_recipients(id),
+    FOREIGN KEY (window_id) REFERENCES coverage_windows(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_coverage_requests_requester ON coverage_requests(requester_id);
+CREATE INDEX IF NOT EXISTS idx_coverage_requests_status ON coverage_requests(status);
+CREATE INDEX IF NOT EXISTS idx_coverage_windows_request ON coverage_windows(request_id);
+CREATE INDEX IF NOT EXISTS idx_coverage_recipients_request ON coverage_recipients(request_id);
+CREATE INDEX IF NOT EXISTS idx_coverage_recipients_token ON coverage_recipients(invite_token);
+CREATE INDEX IF NOT EXISTS idx_coverage_approvals_request ON coverage_approvals(request_id);
+
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_tasks_category ON tasks(category);
 CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);

@@ -2331,6 +2331,136 @@ app.delete('/api/projects/:projectId/expenses/:id', requireAuth, async (req, res
   }
 });
 
+// ============================================
+// Coverage / Care Cascade
+// ============================================
+
+// Create a coverage request with windows and recipients
+app.post('/api/coverage', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const userId = req.session.user?.id;
+    const { reason, note, windows, contact_ids } = req.body;
+
+    // Create request
+    const request = await db.createCoverageRequest({ requester_id: userId, reason, note });
+
+    // Add windows
+    for (const w of (windows || [])) {
+      await db.addCoverageWindow({ request_id: request.id, ...w });
+    }
+
+    // Add recipients and generate invite tokens
+    const recipients = [];
+    for (const contactId of (contact_ids || [])) {
+      const rec = await db.addCoverageRecipient({ request_id: request.id, contact_id: contactId });
+      recipients.push(rec);
+    }
+
+    res.json({ success: true, id: request.id, recipients });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+// List my coverage requests
+app.get('/api/coverage', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const userId = req.session.user?.id;
+    const requests = await db.getCoverageRequests(userId);
+    res.json(requests);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+// Get full details of a coverage request
+app.get('/api/coverage/:id', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const request = await db.getCoverageRequestById(req.params.id);
+    if (!request) return res.status(404).json({ error: 'Not found' });
+    const windows = await db.getCoverageWindows(req.params.id);
+    const recipients = await db.getCoverageRecipients(req.params.id);
+    const approvals = await db.getCoverageApprovals(req.params.id);
+    res.json({ ...request, windows, recipients, approvals });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+// Cancel a coverage request
+app.post('/api/coverage/:id/cancel', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    await db.cancelCoverageRequest(req.params.id);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+// PUBLIC: Approve coverage via invite token (no auth required — care team member uses link)
+app.get('/api/coverage/approve/:token', async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const recipient = await db.getRecipientByToken(req.params.token);
+    if (!recipient) return res.status(404).json({ error: 'Invalid or expired link' });
+    const windows = await db.getCoverageWindows(recipient.request_id);
+    res.json({
+      contact_name: recipient.contact_name,
+      requester_name: recipient.requester_name,
+      reason: recipient.reason,
+      note: recipient.note,
+      request_id: recipient.request_id,
+      recipient_id: recipient.id,
+      status: recipient.status,
+      windows
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+// PUBLIC: Submit approval (care team member confirms a window)
+app.post('/api/coverage/approve/:token', async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const recipient = await db.getRecipientByToken(req.params.token);
+    if (!recipient) return res.status(404).json({ error: 'Invalid or expired link' });
+    if (recipient.status === 'approved') return res.status(409).json({ error: 'Already approved' });
+
+    const { window_id, approved_date, approved_start, approved_end, helper_note } = req.body;
+
+    await db.approveCoverage({
+      request_id: recipient.request_id,
+      recipient_id: recipient.id,
+      window_id,
+      approved_date,
+      approved_start,
+      approved_end,
+      helper_note
+    });
+
+    res.json({ success: true, message: 'Coverage confirmed' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
 // Initialize database on startup — runs full schema.sql with proper async handling
 async function initializeDatabase() {
   const db = new FamilyDB();

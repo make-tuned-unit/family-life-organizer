@@ -559,6 +559,101 @@ final class APIService {
         let _: SuccessResponse = try await delete("/api/projects/\(projectId)/expenses/\(expenseId)")
     }
 
+    // MARK: - Coverage / Care Cascade
+
+    struct CoverageRequestResponse: Codable, Identifiable {
+        let id: Int
+        var requester_id: Int
+        var reason: String
+        var note: String?
+        var status: String
+        var approval_count: Int?
+        var recipient_count: Int?
+        var created_at: String?
+    }
+
+    struct CoverageWindowResponse: Codable, Identifiable {
+        let id: Int
+        var request_id: Int
+        var window_date: String
+        var start_time: String
+        var end_time: String
+        var description: String?
+    }
+
+    struct CoverageRecipientResponse: Codable, Identifiable {
+        let id: Int
+        var request_id: Int
+        var contact_id: Int
+        var invite_token: String?
+        var status: String
+        var contact_name: String?
+        var contact_phone: String?
+        var avatar_initial: String?
+    }
+
+    struct CoverageApprovalResponse: Codable, Identifiable {
+        let id: Int
+        var request_id: Int
+        var recipient_id: Int
+        var window_id: Int
+        var approved_date: String
+        var approved_start: String
+        var approved_end: String
+        var helper_note: String?
+        var helper_name: String?
+        var avatar_initial: String?
+        var window_date: String?
+        var proposed_start: String?
+        var proposed_end: String?
+        var created_at: String?
+    }
+
+    struct CoverageDetailResponse: Codable {
+        let id: Int
+        var requester_id: Int
+        var reason: String
+        var note: String?
+        var status: String
+        var created_at: String?
+        var windows: [CoverageWindowResponse]
+        var recipients: [CoverageRecipientResponse]
+        var approvals: [CoverageApprovalResponse]
+    }
+
+    struct CreateCoverageResponse: Codable {
+        let success: Bool
+        let id: Int
+        let recipients: [RecipientToken]
+
+        struct RecipientToken: Codable {
+            let id: Int
+            let invite_token: String
+        }
+    }
+
+    func createCoverageRequest(reason: String, note: String?, windows: [[String: Any]], contactIds: [Int]) async throws -> CreateCoverageResponse {
+        let body: [String: Any] = [
+            "reason": reason,
+            "note": note ?? "",
+            "windows": windows,
+            "contact_ids": contactIds
+        ]
+        return try await post("/api/coverage", body: body)
+    }
+
+    func fetchCoverageRequests() async throws -> [CoverageRequestResponse] {
+        try await get("/api/coverage")
+    }
+
+    func fetchCoverageDetail(id: Int) async throws -> CoverageDetailResponse {
+        try await get("/api/coverage/\(id)")
+    }
+
+    func cancelCoverageRequest(id: Int) async throws {
+        let _: SuccessResponse = try await post("/api/coverage/\(id)/cancel", body: [:] as [String: String])
+    }
+
     // MARK: - Networking
 
     struct SuccessResponse: Codable {
