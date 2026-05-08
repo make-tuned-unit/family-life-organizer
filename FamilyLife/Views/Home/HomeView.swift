@@ -41,6 +41,7 @@ struct HomeView: View {
         .background { AmbientBackground(style: .home) }
         .refreshable { await viewModel.loadAll(api: api) }
         .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackgroundVisibility(.hidden, for: .navigationBar)
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
                 Button { showingSettings = true } label: {

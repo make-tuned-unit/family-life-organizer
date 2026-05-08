@@ -32,6 +32,7 @@ struct FamilyListsView: View {
         }
         .background { AmbientBackground(style: .home) }
         .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackgroundVisibility(.hidden, for: .navigationBar)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 GlassIconButton(systemName: "plus") {

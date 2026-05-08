@@ -22,6 +22,7 @@ struct ExpensesView: View {
         }
         .background { AmbientBackground(style: .expenses) }
         .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackgroundVisibility(.hidden, for: .navigationBar)
         .toolbar {
             if showsDismissButton {
                 ToolbarItem(placement: .topBarLeading) {

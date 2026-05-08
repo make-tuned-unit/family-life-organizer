@@ -50,6 +50,7 @@ struct MoreView: View {
         }
         .background { AmbientBackground(style: .home) }
         .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackgroundVisibility(.hidden, for: .navigationBar)
     }
 
     private func moreRow(icon: String, title: String, subtitle: String, color: Color) -> some View {
