@@ -1,101 +1,33 @@
 import SwiftUI
 
 struct ExpensesView: View {
+    var showsDismissButton = false
     @Environment(\.dismiss) private var dismiss
     @Environment(APIService.self) private var api
     @State private var viewModel = ExpensesViewModel()
     @State private var showingAddReceipt = false
     @State private var showingScanner = false
+    @State private var projectStore = BudgetProjectStore()
 
     var body: some View {
-        ScrollView {
-            LazyVStack(spacing: 20) {
-                // Month selector
-                HStack {
-                    Button { viewModel.previousMonth() } label: {
-                        Image(systemName: "chevron.left")
-                            .font(.title3.weight(.semibold))
-                    }
-                    Spacer()
-                    Text(viewModel.displayMonthString)
-                        .font(.title2.bold())
-                    Spacer()
-                    Button { viewModel.nextMonth() } label: {
-                        Image(systemName: "chevron.right")
-                            .font(.title3.weight(.semibold))
-                    }
-                }
-                .padding(.horizontal)
-
-                // Total summary
-                if !viewModel.budgetItems.isEmpty {
-                    let totalSpent = viewModel.budgetItems.reduce(0) { $0 + $1.spent }
-                    let totalBudget = viewModel.budgetItems.compactMap(\.monthly_limit).reduce(0, +)
-                    HStack {
-                        VStack(alignment: .leading) {
-                            Text("Total Spent")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                            Text("$\(totalSpent, specifier: "%.0f")")
-                                .font(.title.bold())
-                        }
-                        Spacer()
-                        VStack(alignment: .trailing) {
-                            Text("Budget")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                            Text("$\(totalBudget, specifier: "%.0f")")
-                                .font(.title2)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                    .padding(DesignTokens.Spacing.cardPadding)
-                    .flCard(tint: TabAccent.expenses.color)
-                    .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
-                }
-
-                // Budget categories
-                VStack(spacing: 12) {
-                    ForEach(viewModel.budgetItems, id: \.category) { item in
-                        BudgetCategoryRow(item: item)
-                    }
-                }
-                .padding(.horizontal)
-
-                // Recent receipts
-                if !viewModel.receipts.isEmpty {
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("Recent Receipts")
-                            .font(.headline)
-                            .padding(.horizontal)
-
-                        ForEach(viewModel.receipts) { receipt in
-                            ReceiptRow(receipt: receipt)
-                                .padding(.horizontal)
-                                .contextMenu {
-                                    Button(role: .destructive) {
-                                        Task { await viewModel.deleteReceipt(receipt.id, api: api) }
-                                    } label: {
-                                        Label("Delete", systemImage: "trash")
-                                    }
-                                }
-                        }
-                    }
-                }
-
-                // Empty state for receipts
-                if viewModel.receipts.isEmpty && !viewModel.isLoading {
-                    ContentUnavailableView("No Receipts", systemImage: "receipt", description: Text("Scan or add a receipt"))
-                        .padding(.top, DesignTokens.Spacing.bottomBuffer)
-                }
+        ScrollView(showsIndicators: false) {
+            VStack(spacing: 0) {
+                headerSection
+                heroSummary
+                categoriesSection
+                receiptsSection
+                projectsPreview
             }
-            .padding(.vertical)
+            .padding(.bottom, DesignTokens.Spacing.bottomBuffer)
         }
         .background { AmbientBackground(style: .expenses) }
-        .navigationTitle("Expenses")
+        .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
-                Button("Done") { dismiss() }
+            if showsDismissButton {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Done") { dismiss() }
+                        .foregroundStyle(WarmPalette.ink2)
+                }
             }
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
@@ -107,33 +39,282 @@ struct ExpensesView: View {
                     }
                 } label: {
                     Image(systemName: "plus")
+                        .foregroundStyle(WarmPalette.ink2)
                 }
             }
         }
-        .sheet(isPresented: $showingScanner) {
-            ReceiptScannerView()
-        }
-        .sheet(isPresented: $showingAddReceipt) {
-            AddReceiptView()
-        }
+        .sheet(isPresented: $showingScanner) { ReceiptScannerView() }
+        .sheet(isPresented: $showingAddReceipt) { AddReceiptView() }
         .overlay {
-            if viewModel.isLoading && viewModel.budgetItems.isEmpty {
-                ProgressView()
-            }
+            if viewModel.isLoading && viewModel.budgetItems.isEmpty { ProgressView() }
         }
-        .refreshable {
-            await viewModel.loadAll(api: api)
+        .alert("Something went wrong", isPresented: errorAlertIsPresented) {
+            Button("OK") { viewModel.error = nil }
+        } message: {
+            Text(viewModel.error ?? "An unexpected error occurred.")
         }
-        .task {
-            await viewModel.loadAll(api: api)
-        }
+        .refreshable { await viewModel.loadAll(api: api); await projectStore.loadAll(api: api) }
+        .task { await viewModel.loadAll(api: api); await projectStore.loadAll(api: api) }
         .onChange(of: viewModel.displayedMonth) {
             Task { await viewModel.loadAll(api: api) }
         }
     }
+
+    private var errorAlertIsPresented: Binding<Bool> {
+        Binding(get: { viewModel.error != nil }, set: { if !$0 { viewModel.error = nil } })
+    }
+
+    // MARK: - Projects Preview
+
+    @ViewBuilder
+    private var projectsPreview: some View {
+        if !projectStore.projects.isEmpty {
+            VStack(spacing: 8) {
+                ForEach(projectStore.projects.prefix(2)) { project in
+                    NavigationLink {
+                        ProjectDetailView(store: projectStore, projectID: project.id)
+                    } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: "hammer.fill")
+                                .font(.system(size: 14))
+                                .foregroundStyle(AccentTheme.sage.color)
+                                .frame(width: 28, height: 28)
+                                .background(AccentTheme.sage.color.opacity(0.15))
+                                .clipShape(RoundedRectangle(cornerRadius: 8))
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(project.name)
+                                    .font(.system(size: 14, weight: .semibold))
+                                    .foregroundStyle(WarmPalette.ink1)
+                                Text("$\(Int(project.total_spent).formatted()) of $\(Int(project.budget).formatted())")
+                                    .font(.system(size: 12))
+                                    .foregroundStyle(WarmPalette.ink3)
+                            }
+                            Spacer()
+                            WarmProgressBar(
+                                progress: project.progress,
+                                color: project.progress > 0.85 ? AccentTheme.saffron.color : AccentTheme.sage.color
+                            )
+                            .frame(width: 60)
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundStyle(WarmPalette.ink4)
+                        }
+                        .padding(12)
+                        .glassEffect(.regular.tint(.white.opacity(0.03)), in: .rect(cornerRadius: 16))
+                    }
+                    .buttonStyle(.plain)
+                }
+
+                if projectStore.projects.count > 2 {
+                    NavigationLink {
+                        BudgetProjectsView()
+                    } label: {
+                        Text("View all \(projectStore.projects.count) projects")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(WarmPalette.ink3)
+                    }
+                }
+            }
+            .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
+            .padding(.bottom, 14)
+        } else {
+            NavigationLink {
+                BudgetProjectsView()
+            } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: "hammer.fill")
+                        .font(.system(size: 16))
+                        .foregroundStyle(AccentTheme.sage.color)
+                        .frame(width: 36, height: 36)
+                        .background(AccentTheme.sage.color.opacity(0.15))
+                        .clipShape(Circle())
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Project budgets")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(WarmPalette.ink1)
+                        Text("Track spending on renovations, events, and more")
+                            .font(.system(size: 13))
+                            .foregroundStyle(WarmPalette.ink3)
+                    }
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(WarmPalette.ink4)
+                }
+                .padding(14)
+                .glassEffect(.regular.tint(.white.opacity(0.03)), in: .rect(cornerRadius: DesignTokens.CornerRadius.card))
+            }
+            .buttonStyle(.plain)
+            .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
+            .padding(.bottom, 14)
+        }
+    }
+
+    // MARK: - Header
+
+    private var headerSection: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("\(viewModel.displayMonthString) \u{00B7} halfway through")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(WarmPalette.ink3)
+                    .tracking(0.4)
+                    .textCase(.uppercase)
+                Text("Budget")
+                    .font(.system(size: 28, weight: .bold))
+                    .foregroundStyle(WarmPalette.ink1)
+            }
+            Spacer()
+            HStack(spacing: 8) {
+                Button { viewModel.previousMonth() } label: {
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(WarmPalette.ink2)
+                }
+                Button { viewModel.nextMonth() } label: {
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(WarmPalette.ink2)
+                }
+            }
+        }
+        .padding(.horizontal, 22)
+        .padding(.top, 14)
+        .padding(.bottom, 14)
+    }
+
+    // MARK: - Hero Summary
+
+    @ViewBuilder
+    private var heroSummary: some View {
+        if !viewModel.budgetItems.isEmpty {
+            let totalSpent = viewModel.budgetItems.reduce(0.0) { $0 + $1.spent }
+            let totalBudget = viewModel.budgetItems.compactMap(\.monthly_limit).reduce(0.0, +)
+            let remaining = max(0, totalBudget - totalSpent)
+
+            ZStack(alignment: .bottomTrailing) {
+                // Decorative radial orb (prototype expenses.jsx:27)
+                Circle()
+                    .fill(RadialGradient(colors: [AccentTheme.terracotta.color.opacity(0.3), .clear], center: .center, startRadius: 0, endRadius: 90))
+                    .frame(width: 180, height: 180)
+                    .offset(x: 40, y: 40)
+
+            VStack(alignment: .leading, spacing: 0) {
+                Text("SPENT THIS MONTH")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(WarmPalette.ink3)
+                    .tracking(0.4)
+
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text("$\(Int(totalSpent).formatted())")
+                        .font(.system(size: 44, weight: .bold))
+                        .foregroundStyle(WarmPalette.ink1)
+                        .tracking(-0.88)
+                    Text("of $\(Int(totalBudget).formatted())")
+                        .font(.system(size: 13))
+                        .foregroundStyle(WarmPalette.ink3)
+                }
+                .padding(.top, 8)
+                .padding(.bottom, 14)
+
+                // Stacked bar
+                GeometryReader { geo in
+                    HStack(spacing: 0) {
+                        ForEach(viewModel.budgetItems, id: \.category) { item in
+                            let width = totalBudget > 0 ? (item.spent / totalBudget) * geo.size.width : 0
+                            Rectangle()
+                                .fill(categoryColor(item))
+                                .frame(width: width)
+                        }
+                    }
+                    .clipShape(Capsule())
+                }
+                .frame(height: 10)
+                .background(Capsule().fill(.white.opacity(0.4)))
+                .padding(.bottom, 12)
+
+                HStack {
+                    Text("$\(Int(remaining).formatted()) remaining")
+                        .font(.system(size: 13))
+                        .foregroundStyle(WarmPalette.ink3)
+                    Spacer()
+                    if totalSpent < totalBudget {
+                        Text("\u{2193} on track")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(WarmPalette.good)
+                    } else {
+                        Text("\u{2191} over budget")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(WarmPalette.bad)
+                    }
+                }
+            }
+            .padding(20)
+            } // close ZStack
+            .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.cardLarge))
+            .glassEffect(.regular.tint(AccentTheme.terracotta.color.opacity(0.04)), in: .rect(cornerRadius: DesignTokens.CornerRadius.cardLarge))
+            .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
+            .padding(.bottom, 14)
+        }
+    }
+
+    // MARK: - Categories
+
+    @ViewBuilder
+    private var categoriesSection: some View {
+        if !viewModel.budgetItems.isEmpty {
+            WarmSectionHeader(title: "Categories", trailing: "\(viewModel.budgetItems.count) total")
+                .padding(.bottom, 8)
+
+            VStack(spacing: 8) {
+                ForEach(viewModel.budgetItems, id: \.category) { item in
+                    BudgetCategoryCard(item: item)
+                }
+            }
+            .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
+            .padding(.bottom, 14)
+        }
+    }
+
+    // MARK: - Receipts
+
+    @ViewBuilder
+    private var receiptsSection: some View {
+        if !viewModel.receipts.isEmpty {
+            WarmSectionHeader(title: "Recent receipts", trailing: "View all")
+                .padding(.bottom, 6)
+
+            VStack(spacing: 0) {
+                ForEach(Array(viewModel.receipts.prefix(5).enumerated()), id: \.element.id) { index, receipt in
+                    if index > 0 { GlassDivider() }
+                    ReceiptListRow(receipt: receipt)
+                }
+            }
+            .glassEffect(.regular.tint(.white.opacity(0.03)), in: .rect(cornerRadius: DesignTokens.CornerRadius.card))
+            .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
+        } else if !viewModel.isLoading {
+            VStack(spacing: 8) {
+                Image(systemName: "receipt")
+                    .font(.system(size: 32))
+                    .foregroundStyle(WarmPalette.ink4)
+                Text("No receipts yet")
+                    .font(.system(size: 15))
+                    .foregroundStyle(WarmPalette.ink3)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 40)
+        }
+    }
+
+    private func categoryColor(_ item: BudgetSummaryResponse) -> Color {
+        if let hex = item.color { return Color(hex: hex) }
+        return TabAccent.expenses.color
+    }
 }
 
-struct BudgetCategoryRow: View {
+// MARK: - Budget Category Card
+
+struct BudgetCategoryCard: View {
     let item: BudgetSummaryResponse
 
     private var progress: Double {
@@ -141,95 +322,97 @@ struct BudgetCategoryRow: View {
         return min(item.spent / limit, 1.5)
     }
 
-    private var progressColor: Color {
-        if progress > 1.0 { return .red }
-        if progress > 0.75 { return .yellow }
-        return .green
+    private var color: Color {
+        if let hex = item.color { return Color(hex: hex) }
+        return TabAccent.expenses.color
     }
 
-    private var hexColor: Color {
-        if let hex = item.color {
-            return Color(hex: hex)
+    private var progressColor: Color {
+        progress > 0.9 ? WarmPalette.bad : color
+    }
+
+    private var iconName: String {
+        switch item.category.lowercased() {
+        case "groceries": return "cart.fill"
+        case "dining", "dining out": return "fork.knife"
+        case "kids": return "figure.2.and.child.holdinghands"
+        case "household": return "house.fill"
+        case "transport", "transportation": return "car.fill"
+        case "health": return "heart.fill"
+        default: return "dollarsign.circle.fill"
         }
-        return .teal
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Circle()
-                    .fill(hexColor)
-                    .frame(width: 10, height: 10)
-                Text(item.category)
-                    .font(.subheadline.weight(.medium))
-                Spacer()
-                Text("$\(item.spent, specifier: "%.0f")")
-                    .font(.subheadline.bold())
-                if let limit = item.monthly_limit {
-                    Text("/ $\(limit, specifier: "%.0f")")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+        HStack(spacing: 14) {
+            Image(systemName: iconName)
+                .font(.system(size: 18))
+                .foregroundStyle(color)
+                .frame(width: 40, height: 40)
+                .background(color.opacity(0.15))
+                .clipShape(RoundedRectangle(cornerRadius: 14))
+
+            VStack(alignment: .leading, spacing: 6) {
+                HStack {
+                    Text(item.category)
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(WarmPalette.ink1)
+                    Spacer()
+                    HStack(spacing: 4) {
+                        Text("$\(Int(item.spent))")
+                            .font(.system(size: 15, weight: .bold))
+                            .foregroundStyle(WarmPalette.ink1)
+                        if let limit = item.monthly_limit {
+                            Text("/ $\(Int(limit))")
+                                .font(.system(size: 13))
+                                .foregroundStyle(WarmPalette.ink3)
+                        }
+                    }
                 }
+                WarmProgressBar(progress: progress, color: progressColor)
             }
-            GeometryReader { geo in
-                ZStack(alignment: .leading) {
-                    RoundedRectangle(cornerRadius: 4)
-                        .fill(.fill.tertiary)
-                        .frame(height: 8)
-                    RoundedRectangle(cornerRadius: 4)
-                        .fill(progressColor)
-                        .frame(width: geo.size.width * min(progress, 1.0), height: 8)
-                }
-            }
-            .frame(height: 8)
         }
-        .padding(DesignTokens.Spacing.cardPadding)
-        .flCard(tint: hexColor)
+        .padding(14)
+        .glassEffect(.regular.tint(color.opacity(0.04)), in: .rect(cornerRadius: 20))
     }
 }
 
-struct ReceiptRow: View {
+// MARK: - Receipt Row
+
+struct ReceiptListRow: View {
     let receipt: ReceiptResponse
 
     var body: some View {
         HStack(spacing: 12) {
-            Image(systemName: "receipt")
-                .foregroundStyle(.teal)
-                .frame(width: 32)
+            FamilyAvatar(initial: "J", size: 28)
+
             VStack(alignment: .leading, spacing: 2) {
                 Text(receipt.merchant)
-                    .font(.subheadline.weight(.medium))
-                HStack(spacing: 8) {
-                    Text(receipt.date)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(WarmPalette.ink1)
+                HStack(spacing: 4) {
                     if let cat = receipt.category {
                         Text(cat)
-                            .foregroundStyle(.secondary)
                     }
+                    Text("\u{00B7}")
+                    Text(receipt.date)
                 }
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                .font(.system(size: 13))
+                .foregroundStyle(WarmPalette.ink3)
             }
+
             Spacer()
+
             Text("$\(receipt.amount, specifier: "%.2f")")
-                .font(.subheadline.bold())
+                .font(.system(size: 15, weight: .bold, design: .default))
+                .foregroundStyle(WarmPalette.ink1)
         }
-        .padding(DesignTokens.Spacing.cardPadding)
-        .flCard(tint: TabAccent.expenses.color)
+        .padding(.vertical, 12)
+        .padding(.horizontal, 14)
     }
 }
 
-// Hex color extension
-extension Color {
-    init(hex: String) {
-        let hex = hex.trimmingCharacters(in: CharacterSet(charactersIn: "#"))
-        var int: UInt64 = 0
-        Scanner(string: hex).scanHexInt64(&int)
-        let r = Double((int >> 16) & 0xFF) / 255.0
-        let g = Double((int >> 8) & 0xFF) / 255.0
-        let b = Double(int & 0xFF) / 255.0
-        self.init(red: r, green: g, blue: b)
-    }
-}
+// Color(hex:) is defined in DesignTokens.swift
 
 #Preview {
     NavigationStack {

@@ -1,14 +1,15 @@
 const express = require('express');
 const session = require('express-session');
 const bodyParser = require('body-parser');
+const bcrypt = require('bcryptjs');
 const path = require('path');
 const FamilyDB = require('./database');
 
 const app = express();
 const PORT = process.env.PORT || 3456;
 
-// Users config
-const USERS = {
+// Legacy hardcoded users — only used as fallback during migration
+const LEGACY_USERS = {
   'jesse': { password: 'lauft2024', name: 'Jesse', avatar: '👨‍💼' },
   'sophie': { password: 'family2024', name: 'Sophie', avatar: '👩‍⚕️' }
 };
@@ -39,15 +40,112 @@ function requireAuth(req, res, next) {
   }
 }
 
-// JSON API login for mobile clients
-app.post('/api/auth/login', (req, res) => {
-  const { username, password } = req.body;
-  const user = USERS[username];
-  if (user && user.password === password) {
-    req.session.user = username;
-    res.json({ success: true, user: { username, name: user.name, avatar: user.avatar } });
-  } else {
+// JSON API registration
+app.post('/api/auth/register', async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const { username, password, name, invite_code } = req.body;
+    if (!username || !password || !name) {
+      return res.status(400).json({ error: 'Username, password, and name are required' });
+    }
+
+    // Check if username exists
+    const existing = await db.getUserByUsername(username);
+    if (existing) {
+      return res.status(409).json({ error: 'Username already taken' });
+    }
+
+    // Hash password and create user
+    const password_hash = await bcrypt.hash(password, 10);
+    const user = await db.createUser({ username, password_hash, name });
+
+    // If invite code provided, join that household
+    let household = null;
+    if (invite_code) {
+      household = await db.getGroupByInviteCode(invite_code);
+      if (household) {
+        await db.addGroupMember(household.id, { user_id: user.id, role: 'member', added_by: user.id });
+      }
+    }
+
+    // If no invite code (or invalid), create a new household
+    if (!household) {
+      const newHousehold = await db.createGroup({
+        name: name + "'s Home",
+        group_type: 'household',
+        created_by: user.id
+      });
+      await db.addGroupMember(newHousehold.id, { user_id: user.id, role: 'admin', added_by: user.id });
+      household = { id: newHousehold.id, invite_code: newHousehold.invite_code };
+    }
+
+    // Set session
+    req.session.user = { username, name: user.name, id: user.id };
+    res.json({
+      success: true,
+      user: { id: user.id, username, name, avatar: null },
+      household: { id: household.id, invite_code: household.invite_code }
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+// JSON API login — checks users table first, falls back to legacy
+app.post('/api/auth/login', async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const { username, password } = req.body;
+
+    // Try database user first
+    const dbUser = await db.getUserByUsername(username);
+    if (dbUser) {
+      const valid = await bcrypt.compare(password, dbUser.password_hash);
+      if (valid) {
+        req.session.user = { username: dbUser.username, name: dbUser.name, id: dbUser.id };
+        return res.json({ success: true, user: { id: dbUser.id, username: dbUser.username, name: dbUser.name, avatar: dbUser.avatar } });
+      }
+    }
+
+    // Fallback to legacy hardcoded users (auto-migrate to DB)
+    const legacy = LEGACY_USERS[username];
+    if (legacy && legacy.password === password) {
+      // Migrate legacy user to database
+      let user = dbUser;
+      if (!user) {
+        const password_hash = await bcrypt.hash(password, 10);
+        user = await db.createUser({ username, password_hash, name: legacy.name, avatar: legacy.avatar });
+        // Auto-create household for migrated user
+        const household = await db.createGroup({ name: legacy.name + "'s Home", group_type: 'household', created_by: user.id });
+        await db.addGroupMember(household.id, { user_id: user.id, role: 'admin', added_by: user.id });
+      }
+      req.session.user = { username, name: legacy.name, id: user.id };
+      return res.json({ success: true, user: { id: user.id, username, name: legacy.name, avatar: legacy.avatar } });
+    }
+
     res.status(401).json({ error: 'Invalid credentials' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+// Get current user profile
+app.get('/api/auth/me', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const userId = req.session.user?.id;
+    if (!userId) return res.json({ user: req.session.user, groups: [] });
+    const user = await db.getUserById(userId);
+    const groups = await db.getGroupsByUser(userId);
+    res.json({ user, groups });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
   }
 });
 
@@ -220,15 +318,34 @@ app.get('/login', (req, res) => {
 </html>`);
 });
 
-// Login POST
-app.post('/login', (req, res) => {
-  const { username, password } = req.body;
-  const user = USERS[username];
-  if (user && user.password === password) {
-    req.session.user = { username, name: user.name, avatar: user.avatar };
-    res.redirect('/');
-  } else {
+// Login POST (web)
+app.post('/login', async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const { username, password } = req.body;
+
+    // Try DB user
+    const dbUser = await db.getUserByUsername(username);
+    if (dbUser) {
+      const valid = await bcrypt.compare(password, dbUser.password_hash);
+      if (valid) {
+        req.session.user = { username: dbUser.username, name: dbUser.name, avatar: dbUser.avatar, id: dbUser.id };
+        return res.redirect('/');
+      }
+    }
+
+    // Legacy fallback
+    const legacy = LEGACY_USERS[username];
+    if (legacy && legacy.password === password) {
+      req.session.user = { username, name: legacy.name, avatar: legacy.avatar };
+      return res.redirect('/');
+    }
+
     res.redirect('/login?error=1');
+  } catch (err) {
+    res.redirect('/login?error=1');
+  } finally {
+    db.close();
   }
 });
 
@@ -1882,49 +1999,344 @@ app.delete('/api/gifts/events/:id', requireAuth, async (req, res) => {
   }
 });
 
-// Initialize database on startup
+// ============================================
+// Groups
+// ============================================
+
+app.get('/api/groups', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const userId = req.session.user?.id;
+    if (!userId) return res.json([]);
+    const groups = await db.getGroupsByUser(userId);
+    res.json(groups);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+app.post('/api/groups', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const userId = req.session.user?.id;
+    const group = await db.createGroup({ ...req.body, created_by: userId });
+    await db.addGroupMember(group.id, { user_id: userId, role: 'admin', added_by: userId });
+    res.json({ success: true, id: group.id, invite_code: group.invite_code });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+app.post('/api/groups/join', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const userId = req.session.user?.id;
+    const { invite_code } = req.body;
+    const group = await db.getGroupByInviteCode(invite_code);
+    if (!group) return res.status(404).json({ error: 'Invalid invite code' });
+    await db.addGroupMember(group.id, { user_id: userId, role: 'member', added_by: userId });
+    res.json({ success: true, group });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+app.get('/api/groups/:id/members', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const members = await db.getGroupMembers(req.params.id);
+    res.json(members);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+app.post('/api/groups/:id/members', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const userId = req.session.user?.id;
+    const result = await db.addGroupMember(req.params.id, { ...req.body, added_by: userId });
+    res.json({ success: true, id: result.id });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+app.delete('/api/groups/:groupId/members/:memberId', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    await db.removeGroupMember(req.params.groupId, req.params.memberId);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+app.delete('/api/groups/:id', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    await db.deleteGroup(req.params.id);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+// ============================================
+// Contacts
+// ============================================
+
+app.get('/api/contacts', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const userId = req.session.user?.id;
+    if (!userId) return res.json([]);
+    const contacts = await db.getContactsByUser(userId);
+    res.json(contacts);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+app.post('/api/contacts', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const userId = req.session.user?.id;
+    const result = await db.addContact({ ...req.body, added_by: userId });
+    res.json({ success: true, id: result.id });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+app.put('/api/contacts/:id', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    await db.updateContact(req.params.id, req.body);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+app.delete('/api/contacts/:id', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    await db.deleteContact(req.params.id);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+// ============================================
+// Feed
+// ============================================
+
+app.get('/api/groups/:id/feed', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const posts = await db.getFeedPosts(req.params.id, {
+      limit: parseInt(req.query.limit) || 50,
+      before_id: req.query.before_id ? parseInt(req.query.before_id) : undefined
+    });
+    res.json(posts);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+app.post('/api/groups/:id/feed', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const userId = req.session.user?.id;
+    const result = await db.addFeedPost({ ...req.body, group_id: req.params.id, author_id: userId });
+    res.json({ success: true, id: result.id });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+app.delete('/api/feed/:id', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    await db.deleteFeedPost(req.params.id);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+app.post('/api/feed/:id/reactions', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const userId = req.session.user?.id;
+    await db.addFeedReaction(req.params.id, userId, req.body.reaction_type);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+app.delete('/api/feed/:id/reactions', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const userId = req.session.user?.id;
+    await db.removeFeedReaction(req.params.id, userId);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+app.get('/api/feed/:id/reactions', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const reactions = await db.getFeedReactions(req.params.id);
+    res.json(reactions);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+app.get('/api/feed/:id/comments', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const comments = await db.getFeedComments(req.params.id);
+    res.json(comments);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+app.post('/api/feed/:id/comments', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const userId = req.session.user?.id;
+    const result = await db.addFeedComment(req.params.id, userId, req.body.text);
+    res.json({ success: true, id: result.id });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+// Budget Projects
+app.get('/api/projects', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const projects = await db.getProjects();
+    res.json(projects);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+app.post('/api/projects', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const result = await db.addProject(req.body);
+    res.json({ success: true, id: result.id });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+app.delete('/api/projects/:id', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    await db.deleteProject(req.params.id);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+app.get('/api/projects/:id/expenses', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const expenses = await db.getProjectExpenses(req.params.id);
+    res.json(expenses);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+app.post('/api/projects/:id/expenses', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const result = await db.addProjectExpense(req.params.id, req.body);
+    res.json({ success: true, id: result.id });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+app.delete('/api/projects/:projectId/expenses/:id', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    await db.deleteProjectExpense(req.params.id);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+// Initialize database on startup — runs full schema.sql with proper async handling
 async function initializeDatabase() {
   const db = new FamilyDB();
   try {
-    // Create tables if they don't exist
-    db.db.exec(`
-      CREATE TABLE IF NOT EXISTS groceries (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        item TEXT NOT NULL,
-        category TEXT,
-        status TEXT DEFAULT 'active',
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-      );
-      
-      CREATE TABLE IF NOT EXISTS tasks (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        title TEXT NOT NULL,
-        category TEXT NOT NULL,
-        status TEXT DEFAULT 'active',
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-      );
-      
-      CREATE TABLE IF NOT EXISTS appointments (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        title TEXT NOT NULL,
-        appointment_date TEXT NOT NULL,
-        appointment_time TEXT,
-        location TEXT,
-        person_tags TEXT,
-        created_by TEXT,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-      );
-      
-      CREATE TABLE IF NOT EXISTS receipts (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        amount REAL NOT NULL,
-        merchant TEXT,
-        category TEXT,
-        receipt_date TEXT,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-      );
-    `);
-    console.log('✅ Database initialized');
+    await db.initSchema();
+    console.log('✅ Database initialized with full schema');
   } catch (err) {
     console.error('❌ Database init error:', err.message);
   } finally {
