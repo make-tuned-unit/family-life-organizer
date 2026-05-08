@@ -321,7 +321,7 @@ struct ProjectDetailView: View {
             .sheet(isPresented: $showingScanReceipt) {
                 ReceiptScannerView(
                     projectId: projectID,
-                    projectName: project?.name,
+                    projectName: project.name,
                     onProjectExpenseSaved: {
                         await store.loadAll(api: api)
                         await loadExpenses()
