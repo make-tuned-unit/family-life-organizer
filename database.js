@@ -22,7 +22,6 @@ if (!fs.existsSync(DB_DIR)) {
 class FamilyDB {
   constructor() {
     this.db = new sqlite3.Database(DB_PATH);
-    this.init();
   }
 
   parseJSONList(value) {
@@ -34,24 +33,21 @@ class FamilyDB {
     }
   }
 
-  init() {
-    const schema = fs.readFileSync(
-      path.join(__dirname, 'schema.sql'), 
-      'utf8'
-    );
-    
-    // Split and execute each statement
-    const statements = schema.split(';').filter(s => s.trim());
-    for (const stmt of statements) {
-      try {
-        this.db.exec(stmt + ';');
-      } catch (err) {
-        // Ignore "already exists" errors - tables/columns already created
-        if (!err.message.includes('already exists') && !err.message.includes('duplicate')) {
-          console.error('Schema error:', err.message);
+  // Run full schema — called once at app startup with proper async handling
+  initSchema() {
+    return new Promise((resolve, reject) => {
+      const schema = fs.readFileSync(
+        path.join(__dirname, 'schema.sql'),
+        'utf8'
+      );
+      this.db.exec(schema, (err) => {
+        if (err) {
+          console.error('Schema init error:', err.message);
+          // Don't reject — partial success is OK (tables may already exist)
         }
-      }
-    }
+        resolve();
+      });
+    });
   }
 
   // Task operations
@@ -804,6 +800,351 @@ class FamilyDB {
         if (err) reject(err);
         else resolve({ id, deleted: true });
       });
+    });
+  }
+
+  // Budget project operations
+  addProject(project) {
+    return new Promise((resolve, reject) => {
+      this.db.run(
+        'INSERT INTO budget_projects (name, budget, created_by) VALUES (?, ?, ?)',
+        [project.name, project.budget || 0, project.created_by || 'jesse'],
+        function(err) {
+          if (err) reject(err);
+          else resolve({ id: this.lastID, ...project });
+        }
+      );
+    });
+  }
+
+  getProjects() {
+    return new Promise((resolve, reject) => {
+      const sql = `
+        SELECT p.*, COALESCE(SUM(e.amount), 0) as total_spent, COUNT(e.id) as expense_count
+        FROM budget_projects p
+        LEFT JOIN project_expenses e ON e.project_id = p.id
+        GROUP BY p.id
+        ORDER BY p.created_at DESC
+      `;
+      this.db.all(sql, [], (err, rows) => err ? reject(err) : resolve(rows));
+    });
+  }
+
+  deleteProject(id) {
+    return new Promise((resolve, reject) => {
+      this.db.run('DELETE FROM budget_projects WHERE id = ?', [id], (err) => {
+        if (err) reject(err);
+        else resolve({ id, deleted: true });
+      });
+    });
+  }
+
+  addProjectExpense(projectId, expense) {
+    return new Promise((resolve, reject) => {
+      this.db.run(
+        'INSERT INTO project_expenses (project_id, description, amount, category, notes) VALUES (?, ?, ?, ?, ?)',
+        [projectId, expense.description, expense.amount, expense.category || 'General', expense.notes || null],
+        function(err) {
+          if (err) reject(err);
+          else resolve({ id: this.lastID, ...expense });
+        }
+      );
+    });
+  }
+
+  getProjectExpenses(projectId) {
+    return new Promise((resolve, reject) => {
+      this.db.all(
+        'SELECT * FROM project_expenses WHERE project_id = ? ORDER BY created_at DESC',
+        [projectId],
+        (err, rows) => err ? reject(err) : resolve(rows)
+      );
+    });
+  }
+
+  deleteProjectExpense(id) {
+    return new Promise((resolve, reject) => {
+      this.db.run('DELETE FROM project_expenses WHERE id = ?', [id], (err) => {
+        if (err) reject(err);
+        else resolve({ id, deleted: true });
+      });
+    });
+  }
+
+  // ============================================
+  // Users
+  // ============================================
+
+  createUser(user) {
+    return new Promise((resolve, reject) => {
+      this.db.run(
+        'INSERT INTO users (username, password_hash, name, email, phone, avatar) VALUES (?, ?, ?, ?, ?, ?)',
+        [user.username, user.password_hash, user.name, user.email || null, user.phone || null, user.avatar || null],
+        function(err) {
+          if (err) reject(err);
+          else resolve({ id: this.lastID, username: user.username, name: user.name });
+        }
+      );
+    });
+  }
+
+  getUserByUsername(username) {
+    return new Promise((resolve, reject) => {
+      this.db.get('SELECT * FROM users WHERE username = ?', [username], (err, row) => {
+        if (err) reject(err);
+        else resolve(row || null);
+      });
+    });
+  }
+
+  getUserById(id) {
+    return new Promise((resolve, reject) => {
+      this.db.get('SELECT id, username, name, email, phone, avatar, created_at FROM users WHERE id = ?', [id], (err, row) => {
+        if (err) reject(err);
+        else resolve(row || null);
+      });
+    });
+  }
+
+  // ============================================
+  // Groups
+  // ============================================
+
+  createGroup(group) {
+    return new Promise((resolve, reject) => {
+      const inviteCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+      this.db.run(
+        'INSERT INTO groups (name, group_type, description, invite_code, created_by) VALUES (?, ?, ?, ?, ?)',
+        [group.name, group.group_type || 'household', group.description || null, inviteCode, group.created_by],
+        function(err) {
+          if (err) reject(err);
+          else resolve({ id: this.lastID, invite_code: inviteCode });
+        }
+      );
+    });
+  }
+
+  getGroupsByUser(userId) {
+    return new Promise((resolve, reject) => {
+      this.db.all(`
+        SELECT g.*, gm.role,
+          (SELECT COUNT(*) FROM group_members WHERE group_id = g.id) as member_count
+        FROM groups g
+        JOIN group_members gm ON gm.group_id = g.id AND gm.user_id = ?
+        ORDER BY g.group_type, g.name
+      `, [userId], (err, rows) => err ? reject(err) : resolve(rows));
+    });
+  }
+
+  getGroupById(id) {
+    return new Promise((resolve, reject) => {
+      this.db.get('SELECT * FROM groups WHERE id = ?', [id], (err, row) => err ? reject(err) : resolve(row));
+    });
+  }
+
+  getGroupByInviteCode(code) {
+    return new Promise((resolve, reject) => {
+      this.db.get('SELECT * FROM groups WHERE invite_code = ?', [code], (err, row) => err ? reject(err) : resolve(row));
+    });
+  }
+
+  addGroupMember(groupId, { user_id, contact_id, role, added_by }) {
+    return new Promise((resolve, reject) => {
+      this.db.run(
+        'INSERT INTO group_members (group_id, user_id, contact_id, role, added_by) VALUES (?, ?, ?, ?, ?)',
+        [groupId, user_id || null, contact_id || null, role || 'member', added_by],
+        function(err) {
+          if (err) reject(err);
+          else resolve({ id: this.lastID });
+        }
+      );
+    });
+  }
+
+  getGroupMembers(groupId) {
+    return new Promise((resolve, reject) => {
+      this.db.all(`
+        SELECT gm.*,
+          u.name as user_name, u.username, u.avatar as user_avatar,
+          c.name as contact_name, c.relationship, c.avatar_initial, c.phone as contact_phone
+        FROM group_members gm
+        LEFT JOIN users u ON u.id = gm.user_id
+        LEFT JOIN contacts c ON c.id = gm.contact_id
+        WHERE gm.group_id = ?
+        ORDER BY gm.role DESC, COALESCE(u.name, c.name)
+      `, [groupId], (err, rows) => err ? reject(err) : resolve(rows));
+    });
+  }
+
+  removeGroupMember(groupId, memberId) {
+    return new Promise((resolve, reject) => {
+      this.db.run('DELETE FROM group_members WHERE group_id = ? AND id = ?', [groupId, memberId], (err) => {
+        if (err) reject(err);
+        else resolve({ deleted: true });
+      });
+    });
+  }
+
+  deleteGroup(id) {
+    return new Promise((resolve, reject) => {
+      this.db.run('DELETE FROM groups WHERE id = ?', [id], (err) => {
+        if (err) reject(err);
+        else resolve({ deleted: true });
+      });
+    });
+  }
+
+  // ============================================
+  // Contacts (non-app family members)
+  // ============================================
+
+  addContact(contact) {
+    return new Promise((resolve, reject) => {
+      this.db.run(
+        'INSERT INTO contacts (added_by, name, relationship, phone, email, birthday, avatar_initial, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        [contact.added_by, contact.name, contact.relationship || null, contact.phone || null, contact.email || null, contact.birthday || null, contact.avatar_initial || contact.name.charAt(0).toUpperCase(), contact.notes || null],
+        function(err) {
+          if (err) reject(err);
+          else resolve({ id: this.lastID, ...contact });
+        }
+      );
+    });
+  }
+
+  getContactsByUser(userId) {
+    return new Promise((resolve, reject) => {
+      this.db.all('SELECT * FROM contacts WHERE added_by = ? ORDER BY name', [userId], (err, rows) => err ? reject(err) : resolve(rows));
+    });
+  }
+
+  updateContact(id, updates) {
+    return new Promise((resolve, reject) => {
+      const fields = [];
+      const params = [];
+      for (const [key, value] of Object.entries(updates)) {
+        fields.push(`${key} = ?`);
+        params.push(value);
+      }
+      params.push(id);
+      this.db.run(`UPDATE contacts SET ${fields.join(', ')} WHERE id = ?`, params, (err) => {
+        if (err) reject(err);
+        else resolve({ id, ...updates });
+      });
+    });
+  }
+
+  deleteContact(id) {
+    return new Promise((resolve, reject) => {
+      this.db.run('DELETE FROM contacts WHERE id = ?', [id], (err) => {
+        if (err) reject(err);
+        else resolve({ deleted: true });
+      });
+    });
+  }
+
+  // ============================================
+  // Feed
+  // ============================================
+
+  addFeedPost(post) {
+    return new Promise((resolve, reject) => {
+      this.db.run(
+        `INSERT INTO feed_posts (group_id, author_id, post_type, title, body, link_url, photo_url, reference_type, reference_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [post.group_id, post.author_id, post.post_type || 'text', post.title || null, post.body || null, post.link_url || null, post.photo_url || null, post.reference_type || null, post.reference_id || null],
+        function(err) {
+          if (err) reject(err);
+          else resolve({ id: this.lastID });
+        }
+      );
+    });
+  }
+
+  getFeedPosts(groupId, { limit = 50, before_id } = {}) {
+    return new Promise((resolve, reject) => {
+      let sql = `
+        SELECT fp.*, u.name as author_name, u.avatar as author_avatar,
+          (SELECT COUNT(*) FROM feed_reactions WHERE post_id = fp.id) as reaction_count,
+          (SELECT COUNT(*) FROM feed_comments WHERE post_id = fp.id) as comment_count
+        FROM feed_posts fp
+        JOIN users u ON u.id = fp.author_id
+        WHERE fp.group_id = ?
+      `;
+      const params = [groupId];
+      if (before_id) {
+        sql += ' AND fp.id < ?';
+        params.push(before_id);
+      }
+      sql += ' ORDER BY fp.id DESC LIMIT ?';
+      params.push(limit);
+      this.db.all(sql, params, (err, rows) => err ? reject(err) : resolve(rows));
+    });
+  }
+
+  deleteFeedPost(id) {
+    return new Promise((resolve, reject) => {
+      this.db.run('DELETE FROM feed_posts WHERE id = ?', [id], (err) => {
+        if (err) reject(err);
+        else resolve({ deleted: true });
+      });
+    });
+  }
+
+  addFeedReaction(postId, userId, reactionType) {
+    return new Promise((resolve, reject) => {
+      this.db.run(
+        'INSERT OR REPLACE INTO feed_reactions (post_id, user_id, reaction_type) VALUES (?, ?, ?)',
+        [postId, userId, reactionType || 'like'],
+        function(err) {
+          if (err) reject(err);
+          else resolve({ id: this.lastID });
+        }
+      );
+    });
+  }
+
+  removeFeedReaction(postId, userId) {
+    return new Promise((resolve, reject) => {
+      this.db.run('DELETE FROM feed_reactions WHERE post_id = ? AND user_id = ?', [postId, userId], (err) => {
+        if (err) reject(err);
+        else resolve({ deleted: true });
+      });
+    });
+  }
+
+  getFeedReactions(postId) {
+    return new Promise((resolve, reject) => {
+      this.db.all(`
+        SELECT fr.*, u.name as user_name
+        FROM feed_reactions fr
+        JOIN users u ON u.id = fr.user_id
+        WHERE fr.post_id = ?
+      `, [postId], (err, rows) => err ? reject(err) : resolve(rows));
+    });
+  }
+
+  addFeedComment(postId, userId, text) {
+    return new Promise((resolve, reject) => {
+      this.db.run(
+        'INSERT INTO feed_comments (post_id, user_id, text) VALUES (?, ?, ?)',
+        [postId, userId, text],
+        function(err) {
+          if (err) reject(err);
+          else resolve({ id: this.lastID });
+        }
+      );
+    });
+  }
+
+  getFeedComments(postId) {
+    return new Promise((resolve, reject) => {
+      this.db.all(`
+        SELECT fc.*, u.name as user_name, u.avatar as user_avatar
+        FROM feed_comments fc
+        JOIN users u ON u.id = fc.user_id
+        WHERE fc.post_id = ?
+        ORDER BY fc.created_at ASC
+      `, [postId], (err, rows) => err ? reject(err) : resolve(rows));
     });
   }
 
