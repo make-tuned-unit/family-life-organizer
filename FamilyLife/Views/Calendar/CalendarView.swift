@@ -239,7 +239,7 @@ struct CalendarView: View {
                     Image(systemName: "calendar.badge.plus")
                         .font(.system(size: 32))
                         .foregroundStyle(WarmPalette.ink4)
-                    Text("No appointments")
+                    Text("No events")
                         .font(.system(size: 15))
                         .foregroundStyle(WarmPalette.ink3)
                 }
@@ -311,7 +311,7 @@ struct CalendarView: View {
                     Image(systemName: "calendar.badge.plus")
                         .font(.system(size: 32))
                         .foregroundStyle(WarmPalette.ink4)
-                    Text("No appointments")
+                    Text("No events")
                         .font(.system(size: 15))
                         .foregroundStyle(WarmPalette.ink3)
                 }
