@@ -22,8 +22,8 @@ struct FamilyGroupsView: View {
             .padding(.bottom, DesignTokens.Spacing.bottomBuffer)
         }
         .background { AmbientBackground(style: .home) }
-        .navigationTitle("Family")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackgroundVisibility(.hidden, for: .navigationBar)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {

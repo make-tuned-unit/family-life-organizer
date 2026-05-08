@@ -23,6 +23,7 @@ struct CookView: View {
             if !embedded { AmbientBackground(style: .cook) }
         }
         .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackgroundVisibility(.hidden, for: .navigationBar)
         .toolbar {
             if !embedded {
                 ToolbarItem(placement: .topBarTrailing) {

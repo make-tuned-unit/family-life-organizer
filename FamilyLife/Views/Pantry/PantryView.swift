@@ -26,6 +26,7 @@ struct PantryView: View {
             if !embedded { AmbientBackground(style: .pantry) }
         }
         .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackgroundVisibility(.hidden, for: .navigationBar)
         .toolbar {
             if showsDismissButton {
                 ToolbarItem(placement: .topBarLeading) {

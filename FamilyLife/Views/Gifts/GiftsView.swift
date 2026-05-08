@@ -92,8 +92,8 @@ struct GiftsView: View {
             .padding(.vertical)
         }
         .background { AmbientBackground(style: .gifts) }
-        .navigationTitle("Gifts & Events")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackgroundVisibility(.hidden, for: .navigationBar)
         .toolbar {
             if showsDismissButton {
                 ToolbarItem(placement: .topBarLeading) {
