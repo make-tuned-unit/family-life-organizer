@@ -637,7 +637,7 @@ struct AddContactSheet: View {
     @State private var email = ""
     @State private var birthday = ""
 
-    private let relationships = ["mom", "dad", "sister", "brother", "mother-in-law", "father-in-law", "sister-in-law", "brother-in-law", "grandparent", "aunt", "uncle", "cousin", "friend", "other"]
+    private let relationships = ["wife", "husband", "partner", "mom", "dad", "sister", "brother", "mother-in-law", "father-in-law", "sister-in-law", "brother-in-law", "grandparent", "aunt", "uncle", "cousin", "friend", "other"]
 
     var body: some View {
         NavigationStack {

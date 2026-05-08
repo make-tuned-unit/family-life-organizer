@@ -40,12 +40,12 @@ struct LoginView: View {
                     // Brand section
                     VStack(spacing: 8) {
 
-                        Text("FamilyLife")
+                        Text("Kinrows")
                             .font(.system(size: 38, weight: .bold))
                             .foregroundStyle(.white)
                             .shadow(color: .black.opacity(0.3), radius: 8, y: 4)
 
-                        Text("Your household, organized")
+                        Text("Your family, connected")
                             .font(.system(size: 16, weight: .medium))
                             .foregroundStyle(.white.opacity(0.85))
                     }
