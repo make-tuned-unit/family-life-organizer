@@ -31,6 +31,7 @@ struct ReceiptScannerView: View {
                         sourcePickerSection
                     }
 
+
                     if isScanning {
                         VStack(spacing: 12) {
                             ProgressView().controlSize(.large)
@@ -79,7 +80,8 @@ struct ReceiptScannerView: View {
                 }
                 .padding(.vertical)
             }
-            .background { AmbientBackground(style: .expenses) }
+            .scrollContentBackground(.hidden)
+            .background { AmbientBackground(style: .expenses).ignoresSafeArea() }
             .navigationTitle(isProjectMode ? "Scan for \(projectName ?? "Project")" : "Scan Receipt")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
