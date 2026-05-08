@@ -45,7 +45,7 @@ struct LoginView: View {
                             .foregroundStyle(.white)
                             .shadow(color: .black.opacity(0.3), radius: 8, y: 4)
 
-                        Text("Your family, connected")
+                        Text("Grow together.")
                             .font(.system(size: 16, weight: .medium))
                             .foregroundStyle(.white.opacity(0.85))
                     }
