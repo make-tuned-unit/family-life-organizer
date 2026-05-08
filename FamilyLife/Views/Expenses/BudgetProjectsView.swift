@@ -275,9 +275,15 @@ struct ProjectDetailView: View {
                         VStack(spacing: 0) {
                             ForEach(Array(expenses.enumerated()), id: \.element.id) { index, expense in
                                 if index > 0 { GlassDivider() }
-                                ProjectExpenseRow(expense: expense) {
-                                    Task { await store.deleteExpense(expense.id, from: projectID, api: api); await loadExpenses() }
+                                NavigationLink {
+                                    ExpenseDetailView(expense: expense, projectName: project.name) {
+                                        await store.deleteExpense(expense.id, from: projectID, api: api)
+                                        await loadExpenses()
+                                    }
+                                } label: {
+                                    ProjectExpenseRow(expense: expense)
                                 }
+                                .buttonStyle(.plain)
                             }
                         }
                         .glassEffect(.regular.tint(.white.opacity(0.03)), in: .rect(cornerRadius: DesignTokens.CornerRadius.card))
@@ -345,7 +351,6 @@ struct ProjectDetailView: View {
 
 struct ProjectExpenseRow: View {
     let expense: ProjectExpenseResponse
-    let onDelete: () -> Void
 
     var body: some View {
         HStack(spacing: 12) {
@@ -366,23 +371,142 @@ struct ProjectExpenseRow: View {
             Text("$\(expense.amount, specifier: "%.2f")")
                 .font(.system(size: 15, weight: .bold))
                 .foregroundStyle(WarmPalette.ink1)
+            Image(systemName: "chevron.right")
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(WarmPalette.ink4)
         }
         .padding(.vertical, 12)
         .padding(.horizontal, 14)
-        .swipeActions(edge: .trailing) {
-            Button(role: .destructive, action: onDelete) {
-                Label("Delete", systemImage: "trash")
-            }
-        }
     }
 
     private func formattedDate(_ raw: String) -> String {
-        let prefix = String(raw.prefix(10)) // "YYYY-MM-DD"
+        let prefix = String(raw.prefix(10))
         let fmt = DateFormatter()
         fmt.dateFormat = "yyyy-MM-dd"
         guard let date = fmt.date(from: prefix) else { return prefix }
         fmt.dateFormat = "MMM d"
         return fmt.string(from: date)
+    }
+}
+
+// MARK: - Expense Detail View
+
+struct ExpenseDetailView: View {
+    let expense: ProjectExpenseResponse
+    var projectName: String?
+    let onDelete: () async -> Void
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        ScrollView(showsIndicators: false) {
+            VStack(alignment: .leading, spacing: 0) {
+                // Amount hero
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(expense.description)
+                        .font(.system(size: 24, weight: .bold))
+                        .foregroundStyle(WarmPalette.ink1)
+                    Text("$\(expense.amount, specifier: "%.2f")")
+                        .font(.system(size: 40, weight: .bold))
+                        .foregroundStyle(WarmPalette.ink1)
+                        .tracking(-0.8)
+                }
+                .padding(22)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .glassEffect(.regular.tint(.white.opacity(0.03)), in: .rect(cornerRadius: DesignTokens.CornerRadius.cardLarge))
+                .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
+                .padding(.top, 14)
+                .padding(.bottom, 14)
+
+                // Info rows
+                VStack(spacing: 0) {
+                    detailRow(label: "Category", value: expense.category)
+                    GlassDivider()
+                    if let name = projectName {
+                        detailRow(label: "Project", value: name)
+                        GlassDivider()
+                    }
+                    if let dateStr = expense.created_at {
+                        detailRow(label: "Date", value: formatDate(dateStr))
+                        GlassDivider()
+                    }
+                }
+                .glassEffect(.regular.tint(.white.opacity(0.03)), in: .rect(cornerRadius: DesignTokens.CornerRadius.card))
+                .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
+                .padding(.bottom, 14)
+
+                // Notes / receipt items
+                if let notes = expense.notes, !notes.isEmpty {
+                    WarmSectionHeader(title: "Receipt Details")
+                        .padding(.bottom, 6)
+
+                    VStack(alignment: .leading, spacing: 8) {
+                        ForEach(notes.components(separatedBy: "\n"), id: \.self) { line in
+                            if !line.isEmpty {
+                                HStack(spacing: 8) {
+                                    if line.contains("—") || line.contains("$") {
+                                        Image(systemName: "checkmark.circle.fill")
+                                            .font(.system(size: 13))
+                                            .foregroundStyle(WarmPalette.good)
+                                    }
+                                    Text(line)
+                                        .font(.system(size: 14))
+                                        .foregroundStyle(WarmPalette.ink2)
+                                }
+                            }
+                        }
+                    }
+                    .padding(16)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .glassEffect(.regular.tint(.white.opacity(0.03)), in: .rect(cornerRadius: DesignTokens.CornerRadius.card))
+                    .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
+                    .padding(.bottom, 14)
+                }
+
+                // Delete
+                Button(role: .destructive) {
+                    Task {
+                        await onDelete()
+                        dismiss()
+                    }
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "trash")
+                            .font(.system(size: 14))
+                        Text("Delete Expense")
+                            .font(.system(size: 15, weight: .semibold))
+                    }
+                    .foregroundStyle(WarmPalette.bad)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+                    .glassEffect(.regular.tint(WarmPalette.bad.opacity(0.04)), in: .rect(cornerRadius: 16))
+                }
+                .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
+                .padding(.bottom, DesignTokens.Spacing.bottomBuffer)
+            }
+        }
+        .background { AmbientBackground(style: .expenses) }
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackgroundVisibility(.hidden, for: .navigationBar)
+    }
+
+    private func detailRow(label: String, value: String) -> some View {
+        HStack {
+            Text(label)
+                .font(.system(size: 13))
+                .foregroundStyle(WarmPalette.ink3)
+            Spacer()
+            Text(value)
+                .font(.system(size: 15, weight: .medium))
+                .foregroundStyle(WarmPalette.ink1)
+        }
+        .padding(.vertical, 12)
+        .padding(.horizontal, 14)
+    }
+
+    private func formatDate(_ raw: String) -> String {
+        let prefix = String(raw.prefix(10))
+        guard let date = DateFormatter.isoDate.date(from: prefix) else { return prefix }
+        return DateFormatter.longDate.string(from: date)
     }
 }
 
