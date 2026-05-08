@@ -1034,7 +1034,7 @@ app.post('/api/add', requireAuth, async (req, res) => {
   try {
     const { type, data } = req.body;
     if (type === 'grocery') {
-      await db.addGrocery(data);
+      await db.addGrocery(data.item, data.category || null, data.quantity || '1');
     } else if (type === 'task') {
       await db.addTask({...data, status: 'active'});
     }
