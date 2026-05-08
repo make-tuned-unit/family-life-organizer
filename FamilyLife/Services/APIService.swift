@@ -559,6 +559,63 @@ final class APIService {
         let _: SuccessResponse = try await delete("/api/projects/\(projectId)/expenses/\(expenseId)")
     }
 
+    // MARK: - Lists
+
+    struct ListResponse: Codable, Identifiable {
+        let id: Int
+        var name: String
+        var icon: String?
+        var color: String?
+        var active_count: Int?
+        var total_count: Int?
+        var created_at: String?
+    }
+
+    struct ListItemResponse: Codable, Identifiable {
+        let id: Int
+        var list_id: Int
+        var title: String
+        var is_done: Int  // 0 or 1
+        var sort_order: Int?
+        var added_by: String?
+        var created_at: String?
+        var completed_at: String?
+
+        var isDone: Bool { is_done != 0 }
+    }
+
+    func fetchLists() async throws -> [ListResponse] {
+        try await get("/api/lists")
+    }
+
+    func createList(_ data: [String: Any]) async throws -> IDResponse {
+        try await post("/api/lists", body: data)
+    }
+
+    func updateList(id: Int, data: [String: Any]) async throws {
+        let _: SuccessResponse = try await put("/api/lists/\(id)", body: data)
+    }
+
+    func deleteList(id: Int) async throws {
+        let _: SuccessResponse = try await delete("/api/lists/\(id)")
+    }
+
+    func fetchListItems(listId: Int) async throws -> [ListItemResponse] {
+        try await get("/api/lists/\(listId)/items")
+    }
+
+    func addListItem(listId: Int, title: String) async throws -> IDResponse {
+        try await post("/api/lists/\(listId)/items", body: ["title": title])
+    }
+
+    func toggleListItem(id: Int) async throws {
+        let _: SuccessResponse = try await post("/api/lists/items/\(id)/toggle", body: [:] as [String: String])
+    }
+
+    func deleteListItem(id: Int) async throws {
+        let _: SuccessResponse = try await delete("/api/lists/items/\(id)")
+    }
+
     // MARK: - Coverage / Care Cascade
 
     struct CoverageRequestResponse: Codable, Identifiable {
