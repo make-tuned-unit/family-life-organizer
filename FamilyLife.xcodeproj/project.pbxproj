@@ -78,6 +78,7 @@
 		AA00004C /* BudgetProjectsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00004C /* BudgetProjectsView.swift */; };
 		AA00004D /* SignUpView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00004D /* SignUpView.swift */; };
 		AA00004E /* FamilyGroupsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00004E /* FamilyGroupsView.swift */; };
+		AA00004F /* EventDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00004F /* EventDetailView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -152,6 +153,7 @@
 		BB00004C /* BudgetProjectsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BudgetProjectsView.swift; sourceTree = "<group>"; };
 		BB00004D /* SignUpView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignUpView.swift; sourceTree = "<group>"; };
 		BB00004E /* FamilyGroupsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FamilyGroupsView.swift; sourceTree = "<group>"; };
+		BB00004F /* EventDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventDetailView.swift; sourceTree = "<group>"; };
 		CC000001 /* FamilyLife.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = FamilyLife.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -284,6 +286,7 @@
 				BB000010 /* AddAppointmentView.swift */,
 				BB00002D /* WeekView.swift */,
 				BB000037 /* EditAppointmentView.swift */,
+				BB00004F /* EventDetailView.swift */,
 			);
 			path = Calendar;
 			sourceTree = "<group>";
@@ -544,6 +547,7 @@
 				AA000043 /* MoreView.swift in Sources */,
 				AA00004D /* SignUpView.swift in Sources */,
 				AA00004E /* FamilyGroupsView.swift in Sources */,
+				AA00004F /* EventDetailView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -556,7 +560,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 5;
+				CURRENT_PROJECT_VERSION = 6;
 				DEVELOPMENT_ASSET_PATHS = "";
 				DEVELOPMENT_TEAM = GANM22MFCH;
 				ENABLE_PREVIEWS = YES;
@@ -590,7 +594,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 5;
+				CURRENT_PROJECT_VERSION = 6;
 				DEVELOPMENT_ASSET_PATHS = "";
 				DEVELOPMENT_TEAM = GANM22MFCH;
 				ENABLE_PREVIEWS = YES;

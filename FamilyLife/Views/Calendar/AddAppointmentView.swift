@@ -1,7 +1,9 @@
 import SwiftUI
+import MapKit
 
 struct AddAppointmentView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(APIService.self) private var api
 
     @State private var title = ""
     @State private var date = Date()
@@ -15,10 +17,16 @@ struct AddAppointmentView: View {
     @State private var isSaving = false
     @State private var error: String?
 
+    // Location autocomplete
+    @State private var locationCompleter = LocationCompleter()
+    @State private var showingLocationSuggestions = false
+
+    // Family contacts
+    @State private var contacts: [APIService.ContactResponse] = []
+
     let onSave: ([String: Any]) -> Void
 
-    private let categories = ["personal", "medical", "school", "daycare"]
-    private let familyMembers = ["Me", "Partner"] // TODO: load from API
+    private let categories = ["personal", "medical", "school", "daycare", "work", "social"]
 
     var body: some View {
         NavigationStack {
@@ -32,8 +40,35 @@ struct AddAppointmentView: View {
                     }
                 }
 
+                Section("Location") {
+                    TextField("Search for a place...", text: $location)
+                        .onChange(of: location) {
+                            locationCompleter.search(query: location)
+                            showingLocationSuggestions = !location.isEmpty
+                        }
+
+                    if showingLocationSuggestions && !locationCompleter.results.isEmpty {
+                        ForEach(locationCompleter.results, id: \.self) { result in
+                            Button {
+                                location = [result.title, result.subtitle].filter { !$0.isEmpty }.joined(separator: ", ")
+                                showingLocationSuggestions = false
+                            } label: {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(result.title)
+                                        .font(.subheadline.weight(.medium))
+                                        .foregroundStyle(.primary)
+                                    if !result.subtitle.isEmpty {
+                                        Text(result.subtitle)
+                                            .font(.caption)
+                                            .foregroundStyle(WarmPalette.ink3)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
                 Section("Details") {
-                    TextField("Location", text: $location)
                     TextField("Notes (optional)", text: $notes, axis: .vertical)
                         .lineLimit(3)
                     Picker("Category", selection: $category) {
@@ -43,20 +78,38 @@ struct AddAppointmentView: View {
                     }
                 }
 
-                Section("Who") {
-                    ForEach(familyMembers, id: \.self) { member in
-                        Button {
-                            if personTags.contains(member) {
-                                personTags.remove(member)
-                            } else {
-                                personTags.insert(member)
+                Section("Who's involved") {
+                    // Current user
+                    Button {
+                        toggleTag("Me")
+                    } label: {
+                        HStack {
+                            Text("Me")
+                                .foregroundStyle(.primary)
+                            Spacer()
+                            if personTags.contains("Me") {
+                                Image(systemName: "checkmark")
+                                    .foregroundStyle(TabAccent.home.color)
                             }
+                        }
+                    }
+
+                    // Family contacts from API
+                    ForEach(contacts) { contact in
+                        Button {
+                            toggleTag(contact.name)
                         } label: {
                             HStack {
-                                Text(member)
+                                FamilyAvatar(initial: contact.avatar_initial ?? String(contact.name.prefix(1)).uppercased(), size: 24)
+                                Text(contact.name)
                                     .foregroundStyle(.primary)
+                                if let rel = contact.relationship {
+                                    Text(rel.capitalized)
+                                        .font(.caption)
+                                        .foregroundStyle(WarmPalette.ink3)
+                                }
                                 Spacer()
-                                if personTags.contains(member) {
+                                if personTags.contains(contact.name) {
                                     Image(systemName: "checkmark")
                                         .foregroundStyle(TabAccent.home.color)
                                 }
@@ -66,17 +119,14 @@ struct AddAppointmentView: View {
                 }
 
                 Section("Reminder") {
-                    Toggle("Notify me before this appointment", isOn: $addReminder)
-                    Text("If notifications are unavailable, the appointment still saves and the reminder is skipped.")
-                        .font(.caption)
-                        .foregroundStyle(WarmPalette.ink3)
+                    Toggle("Notify me before this event", isOn: $addReminder)
                 }
             }
             .scrollContentBackground(.hidden)
             .background { AmbientBackground(style: .calendar) }
             .navigationTitle("New Event")
             .navigationBarTitleDisplayMode(.inline)
-            .alert("Couldn’t save event", isPresented: errorAlertIsPresented) {
+            .alert("Couldn't save event", isPresented: errorAlertIsPresented) {
                 Button("OK") { error = nil }
             } message: {
                 Text(error ?? "An unexpected error occurred.")
@@ -84,6 +134,7 @@ struct AddAppointmentView: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
+                        .foregroundStyle(WarmPalette.ink2)
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
@@ -92,7 +143,17 @@ struct AddAppointmentView: View {
                     .disabled(title.isEmpty || isSaving)
                 }
             }
+            .task { await loadContacts() }
         }
+    }
+
+    private func toggleTag(_ name: String) {
+        if personTags.contains(name) { personTags.remove(name) }
+        else { personTags.insert(name) }
+    }
+
+    private func loadContacts() async {
+        do { contacts = try await api.fetchContacts() } catch {}
     }
 
     private func save() async {
@@ -105,15 +166,9 @@ struct AddAppointmentView: View {
         if includeTime {
             data["appointment_time"] = DateFormatter.hourMinute.string(from: time)
         }
-        if !location.isEmpty {
-            data["location"] = location
-        }
-        if !notes.isEmpty {
-            data["description"] = notes
-        }
-        if !personTags.isEmpty {
-            data["person_tags"] = Array(personTags)
-        }
+        if !location.isEmpty { data["location"] = location }
+        if !notes.isEmpty { data["description"] = notes }
+        if !personTags.isEmpty { data["person_tags"] = Array(personTags) }
 
         onSave(data)
         if addReminder {
@@ -132,13 +187,37 @@ struct AddAppointmentView: View {
     }
 
     private var errorAlertIsPresented: Binding<Bool> {
-        Binding(
-            get: { error != nil },
-            set: { if !$0 { error = nil } }
-        )
+        Binding(get: { error != nil }, set: { if !$0 { error = nil } })
+    }
+}
+
+// MARK: - Location Autocomplete using MapKit
+
+@Observable
+final class LocationCompleter: NSObject, MKLocalSearchCompleterDelegate {
+    var results: [MKLocalSearchCompletion] = []
+    private let completer = MKLocalSearchCompleter()
+
+    override init() {
+        super.init()
+        completer.delegate = self
+        completer.resultTypes = [.address, .pointOfInterest]
+    }
+
+    func search(query: String) {
+        completer.queryFragment = query
+    }
+
+    func completerDidUpdateResults(_ completer: MKLocalSearchCompleter) {
+        results = Array(completer.results.prefix(5))
+    }
+
+    func completer(_ completer: MKLocalSearchCompleter, didFailWithError error: Error) {
+        results = []
     }
 }
 
 #Preview {
     AddAppointmentView { _ in }
+        .environment(APIService())
 }
