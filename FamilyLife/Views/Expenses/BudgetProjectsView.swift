@@ -214,6 +214,7 @@ struct ProjectDetailView: View {
     @Environment(APIService.self) private var api
     @State private var expenses: [ProjectExpenseResponse] = []
     @State private var showingAddExpense = false
+    @State private var showingScanReceipt = false
     @State private var isLoading = false
 
     private var project: ProjectResponse? {
@@ -296,8 +297,16 @@ struct ProjectDetailView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    GlassIconButton(systemName: "plus") {
-                        showingAddExpense = true
+                    Menu {
+                        Button { showingAddExpense = true } label: {
+                            Label("Add Manually", systemImage: "square.and.pencil")
+                        }
+                        Button { showingScanReceipt = true } label: {
+                            Label("Scan Receipt", systemImage: "camera.fill")
+                        }
+                    } label: {
+                        Image(systemName: "plus")
+                            .foregroundStyle(WarmPalette.ink2)
                     }
                 }
             }
@@ -308,6 +317,16 @@ struct ProjectDetailView: View {
                         await loadExpenses()
                     }
                 }
+            }
+            .sheet(isPresented: $showingScanReceipt) {
+                ReceiptScannerView(
+                    projectId: projectID,
+                    projectName: project?.name,
+                    onProjectExpenseSaved: {
+                        await store.loadAll(api: api)
+                        await loadExpenses()
+                    }
+                )
             }
             .task { await loadExpenses() }
         }
