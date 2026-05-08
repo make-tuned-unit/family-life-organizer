@@ -11,11 +11,14 @@ struct AddAppointmentView: View {
     @State private var category = "personal"
     @State private var notes = ""
     @State private var personTags: Set<String> = []
+    @State private var addReminder = true
+    @State private var isSaving = false
+    @State private var error: String?
 
     let onSave: ([String: Any]) -> Void
 
     private let categories = ["personal", "medical", "school", "daycare"]
-    private let familyMembers = ["Jesse", "Sophie", "Rowan", "Jude"]
+    private let familyMembers = ["Me", "Partner"] // TODO: load from API
 
     var body: some View {
         NavigationStack {
@@ -55,33 +58,45 @@ struct AddAppointmentView: View {
                                 Spacer()
                                 if personTags.contains(member) {
                                     Image(systemName: "checkmark")
-                                        .foregroundStyle(.teal)
+                                        .foregroundStyle(TabAccent.home.color)
                                 }
                             }
                         }
                     }
                 }
+
+                Section("Reminder") {
+                    Toggle("Notify me before this appointment", isOn: $addReminder)
+                    Text("If notifications are unavailable, the appointment still saves and the reminder is skipped.")
+                        .font(.caption)
+                        .foregroundStyle(WarmPalette.ink3)
+                }
             }
             .scrollContentBackground(.hidden)
             .background { AmbientBackground(style: .calendar) }
-            .navigationTitle("New Appointment")
+            .navigationTitle("New Event")
             .navigationBarTitleDisplayMode(.inline)
+            .alert("Couldn’t save event", isPresented: errorAlertIsPresented) {
+                Button("OK") { error = nil }
+            } message: {
+                Text(error ?? "An unexpected error occurred.")
+            }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
-                        save()
-                        dismiss()
+                        Task { await save() }
                     }
-                    .disabled(title.isEmpty)
+                    .disabled(title.isEmpty || isSaving)
                 }
             }
         }
     }
 
-    private func save() {
+    private func save() async {
+        isSaving = true
         var data: [String: Any] = [
             "title": title,
             "appointment_date": DateFormatter.isoDate.string(from: date),
@@ -99,7 +114,28 @@ struct AddAppointmentView: View {
         if !personTags.isEmpty {
             data["person_tags"] = Array(personTags)
         }
+
         onSave(data)
+        if addReminder {
+            let authorized = await NotificationService.shared.ensurePermissionIfNeeded()
+            if authorized {
+                NotificationService.shared.scheduleAppointmentReminder(
+                    id: Int(Date().timeIntervalSince1970),
+                    title: title,
+                    date: DateFormatter.isoDate.string(from: date),
+                    time: includeTime ? DateFormatter.hourMinute.string(from: time) : nil
+                )
+            }
+        }
+        isSaving = false
+        dismiss()
+    }
+
+    private var errorAlertIsPresented: Binding<Bool> {
+        Binding(
+            get: { error != nil },
+            set: { if !$0 { error = nil } }
+        )
     }
 }
 
