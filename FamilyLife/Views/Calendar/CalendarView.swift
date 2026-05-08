@@ -24,8 +24,21 @@ struct CalendarView: View {
                 headerSection
                 careRequestBanner
                 segmentedControl
-                monthGrid
-                selectedDayEvents
+
+                switch displayMode {
+                case .month:
+                    monthGrid
+                    selectedDayEvents
+                case .week:
+                    WeekView(
+                        weekStart: currentWeekStart,
+                        selectedDate: $viewModel.selectedDate,
+                        appointments: viewModel.monthAppointments
+                    )
+                    .frame(minHeight: 400)
+                case .day:
+                    dayView
+                }
             }
             .padding(.bottom, DesignTokens.Spacing.bottomBuffer)
         }
@@ -188,7 +201,7 @@ struct CalendarView: View {
             .padding(.bottom, 8)
 
             // Calendar cells
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 7), spacing: 6) {
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 7), spacing: 4) {
                 ForEach(viewModel.calendarDays, id: \.id) { day in
                     CalendarDayCell(
                         day: day,
@@ -201,7 +214,8 @@ struct CalendarView: View {
                 }
             }
         }
-        .padding(16)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 16)
         .glassEffect(.regular.tint(.white.opacity(0.03)), in: .rect(cornerRadius: 24))
         .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
         .padding(.bottom, 14)
@@ -214,6 +228,78 @@ struct CalendarView: View {
         if let selected = viewModel.selectedDate {
             let dayAppointments = viewModel.appointments(for: selected)
 
+            WarmSectionHeader(
+                title: viewModel.selectedDateString,
+                trailing: dayAppointments.isEmpty ? nil : "\(dayAppointments.count) event\(dayAppointments.count == 1 ? "" : "s")"
+            )
+            .padding(.bottom, 6)
+
+            if dayAppointments.isEmpty {
+                VStack(spacing: 8) {
+                    Image(systemName: "calendar.badge.plus")
+                        .font(.system(size: 32))
+                        .foregroundStyle(WarmPalette.ink4)
+                    Text("No appointments")
+                        .font(.system(size: 15))
+                        .foregroundStyle(WarmPalette.ink3)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 40)
+            } else {
+                VStack(spacing: 10) {
+                    ForEach(dayAppointments) { appt in
+                        Button { appointmentToEdit = appt } label: {
+                            CalendarEventCard(appointment: appt)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
+            }
+        }
+    }
+
+    // MARK: - Day View
+
+    @ViewBuilder
+    private var dayView: some View {
+        if let selected = viewModel.selectedDate {
+            let dayAppointments = viewModel.appointments(for: selected)
+
+            // Date picker strip
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(-3..<4, id: \.self) { offset in
+                        let date = Calendar.current.date(byAdding: .day, value: offset, to: selected) ?? selected
+                        let isThis = Calendar.current.isDate(date, inSameDayAs: selected)
+                        Button {
+                            viewModel.selectedDate = date
+                        } label: {
+                            VStack(spacing: 2) {
+                                Text(DateFormatter.shortWeekday.string(from: date))
+                                    .font(.system(size: 10, weight: .semibold))
+                                    .foregroundStyle(isThis ? WarmPalette.cream1.opacity(0.7) : WarmPalette.ink3)
+                                Text("\(Calendar.current.component(.day, from: date))")
+                                    .font(.system(size: 17, weight: .bold))
+                                    .foregroundStyle(isThis ? WarmPalette.cream1 : WarmPalette.ink1)
+                            }
+                            .frame(width: 44)
+                            .padding(.vertical, 10)
+                            .background {
+                                if isThis {
+                                    RoundedRectangle(cornerRadius: 14)
+                                        .fill(WarmPalette.ink1)
+                                }
+                            }
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal, 22)
+            }
+            .padding(.bottom, 12)
+
+            // Full day header
             WarmSectionHeader(
                 title: viewModel.selectedDateString,
                 trailing: dayAppointments.isEmpty ? nil : "\(dayAppointments.count) event\(dayAppointments.count == 1 ? "" : "s")"
@@ -266,31 +352,36 @@ struct CalendarDayCell: View {
         Color(hex: "#b97090")
     ]
 
+    private let cellSize: CGFloat = 40
+
     var body: some View {
-        VStack(spacing: 3) {
+        VStack(spacing: 2) {
             if let date = day.date {
                 Text("\(Calendar.current.component(.day, from: date))")
-                    .font(.system(size: 14, weight: day.isToday ? .bold : .medium, design: .default))
+                    .font(.system(size: 15, weight: day.isToday ? .bold : .medium, design: .default))
                     .foregroundStyle(isSelected ? .white : (day.isToday ? AccentTheme.terracotta.color : WarmPalette.ink1))
+                    .frame(width: cellSize, height: cellSize)
+                    .background {
+                        if isSelected {
+                            Circle()
+                                .fill(AccentTheme.terracotta.color)
+                                .frame(width: cellSize, height: cellSize)
+                        }
+                    }
 
                 HStack(spacing: 2) {
                     ForEach(0..<min(appointmentCount, 3), id: \.self) { i in
                         Circle()
-                            .fill(isSelected ? .white.opacity(0.85) : dotColors[i % dotColors.count])
+                            .fill(isSelected ? AccentTheme.terracotta.color : dotColors[i % dotColors.count])
                             .frame(width: 4, height: 4)
                     }
                 }
                 .frame(height: 5)
+            } else {
+                Spacer().frame(height: cellSize + 7)
             }
         }
         .frame(maxWidth: .infinity)
-        .aspectRatio(1, contentMode: .fit)
-        .background {
-            if isSelected {
-                Circle()
-                    .fill(AccentTheme.terracotta.color)
-            }
-        }
         .opacity(day.isCurrentMonth ? 1 : 0.3)
     }
 }
