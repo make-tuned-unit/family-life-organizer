@@ -295,12 +295,18 @@ struct ReceiptScannerView: View {
         Task {
             do {
                 if let projectId {
-                    // Save as project expense
+                    // Save as project expense — tag with merchant, items in notes
+                    let itemDetail = result.items.map { item in
+                        if let price = item.price {
+                            return "\(item.name) — $\(String(format: "%.2f", price))"
+                        }
+                        return item.name
+                    }.joined(separator: "\n")
                     let expenseData: [String: Any] = [
-                        "description": "\(result.merchant) - \(result.category)",
+                        "description": result.merchant,
                         "amount": result.total,
-                        "category": result.category,
-                        "notes": result.items.map(\.name).joined(separator: ", ")
+                        "category": projectName ?? "General",
+                        "notes": "\(result.category) receipt\n\(itemDetail)"
                     ]
                     let _ = try await api.addProjectExpense(projectId: projectId, expense: expenseData)
                     await onProjectExpenseSaved?()
