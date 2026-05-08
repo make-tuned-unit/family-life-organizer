@@ -499,7 +499,7 @@ struct CoveragePendingView: View {
                         .font(.system(size: 12, weight: .semibold))
                         .padding(.horizontal, 12)
                         .padding(.vertical, 8)
-                        .glassEffect(.regular.tint(.white.opacity(0.05).interactive()), in: .capsule)
+                        .glassEffect(.regular.tint(.white.opacity(0.05)), in: .capsule)
                 }
                 .padding(14)
                 .glassEffect(.regular.tint(WarmPalette.warn.opacity(0.04)), in: .rect(cornerRadius: 22))
