@@ -288,7 +288,17 @@ struct ExpensesView: View {
             VStack(spacing: 0) {
                 ForEach(Array(viewModel.receipts.prefix(5).enumerated()), id: \.element.id) { index, receipt in
                     if index > 0 { GlassDivider() }
-                    ReceiptListRow(receipt: receipt)
+                    NavigationLink {
+                        ReceiptDetailView(receipt: receipt) {
+                            Task {
+                                try? await api.deleteReceipt(id: receipt.id)
+                                await viewModel.loadAll(api: api)
+                            }
+                        }
+                    } label: {
+                        ReceiptListRow(receipt: receipt)
+                    }
+                    .buttonStyle(.plain)
                 }
             }
             .glassEffect(.regular.tint(.white.opacity(0.03)), in: .rect(cornerRadius: DesignTokens.CornerRadius.card))
@@ -385,7 +395,7 @@ struct ReceiptListRow: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            FamilyAvatar(initial: "J", size: 28)
+            FamilyAvatar(initial: String(receipt.added_by?.prefix(1) ?? "?").uppercased(), size: 28)
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(receipt.merchant)
@@ -405,15 +415,126 @@ struct ReceiptListRow: View {
             Spacer()
 
             Text("$\(receipt.amount, specifier: "%.2f")")
-                .font(.system(size: 15, weight: .bold, design: .default))
+                .font(.system(size: 15, weight: .bold))
                 .foregroundStyle(WarmPalette.ink1)
+
+            Image(systemName: "chevron.right")
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(WarmPalette.ink4)
         }
         .padding(.vertical, 12)
         .padding(.horizontal, 14)
     }
 }
 
-// Color(hex:) is defined in DesignTokens.swift
+// MARK: - Receipt Detail View
+
+struct ReceiptDetailView: View {
+    let receipt: ReceiptResponse
+    let onDelete: () -> Void
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        ScrollView(showsIndicators: false) {
+            VStack(alignment: .leading, spacing: 0) {
+                // Hero
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(receipt.merchant)
+                        .font(.system(size: 24, weight: .bold))
+                        .foregroundStyle(WarmPalette.ink1)
+                    Text("$\(receipt.amount, specifier: "%.2f")")
+                        .font(.system(size: 40, weight: .bold))
+                        .foregroundStyle(WarmPalette.ink1)
+                        .tracking(-0.8)
+                    if receipt.processed_by == "scan" {
+                        HStack(spacing: 4) {
+                            Image(systemName: "sparkles")
+                                .font(.system(size: 11))
+                            Text("Scanned with AI")
+                                .font(.system(size: 12, weight: .medium))
+                        }
+                        .foregroundStyle(AccentTheme.saffron.color)
+                    }
+                }
+                .padding(22)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .glassEffect(.regular.tint(.white.opacity(0.03)), in: .rect(cornerRadius: DesignTokens.CornerRadius.cardLarge))
+                .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
+                .padding(.top, 14)
+                .padding(.bottom, 14)
+
+                // Info
+                VStack(spacing: 0) {
+                    detailRow(label: "Category", value: receipt.category ?? "Other")
+                    GlassDivider()
+                    detailRow(label: "Date", value: formatDate(receipt.date))
+                    GlassDivider()
+                    if let by = receipt.added_by, !by.isEmpty {
+                        detailRow(label: "Added by", value: by.capitalized)
+                        GlassDivider()
+                    }
+                    if let method = receipt.payment_method, !method.isEmpty {
+                        detailRow(label: "Payment", value: method)
+                        GlassDivider()
+                    }
+                }
+                .glassEffect(.regular.tint(.white.opacity(0.03)), in: .rect(cornerRadius: DesignTokens.CornerRadius.card))
+                .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
+                .padding(.bottom, 14)
+
+                // Notes
+                if let notes = receipt.notes, !notes.isEmpty {
+                    WarmSectionHeader(title: "Notes")
+                        .padding(.bottom, 6)
+
+                    Text(notes)
+                        .font(.system(size: 14))
+                        .foregroundStyle(WarmPalette.ink2)
+                        .padding(16)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .glassEffect(.regular.tint(.white.opacity(0.03)), in: .rect(cornerRadius: DesignTokens.CornerRadius.card))
+                        .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
+                        .padding(.bottom, 14)
+                }
+
+                // Delete
+                Button(role: .destructive) {
+                    onDelete()
+                    dismiss()
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "trash").font(.system(size: 14))
+                        Text("Delete Receipt").font(.system(size: 15, weight: .semibold))
+                    }
+                    .foregroundStyle(WarmPalette.bad)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+                    .glassEffect(.regular.tint(WarmPalette.bad.opacity(0.04)), in: .rect(cornerRadius: 16))
+                }
+                .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
+                .padding(.bottom, DesignTokens.Spacing.bottomBuffer)
+            }
+        }
+        .background { AmbientBackground(style: .expenses) }
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackgroundVisibility(.hidden, for: .navigationBar)
+    }
+
+    private func detailRow(label: String, value: String) -> some View {
+        HStack {
+            Text(label).font(.system(size: 13)).foregroundStyle(WarmPalette.ink3)
+            Spacer()
+            Text(value).font(.system(size: 15, weight: .medium)).foregroundStyle(WarmPalette.ink1)
+        }
+        .padding(.vertical, 12)
+        .padding(.horizontal, 14)
+    }
+
+    private func formatDate(_ raw: String) -> String {
+        guard let date = DateFormatter.isoDate.date(from: raw) else { return raw }
+        return DateFormatter.longDate.string(from: date)
+    }
+}
 
 #Preview {
     NavigationStack {
