@@ -1,128 +1,71 @@
 import SwiftUI
 
 struct HomeView: View {
+    @Binding var selectedTab: MainTab
     @Environment(APIService.self) private var api
     @Environment(AuthService.self) private var auth
     @State private var viewModel = HomeViewModel()
     @State private var showingAddTask = false
-    @State private var showingFood = false
     @State private var showingSettings = false
-    @State private var showingCalendar = false
-    @State private var showingPantry = false
-    @State private var showingExpenses = false
-    @State private var showingTrips = false
-    @State private var showingRivalries = false
-    @State private var showingDecisions = false
-    @State private var showingGifts = false
     @State private var todaySteps: Int?
     @State private var activeTrips: [TripResponse] = []
     @State private var healthKit = HealthKitManager()
 
-    private let greeting: String = {
+    private var greeting: String {
         let hour = Calendar.current.component(.hour, from: Date())
         if hour < 12 { return "Good morning" }
         if hour < 17 { return "Good afternoon" }
         return "Good evening"
-    }()
+    }
+
+    private var dateString: String {
+        let f = DateFormatter()
+        f.dateFormat = "EEEE '\u{00B7}' MMMM d"
+        return f.string(from: Date())
+    }
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 24) {
-                // Greeting
-                greetingHeader
-
-                // At-a-glance stats
-                statsRow
-
-                // Live activity: steps, location, upcoming
-                liveActivitySection
-
-                // Feature hub
-                featureGrid
-
-                // Today's schedule
-                todaySection
-
-                // Active tasks
-                tasksSection
-
-                // Grocery preview
-                grocerySection
+        ScrollView(showsIndicators: false) {
+            VStack(spacing: 0) {
+                headerSection
+                greetingSection
+                presenceRow
+                heroFocusCard
+                statsGrid
+                upNextSection
+                quickActions
             }
-            .padding(.horizontal)
             .padding(.bottom, DesignTokens.Spacing.bottomBuffer)
         }
         .background { AmbientBackground(style: .home) }
-        .refreshable {
-            await viewModel.loadAll(api: api)
-        }
-        .navigationTitle("Home")
+        .refreshable { await viewModel.loadAll(api: api) }
+        .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
                 Button { showingSettings = true } label: {
                     Image(systemName: "gearshape")
+                        .foregroundStyle(WarmPalette.ink2)
                 }
             }
             ToolbarItem(placement: .topBarTrailing) {
                 Button { showingAddTask = true } label: {
                     Image(systemName: "plus")
+                        .foregroundStyle(WarmPalette.ink2)
                 }
             }
         }
         .sheet(isPresented: $showingAddTask) {
-            AddTaskView { task in
-                Task { await viewModel.addTask(task, api: api) }
-            }
+            AddTaskView { task in Task { await viewModel.addTask(task, api: api) } }
         }
-        .sheet(isPresented: $showingFood) {
-            NavigationStack {
-                FoodKitchenView()
-            }
-        }
-        .sheet(isPresented: $showingSettings) {
-            NavigationStack {
-                SettingsView()
-            }
-        }
-        .sheet(isPresented: $showingCalendar) {
-            NavigationStack {
-                CalendarView()
-            }
-        }
-        .sheet(isPresented: $showingPantry) {
-            NavigationStack {
-                PantryView()
-            }
-        }
-        .sheet(isPresented: $showingExpenses) {
-            NavigationStack {
-                ExpensesView()
-            }
-        }
-        .sheet(isPresented: $showingTrips) {
-            NavigationStack {
-                TripsView()
-            }
-        }
-        .sheet(isPresented: $showingRivalries) {
-            NavigationStack {
-                RivalriesView()
-            }
-        }
-        .sheet(isPresented: $showingDecisions) {
-            NavigationStack {
-                DecisionsView()
-            }
-        }
-        .sheet(isPresented: $showingGifts) {
-            NavigationStack {
-                GiftsView()
-            }
-        }
+        .sheet(isPresented: $showingSettings) { NavigationStack { SettingsView(showsDismissButton: true) } }
+        // Rivalries and Gifts accessed via More tab
         .overlay {
-            if viewModel.isLoading && viewModel.summary == nil {
-                ProgressView()
-            }
+            if viewModel.isLoading && viewModel.summary == nil { ProgressView() }
+        }
+        .alert("Something went wrong", isPresented: errorAlertIsPresented) {
+            Button("OK") { viewModel.error = nil }
+        } message: {
+            Text(viewModel.error ?? "An unexpected error occurred.")
         }
         .task {
             await viewModel.loadAll(api: api)
@@ -131,7 +74,6 @@ struct HomeView: View {
     }
 
     private func loadLiveData() async {
-        // Steps from HealthKit (guard for simulator)
         if healthKit.isAvailable {
             if await healthKit.requestStepAuthorization() {
                 let start = Calendar.current.startOfDay(for: Date())
@@ -139,262 +81,314 @@ struct HomeView: View {
                 todaySteps = Int(steps)
             }
         }
-        // Active trips
-        do {
-            activeTrips = try await api.fetchTrips(status: "active")
-        } catch {}
+        do { activeTrips = try await api.fetchTrips(status: "active") } catch {}
+    }
+
+    private var errorAlertIsPresented: Binding<Bool> {
+        Binding(get: { viewModel.error != nil }, set: { if !$0 { viewModel.error = nil } })
+    }
+
+    // MARK: - Header
+
+    private var headerSection: some View {
+        HStack {
+            Text(dateString)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(WarmPalette.ink2)
+                .opacity(0.7)
+                .tracking(0.4)
+            Spacer()
+            HStack(spacing: 6) {
+                Circle()
+                    .fill(TabAccent.home.color)
+                    .frame(width: 8, height: 8)
+                Text("Home")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(WarmPalette.ink2)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .background(.ultraThinMaterial, in: Capsule())
+        }
+        .padding(.horizontal, 22)
+        .padding(.top, 14)
+        .padding(.bottom, 8)
     }
 
     // MARK: - Greeting
 
-    private var greetingHeader: some View {
-        Text("\(greeting), \(auth.currentUser?.name ?? "Family")")
-            .font(.title.bold())
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.top, DesignTokens.Spacing.sectionTop)
+    private var greetingSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: 0) {
+                Text("\(greeting),")
+                    .font(.system(size: 34, weight: .bold))
+                    .foregroundStyle(WarmPalette.ink1)
+                    .tracking(-0.68)
+                Text("\(auth.currentUser?.name ?? "there").")
+                    .font(.system(size: 34, weight: .bold))
+                    .foregroundStyle(TabAccent.home.color)
+                    .tracking(-0.68)
+            }
+            familyStatusSubtitle
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 22)
+        .padding(.top, 8)
+        .padding(.bottom, 18)
     }
 
-    // MARK: - Stats Row
+    @ViewBuilder
+    private var familyStatusSubtitle: some View {
+        if let trip = activeTrips.first {
+            Text("\(trip.traveler.capitalized) is on the way home.")
+                .font(.system(size: 15))
+                .foregroundStyle(WarmPalette.ink2)
+        } else {
+            Text("Everyone's home. Quiet evening ahead.")
+                .font(.system(size: 15))
+                .foregroundStyle(WarmPalette.ink2)
+        }
+    }
 
-    private var statsRow: some View {
-        GlassEffectContainer(spacing: 8) {
-            HStack(spacing: 8) {
-                StatPill(
-                    title: "Tasks",
-                    value: "\(viewModel.summary?.tasks_today ?? 0)",
-                    icon: "checkmark.circle.fill",
-                    color: .blue
-                )
-                StatPill(
-                    title: "Events",
-                    value: "\(viewModel.summary?.appointments_today ?? 0)",
-                    icon: "calendar.circle.fill",
-                    color: .purple
-                )
-                StatPill(
-                    title: "Grocery",
-                    value: "\(viewModel.summary?.groceries_needed ?? 0)",
-                    icon: "cart.circle.fill",
-                    color: .green
-                )
-                if (viewModel.summary?.overdue_tasks ?? 0) > 0 {
-                    StatPill(
-                        title: "Overdue",
-                        value: "\(viewModel.summary?.overdue_tasks ?? 0)",
-                        icon: "exclamationmark.circle.fill",
-                        color: .red
+    // MARK: - Presence Row
+
+    private var presenceRow: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 10) {
+                if let trip = activeTrips.first {
+                    PresenceChip(
+                        initial: String(trip.traveler.prefix(1)).uppercased(),
+                        name: trip.traveler.capitalized,
+                        status: "On the way \u{00B7} \(trip.eta_minutes ?? 0) min",
+                        statusColor: WarmPalette.warn,
+                        showTrip: true
                     )
                 }
+                // Additional family members would be populated from API
             }
+            .padding(.horizontal, 22)
         }
+        .padding(.bottom, 16)
     }
 
-    // MARK: - Feature Grid
-
-    private var featureGrid: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Text("Your tools")
-                .font(.headline)
-
-            GlassEffectContainer(spacing: 10) {
-                LazyVGrid(columns: Array(repeating: .init(.flexible(), spacing: 10), count: 4), spacing: 10) {
-                    FeatureTile(icon: "calendar", label: "Calendar", color: .purple) { showingCalendar = true }
-                    FeatureTile(icon: "fork.knife", label: "Food", color: .green) { showingFood = true }
-                    FeatureTile(icon: "refrigerator.fill", label: "Pantry", color: .cyan) { showingPantry = true }
-                    FeatureTile(icon: "creditcard.fill", label: "Expenses", color: .orange) { showingExpenses = true }
-                    FeatureTile(icon: "car.fill", label: "Trips", color: .blue) { showingTrips = true }
-                    FeatureTile(icon: "flag.2.crossed.fill", label: "Rivalries", color: .red) { showingRivalries = true }
-                    FeatureTile(icon: "bubble.left.and.bubble.right.fill", label: "Decisions", color: .indigo) { showingDecisions = true }
-                    FeatureTile(icon: "gift.fill", label: "Gifts", color: .pink) { showingGifts = true }
-                    FeatureTile(icon: "checkmark.circle", label: "Add Task", color: .blue) { showingAddTask = true }
-                    FeatureTile(icon: "gearshape.fill", label: "Settings", color: .gray) { showingSettings = true }
-                }
-            }
-        }
-    }
-
-    // MARK: - Live Activity
+    // MARK: - Hero Focus Card
 
     @ViewBuilder
-    private var liveActivitySection: some View {
-        let hasContent = todaySteps != nil || !activeTrips.isEmpty
-        if hasContent {
-            VStack(alignment: .leading, spacing: 12) {
-                Text("Right now")
-                    .font(.headline)
-
-                GlassEffectContainer(spacing: 10) {
-                    HStack(spacing: 10) {
-                        // Steps
-                        if let steps = todaySteps {
-                            HStack(spacing: 10) {
-                                Image(systemName: "figure.walk")
-                                    .font(.title2)
-                                    .foregroundStyle(.orange)
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text("\(steps.formatted())")
-                                        .font(.title3.bold())
-                                        .monospacedDigit()
-                                    Text("steps today")
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                }
-                            }
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(DesignTokens.Spacing.cardGap)
-                            .flCard(tint: .orange)
-                        }
-
-                        // Active trip
-                        if let trip = activeTrips.first {
-                            Button { showingTrips = true } label: {
-                                HStack(spacing: 10) {
-                                    Image(systemName: "car.fill")
-                                        .font(.title2)
-                                        .foregroundStyle(.blue)
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text(trip.traveler.capitalized)
-                                            .font(.subheadline.bold())
-                                        HStack(spacing: 4) {
-                                            Text(trip.destination)
-                                            if let eta = trip.eta_minutes {
-                                                Text("· \(eta)m")
-                                                    .foregroundStyle(.blue)
-                                            }
-                                        }
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                    }
-                                }
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(DesignTokens.Spacing.cardGap)
-                                .flCard(tint: TabAccent.trips.color)
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    // MARK: - Today Section
-
-    @ViewBuilder
-    private var todaySection: some View {
-        if !viewModel.todayAppointments.isEmpty {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack {
-                    Image(systemName: "sun.max.fill")
-                        .foregroundStyle(.orange)
-                    Text("Today")
-                        .font(.headline)
-                }
-                ForEach(viewModel.todayAppointments) { appt in
-                    AppointmentRow(appointment: appt)
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-    }
-
-    // MARK: - Tasks Section
-
-    @ViewBuilder
-    private var tasksSection: some View {
-        if !viewModel.activeTasks.isEmpty {
-            let grouped = Dictionary(grouping: viewModel.activeTasks) { $0.category }
+    private var heroFocusCard: some View {
+        if let appt = viewModel.todayAppointments.first {
             VStack(alignment: .leading, spacing: 14) {
                 HStack {
-                    Image(systemName: "checklist")
-                        .foregroundStyle(.blue)
-                    Text("Tasks")
-                        .font(.headline)
+                    Text("TODAY'S FOCUS")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(TabAccent.home.color)
+                        .tracking(0.4)
                     Spacer()
-                    Text("\(viewModel.activeTasks.count)")
-                        .font(.caption.weight(.semibold))
-                        .padding(.horizontal, DesignTokens.Spacing.chipPadding)
-                        .padding(.vertical, DesignTokens.Spacing.tinyLabel)
-                        .glassEffect(.regular.tint(.blue.opacity(0.2)), in: .capsule)
+                    if let time = appt.appointment_time {
+                        Text(time)
+                            .font(.system(size: 13))
+                            .foregroundStyle(WarmPalette.ink3)
+                    }
                 }
-                ForEach(grouped.keys.sorted(), id: \.self) { category in
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text(category.capitalized)
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(.secondary)
-                        ForEach(grouped[category] ?? []) { task in
-                            TaskRow(task: task) {
-                                Task { await viewModel.completeTask(task.id, api: api) }
+
+                Text(appt.title)
+                    .font(.system(size: 28, weight: .bold))
+                    .foregroundStyle(WarmPalette.ink1)
+                    .tracking(-0.56)
+
+                if let location = appt.location, !location.isEmpty {
+                    Text(location)
+                        .font(.system(size: 15))
+                        .foregroundStyle(WarmPalette.ink2)
+                        .padding(.bottom, 2)
+                }
+
+                HStack(spacing: 8) {
+                    if let location = appt.location, !location.isEmpty {
+                        Button {
+                            let query = location.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? location
+                            if let url = URL(string: "maps://?q=\(query)") {
+                                UIApplication.shared.open(url)
                             }
+                        } label: {
+                            Text("Get directions")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundStyle(WarmPalette.cream1)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 10)
+                                .background(WarmPalette.ink1)
+                                .clipShape(Capsule())
+                        }
+                    }
+                    Button {
+                        viewModel.dismissHeroCard()
+                    } label: {
+                        Text("Done")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(WarmPalette.ink1)
+                            .padding(.horizontal, 18)
+                            .padding(.vertical, 10)
+                            .background(.ultraThinMaterial, in: Capsule())
+                    }
+                }
+            }
+            .padding(.vertical, 20)
+            .padding(.horizontal, 22)
+            .glassEffect(.regular.tint(TabAccent.home.color.opacity(0.04)), in: .rect(cornerRadius: DesignTokens.CornerRadius.cardLarge))
+            .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
+            .padding(.bottom, 14)
+        }
+    }
+
+    // MARK: - Stats Grid
+
+    private var statsGrid: some View {
+        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 4), spacing: 8) {
+            WarmStatTile(label: "Tasks", value: "\(viewModel.summary?.tasks_today ?? 0)", sub: "today")
+            WarmStatTile(label: "Events", value: "\(viewModel.summary?.appointments_today ?? 0)", sub: "today")
+            WarmStatTile(label: "Grocery", value: "\(viewModel.summary?.groceries_needed ?? 0)", sub: "needed")
+            WarmStatTile(label: "Overdue", value: "\(viewModel.summary?.overdue_tasks ?? 0)", sub: "tasks")
+        }
+        .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
+        .padding(.bottom, 14)
+    }
+
+    // MARK: - Up Next
+
+    @ViewBuilder
+    private var upNextSection: some View {
+        if !viewModel.todayAppointments.isEmpty || !viewModel.activeTasks.isEmpty {
+            VStack(spacing: 6) {
+                WarmSectionHeader(title: "Up next", trailing: "This evening")
+                    .padding(.bottom, 6)
+
+                VStack(spacing: 0) {
+                    ForEach(Array(viewModel.todayAppointments.prefix(3).enumerated()), id: \.element.id) { index, appt in
+                        if index > 0 { GlassDivider() }
+                        WarmAgendaRow(
+                            time: appt.appointment_time ?? "",
+                            title: appt.title,
+                            subtitle: appt.location ?? "",
+                            tagInitial: appt.person_tags.flatMap { $0.first.map(String.init) }
+                        )
+                    }
+                    if viewModel.todayAppointments.count < 3 {
+                        ForEach(Array(viewModel.activeTasks.prefix(3 - viewModel.todayAppointments.count).enumerated()), id: \.element.id) { _, task in
+                            GlassDivider()
+                            WarmAgendaRow(
+                                time: "",
+                                title: task.title,
+                                subtitle: task.category,
+                                isAuto: true
+                            )
                         }
                     }
                 }
+                .glassEffect(.regular.tint(.white.opacity(0.03)), in: .rect(cornerRadius: DesignTokens.CornerRadius.card))
+                .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.bottom, 14)
         }
     }
 
-    // MARK: - Grocery Section
+    // MARK: - Quick Actions (replaces Henry suggestion)
 
-    @ViewBuilder
-    private var grocerySection: some View {
-        if !viewModel.groceries.isEmpty {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack {
-                    Image(systemName: "cart.fill")
-                        .foregroundStyle(.green)
-                    Text("Groceries")
-                        .font(.headline)
-                    Spacer()
-                    Button {
-                        showingFood = true
-                    } label: {
-                        Text("All \(viewModel.groceries.count)")
-                            .font(.caption.weight(.semibold))
-                    }
-                }
-                ForEach(viewModel.groceries.prefix(4)) { grocery in
-                    GroceryRow(grocery: grocery) {
-                        Task { await viewModel.completeGrocery(grocery.id, api: api) }
-                    }
-                }
+    private var quickActions: some View {
+        VStack(spacing: 10) {
+            Button { selectedTab = .lists } label: {
+                quickActionRow(
+                    icon: "list.bullet.rectangle.fill",
+                    title: "\(viewModel.summary?.groceries_needed ?? 0) items on grocery list",
+                    subtitle: "Tap to view and add",
+                    color: TabAccent.home.color
+                )
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-    }
-}
-
-// MARK: - Feature Tile
-
-struct FeatureTile: View {
-    let icon: String
-    let label: String
-    let color: Color
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) { tileContent }
             .buttonStyle(.plain)
+
+            Button { selectedTab = .decisions } label: {
+                quickActionRow(
+                    icon: "bubble.left.and.bubble.right.fill",
+                    title: "What's for dinner?",
+                    subtitle: "Post an idea or ask the family",
+                    color: TabAccent.decisions.color
+                )
+            }
+            .buttonStyle(.plain)
+
+            Button { selectedTab = .more } label: {
+                quickActionRow(
+                    icon: "ellipsis.circle.fill",
+                    title: "Budget, Rivalries, Gifts & more",
+                    subtitle: "All your other tools",
+                    color: WarmPalette.ink3
+                )
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
+        .padding(.bottom, 18)
     }
 
-    private var tileContent: some View {
-        VStack(spacing: 6) {
+    private func quickActionRow(icon: String, title: String, subtitle: String, color: Color) -> some View {
+        HStack(spacing: 12) {
             Image(systemName: icon)
-                .font(.title3)
+                .font(.system(size: 18, weight: .medium))
                 .foregroundStyle(color)
-            Text(label)
-                .font(.caption2.weight(.medium))
-                .foregroundStyle(.primary)
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
+                .frame(width: 36, height: 36)
+                .background(color.opacity(0.15))
+                .clipShape(Circle())
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(WarmPalette.ink1)
+                Text(subtitle)
+                    .font(.system(size: 13))
+                    .foregroundStyle(WarmPalette.ink3)
+            }
+            Spacer()
+            Image(systemName: "chevron.right")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(WarmPalette.ink4)
         }
-        .frame(maxWidth: .infinity)
-        .frame(height: 72)
-        .flCard(tint: color, interactive: true)
+        .padding(14)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
     }
+
+    // miniCard removed — quick actions now use quickActionRow
 }
 
 // MARK: - Row Components
+
+struct TaskRow: View {
+    let task: TaskResponse
+    let onComplete: () -> Void
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Button(action: onComplete) {
+                Image(systemName: "circle")
+                    .font(.title3)
+                    .foregroundStyle(TabAccent.home.color)
+            }
+            VStack(alignment: .leading, spacing: 2) {
+                Text(task.title)
+                    .font(.subheadline.weight(.medium))
+                if let assigned = task.assigned_to, !assigned.isEmpty {
+                    Text(assigned.capitalized)
+                        .font(.caption)
+                        .foregroundStyle(WarmPalette.ink3)
+                }
+            }
+            Spacer()
+            if task.priority == "high" {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .font(.caption)
+                    .foregroundStyle(WarmPalette.warn)
+            }
+        }
+        .padding(DesignTokens.Spacing.cardPadding)
+        .flCard(tint: TabAccent.home.color)
+    }
+}
 
 struct AppointmentRow: View {
     let appointment: AppointmentResponse
@@ -402,7 +396,7 @@ struct AppointmentRow: View {
     var body: some View {
         HStack(spacing: 12) {
             RoundedRectangle(cornerRadius: 3)
-                .fill(.purple)
+                .fill(TabAccent.calendar.color)
                 .frame(width: 4, height: 36)
             VStack(alignment: .leading, spacing: 2) {
                 Text(appointment.title)
@@ -416,44 +410,12 @@ struct AppointmentRow: View {
                     }
                 }
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(WarmPalette.ink3)
             }
             Spacer()
         }
         .padding(DesignTokens.Spacing.cardPadding)
         .flCard(tint: TabAccent.calendar.color)
-    }
-}
-
-struct TaskRow: View {
-    let task: TaskResponse
-    let onComplete: () -> Void
-
-    var body: some View {
-        HStack(spacing: 12) {
-            Button(action: onComplete) {
-                Image(systemName: "circle")
-                    .font(.title3)
-                    .foregroundStyle(.blue)
-            }
-            VStack(alignment: .leading, spacing: 2) {
-                Text(task.title)
-                    .font(.subheadline.weight(.medium))
-                if let assigned = task.assigned_to, !assigned.isEmpty {
-                    Text(assigned.capitalized)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
-            Spacer()
-            if task.priority == "high" {
-                Image(systemName: "exclamationmark.triangle.fill")
-                    .font(.caption)
-                    .foregroundStyle(.orange)
-            }
-        }
-        .padding(DesignTokens.Spacing.cardPadding)
-        .flCard(tint: .blue)
     }
 }
 
@@ -466,7 +428,7 @@ struct GroceryRow: View {
             Button(action: onComplete) {
                 Image(systemName: "circle")
                     .font(.title3)
-                    .foregroundStyle(.green)
+                    .foregroundStyle(WarmPalette.good)
             }
             Text(grocery.item)
                 .font(.subheadline)
@@ -480,13 +442,13 @@ struct GroceryRow: View {
             }
         }
         .padding(DesignTokens.Spacing.cardPadding)
-        .flCard(tint: .green)
+        .flCard(tint: WarmPalette.good)
     }
 }
 
 #Preview {
     NavigationStack {
-        HomeView()
+        HomeView(selectedTab: .constant(.home))
     }
     .environment(APIService())
     .environment(AuthService())

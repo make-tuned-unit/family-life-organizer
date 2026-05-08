@@ -36,7 +36,7 @@ final class HomeViewModel {
         do {
             activeTasks = try await api.fetchTasks(status: "active")
         } catch {
-            // Tasks endpoint may not have data yet
+            self.error = error.localizedDescription
         }
     }
 
@@ -45,7 +45,7 @@ final class HomeViewModel {
             let today = Self.todayString()
             todayAppointments = try await api.fetchAppointments(dateFrom: today, dateTo: today)
         } catch {
-            // Appointments endpoint may not have data yet
+            self.error = error.localizedDescription
         }
     }
 
@@ -72,6 +72,15 @@ final class HomeViewModel {
             await loadAll(api: api)
         } catch {
             self.error = error.localizedDescription
+        }
+    }
+
+    private var dismissedHeroIds: Set<Int> = []
+
+    func dismissHeroCard() {
+        if let first = todayAppointments.first {
+            dismissedHeroIds.insert(first.id)
+            todayAppointments.removeAll { dismissedHeroIds.contains($0.id) }
         }
     }
 
