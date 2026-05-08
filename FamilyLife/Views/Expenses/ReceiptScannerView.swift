@@ -200,13 +200,13 @@ struct ReceiptScannerView: View {
             }
 
             HStack {
-                Text("Category").font(.subheadline.weight(.medium))
+                Text(isProjectMode ? "Project" : "Category").font(.subheadline.weight(.medium))
                 Spacer()
-                Text(result.category)
+                Text(isProjectMode ? (projectName ?? "Project") : result.category)
                     .font(.subheadline)
                     .padding(.horizontal, DesignTokens.Spacing.inset)
                     .padding(.vertical, DesignTokens.Spacing.chipVerticalPadding)
-                    .background(AccentTheme.ocean.color.opacity(DesignTokens.Opacity.cardTint))
+                    .background((isProjectMode ? AccentTheme.sage.color : AccentTheme.ocean.color).opacity(DesignTokens.Opacity.cardTint))
                     .clipShape(Capsule())
             }
 
@@ -295,7 +295,7 @@ struct ReceiptScannerView: View {
         Task {
             do {
                 if let projectId {
-                    // Save as project expense — tag with merchant, items in notes
+                    // Save as project expense — tag with project name, items in notes
                     let itemDetail = result.items.map { item in
                         if let price = item.price {
                             return "\(item.name) — $\(String(format: "%.2f", price))"
@@ -309,7 +309,11 @@ struct ReceiptScannerView: View {
                         "notes": "\(result.category) receipt\n\(itemDetail)"
                     ]
                     let _ = try await api.addProjectExpense(projectId: projectId, expense: expenseData)
-                    await onProjectExpenseSaved?()
+                    // Dismiss first, then let parent reload — avoids task cancellation race
+                    dismiss()
+                    // Fire-and-forget: parent will pick up changes
+                    Task.detached { await onProjectExpenseSaved?() }
+                    return
                 } else {
                     // Save as budget receipt
                     try await api.saveScannedReceipt(result: result, addToPantry: addToPantry)
