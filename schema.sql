@@ -411,6 +411,34 @@ CREATE INDEX IF NOT EXISTS idx_feed_reactions_post_id ON feed_reactions(post_id)
 CREATE INDEX IF NOT EXISTS idx_feed_comments_post_id ON feed_comments(post_id);
 
 -- ============================================
+-- Lists (user-created, each with their own items)
+-- ============================================
+
+CREATE TABLE IF NOT EXISTS lists (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    icon TEXT DEFAULT 'list.bullet',
+    color TEXT,
+    created_by INTEGER,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (created_by) REFERENCES users(id)
+);
+
+CREATE TABLE IF NOT EXISTS list_items (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    list_id INTEGER NOT NULL,
+    title TEXT NOT NULL,
+    is_done BOOLEAN DEFAULT 0,
+    sort_order INTEGER DEFAULT 0,
+    added_by TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    completed_at DATETIME,
+    FOREIGN KEY (list_id) REFERENCES lists(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_list_items_list_id ON list_items(list_id);
+
+-- ============================================
 -- Coverage / Care Cascade
 -- ============================================
 

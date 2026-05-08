@@ -2332,6 +2332,109 @@ app.delete('/api/projects/:projectId/expenses/:id', requireAuth, async (req, res
 });
 
 // ============================================
+// Lists
+// ============================================
+
+app.get('/api/lists', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const userId = req.session.user?.id;
+    const lists = await db.getLists(userId);
+    res.json(lists);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+app.post('/api/lists', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const userId = req.session.user?.id;
+    const result = await db.createList({ ...req.body, created_by: userId });
+    res.json({ success: true, id: result.id });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+app.put('/api/lists/:id', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    await db.updateList(req.params.id, req.body);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+app.delete('/api/lists/:id', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    await db.deleteList(req.params.id);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+app.get('/api/lists/:id/items', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const items = await db.getListItems(req.params.id);
+    res.json(items);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+app.post('/api/lists/:id/items', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const userName = req.session.user?.name || req.session.user?.username;
+    const result = await db.addListItem({ list_id: req.params.id, title: req.body.title, added_by: userName });
+    res.json({ success: true, id: result.id });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+app.post('/api/lists/items/:id/toggle', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    await db.toggleListItem(req.params.id);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+app.delete('/api/lists/items/:id', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    await db.deleteListItem(req.params.id);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+// ============================================
 // Coverage / Care Cascade
 // ============================================
 

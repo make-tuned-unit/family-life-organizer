@@ -1240,6 +1240,103 @@ class FamilyDB {
   }
 
   // ============================================
+  // Lists
+  // ============================================
+
+  createList(list) {
+    return new Promise((resolve, reject) => {
+      this.db.run(
+        'INSERT INTO lists (name, icon, color, created_by) VALUES (?, ?, ?, ?)',
+        [list.name, list.icon || 'list.bullet', list.color || null, list.created_by || null],
+        function(err) {
+          if (err) reject(err);
+          else resolve({ id: this.lastID });
+        }
+      );
+    });
+  }
+
+  getLists(userId) {
+    return new Promise((resolve, reject) => {
+      this.db.all(`
+        SELECT l.*,
+          (SELECT COUNT(*) FROM list_items WHERE list_id = l.id AND is_done = 0) as active_count,
+          (SELECT COUNT(*) FROM list_items WHERE list_id = l.id) as total_count
+        FROM lists l
+        ORDER BY l.created_at ASC
+      `, [], (err, rows) => err ? reject(err) : resolve(rows));
+    });
+  }
+
+  deleteList(id) {
+    return new Promise((resolve, reject) => {
+      this.db.run('DELETE FROM lists WHERE id = ?', [id], (err) => {
+        if (err) reject(err);
+        else resolve({ deleted: true });
+      });
+    });
+  }
+
+  updateList(id, updates) {
+    return new Promise((resolve, reject) => {
+      const fields = [];
+      const params = [];
+      for (const [key, value] of Object.entries(updates)) {
+        fields.push(`${key} = ?`);
+        params.push(value);
+      }
+      params.push(id);
+      this.db.run(`UPDATE lists SET ${fields.join(', ')} WHERE id = ?`, params, (err) => {
+        if (err) reject(err);
+        else resolve({ id, ...updates });
+      });
+    });
+  }
+
+  getListItems(listId) {
+    return new Promise((resolve, reject) => {
+      this.db.all(
+        'SELECT * FROM list_items WHERE list_id = ? ORDER BY is_done ASC, sort_order ASC, id DESC',
+        [listId], (err, rows) => err ? reject(err) : resolve(rows)
+      );
+    });
+  }
+
+  addListItem(item) {
+    return new Promise((resolve, reject) => {
+      this.db.run(
+        'INSERT INTO list_items (list_id, title, added_by) VALUES (?, ?, ?)',
+        [item.list_id, item.title, item.added_by || null],
+        function(err) {
+          if (err) reject(err);
+          else resolve({ id: this.lastID });
+        }
+      );
+    });
+  }
+
+  toggleListItem(id) {
+    return new Promise((resolve, reject) => {
+      this.db.run(
+        `UPDATE list_items SET is_done = NOT is_done, completed_at = CASE WHEN is_done = 0 THEN CURRENT_TIMESTAMP ELSE NULL END WHERE id = ?`,
+        [id], (err) => {
+          if (err) reject(err);
+          else resolve({ id });
+        }
+      );
+    });
+  }
+
+  deleteListItem(id) {
+    return new Promise((resolve, reject) => {
+      this.db.run('DELETE FROM list_items WHERE id = ?', [id], (err) => {
+        if (err) reject(err);
+        else resolve({ deleted: true });
+      });
+    });
+  }
+
+  // ============================================
   // Coverage / Care Cascade
   // ============================================
 
