@@ -6,6 +6,7 @@ final class ExpensesViewModel {
     var budgetItems: [BudgetSummaryResponse] = []
     var receipts: [ReceiptResponse] = []
     var isLoading = false
+    var error: String?
 
     var displayMonthString: String {
         DateFormatter.monthYear.string(from: displayedMonth)
@@ -25,6 +26,7 @@ final class ExpensesViewModel {
 
     func loadAll(api: APIService) async {
         isLoading = true
+        error = nil
         async let budgetReq: () = loadBudget(api: api)
         async let receiptsReq: () = loadReceipts(api: api)
         _ = await (budgetReq, receiptsReq)
@@ -34,16 +36,20 @@ final class ExpensesViewModel {
     private func loadBudget(api: APIService) async {
         do {
             budgetItems = try await api.fetchBudget(month: monthParam)
+        } catch is CancellationError {
         } catch {
             budgetItems = []
+            self.error = error.localizedDescription
         }
     }
 
     private func loadReceipts(api: APIService) async {
         do {
             receipts = try await api.fetchReceipts(month: monthParam)
+        } catch is CancellationError {
         } catch {
             receipts = []
+            self.error = error.localizedDescription
         }
     }
 
@@ -51,6 +57,9 @@ final class ExpensesViewModel {
         do {
             try await api.deleteReceipt(id: id)
             receipts.removeAll { $0.id == id }
-        } catch {}
+        } catch is CancellationError {
+        } catch {
+            self.error = error.localizedDescription
+        }
     }
 }
