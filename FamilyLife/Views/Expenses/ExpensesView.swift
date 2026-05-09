@@ -44,8 +44,12 @@ struct ExpensesView: View {
                 }
             }
         }
-        .sheet(isPresented: $showingScanner) { ReceiptScannerView() }
-        .sheet(isPresented: $showingAddReceipt) { AddReceiptView() }
+        .sheet(isPresented: $showingScanner, onDismiss: {
+            Task { await viewModel.loadAll(api: api) }
+        }) { ReceiptScannerView() }
+        .sheet(isPresented: $showingAddReceipt, onDismiss: {
+            Task { await viewModel.loadAll(api: api) }
+        }) { AddReceiptView() }
         .overlay {
             if viewModel.isLoading && viewModel.budgetItems.isEmpty { ProgressView() }
         }
