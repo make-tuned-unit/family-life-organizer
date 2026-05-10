@@ -27,7 +27,9 @@ final class HomeViewModel {
             let data = try await api.fetchDashboard()
             summary = data.summary
             groceries = data.groceries
-        } catch {
+        } catch is CancellationError {
+            // View dismissed — ignore
+            } catch {
             self.error = error.localizedDescription
         }
     }
@@ -35,7 +37,9 @@ final class HomeViewModel {
     private func loadTasks(api: APIService) async {
         do {
             activeTasks = try await api.fetchTasks(status: "active")
-        } catch {
+        } catch is CancellationError {
+            // View dismissed — ignore
+            } catch {
             self.error = error.localizedDescription
         }
     }
@@ -44,7 +48,9 @@ final class HomeViewModel {
         do {
             let today = Self.todayString()
             todayAppointments = try await api.fetchAppointments(dateFrom: today, dateTo: today)
-        } catch {
+        } catch is CancellationError {
+            // View dismissed — ignore
+            } catch {
             self.error = error.localizedDescription
         }
     }
@@ -61,7 +67,9 @@ final class HomeViewModel {
                     overdue_tasks: s.overdue_tasks
                 )
             }
-        } catch {
+        } catch is CancellationError {
+            // View dismissed — ignore
+            } catch {
             self.error = error.localizedDescription
         }
     }
@@ -70,7 +78,9 @@ final class HomeViewModel {
         do {
             try await api.addTask(data)
             await loadAll(api: api)
-        } catch {
+        } catch is CancellationError {
+            // View dismissed — ignore
+            } catch {
             self.error = error.localizedDescription
         }
     }
@@ -96,7 +106,9 @@ final class HomeViewModel {
                     overdue_tasks: s.overdue_tasks
                 )
             }
-        } catch {
+        } catch is CancellationError {
+            // View dismissed — ignore
+            } catch {
             self.error = error.localizedDescription
         }
     }

@@ -10,6 +10,9 @@ struct AddPantryItemView: View {
     @State private var unit = ""
     @State private var hasExpiry = false
     @State private var expiryDate = Date().addingTimeInterval(7 * 86400)
+    @State private var addExpiryAlert = false
+    @State private var isSaving = false
+    @State private var error: String?
 
     let onSave: ([String: Any]) -> Void
 
@@ -44,6 +47,10 @@ struct AddPantryItemView: View {
                     Toggle("Has expiry date", isOn: $hasExpiry)
                     if hasExpiry {
                         DatePicker("Expires", selection: $expiryDate, displayedComponents: .date)
+                        Toggle("Notify me the day before", isOn: $addExpiryAlert)
+                        Text("If notifications are unavailable, the item still saves and the alert is skipped.")
+                            .font(.caption)
+                            .foregroundStyle(WarmPalette.ink3)
                     }
                 }
             }
@@ -51,22 +58,27 @@ struct AddPantryItemView: View {
             .background { AmbientBackground(style: .pantry) }
             .navigationTitle("Add Item")
             .navigationBarTitleDisplayMode(.inline)
+            .alert("Couldn’t add item", isPresented: errorAlertIsPresented) {
+                Button("OK") { error = nil }
+            } message: {
+                Text(error ?? "An unexpected error occurred.")
+            }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Add") {
-                        save()
-                        dismiss()
+                        Task { await save() }
                     }
-                    .disabled(itemName.isEmpty)
+                    .disabled(itemName.isEmpty || isSaving)
                 }
             }
         }
     }
 
-    private func save() {
+    private func save() async {
+        isSaving = true
         var data: [String: Any] = [
             "item": itemName,
             "category": category,
@@ -77,7 +89,27 @@ struct AddPantryItemView: View {
         if hasExpiry {
             data["expiry_date"] = DateFormatter.isoDate.string(from: expiryDate)
         }
+
         onSave(data)
+        if hasExpiry && addExpiryAlert {
+            let authorized = await NotificationService.shared.ensurePermissionIfNeeded()
+            if authorized {
+                NotificationService.shared.schedulePantryExpiryAlert(
+                    id: Int(Date().timeIntervalSince1970),
+                    itemName: itemName,
+                    expiryDate: DateFormatter.isoDate.string(from: expiryDate)
+                )
+            }
+        }
+        isSaving = false
+        dismiss()
+    }
+
+    private var errorAlertIsPresented: Binding<Bool> {
+        Binding(
+            get: { error != nil },
+            set: { if !$0 { error = nil } }
+        )
     }
 }
 

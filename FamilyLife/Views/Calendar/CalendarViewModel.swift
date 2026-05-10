@@ -6,6 +6,7 @@ final class CalendarViewModel {
     var selectedDate: Date?
     var monthAppointments: [AppointmentResponse] = []
     var isLoading = false
+    var error: String?
 
     private let calendar = Calendar.current
 
@@ -49,7 +50,7 @@ final class CalendarViewModel {
 
         // Current month days
         for day in range {
-            let date = calendar.date(bySetting: .day, value: day, of: firstOfMonth)!
+            guard let date = calendar.date(bySetting: .day, value: day, of: firstOfMonth) else { continue }
             let startOfDate = calendar.startOfDay(for: date)
             days.append(CalendarDay(date: startOfDate, isCurrentMonth: true, isToday: startOfDate == today))
         }
@@ -95,12 +96,15 @@ final class CalendarViewModel {
 
     func loadMonth(api: APIService) async {
         isLoading = true
+        error = nil
         let year = calendar.component(.year, from: displayedMonth)
         let month = calendar.component(.month, from: displayedMonth)
         do {
             monthAppointments = try await api.fetchAppointmentsByMonth(year: year, month: month)
+        } catch is CancellationError {
         } catch {
             monthAppointments = []
+            self.error = error.localizedDescription
         }
         isLoading = false
     }
@@ -109,14 +113,24 @@ final class CalendarViewModel {
         do {
             try await api.addAppointment(data)
             await loadMonth(api: api)
-        } catch {}
+        } catch is CancellationError {
+            // View dismissed — ignore
+            } catch is CancellationError {
+        } catch {
+            self.error = error.localizedDescription
+        }
     }
 
     func deleteAppointment(_ id: Int, api: APIService) async {
         do {
             try await api.deleteAppointment(id: id)
             monthAppointments.removeAll { $0.id == id }
-        } catch {}
+        } catch is CancellationError {
+            // View dismissed — ignore
+            } catch is CancellationError {
+        } catch {
+            self.error = error.localizedDescription
+        }
     }
 
     // MARK: - Helpers

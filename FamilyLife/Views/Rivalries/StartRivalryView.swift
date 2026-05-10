@@ -1,27 +1,21 @@
 import SwiftUI
-import SwiftData
 
 struct StartRivalryView: View {
-    @Environment(\.modelContext) private var modelContext
+    @Environment(APIService.self) private var api
     @Environment(\.dismiss) private var dismiss
+
+    let onSaved: () async -> Void
 
     @State private var title = ""
     @State private var challengeType: ChallengeType = .steps
-    @State private var opponentName = "Sophie"
+    @State private var opponentName = "Partner"
     @State private var endDate = Calendar.current.date(byAdding: .day, value: 7, to: Date()) ?? Date().addingTimeInterval(7 * 86400)
     @State private var pointValue = 100
-    @State private var startError: String?
+    @State private var error: String?
+    @State private var isSaving = false
 
-    private let familyMembers = ["Jesse", "Sophie", "Rowan", "Jude"]
-    private let currentUser = "Jesse" // From AuthService in real usage
-
-    // Stable UUIDs per family member (deterministic for local-only SwiftData)
-    private let memberIDs: [String: UUID] = [
-        "Jesse": UUID(uuidString: "00000000-0000-0000-0000-000000000001") ?? UUID(),
-        "Sophie": UUID(uuidString: "00000000-0000-0000-0000-000000000002") ?? UUID(),
-        "Rowan": UUID(uuidString: "00000000-0000-0000-0000-000000000003") ?? UUID(),
-        "Jude": UUID(uuidString: "00000000-0000-0000-0000-000000000004") ?? UUID()
-    ]
+    private let familyMembers = ["Me", "Partner"] // TODO: load from API
+    private let currentUser = "Me"
 
     var body: some View {
         NavigationStack {
@@ -48,13 +42,13 @@ struct StartRivalryView: View {
                                     if type != .custom {
                                         Text(type.hint)
                                             .font(.caption)
-                                            .foregroundStyle(.secondary)
+                                            .foregroundStyle(WarmPalette.ink3)
                                     }
                                 }
                                 Spacer()
                                 if challengeType == type {
                                     Image(systemName: "checkmark")
-                                        .foregroundStyle(.teal)
+                                        .foregroundStyle(TabAccent.home.color)
                                 }
                             }
                         }
@@ -74,29 +68,25 @@ struct StartRivalryView: View {
                     DatePicker("End Date", selection: $endDate, in: Date()..., displayedComponents: .date)
                     Stepper("Points: \(pointValue)", value: $pointValue, in: 10...1000, step: 10)
                 }
-
-                if let error = startError {
-                    Section {
-                        Text(error)
-                            .foregroundStyle(.red)
-                            .font(.caption)
-                    }
-                }
             }
             .scrollContentBackground(.hidden)
             .background { AmbientBackground(style: .rivalries) }
             .navigationTitle("Start a Rivalry")
             .navigationBarTitleDisplayMode(.inline)
+            .alert("Couldn’t start rivalry", isPresented: errorAlertIsPresented) {
+                Button("OK") { error = nil }
+            } message: {
+                Text(error ?? "An unexpected error occurred.")
+            }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Challenge!") {
-                        createRivalry()
-                        if startError == nil { dismiss() }
+                        Task { await createRivalry() }
                     }
-                    .disabled(title.isEmpty)
+                    .disabled(title.isEmpty || isSaving)
                 }
             }
         }
@@ -104,10 +94,10 @@ struct StartRivalryView: View {
 
     private func typeColor(_ type: ChallengeType) -> Color {
         switch type {
-        case .steps: .blue
-        case .workout: .orange
-        case .habit: .green
-        case .custom: .purple
+        case .steps: AccentTheme.ocean.color
+        case .workout: AccentTheme.saffron.color
+        case .habit: WarmPalette.good
+        case .custom: AccentTheme.mauve.color
         }
     }
 
@@ -117,27 +107,35 @@ struct StartRivalryView: View {
         }
     }
 
-    private func createRivalry() {
-        guard let initiatorID = memberIDs[currentUser],
-              let opponentID = memberIDs[opponentName] else {
-            startError = "Could not find member IDs. Please try again."
-            return
+    private func createRivalry() async {
+        isSaving = true
+        do {
+            try await api.addRivalry([
+                "title": title,
+                "challenge_type": challengeType.rawValue,
+                "initiator_name": currentUser,
+                "opponent_name": opponentName,
+                "start_date": ISO8601DateFormatter().string(from: Date()),
+                "end_date": ISO8601DateFormatter().string(from: endDate),
+                "status": RivalryStatus.active.rawValue,
+                "point_value": pointValue
+            ])
+            await onSaved()
+            dismiss()
+        } catch is CancellationError {
+            // View dismissed — ignore
+            } catch {
+            self.error = error.localizedDescription
+            isSaving = false
         }
-        let rivalry = Rivalry(
-            title: title,
-            challengeType: challengeType,
-            initiatorID: initiatorID,
-            initiatorName: currentUser,
-            opponentID: opponentID,
-            opponentName: opponentName,
-            endDate: endDate,
-            pointValue: pointValue
-        )
-        modelContext.insert(rivalry)
+    }
+
+    private var errorAlertIsPresented: Binding<Bool> {
+        Binding(get: { error != nil }, set: { if !$0 { error = nil } })
     }
 }
 
 #Preview {
-    StartRivalryView()
-        .modelContainer(for: [Rivalry.self])
+    StartRivalryView(onSaved: {})
+        .environment(APIService())
 }

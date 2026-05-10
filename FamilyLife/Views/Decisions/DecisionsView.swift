@@ -193,6 +193,7 @@ struct DecisionsView: View {
         error = nil
         do {
             decisions = try await api.fetchDecisions()
+        } catch is CancellationError {
         } catch {
             decisions = []
             self.error = error.localizedDescription
