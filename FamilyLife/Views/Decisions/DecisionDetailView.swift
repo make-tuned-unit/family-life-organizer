@@ -1,57 +1,54 @@
 import SwiftUI
-import SwiftData
 
 struct DecisionDetailView: View {
-    @Environment(\.modelContext) private var modelContext
-    let decision: Decision
+    @Environment(APIService.self) private var api
+    let decision: DecisionResponse
 
-    @Query private var allReactions: [DecisionReaction]
-    @Query private var allComments: [DecisionComment]
-
+    @State private var reactions: [DecisionReactionResponse] = []
+    @State private var comments: [DecisionCommentResponse] = []
     @State private var newComment = ""
-    @State private var showingResolved = false
+    @State private var currentDecision: DecisionResponse
+    @State private var error: String?
 
-    private let currentUser = "Jesse"
+    @Environment(AuthService.self) private var auth
 
-    private var reactions: [DecisionReaction] {
-        allReactions.filter { $0.decisionID == decision.id }
-    }
-
-    private var comments: [DecisionComment] {
-        allComments.filter { $0.decisionID == decision.id }.sorted { $0.createdAt < $1.createdAt }
+    init(decision: DecisionResponse) {
+        self.decision = decision
+        _currentDecision = State(initialValue: decision)
     }
 
     private var myReaction: String? {
-        reactions.first { $0.memberName == currentUser && $0.reactionType != "vote" }?.reactionType
+        reactions.first { $0.member_name == (auth.currentUser?.username ?? "Me") && $0.reaction_type != "vote" }?.reaction_type
     }
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                // Header
                 VStack(alignment: .leading, spacing: 8) {
                     HStack {
-                        Image(systemName: decision.decisionType.icon)
-                            .foregroundStyle(.teal)
-                        Text(decision.creatorName)
+                        Image(systemName: currentDecision.decisionType.icon)
+                            .foregroundStyle(TabAccent.home.color)
+                        Text(currentDecision.creator_name)
                             .font(.subheadline.weight(.semibold))
                         Spacer()
-                        Text(decision.createdAt, style: .relative)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                        if let created = currentDecision.createdDate {
+                            Text(created, style: .relative)
+                                .font(.caption)
+                                .foregroundStyle(WarmPalette.ink3)
+                        }
                     }
 
-                    Text(decision.title)
+                    Text(currentDecision.title)
                         .font(.title3.bold())
 
-                    if let body = decision.body, !body.isEmpty {
+                    if let body = currentDecision.body, !body.isEmpty {
                         Text(body)
                             .font(.subheadline)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(WarmPalette.ink3)
                     }
 
-                    if let url = decision.linkURL, !url.isEmpty {
-                        Link(destination: URL(string: url) ?? URL(string: "https://example.com")!) {
+                    if let url = currentDecision.link_url, !url.isEmpty, let parsedURL = URL(string: url) {
+                        Link(destination: parsedURL) {
                             HStack {
                                 Image(systemName: "link")
                                 Text(url)
@@ -59,22 +56,21 @@ struct DecisionDetailView: View {
                             }
                             .font(.subheadline)
                             .padding(DesignTokens.Spacing.inset)
-                            .background(TabAccent.decisions.color.opacity(DesignTokens.Opacity.cardTint)) // DS-05: replaced raw opacity fill
+                            .background(TabAccent.decisions.color.opacity(DesignTokens.Opacity.cardTint))
                             .clipShape(RoundedRectangle(cornerRadius: 8))
                         }
                     }
                 }
                 .padding(.horizontal)
 
-                // Poll
-                if decision.decisionType == .poll && !decision.pollOptions.isEmpty {
+                if currentDecision.decisionType == .poll && !currentDecision.poll_options.isEmpty {
                     VStack(spacing: 8) {
-                        let totalVotes = reactions.filter { $0.reactionType == "vote" }.count
-                        ForEach(Array(decision.pollOptions.enumerated()), id: \.offset) { idx, option in
-                            let voteCount = reactions.filter { $0.pollChoice == idx }.count
-                            let myVote = reactions.first { $0.memberName == currentUser && $0.reactionType == "vote" }?.pollChoice
+                        let totalVotes = reactions.filter { $0.reaction_type == "vote" }.count
+                        let myVote = reactions.first { $0.member_name == (auth.currentUser?.username ?? "Me") && $0.reaction_type == "vote" }?.poll_choice
+                        ForEach(Array(currentDecision.poll_options.enumerated()), id: \.offset) { idx, option in
+                            let voteCount = reactions.filter { $0.poll_choice == idx }.count
                             Button {
-                                vote(for: idx)
+                                Task { await vote(for: idx) }
                             } label: {
                                 HStack {
                                     Text(option)
@@ -83,40 +79,39 @@ struct DecisionDetailView: View {
                                     Spacer()
                                     Text("\(voteCount)")
                                         .font(.subheadline.bold())
-                                        .foregroundStyle(.teal)
+                                        .foregroundStyle(TabAccent.home.color)
                                     if myVote == idx {
                                         Image(systemName: "checkmark.circle.fill")
-                                            .foregroundStyle(.teal)
+                                            .foregroundStyle(TabAccent.home.color)
                                     }
                                 }
                                 .padding(DesignTokens.Spacing.cardGap)
                                 .background {
                                     GeometryReader { geo in
                                         RoundedRectangle(cornerRadius: 8)
-                                            .fill(TabAccent.decisions.color.opacity(DesignTokens.Opacity.cardTint)) // DS-05: replaced raw opacity fill
+                                            .fill(TabAccent.decisions.color.opacity(DesignTokens.Opacity.cardTint))
                                             .frame(width: totalVotes > 0 ? geo.size.width * Double(voteCount) / Double(totalVotes) : 0)
                                     }
                                 }
-                                .background(Color(.tertiarySystemFill))
+                                .background(WarmPalette.ink1.opacity(0.06))
                                 .clipShape(RoundedRectangle(cornerRadius: 8))
                             }
-                            .disabled(decision.status != .active)
+                            .disabled(currentDecision.status != DecisionStatus.active.rawValue)
                         }
                     }
                     .padding(.horizontal)
                 }
 
-                // Reactions
-                if decision.decisionType != .poll {
+                if currentDecision.decisionType != .poll {
                     HStack(spacing: 16) {
-                        ReactionButton(emoji: "hand.thumbsup.fill", type: "thumbsUp", count: reactions.filter { $0.reactionType == "thumbsUp" }.count, isSelected: myReaction == "thumbsUp") {
-                            react("thumbsUp")
+                        ReactionButton(emoji: "hand.thumbsup.fill", type: "thumbsUp", count: reactions.filter { $0.reaction_type == "thumbsUp" }.count, isSelected: myReaction == "thumbsUp") {
+                            Task { await react("thumbsUp") }
                         }
-                        ReactionButton(emoji: "hand.thumbsdown.fill", type: "thumbsDown", count: reactions.filter { $0.reactionType == "thumbsDown" }.count, isSelected: myReaction == "thumbsDown") {
-                            react("thumbsDown")
+                        ReactionButton(emoji: "hand.thumbsdown.fill", type: "thumbsDown", count: reactions.filter { $0.reaction_type == "thumbsDown" }.count, isSelected: myReaction == "thumbsDown") {
+                            Task { await react("thumbsDown") }
                         }
-                        ReactionButton(emoji: "heart.fill", type: "heart", count: reactions.filter { $0.reactionType == "heart" }.count, isSelected: myReaction == "heart") {
-                            react("heart")
+                        ReactionButton(emoji: "heart.fill", type: "heart", count: reactions.filter { $0.reaction_type == "heart" }.count, isSelected: myReaction == "heart") {
+                            Task { await react("heart") }
                         }
                         Spacer()
                     }
@@ -125,7 +120,6 @@ struct DecisionDetailView: View {
 
                 Divider()
 
-                // Comments
                 VStack(alignment: .leading, spacing: 12) {
                     Text("Comments (\(comments.count))")
                         .font(.headline)
@@ -134,14 +128,16 @@ struct DecisionDetailView: View {
                     ForEach(comments) { comment in
                         HStack(alignment: .top, spacing: 8) {
                             Image(systemName: "person.circle.fill")
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(WarmPalette.ink3)
                             VStack(alignment: .leading, spacing: 2) {
                                 HStack {
-                                    Text(comment.memberName)
+                                    Text(comment.member_name)
                                         .font(.caption.weight(.semibold))
-                                    Text(comment.createdAt, style: .relative)
-                                        .font(.caption2)
-                                        .foregroundStyle(.tertiary)
+                                    if let date = comment.createdDate {
+                                        Text(date, style: .relative)
+                                            .font(.caption2)
+                                            .foregroundStyle(WarmPalette.ink4)
+                                    }
                                 }
                                 Text(comment.text)
                                     .font(.subheadline)
@@ -150,17 +146,16 @@ struct DecisionDetailView: View {
                         .padding(.horizontal)
                     }
 
-                    // Add comment
-                    if decision.status == .active {
+                    if currentDecision.status == DecisionStatus.active.rawValue {
                         HStack {
                             TextField("Add a comment...", text: $newComment)
-                                .textFieldStyle(.roundedBorder)
+                                
                             Button {
-                                addComment()
+                                Task { await addComment() }
                             } label: {
                                 Image(systemName: "arrow.up.circle.fill")
                                     .font(.title2)
-                                    .foregroundStyle(.teal)
+                                    .foregroundStyle(TabAccent.home.color)
                             }
                             .disabled(newComment.isEmpty)
                         }
@@ -170,78 +165,135 @@ struct DecisionDetailView: View {
             }
             .padding(.vertical)
         }
-        .navigationTitle(decision.title)
+        .background { AmbientBackground(style: .decisions) }
+        .navigationTitle(currentDecision.title)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            if decision.status == .active && decision.creatorName == currentUser {
+            if currentDecision.status == DecisionStatus.active.rawValue && currentDecision.creator_name == (auth.currentUser?.username ?? "Me") {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Resolve") {
-                        decision.status = .resolved
+                        Task { await resolveDecision() }
                     }
                 }
             }
         }
-    }
-
-    private func react(_ type: String) {
-        // Remove existing non-vote reaction from this user
-        if let existing = reactions.first(where: { $0.memberName == currentUser && $0.reactionType != "vote" }) {
-            modelContext.delete(existing)
-            if existing.reactionType == type { return } // toggle off
+        .alert("Couldn’t update decision", isPresented: errorAlertIsPresented) {
+            Button("OK") { error = nil }
+        } message: {
+            Text(error ?? "An unexpected error occurred.")
         }
-        let reaction = DecisionReaction(decisionID: decision.id, memberName: currentUser, reactionType: type)
-        modelContext.insert(reaction)
-    }
-
-    private func vote(for option: Int) {
-        // Remove existing vote
-        if let existing = reactions.first(where: { $0.memberName == currentUser && $0.reactionType == "vote" }) {
-            modelContext.delete(existing)
+        .task {
+            await reload()
         }
-        let reaction = DecisionReaction(decisionID: decision.id, memberName: currentUser, reactionType: "vote", pollChoice: option)
-        modelContext.insert(reaction)
     }
 
-    private func addComment() {
-        let comment = DecisionComment(decisionID: decision.id, memberName: currentUser, text: newComment)
-        modelContext.insert(comment)
-        newComment = ""
-    }
-}
-
-struct ReactionButton: View {
-    let emoji: String
-    let type: String
-    let count: Int
-    let isSelected: Bool
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: 4) {
-                Image(systemName: emoji)
-                    .font(.body)
-                if count > 0 {
-                    Text("\(count)")
-                        .font(.caption.bold())
-                }
-            }
-            .padding(.horizontal, DesignTokens.Spacing.cardGap)
-            .padding(.vertical, DesignTokens.Spacing.chipVerticalMed)
-            .glassEffect(.regular.tint(isSelected ? .teal : .clear).interactive(), in: .capsule)
+    private func reload() async {
+        do {
+            async let fetchedReactions = api.fetchDecisionReactions(id: currentDecision.id)
+            async let fetchedComments = api.fetchDecisionComments(id: currentDecision.id)
+            reactions = try await fetchedReactions
+            comments = try await fetchedComments
+        } catch is CancellationError {
+            // View dismissed — ignore
+            } catch {
+            self.error = error.localizedDescription
         }
-        .foregroundStyle(isSelected ? .teal : .secondary)
+    }
+
+    private func react(_ type: String) async {
+        do {
+            try await api.setDecisionReaction(id: currentDecision.id, data: [
+                "member_name": auth.currentUser?.username ?? "Me",
+                "reaction_type": type
+            ])
+            await reload()
+        } catch is CancellationError {
+            // View dismissed — ignore
+            } catch {
+            self.error = error.localizedDescription
+        }
+    }
+
+    private func vote(for option: Int) async {
+        do {
+            try await api.setDecisionReaction(id: currentDecision.id, data: [
+                "member_name": auth.currentUser?.username ?? "Me",
+                "reaction_type": "vote",
+                "poll_choice": option
+            ])
+            await reload()
+        } catch is CancellationError {
+            // View dismissed — ignore
+            } catch {
+            self.error = error.localizedDescription
+        }
+    }
+
+    private func addComment() async {
+        do {
+            try await api.addDecisionComment(id: currentDecision.id, data: [
+                "member_name": auth.currentUser?.username ?? "Me",
+                "text": newComment
+            ])
+            newComment = ""
+            await reload()
+        } catch is CancellationError {
+            // View dismissed — ignore
+            } catch {
+            self.error = error.localizedDescription
+        }
+    }
+
+    private func resolveDecision() async {
+        do {
+            try await api.updateDecision(id: currentDecision.id, data: [
+                "status": DecisionStatus.resolved.rawValue
+            ])
+            currentDecision = DecisionResponse(
+                id: currentDecision.id,
+                title: currentDecision.title,
+                decision_type: currentDecision.decision_type,
+                body: currentDecision.body,
+                link_url: currentDecision.link_url,
+                photo_data: currentDecision.photo_data,
+                poll_options: currentDecision.poll_options,
+                creator_name: currentDecision.creator_name,
+                status: DecisionStatus.resolved.rawValue,
+                created_at: currentDecision.created_at,
+                expires_at: currentDecision.expires_at
+            )
+        } catch is CancellationError {
+            // View dismissed — ignore
+            } catch {
+            self.error = error.localizedDescription
+        }
+    }
+
+    private var errorAlertIsPresented: Binding<Bool> {
+        Binding(
+            get: { error != nil },
+            set: { if !$0 { error = nil } }
+        )
     }
 }
 
 #Preview {
-    let config = ModelConfiguration(isStoredInMemoryOnly: true)
-    let container = try! ModelContainer(for: Decision.self, DecisionReaction.self, DecisionComment.self, configurations: config)
-    let decision = Decision(title: "Should we get a trampoline?", decisionType: .poll, body: "The kids have been asking", pollOptions: ["Yes!", "No way", "Maybe later"])
-    container.mainContext.insert(decision)
-
-    return NavigationStack {
-        DecisionDetailView(decision: decision)
+    NavigationStack {
+        DecisionDetailView(
+            decision: DecisionResponse(
+                id: 1,
+                title: "Should we get a trampoline?",
+                decision_type: "poll",
+                body: "The kids have been asking",
+                link_url: nil,
+                photo_data: nil,
+                poll_options: ["Yes", "No", "Maybe later"],
+                creator_name: "Jesse",
+                status: "active",
+                created_at: "2026-04-08T00:00:00Z",
+                expires_at: "2026-04-15T00:00:00Z"
+            )
+        )
+        .environment(APIService())
     }
-    .modelContainer(container)
 }

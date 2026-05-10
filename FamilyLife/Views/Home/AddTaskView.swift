@@ -6,7 +6,7 @@ struct AddTaskView: View {
     @State private var title = ""
     @State private var category = "household"
     @State private var priority = "medium"
-    @State private var assignedTo = "Jesse"
+    @State private var assignedTo = "Me"
     @State private var hasDueDate = false
     @State private var dueDate = Date()
 
@@ -14,7 +14,7 @@ struct AddTaskView: View {
 
     private let categories = ["household", "errands", "kids", "health", "finance", "work"]
     private let priorities = ["low", "medium", "high"]
-    private let familyMembers = ["Jesse", "Sophie"]
+    private let familyMembers = ["Me", "Partner"]
 
     var body: some View {
         NavigationStack {
@@ -79,9 +79,9 @@ struct AddTaskView: View {
 
     private func priorityColor(_ p: String) -> Color {
         switch p {
-        case "high": .red
-        case "medium": .orange
-        default: .green
+        case "high": WarmPalette.bad
+        case "medium": AccentTheme.saffron.color
+        default: WarmPalette.good
         }
     }
 

@@ -14,37 +14,39 @@ struct WeekView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Day headers
-            HStack(spacing: 0) {
+            // Day strip
+            HStack(spacing: 4) {
                 ForEach(weekDays, id: \.self) { day in
                     let isToday = calendar.isDateInToday(day)
                     let isSelected = selectedDate.map { calendar.isDate($0, inSameDayAs: day) } ?? false
                     Button {
                         selectedDate = day
                     } label: {
-                        VStack(spacing: 4) {
+                        VStack(spacing: 2) {
                             Text(dayName(day))
-                                .font(.caption2.weight(.medium))
-                                .foregroundStyle(.secondary)
+                                .font(.system(size: 10, weight: .semibold))
+                                .foregroundStyle(isSelected ? WarmPalette.cream1.opacity(0.7) : WarmPalette.ink3)
                             Text("\(calendar.component(.day, from: day))")
-                                .font(.subheadline.weight(isToday ? .bold : .regular))
-                                .foregroundStyle(isSelected ? .white : isToday ? .teal : .primary)
-                                .frame(width: 30, height: 30)
-                                .background {
-                                    if isSelected {
-                                        Circle().fill(.teal)
-                                    } else if isToday {
-                                        Circle().stroke(.teal, lineWidth: 1.5)
-                                    }
-                                }
+                                .font(.system(size: 17, weight: .bold))
+                                .foregroundStyle(isSelected ? WarmPalette.cream1 : isToday ? AccentTheme.terracotta.color : WarmPalette.ink1)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                        .background {
+                            if isSelected {
+                                RoundedRectangle(cornerRadius: 14)
+                                    .fill(WarmPalette.ink1)
+                            } else if isToday {
+                                RoundedRectangle(cornerRadius: 14)
+                                    .stroke(AccentTheme.terracotta.color, lineWidth: 1.5)
+                            }
                         }
                     }
-                    .frame(maxWidth: .infinity)
+                    .buttonStyle(.plain)
                 }
             }
-            .padding(.vertical, DesignTokens.Spacing.rowVertical)
-
-            Divider()
+            .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
+            .padding(.vertical, 8)
 
             // Agenda for selected day
             if let selected = selectedDate {
@@ -52,20 +54,25 @@ struct WeekView: View {
                 if dayAppts.isEmpty {
                     VStack(spacing: 8) {
                         Image(systemName: "calendar.badge.checkmark")
-                            .font(.title2)
-                            .foregroundStyle(.secondary)
+                            .font(.system(size: 28))
+                            .foregroundStyle(WarmPalette.ink4)
                         Text("Nothing scheduled")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
+                            .font(.system(size: 15))
+                            .foregroundStyle(WarmPalette.ink3)
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
-                    List {
-                        ForEach(dayAppts) { appt in
-                            AgendaRow(appointment: appt)
+                    ScrollView {
+                        VStack(spacing: 0) {
+                            ForEach(Array(dayAppts.enumerated()), id: \.element.id) { index, appt in
+                                if index > 0 { GlassDivider() }
+                                WeekAgendaRow(appointment: appt)
+                            }
                         }
+                        .glassEffect(.regular.tint(.white.opacity(0.03)), in: .rect(cornerRadius: DesignTokens.CornerRadius.card))
+                        .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
+                        .padding(.top, 8)
                     }
-                    .listStyle(.plain)
                 }
             }
         }
@@ -83,18 +90,20 @@ struct WeekView: View {
     }
 }
 
-struct AgendaRow: View {
+// Renamed to avoid conflict with HomeView's AgendaRow
+struct WeekAgendaRow: View {
     let appointment: AppointmentResponse
 
     var body: some View {
         HStack(spacing: 12) {
-            RoundedRectangle(cornerRadius: 3)
+            RoundedRectangle(cornerRadius: 999)
                 .fill(categoryColor)
                 .frame(width: 4, height: 44)
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(appointment.title)
-                    .font(.subheadline.weight(.medium))
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(WarmPalette.ink1)
                 HStack(spacing: 6) {
                     if let time = appointment.appointment_time, !time.isEmpty {
                         Label(time, systemImage: "clock")
@@ -106,29 +115,42 @@ struct AgendaRow: View {
                         Label(tags, systemImage: "person")
                     }
                 }
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                .font(.system(size: 13))
+                .foregroundStyle(WarmPalette.ink3)
             }
             Spacer()
         }
-        .padding(.vertical, DesignTokens.Spacing.chipVerticalPadding)
+        .padding(.vertical, 12)
+        .padding(.horizontal, 14)
     }
 
     private var categoryColor: Color {
         switch appointment.category {
-        case "medical": .red
-        case "school": .blue
-        case "daycare": .orange
-        default: .teal
+        case "medical": WarmPalette.bad
+        case "school": AccentTheme.ocean.color
+        case "daycare": AccentTheme.saffron.color
+        case "personal": AccentTheme.mauve.color
+        default: AccentTheme.terracotta.color
         }
     }
 }
 
+// Keep old AgendaRow name for backward compatibility with any remaining references
+struct AgendaRow: View {
+    let appointment: AppointmentResponse
+    var body: some View {
+        WeekAgendaRow(appointment: appointment)
+    }
+}
+
 #Preview {
-    WeekView(
-        weekStart: Date(),
-        selectedDate: .constant(Date()),
-        appointments: []
-    )
+    ZStack {
+        AmbientBackground(style: .calendar)
+        WeekView(
+            weekStart: Date(),
+            selectedDate: .constant(Date()),
+            appointments: []
+        )
+    }
     .environment(APIService())
 }

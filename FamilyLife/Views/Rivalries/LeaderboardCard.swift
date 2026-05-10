@@ -13,7 +13,7 @@ struct LeaderboardCard: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Image(systemName: "trophy.fill")
-                    .foregroundStyle(.yellow)
+                    .foregroundStyle(AccentTheme.saffron.color)
                 Text("Family Leaderboard")
                     .font(.headline)
             }
@@ -48,10 +48,10 @@ struct LeaderboardCard: View {
                         HStack(spacing: 8) {
                             Label("\(member.rivalriesWon)W", systemImage: "star.fill")
                                 .font(.caption2)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(WarmPalette.ink3)
                             Text("\(member.totalPoints) pts")
                                 .font(.subheadline.bold())
-                                .foregroundStyle(.teal)
+                                .foregroundStyle(TabAccent.home.color)
                         }
                     }
                     .padding(.vertical, DesignTokens.Spacing.rowVertical)
@@ -74,9 +74,9 @@ struct LeaderboardCard: View {
 
     private func rankColor(_ index: Int) -> Color {
         switch index {
-        case 0: .yellow
-        case 1: .gray
-        case 2: .brown
+        case 0: AccentTheme.saffron.color
+        case 1: WarmPalette.ink3
+        case 2: WarmPalette.ink2
         default: .secondary
         }
     }
@@ -101,23 +101,25 @@ struct MemberStatsSheet: View {
                     HStack {
                         Image(systemName: "person.circle.fill")
                             .font(.largeTitle)
-                            .foregroundStyle(.teal)
+                            .foregroundStyle(TabAccent.home.color)
                         VStack(alignment: .leading) {
                             Text(member.memberName)
                                 .font(.title2.bold())
                             Text("Family competitor")
                                 .font(.caption)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(WarmPalette.ink3)
                         }
                     }
                 }
 
                 Section("Stats") {
-                    StatRow(label: "Total Points", value: "\(member.totalPoints)", icon: "trophy.fill", color: .yellow)
-                    StatRow(label: "Rivalries Won", value: "\(member.rivalriesWon)", icon: "star.fill", color: .teal)
-                    StatRow(label: "Rivalries Completed", value: "\(member.rivalriesCompleted)", icon: "checkmark.circle.fill", color: .green)
+                    StatRow(label: "Total Points", value: "\(member.totalPoints)", icon: "trophy.fill", color: AccentTheme.saffron.color)
+                    StatRow(label: "Rivalries Won", value: "\(member.rivalriesWon)", icon: "star.fill", color: TabAccent.home.color)
+                    StatRow(label: "Rivalries Completed", value: "\(member.rivalriesCompleted)", icon: "checkmark.circle.fill", color: WarmPalette.good)
                 }
             }
+            .scrollContentBackground(.hidden)
+            .background { AmbientBackground(style: .rivalries) }
             .navigationTitle("Stats")
             .navigationBarTitleDisplayMode(.inline)
         }

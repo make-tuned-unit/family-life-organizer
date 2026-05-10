@@ -14,7 +14,9 @@ struct EditPantryItemView: View {
     @State private var unit: String
     @State private var hasExpiry: Bool
     @State private var expiryDate: Date
+    @State private var addExpiryAlert = false
     @State private var isSaving = false
+    @State private var error: String?
 
     private let categories = ["Produce", "Dairy", "Meat", "Bakery", "Frozen", "Dry Goods", "Beverages", "Snacks", "Household", "Other"]
     private let locations = ["Fridge", "Freezer", "Pantry", "Counter"]
@@ -61,6 +63,10 @@ struct EditPantryItemView: View {
                     Toggle("Has expiry date", isOn: $hasExpiry)
                     if hasExpiry {
                         DatePicker("Expires", selection: $expiryDate, displayedComponents: .date)
+                        Toggle("Notify me the day before", isOn: $addExpiryAlert)
+                        Text("If notifications are unavailable, the item still saves and the alert is skipped.")
+                            .font(.caption)
+                            .foregroundStyle(WarmPalette.ink3)
                     }
                 }
             }
@@ -68,6 +74,11 @@ struct EditPantryItemView: View {
             .background { AmbientBackground(style: .pantry) }
             .navigationTitle("Edit Item")
             .navigationBarTitleDisplayMode(.inline)
+            .alert("Couldn’t save changes", isPresented: errorAlertIsPresented) {
+                Button("OK") { error = nil }
+            } message: {
+                Text(error ?? "An unexpected error occurred.")
+            }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
@@ -98,12 +109,30 @@ struct EditPantryItemView: View {
         Task {
             do {
                 try await api.updatePantryItem(id: item.id, data: data)
+                if hasExpiry && addExpiryAlert {
+                    let authorized = await NotificationService.shared.ensurePermissionIfNeeded()
+                    if authorized {
+                        NotificationService.shared.schedulePantryExpiryAlert(
+                            id: item.id,
+                            itemName: itemName,
+                            expiryDate: DateFormatter.isoDate.string(from: expiryDate)
+                        )
+                    }
+                }
                 onSaved()
                 dismiss()
-            } catch {
+            } catch let saveError {
+                error = saveError.localizedDescription
                 isSaving = false
             }
         }
+    }
+
+    private var errorAlertIsPresented: Binding<Bool> {
+        Binding(
+            get: { error != nil },
+            set: { if !$0 { error = nil } }
+        )
     }
 }
 

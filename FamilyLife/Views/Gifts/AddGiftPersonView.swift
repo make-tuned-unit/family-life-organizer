@@ -1,9 +1,10 @@
 import SwiftUI
-import SwiftData
 
 struct AddGiftPersonView: View {
-    @Environment(\.modelContext) private var modelContext
+    @Environment(APIService.self) private var api
     @Environment(\.dismiss) private var dismiss
+
+    let onSaved: () async -> Void
 
     @State private var name = ""
     @State private var relationship = "other"
@@ -12,6 +13,7 @@ struct AddGiftPersonView: View {
     @State private var hasAnniversary = false
     @State private var anniversaryDate = Date()
     @State private var notes = ""
+    @State private var error: String?
 
     private let relationships = ["spouse", "child", "parent", "sibling", "friend", "other"]
 
@@ -50,14 +52,18 @@ struct AddGiftPersonView: View {
             .background { AmbientBackground(style: .gifts) }
             .navigationTitle("Add Person")
             .navigationBarTitleDisplayMode(.inline)
+            .alert("Couldn’t save person", isPresented: errorAlertIsPresented) {
+                Button("OK") { error = nil }
+            } message: {
+                Text(error ?? "An unexpected error occurred.")
+            }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
-                        save()
-                        dismiss()
+                        Task { await save() }
                     }
                     .disabled(name.isEmpty)
                 }
@@ -65,39 +71,30 @@ struct AddGiftPersonView: View {
         }
     }
 
-    private func save() {
-        let person = GiftPerson(
-            name: name,
-            relationship: relationship,
-            birthday: hasBirthday ? DateFormatter.monthDay.string(from: birthdayDate) : nil,
-            anniversary: hasAnniversary ? DateFormatter.monthDay.string(from: anniversaryDate) : nil,
-            notes: notes.isEmpty ? nil : notes
-        )
-        modelContext.insert(person)
+    private func save() async {
+        do {
+            try await api.addGiftPerson([
+                "name": name,
+                "relationship": relationship,
+                "birthday": hasBirthday ? DateFormatter.monthDay.string(from: birthdayDate) : NSNull(),
+                "anniversary": hasAnniversary ? DateFormatter.monthDay.string(from: anniversaryDate) : NSNull(),
+                "notes": notes.isEmpty ? NSNull() : notes
+            ])
+            await onSaved()
+            dismiss()
+        } catch is CancellationError {
+            // View dismissed — ignore
+            } catch {
+            self.error = error.localizedDescription
+        }
+    }
 
-        // Auto-create special events
-        if hasBirthday {
-            let event = SpecialEvent(
-                personID: person.id,
-                title: "\(name)'s Birthday",
-                date: DateFormatter.monthDay.string(from: birthdayDate),
-                eventType: "birthday"
-            )
-            modelContext.insert(event)
-        }
-        if hasAnniversary {
-            let event = SpecialEvent(
-                personID: person.id,
-                title: "Anniversary with \(name)",
-                date: DateFormatter.monthDay.string(from: anniversaryDate),
-                eventType: "anniversary"
-            )
-            modelContext.insert(event)
-        }
+    private var errorAlertIsPresented: Binding<Bool> {
+        Binding(get: { error != nil }, set: { if !$0 { error = nil } })
     }
 }
 
 #Preview {
-    AddGiftPersonView()
-        .modelContainer(for: [GiftPerson.self, SpecialEvent.self])
+    AddGiftPersonView(onSaved: {})
+        .environment(APIService())
 }

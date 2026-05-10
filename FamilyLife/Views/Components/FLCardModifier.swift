@@ -48,10 +48,10 @@ extension View {
                     .font(.headline)
                 Text("Use for non-tappable content areas. Glass refracts the ambient gradient behind it.")
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(WarmPalette.ink3)
             }
             .padding(DesignTokens.Spacing.cardPadding)
-            .flCard(tint: .teal)
+            .flCard(tint: TabAccent.home.color)
             .frame(maxWidth: .infinity)
 
             // Interactive card
@@ -63,10 +63,10 @@ extension View {
                         .font(.headline)
                     Text("Use for tappable rows. Adds scale and shimmer on press via .interactive().")
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(WarmPalette.ink3)
                 }
                 .padding(DesignTokens.Spacing.cardPadding)
-                .flCard(tint: .purple, interactive: true)
+                .flCard(tint: AccentTheme.mauve.color, interactive: true)
                 .frame(maxWidth: .infinity)
             }
             .buttonStyle(.plain)
@@ -77,7 +77,7 @@ extension View {
                     .font(.headline)
                 Text("Pass .clear for a neutral glass surface with no color tint.")
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(WarmPalette.ink3)
             }
             .padding(DesignTokens.Spacing.cardPadding)
             .flCard()
