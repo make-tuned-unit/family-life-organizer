@@ -12,6 +12,7 @@ struct AddReceiptView: View {
     @State private var notes = ""
     @State private var selectedPhoto: PhotosPickerItem?
     @State private var isSaving = false
+    @State private var error: String?
 
     private let categories = ["Groceries", "Dining Out", "Gas/Transport", "Household", "Health", "Entertainment", "Kids", "Other"]
 
@@ -21,7 +22,7 @@ struct AddReceiptView: View {
                 Section {
                     HStack {
                         Text("$")
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(WarmPalette.ink3)
                         TextField("0.00", text: $amount)
                             .keyboardType(.decimalPad)
                     }
@@ -50,6 +51,11 @@ struct AddReceiptView: View {
             .background { AmbientBackground(style: .expenses) }
             .navigationTitle("Add Receipt")
             .navigationBarTitleDisplayMode(.inline)
+            .alert("Couldn’t save receipt", isPresented: errorAlertIsPresented) {
+                Button("OK") { error = nil }
+            } message: {
+                Text(error ?? "An unexpected error occurred.")
+            }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
@@ -65,7 +71,10 @@ struct AddReceiptView: View {
     }
 
     private func save() {
-        guard let amountValue = Double(amount) else { return }
+        guard let amountValue = Double(amount) else {
+            error = "Enter a valid amount before saving."
+            return
+        }
         isSaving = true
 
         let body: [String: Any] = [
@@ -81,10 +90,20 @@ struct AddReceiptView: View {
             do {
                 try await api.addReceipt(body)
                 dismiss()
-            } catch {
+            } catch is CancellationError {
+                // View dismissed — ignore
+                } catch {
+                self.error = error.localizedDescription
                 isSaving = false
             }
         }
+    }
+
+    private var errorAlertIsPresented: Binding<Bool> {
+        Binding(
+            get: { error != nil },
+            set: { if !$0 { error = nil } }
+        )
     }
 }
 

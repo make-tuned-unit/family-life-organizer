@@ -111,3 +111,11 @@ extension DateFormatter {
         return f
     }()
 }
+
+extension ISO8601DateFormatter {
+    static let flexible: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter
+    }()
+}

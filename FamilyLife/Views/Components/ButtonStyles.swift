@@ -2,12 +2,12 @@ import SwiftUI
 
 // MARK: - FLPrimaryButtonStyle
 // Filled glass with tab tint color. Use for the main CTA in any form.
-// Usage: Button("Save") {}.buttonStyle(.flPrimary(tint: .teal))
+// Usage: Button("Save") {}.buttonStyle(.flPrimary(tint: TabAccent.home.color))
 // NOTE: ButtonStyle.makeBody uses .glassEffect() directly — ButtonStyle bodies
 //       cannot chain View extension modifiers via flCard() in the standard way.
 
 struct FLPrimaryButtonStyle: ButtonStyle {
-    var tint: Color = .teal
+    var tint: Color = TabAccent.home.color
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
@@ -81,7 +81,7 @@ extension ButtonStyle where Self == FLDestructiveButtonStyle {
 
         VStack(spacing: DesignTokens.Spacing.cardGap) {
             Button("Save Changes") {}
-                .buttonStyle(.flPrimary(tint: .teal))
+                .buttonStyle(.flPrimary(tint: TabAccent.home.color))
 
             Button("Cancel") {}
                 .buttonStyle(.flSecondary)

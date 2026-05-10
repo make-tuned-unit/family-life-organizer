@@ -130,7 +130,9 @@ struct RivalriesView: View {
                 nextEntries[rivalry.id] = try await api.fetchRivalryEntries(id: rivalry.id)
             }
             entriesByRivalry = nextEntries
-        } catch {
+        } catch is CancellationError {
+            // View dismissed — ignore
+            } catch {
             self.error = error.localizedDescription
         }
         isLoading = false

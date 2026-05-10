@@ -244,7 +244,9 @@ struct GiftsView: View {
             people = try await fetchedPeople
             events = try await fetchedEvents
             allIdeas = try await fetchedIdeas
-        } catch {
+        } catch is CancellationError {
+            // View dismissed — ignore
+            } catch {
             self.error = error.localizedDescription
         }
         isLoading = false
@@ -254,7 +256,9 @@ struct GiftsView: View {
         do {
             try await api.deleteSpecialEvent(id: id)
             await loadAll()
-        } catch {
+        } catch is CancellationError {
+            // View dismissed — ignore
+            } catch {
             self.error = error.localizedDescription
         }
     }

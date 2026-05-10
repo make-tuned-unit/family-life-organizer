@@ -39,7 +39,6 @@ final class BudgetProjectStore {
         do {
             projects = try await api.fetchProjects()
         } catch is CancellationError {
-            // Ignore — task was cancelled by view dismissal
         } catch {
             self.error = error.localizedDescription
         }
@@ -50,7 +49,9 @@ final class BudgetProjectStore {
         do {
             let _ = try await api.addProject(["name": name, "budget": budget])
             await loadAll(api: api)
-        } catch {
+        } catch is CancellationError {
+            // View dismissed — ignore
+            } catch {
             self.error = error.localizedDescription
         }
     }
@@ -59,7 +60,9 @@ final class BudgetProjectStore {
         do {
             let _ = try await api.addProjectExpense(projectId: projectID, expense: expense)
             await loadAll(api: api)
-        } catch {
+        } catch is CancellationError {
+            // View dismissed — ignore
+            } catch {
             self.error = error.localizedDescription
         }
     }
@@ -68,7 +71,9 @@ final class BudgetProjectStore {
         do {
             try await api.deleteProjectExpense(projectId: projectID, expenseId: expenseID)
             await loadAll(api: api)
-        } catch {
+        } catch is CancellationError {
+            // View dismissed — ignore
+            } catch {
             self.error = error.localizedDescription
         }
     }
@@ -77,7 +82,9 @@ final class BudgetProjectStore {
         do {
             try await api.deleteProject(id: projectID)
             await loadAll(api: api)
-        } catch {
+        } catch is CancellationError {
+            // View dismissed — ignore
+            } catch {
             self.error = error.localizedDescription
         }
     }
