@@ -327,6 +327,7 @@ struct FeedCard: View {
         case "decision": TabAccent.decisions.color
         case "event": TabAccent.calendar.color
         case "coverage": TabAccent.care.color
+        case "rivalry": AccentTheme.saffron.color
         case "post": AccentTheme.ocean.color
         default: WarmPalette.ink3
         }
@@ -337,6 +338,7 @@ struct FeedCard: View {
         case "decision": "Decision"
         case "event": "Event"
         case "coverage": "Coverage"
+        case "rivalry": "Challenge"
         case "post": "Post"
         default: "Update"
         }
