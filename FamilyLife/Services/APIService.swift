@@ -533,6 +533,10 @@ final class APIService {
         let _: SuccessResponse = try await delete("/api/feed/\(id)")
     }
 
+    func fetchFeedReactions(postId: Int) async throws -> [FeedReactionResponse] {
+        try await get("/api/feed/\(postId)/reactions")
+    }
+
     func addFeedReaction(postId: Int, type: String = "like") async throws {
         let _: SuccessResponse = try await post("/api/feed/\(postId)/reactions", body: ["reaction_type": type])
     }

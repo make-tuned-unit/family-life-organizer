@@ -84,6 +84,7 @@
 		AA000052 /* BudgetSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000052 /* BudgetSettingsView.swift */; };
 		AA000053 /* BudgetCategoryDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000053 /* BudgetCategoryDetailView.swift */; };
 		AA000054 /* NewPostView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000054 /* NewPostView.swift */; };
+		AA000055 /* FeedCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000055 /* FeedCardView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -164,6 +165,7 @@
 		BB000052 /* BudgetSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BudgetSettingsView.swift; sourceTree = "<group>"; };
 		BB000053 /* BudgetCategoryDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BudgetCategoryDetailView.swift; sourceTree = "<group>"; };
 		BB000054 /* NewPostView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewPostView.swift; sourceTree = "<group>"; };
+		BB000055 /* FeedCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedCardView.swift; sourceTree = "<group>"; };
 		CC000001 /* FamilyLife.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = FamilyLife.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -287,6 +289,7 @@
 				BB000043 /* MoreView.swift */,
 				BB000051 /* HouseholdView.swift */,
 				BB000054 /* NewPostView.swift */,
+				BB000055 /* FeedCardView.swift */,
 			);
 			path = Home;
 			sourceTree = "<group>";
@@ -568,6 +571,7 @@
 				AA000052 /* BudgetSettingsView.swift in Sources */,
 				AA000053 /* BudgetCategoryDetailView.swift in Sources */,
 				AA000054 /* NewPostView.swift in Sources */,
+				AA000055 /* FeedCardView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

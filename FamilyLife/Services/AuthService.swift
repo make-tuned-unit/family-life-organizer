@@ -60,7 +60,7 @@ final class AuthService {
         do {
             let (_, response) = try await URLSession.shared.data(from: url)
             if let http = response as? HTTPURLResponse, http.statusCode == 401 {
-                await MainActor.run { logout() }
+                logout()
             }
         } catch {}
     }
