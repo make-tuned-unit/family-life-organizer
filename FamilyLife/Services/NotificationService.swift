@@ -141,6 +141,98 @@ final class NotificationService {
         UNUserNotificationCenter.current().add(request)
     }
 
+    // MARK: - Social notifications (posts, comments, likes, mentions)
+
+    func notifyNewPost(author: String, preview: String) {
+        let content = UNMutableNotificationContent()
+        content.title = "\(author) shared a post"
+        content.body = String(preview.prefix(80))
+        content.sound = .default
+        content.categoryIdentifier = "SOCIAL"
+
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 1, repeats: false)
+        let request = UNNotificationRequest(identifier: "post-\(UUID().uuidString)", content: content, trigger: trigger)
+        UNUserNotificationCenter.current().add(request)
+    }
+
+    func notifyNewComment(author: String, onPost: String, comment: String) {
+        let content = UNMutableNotificationContent()
+        content.title = "\(author) commented"
+        content.body = String(comment.prefix(80))
+        content.sound = .default
+        content.categoryIdentifier = "SOCIAL"
+
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 1, repeats: false)
+        let request = UNNotificationRequest(identifier: "comment-\(UUID().uuidString)", content: content, trigger: trigger)
+        UNUserNotificationCenter.current().add(request)
+    }
+
+    func notifyNewLike(author: String, onPost: String) {
+        let content = UNMutableNotificationContent()
+        content.title = "\(author) liked your post"
+        content.body = String(onPost.prefix(60))
+        content.sound = .default
+        content.categoryIdentifier = "SOCIAL"
+
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 1, repeats: false)
+        let request = UNNotificationRequest(identifier: "like-\(UUID().uuidString)", content: content, trigger: trigger)
+        UNUserNotificationCenter.current().add(request)
+    }
+
+    func notifyMention(author: String, inPost: String) {
+        let content = UNMutableNotificationContent()
+        content.title = "\(author) mentioned you"
+        content.body = String(inPost.prefix(80))
+        content.sound = .default
+        content.categoryIdentifier = "SOCIAL"
+
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 1, repeats: false)
+        let request = UNNotificationRequest(identifier: "mention-\(UUID().uuidString)", content: content, trigger: trigger)
+        UNUserNotificationCenter.current().add(request)
+    }
+
+    func notifyNewDecision(author: String, title: String) {
+        let content = UNMutableNotificationContent()
+        content.title = "\(author) needs your input"
+        content.body = title
+        content.sound = .default
+        content.categoryIdentifier = "SOCIAL"
+
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 1, repeats: false)
+        let request = UNNotificationRequest(identifier: "decision-\(UUID().uuidString)", content: content, trigger: trigger)
+        UNUserNotificationCenter.current().add(request)
+    }
+
+    /// Check feed for new items since last check and fire notifications
+    func checkForNewFeedItems(_ items: [APIService.ActivityItem], currentUser: String) {
+        let lastSeenKey = "last_seen_feed_id"
+        let lastSeenId = UserDefaults.standard.string(forKey: lastSeenKey) ?? ""
+
+        var foundNew = false
+        for item in items {
+            guard item.id != lastSeenId else { break }
+            guard item.author?.localizedCaseInsensitiveCompare(currentUser) != .orderedSame else { continue }
+            foundNew = true
+
+            switch item.feed_type {
+            case "post":
+                notifyNewPost(author: item.author ?? "Someone", preview: item.body ?? item.title ?? "")
+                // Check for @mention
+                if let body = item.body, body.localizedStandardContains("@\(currentUser)") {
+                    notifyMention(author: item.author ?? "Someone", inPost: body)
+                }
+            case "decision":
+                notifyNewDecision(author: item.author ?? "Someone", title: item.title ?? "New decision")
+            default:
+                break
+            }
+        }
+
+        if let first = items.first {
+            UserDefaults.standard.set(first.id, forKey: lastSeenKey)
+        }
+    }
+
     // MARK: - Helpers
 
     private func parseDateTime(date: String, time: String?, minutesBefore: Int) -> Date? {
