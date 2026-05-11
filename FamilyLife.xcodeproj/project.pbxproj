@@ -82,6 +82,8 @@
 		AA000050 /* HouseholdService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000050 /* HouseholdService.swift */; };
 		AA000051 /* HouseholdView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000051 /* HouseholdView.swift */; };
 		AA000052 /* BudgetSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000052 /* BudgetSettingsView.swift */; };
+		AA000053 /* BudgetCategoryDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000053 /* BudgetCategoryDetailView.swift */; };
+		AA000054 /* NewPostView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000054 /* NewPostView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -160,6 +162,8 @@
 		BB000050 /* HouseholdService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HouseholdService.swift; sourceTree = "<group>"; };
 		BB000051 /* HouseholdView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HouseholdView.swift; sourceTree = "<group>"; };
 		BB000052 /* BudgetSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BudgetSettingsView.swift; sourceTree = "<group>"; };
+		BB000053 /* BudgetCategoryDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BudgetCategoryDetailView.swift; sourceTree = "<group>"; };
+		BB000054 /* NewPostView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewPostView.swift; sourceTree = "<group>"; };
 		CC000001 /* FamilyLife.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = FamilyLife.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -282,6 +286,7 @@
 				BB00001B /* AddTaskView.swift */,
 				BB000043 /* MoreView.swift */,
 				BB000051 /* HouseholdView.swift */,
+				BB000054 /* NewPostView.swift */,
 			);
 			path = Home;
 			sourceTree = "<group>";
@@ -308,6 +313,7 @@
 				BB00001D /* ReceiptScannerView.swift */,
 				BB00004C /* BudgetProjectsView.swift */,
 				BB000052 /* BudgetSettingsView.swift */,
+				BB000053 /* BudgetCategoryDetailView.swift */,
 			);
 			path = Expenses;
 			sourceTree = "<group>";
@@ -560,6 +566,8 @@
 				AA000050 /* HouseholdService.swift in Sources */,
 				AA000051 /* HouseholdView.swift in Sources */,
 				AA000052 /* BudgetSettingsView.swift in Sources */,
+				AA000053 /* BudgetCategoryDetailView.swift in Sources */,
+				AA000054 /* NewPostView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -572,7 +580,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 15;
+				CURRENT_PROJECT_VERSION = 18;
 				DEVELOPMENT_ASSET_PATHS = "";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -606,7 +614,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 15;
+				CURRENT_PROJECT_VERSION = 18;
 				DEVELOPMENT_ASSET_PATHS = "";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;

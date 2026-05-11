@@ -1458,7 +1458,7 @@ app.post('/api/receipts/scan', requireAuth, async (req, res) => {
 app.post('/api/receipts/save', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
-    const { merchant, date, total, category } = req.body;
+    const { merchant, date, total, category, notes } = req.body;
     const username = req.session.user?.username || 'jesse';
 
     // Normalize date to YYYY-MM-DD for strftime compatibility
@@ -1475,6 +1475,7 @@ app.post('/api/receipts/save', requireAuth, async (req, res) => {
       merchant,
       date: normalizedDate,
       category: category || 'Other',
+      notes: notes || null,
       processed_by: 'scan',
       added_by: username
     });

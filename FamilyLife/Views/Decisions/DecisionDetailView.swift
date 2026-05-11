@@ -17,6 +17,13 @@ struct DecisionDetailView: View {
         _currentDecision = State(initialValue: decision)
     }
 
+    private var isCurrentUserCreator: Bool {
+        let name = auth.currentUser?.username ?? ""
+        return currentDecision.creator_name.localizedCaseInsensitiveCompare(name) == .orderedSame
+            || currentDecision.creator_name.localizedCaseInsensitiveCompare(auth.currentUser?.name ?? "") == .orderedSame
+            || currentDecision.creator_name == "Me"
+    }
+
     private var myReaction: String? {
         reactions.first { $0.member_name == (auth.currentUser?.username ?? "Me") && $0.reaction_type != "vote" }?.reaction_type
     }
@@ -26,8 +33,11 @@ struct DecisionDetailView: View {
             VStack(alignment: .leading, spacing: 16) {
                 VStack(alignment: .leading, spacing: 8) {
                     HStack {
-                        Image(systemName: currentDecision.decisionType.icon)
-                            .foregroundStyle(TabAccent.home.color)
+                        if isCurrentUserCreator {
+                            ProfileAvatar(size: 24)
+                        } else {
+                            FamilyAvatar(initial: String(currentDecision.creator_name.prefix(1)).uppercased(), size: 24)
+                        }
                         Text(currentDecision.creator_name)
                             .font(.subheadline.weight(.semibold))
                         Spacer()

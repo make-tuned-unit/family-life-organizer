@@ -1,5 +1,6 @@
 import Foundation
 
+@MainActor
 @Observable
 final class PantryViewModel {
     var items: [PantryItemResponse] = []

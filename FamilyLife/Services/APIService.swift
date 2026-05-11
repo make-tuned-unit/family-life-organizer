@@ -173,13 +173,14 @@ final class APIService {
         return try await post("/api/receipts/scan", body: body)
     }
 
-    func saveScannedReceipt(result: ScanResult) async throws {
-        let body: [String: Any] = [
+    func saveScannedReceipt(result: ScanResult, notes: String? = nil) async throws {
+        var body: [String: Any] = [
             "merchant": result.merchant,
             "date": result.date,
             "total": result.total,
             "category": result.category
         ]
+        if let notes, !notes.isEmpty { body["notes"] = notes }
         let _: SuccessResponse = try await post("/api/receipts/save", body: body)
     }
 

@@ -219,16 +219,24 @@ struct ActiveTripCard: View {
 
 struct TripStatusHeader: View {
     let trip: TripResponse
+    @Environment(AuthService.self) private var auth
+
+    private var isCurrentUser: Bool {
+        trip.traveler.localizedCaseInsensitiveCompare(auth.currentUser?.name ?? "") == .orderedSame
+        || trip.traveler.localizedCaseInsensitiveCompare(auth.currentUser?.username ?? "") == .orderedSame
+    }
 
     var body: some View {
         HStack(alignment: .top) {
             VStack(alignment: .leading, spacing: 6) {
-                Label {
+                HStack(spacing: 8) {
+                    if isCurrentUser {
+                        ProfileAvatar(size: 28)
+                    } else {
+                        FamilyAvatar(initial: String(trip.traveler.prefix(1)).uppercased(), size: 28)
+                    }
                     Text("\(trip.traveler.capitalized) is on the way")
                         .font(.headline)
-                } icon: {
-                    Image(systemName: "car.fill")
-                        .foregroundStyle(TabAccent.home.color)
                 }
 
                 HStack(spacing: 8) {

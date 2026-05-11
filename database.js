@@ -19,9 +19,23 @@ if (!fs.existsSync(DB_DIR)) {
   fs.mkdirSync(DB_DIR, { recursive: true });
 }
 
+// Shared connection for concurrent access
+let _sharedDb = null;
+
+function getSharedDb() {
+  if (!_sharedDb) {
+    _sharedDb = new sqlite3.Database(DB_PATH);
+    _sharedDb.configure('busyTimeout', 10000);
+    _sharedDb.run('PRAGMA journal_mode = WAL');
+    _sharedDb.run('PRAGMA synchronous = NORMAL');
+  }
+  return _sharedDb;
+}
+
 class FamilyDB {
   constructor() {
-    this.db = new sqlite3.Database(DB_PATH);
+    this.db = getSharedDb();
+    this._ownsConnection = false;
   }
 
   parseJSONList(value) {
@@ -40,22 +54,21 @@ class FamilyDB {
         path.join(__dirname, 'schema.sql'),
         'utf8'
       );
-      this.db.exec(schema, (err) => {
-        if (err) {
-          console.error('Schema init error:', err.message);
-        }
-        // Deduplicate budget_categories (keep lowest id per name)
+      this.db.serialize(() => {
+        this.db.exec(schema, (err) => {
+          if (err) console.error('Schema init error:', err.message);
+        });
+        // One-time dedup then add unique index
         this.db.run(`
           DELETE FROM budget_categories WHERE id NOT IN (
             SELECT MIN(id) FROM budget_categories GROUP BY name
           )
-        `, (err2) => {
-          if (err2) console.error('Dedup error:', err2.message);
-          // Add UNIQUE index if missing (for databases created before the constraint)
-          this.db.run('CREATE UNIQUE INDEX IF NOT EXISTS idx_budget_cat_name ON budget_categories(name)', (err3) => {
-            if (err3) console.error('Index error:', err3.message);
-            resolve();
-          });
+        `, (err) => {
+          if (err) console.error('Dedup error:', err.message);
+        });
+        this.db.run('CREATE UNIQUE INDEX IF NOT EXISTS idx_budget_cat_name ON budget_categories(name)', (err) => {
+          if (err) console.error('Index error:', err.message);
+          resolve();
         });
       });
     });
@@ -1566,7 +1579,7 @@ class FamilyDB {
   }
 
   close() {
-    this.db.close();
+    // No-op: using shared connection for WAL mode concurrency
   }
 }
 

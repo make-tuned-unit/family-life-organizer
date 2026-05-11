@@ -1,10 +1,13 @@
 import Foundation
+import UIKit
 
+@MainActor
 @Observable
 final class AuthService {
     var isAuthenticated = false
     var currentUser: UserProfile?
     var needsOnboarding = false
+    var profileImageData: Data?
 
     struct UserProfile {
         let id: Int?
@@ -22,6 +25,33 @@ final class AuthService {
             currentUser = UserProfile(id: id > 0 ? id : nil, username: username, name: name, avatar: "")
             isAuthenticated = true
         }
+        profileImageData = Self.loadProfileImageFromDisk()
+    }
+
+    func setProfileImage(_ data: Data) {
+        // Compress to JPEG and save to disk (not UserDefaults)
+        let compressed = UIImage(data: data)?.jpegData(compressionQuality: 0.6) ?? data
+        profileImageData = compressed
+        try? compressed.write(to: Self.profileImageURL)
+        // Remove legacy UserDefaults entry
+        UserDefaults.standard.removeObject(forKey: "profile_image")
+    }
+
+    private static var profileImageURL: URL {
+        FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("profile_image.jpg")
+    }
+
+    private static func loadProfileImageFromDisk() -> Data? {
+        // Try disk first, fall back to legacy UserDefaults
+        if let data = try? Data(contentsOf: profileImageURL) { return data }
+        if let legacy = UserDefaults.standard.data(forKey: "profile_image") {
+            // Migrate to disk
+            try? legacy.write(to: profileImageURL)
+            UserDefaults.standard.removeObject(forKey: "profile_image")
+            return legacy
+        }
+        return nil
     }
 
     func validateSession() async {

@@ -6,6 +6,9 @@ struct HomeView: View {
     @Environment(AuthService.self) private var auth
     @State private var viewModel = HomeViewModel()
     @State private var showingAddTask = false
+    @State private var showingNewDecision = false
+    @State private var showingNewEvent = false
+    @State private var showingNewPost = false
     @State private var showingSettings = false
     @State private var todaySteps: Int?
     @State private var activityFeed: [APIService.ActivityItem] = []
@@ -46,12 +49,24 @@ struct HomeView: View {
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
                 Button { showingSettings = true } label: {
-                    Image(systemName: "gearshape")
-                        .foregroundStyle(WarmPalette.ink2)
+                    ProfileAvatar(size: 30)
                 }
             }
             ToolbarItem(placement: .topBarTrailing) {
-                Button { showingAddTask = true } label: {
+                Menu {
+                    Button { showingNewPost = true } label: {
+                        Label("New Post", systemImage: "text.bubble")
+                    }
+                    Button { showingNewDecision = true } label: {
+                        Label("New Decision", systemImage: "bubble.left.and.bubble.right")
+                    }
+                    Button { showingAddTask = true } label: {
+                        Label("New Task", systemImage: "checkmark.circle")
+                    }
+                    Button { showingNewEvent = true } label: {
+                        Label("New Event", systemImage: "calendar.badge.plus")
+                    }
+                } label: {
                     Image(systemName: "plus")
                         .foregroundStyle(WarmPalette.ink2)
                 }
@@ -59,6 +74,25 @@ struct HomeView: View {
         }
         .sheet(isPresented: $showingAddTask) {
             AddTaskView { task in Task { await viewModel.addTask(task, api: api) } }
+        }
+        .sheet(isPresented: $showingNewDecision) {
+            NewDecisionView {
+                await viewModel.loadAll(api: api)
+                do { activityFeed = try await api.fetchActivity() } catch {}
+            }
+        }
+        .sheet(isPresented: $showingNewEvent) {
+            AddAppointmentView { data in
+                Task {
+                    try? await api.addAppointment(data)
+                    await viewModel.loadAll(api: api)
+                }
+            }
+        }
+        .sheet(isPresented: $showingNewPost) {
+            NewPostView {
+                do { activityFeed = try await api.fetchActivity() } catch {}
+            }
         }
         .sheet(isPresented: $showingSettings) { NavigationStack { SettingsView(showsDismissButton: true) } }
         .sheet(item: $selectedFeedEvent) { appt in

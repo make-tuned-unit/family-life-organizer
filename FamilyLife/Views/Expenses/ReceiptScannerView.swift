@@ -310,8 +310,14 @@ struct ReceiptScannerView: View {
                     Task.detached { await onProjectExpenseSaved?() }
                     return
                 } else {
-                    // Save as budget receipt
-                    try await api.saveScannedReceipt(result: result)
+                    // Save as budget receipt with item breakdown in notes
+                    let itemDetail = result.items.map { item in
+                        if let price = item.price {
+                            return "\(item.name) — $\(String(format: "%.2f", price))"
+                        }
+                        return item.name
+                    }.joined(separator: "\n")
+                    try await api.saveScannedReceipt(result: result, notes: itemDetail)
                 }
                 dismiss()
             } catch {
