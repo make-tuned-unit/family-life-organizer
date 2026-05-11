@@ -203,26 +203,68 @@ final class NotificationService {
         UNUserNotificationCenter.current().add(request)
     }
 
+    func notifyNewRivalry(author: String, title: String) {
+        let content = UNMutableNotificationContent()
+        content.title = "\(author) challenged you"
+        content.body = title
+        content.sound = .default
+        content.categoryIdentifier = "SOCIAL"
+
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 1, repeats: false)
+        let request = UNNotificationRequest(identifier: "rivalry-\(UUID().uuidString)", content: content, trigger: trigger)
+        UNUserNotificationCenter.current().add(request)
+    }
+
+    func notifyNewEvent(author: String, title: String) {
+        let content = UNMutableNotificationContent()
+        content.title = "New event"
+        content.body = title
+        content.sound = .default
+        content.categoryIdentifier = "CALENDAR"
+
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 1, repeats: false)
+        let request = UNNotificationRequest(identifier: "event-new-\(UUID().uuidString)", content: content, trigger: trigger)
+        UNUserNotificationCenter.current().add(request)
+    }
+
+    func notifyCoverageRequest(author: String, reason: String) {
+        let content = UNMutableNotificationContent()
+        content.title = "\(author) needs coverage"
+        content.body = reason
+        content.sound = .default
+        content.categoryIdentifier = "COVERAGE"
+
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 1, repeats: false)
+        let request = UNNotificationRequest(identifier: "coverage-new-\(UUID().uuidString)", content: content, trigger: trigger)
+        UNUserNotificationCenter.current().add(request)
+    }
+
     /// Check feed for new items since last check and fire notifications
     func checkForNewFeedItems(_ items: [APIService.ActivityItem], currentUser: String) {
         let lastSeenKey = "last_seen_feed_id"
         let lastSeenId = UserDefaults.standard.string(forKey: lastSeenKey) ?? ""
 
-        var foundNew = false
         for item in items {
             guard item.id != lastSeenId else { break }
+            // Skip own actions
             guard item.author?.localizedCaseInsensitiveCompare(currentUser) != .orderedSame else { continue }
-            foundNew = true
+
+            let author = item.author ?? "Someone"
 
             switch item.feed_type {
             case "post":
-                notifyNewPost(author: item.author ?? "Someone", preview: item.body ?? item.title ?? "")
-                // Check for @mention
+                notifyNewPost(author: author, preview: item.body ?? item.title ?? "")
                 if let body = item.body, body.localizedStandardContains("@\(currentUser)") {
-                    notifyMention(author: item.author ?? "Someone", inPost: body)
+                    notifyMention(author: author, inPost: body)
                 }
             case "decision":
-                notifyNewDecision(author: item.author ?? "Someone", title: item.title ?? "New decision")
+                notifyNewDecision(author: author, title: item.title ?? "New decision")
+            case "rivalry":
+                notifyNewRivalry(author: author, title: item.title ?? "New challenge")
+            case "event":
+                notifyNewEvent(author: author, title: item.title ?? "New event")
+            case "coverage":
+                notifyCoverageRequest(author: author, reason: item.title ?? "Coverage needed")
             default:
                 break
             }
