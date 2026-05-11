@@ -225,18 +225,28 @@ struct DecisionsView: View {
 
 struct DecisionCard: View {
     @Environment(APIService.self) private var api
+    @Environment(AuthService.self) private var auth
     let decision: DecisionResponse
 
     @State private var reactions: [DecisionReactionResponse] = []
     @State private var comments: [DecisionCommentResponse] = []
 
+    private var isCurrentUserCreator: Bool {
+        let name = auth.currentUser?.username ?? ""
+        return decision.creator_name.localizedCaseInsensitiveCompare(name) == .orderedSame
+            || decision.creator_name.localizedCaseInsensitiveCompare(auth.currentUser?.name ?? "") == .orderedSame
+            || decision.creator_name == "Me"
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             // Meta row
             HStack(spacing: 8) {
-                Image(systemName: decision.decisionType.icon)
-                    .font(.system(size: 14))
-                    .foregroundStyle(TabAccent.decisions.color)
+                if isCurrentUserCreator {
+                    ProfileAvatar(size: 22)
+                } else {
+                    FamilyAvatar(initial: String(decision.creator_name.prefix(1)).uppercased(), size: 22)
+                }
                 Text(decision.creator_name)
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(WarmPalette.ink1)

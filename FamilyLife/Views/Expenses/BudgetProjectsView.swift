@@ -27,6 +27,7 @@ struct ProjectExpenseResponse: Codable, Identifiable {
 
 // MARK: - Storage (API-backed, shared between family members)
 
+@MainActor
 @Observable
 final class BudgetProjectStore {
     var projects: [ProjectResponse] = []

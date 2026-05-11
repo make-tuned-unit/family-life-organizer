@@ -42,6 +42,29 @@ struct FamilyAvatar: View {
     }
 }
 
+// MARK: - Profile Avatar (current user's photo or initial fallback)
+
+struct ProfileAvatar: View {
+    @Environment(AuthService.self) private var auth
+    var size: CGFloat = 32
+
+    var body: some View {
+        if let data = auth.profileImageData, let uiImage = UIImage(data: data) {
+            Image(uiImage: uiImage)
+                .resizable()
+                .scaledToFill()
+                .frame(width: size, height: size)
+                .clipShape(Circle())
+                .overlay(Circle().stroke(.white.opacity(0.7), lineWidth: 1.5))
+        } else {
+            FamilyAvatar(
+                initial: String(auth.currentUser?.name.prefix(1) ?? "?").uppercased(),
+                size: size
+            )
+        }
+    }
+}
+
 // MARK: - Presence Chip
 
 struct PresenceChip: View {
