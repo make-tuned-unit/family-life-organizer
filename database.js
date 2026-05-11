@@ -1309,6 +1309,11 @@ class FamilyDB {
         JOIN users u ON u.id = cr.requester_id
         WHERE cr.status IN ('pending', 'approved')
         UNION ALL
+        SELECT 'rivalry' as feed_type, id as ref_id, title, challenge_type as body,
+          initiator_name as author, status,
+          created_at
+        FROM rivalries WHERE status = 'active' AND created_at >= datetime('now', '-14 days')
+        UNION ALL
         SELECT 'post' as feed_type, fp.id as ref_id, fp.title, fp.body,
           u.name as author, fp.post_type as status,
           fp.created_at
