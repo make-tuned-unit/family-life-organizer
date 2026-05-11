@@ -59,7 +59,7 @@ struct FloatingTabBar: View {
     @Binding var selectedTab: MainTab
 
     var body: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: 0) {
             ForEach(MainTab.allCases, id: \.self) { tab in
                 Button {
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
@@ -69,11 +69,13 @@ struct FloatingTabBar: View {
                     Image(systemName: tab.icon)
                         .font(.system(size: 20, weight: .medium))
                         .foregroundStyle(selectedTab == tab ? accentColor(for: tab) : WarmPalette.ink3)
-                        .frame(width: 56, height: 56)
+                        .frame(maxWidth: .infinity, minHeight: 52)
+                        .contentShape(Rectangle())
                         .background {
                             if selectedTab == tab {
                                 Circle()
                                     .fill(.clear)
+                                    .frame(width: 48, height: 48)
                                     .glassEffect(.regular.tint(accentColor(for: tab).opacity(0.2)), in: .circle)
                                     .shadow(color: accentColor(for: tab).opacity(0.25), radius: 8, y: 2)
                             }
@@ -82,11 +84,13 @@ struct FloatingTabBar: View {
                 .buttonStyle(.plain)
             }
         }
-        .padding(8)
-        .glassEffect(.regular.tint(WarmPalette.ink1.opacity(0.06)), in: .capsule)
+        .padding(.horizontal, 6)
+        .padding(.vertical, 6)
+        .glassEffect(.regular.tint(WarmPalette.ink1.opacity(0.08)), in: .capsule)
         .shadow(color: .white.opacity(0.6), radius: 0.5, y: -0.5)
         .shadow(color: Color(hex: "#501e0a").opacity(0.3), radius: 18, y: 8)
         .shadow(color: Color(hex: "#501e0a").opacity(0.2), radius: 5, y: 2)
+        .padding(.horizontal, 16)
         .padding(.bottom, 22)
     }
 
@@ -105,4 +109,5 @@ struct FloatingTabBar: View {
     ContentView()
         .environment(AuthService())
         .environment(APIService())
+        .environment(HouseholdService())
 }

@@ -47,6 +47,17 @@ struct DecisionDetailView: View {
                             .foregroundStyle(WarmPalette.ink3)
                     }
 
+                    if let photoData = currentDecision.photo_data,
+                       let data = Data(base64Encoded: photoData),
+                       let uiImage = UIImage(data: data) {
+                        Image(uiImage: uiImage)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(maxHeight: 300)
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                            .frame(maxWidth: .infinity)
+                    }
+
                     if let url = currentDecision.link_url, !url.isEmpty, let parsedURL = URL(string: url) {
                         Link(destination: parsedURL) {
                             HStack {
@@ -193,9 +204,8 @@ struct DecisionDetailView: View {
             async let fetchedComments = api.fetchDecisionComments(id: currentDecision.id)
             reactions = try await fetchedReactions
             comments = try await fetchedComments
-        } catch is CancellationError {
-            // View dismissed — ignore
-            } catch {
+        } catch {
+            guard !error.isCancellation else { return }
             self.error = error.localizedDescription
         }
     }
@@ -207,9 +217,8 @@ struct DecisionDetailView: View {
                 "reaction_type": type
             ])
             await reload()
-        } catch is CancellationError {
-            // View dismissed — ignore
-            } catch {
+        } catch {
+            guard !error.isCancellation else { return }
             self.error = error.localizedDescription
         }
     }
@@ -222,9 +231,8 @@ struct DecisionDetailView: View {
                 "poll_choice": option
             ])
             await reload()
-        } catch is CancellationError {
-            // View dismissed — ignore
-            } catch {
+        } catch {
+            guard !error.isCancellation else { return }
             self.error = error.localizedDescription
         }
     }
@@ -237,9 +245,8 @@ struct DecisionDetailView: View {
             ])
             newComment = ""
             await reload()
-        } catch is CancellationError {
-            // View dismissed — ignore
-            } catch {
+        } catch {
+            guard !error.isCancellation else { return }
             self.error = error.localizedDescription
         }
     }
@@ -262,9 +269,8 @@ struct DecisionDetailView: View {
                 created_at: currentDecision.created_at,
                 expires_at: currentDecision.expires_at
             )
-        } catch is CancellationError {
-            // View dismissed — ignore
-            } catch {
+        } catch {
+            guard !error.isCancellation else { return }
             self.error = error.localizedDescription
         }
     }

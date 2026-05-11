@@ -62,7 +62,9 @@ struct FamilyListsView: View {
             if let sel = selectedList {
                 selectedList = lists.first { $0.id == sel.id } ?? lists.first
             }
-        } catch {}
+        } catch {
+            guard !error.isCancellation else { return }
+        }
         isLoading = false
     }
 
@@ -235,7 +237,11 @@ struct ListDetailSection: View {
 
     private func loadItems() async {
         isLoading = true
-        do { items = try await api.fetchListItems(listId: list.id) } catch {}
+        do {
+            items = try await api.fetchListItems(listId: list.id)
+        } catch {
+            guard !error.isCancellation else { return }
+        }
         isLoading = false
     }
 
@@ -247,7 +253,9 @@ struct ListDetailSection: View {
             do {
                 let _ = try await api.addListItem(listId: list.id, title: title)
                 await loadItems()
-            } catch {}
+            } catch {
+                guard !error.isCancellation else { return }
+            }
         }
     }
 
@@ -255,14 +263,18 @@ struct ListDetailSection: View {
         do {
             try await api.toggleListItem(id: id)
             await loadItems()
-        } catch {}
+        } catch {
+            guard !error.isCancellation else { return }
+        }
     }
 
     private func deleteItem(_ id: Int) async {
         do {
             try await api.deleteListItem(id: id)
             items.removeAll { $0.id == id }
-        } catch {}
+        } catch {
+            guard !error.isCancellation else { return }
+        }
     }
 }
 

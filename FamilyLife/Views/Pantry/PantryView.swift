@@ -199,7 +199,7 @@ struct PantryView: View {
             guard let expiry = item.expiry_date,
                   let date = DateFormatter.isoDate.date(from: expiry) else { return false }
             let days = Calendar.current.dateComponents([.day], from: Date(), to: date).day ?? 999
-            return days >= 0 && days <= 3
+            return days <= 3 // includes expired (negative days)
         }.count
     }
 
@@ -208,7 +208,7 @@ struct PantryView: View {
             guard let expiry = item.expiry_date,
                   let date = DateFormatter.isoDate.date(from: expiry) else { return false }
             let days = Calendar.current.dateComponents([.day], from: Date(), to: date).day ?? 999
-            return days >= 0 && days <= 5
+            return days <= 5 // includes expired (negative days)
         }.sorted { item1, item2 in
             let d1 = DateFormatter.isoDate.date(from: item1.expiry_date ?? "") ?? .distantFuture
             let d2 = DateFormatter.isoDate.date(from: item2.expiry_date ?? "") ?? .distantFuture
@@ -233,9 +233,9 @@ struct ExpiringItemCard: View {
             Text(item.item)
                 .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(WarmPalette.ink1)
-            Text(daysLeft <= 1 ? "Tomorrow" : "\(daysLeft) days")
+            Text(daysLeft < 0 ? "Expired" : daysLeft == 0 ? "Today" : daysLeft == 1 ? "Tomorrow" : "\(daysLeft) days")
                 .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(daysLeft <= 1 ? WarmPalette.bad : WarmPalette.warn)
+                .foregroundStyle(daysLeft <= 0 ? WarmPalette.bad : daysLeft <= 1 ? WarmPalette.warn : WarmPalette.warn)
             Text(item.location?.capitalized ?? "")
                 .font(.system(size: 11))
                 .foregroundStyle(WarmPalette.ink3)
@@ -259,9 +259,14 @@ struct PantryItemTile: View {
         return Calendar.current.dateComponents([.day], from: Date(), to: date).day
     }
 
+    private var isExpired: Bool {
+        guard let days = daysUntilExpiry else { return false }
+        return days < 0
+    }
+
     private var isExpiringSoon: Bool {
         guard let days = daysUntilExpiry else { return false }
-        return days >= 0 && days <= 3
+        return days <= 3 // includes expired
     }
 
     var body: some View {
@@ -286,13 +291,13 @@ struct PantryItemTile: View {
                 let display = expiryDisplay(expiry)
                 HStack(spacing: 2) {
                     if isExpiringSoon {
-                        Image(systemName: "exclamationmark.triangle.fill")
+                        Image(systemName: isExpired ? "xmark.circle.fill" : "exclamationmark.triangle.fill")
                             .font(.system(size: 9))
                     }
-                    Text("Exp \u{00B7} \(display)")
+                    Text(isExpired ? "Expired" : "Exp \u{00B7} \(display)")
                 }
                 .font(.system(size: 11, weight: isExpiringSoon ? .semibold : .regular))
-                .foregroundStyle(isExpiringSoon ? WarmPalette.bad : WarmPalette.ink3)
+                .foregroundStyle(isExpired ? WarmPalette.bad.opacity(0.8) : (isExpiringSoon ? WarmPalette.bad : WarmPalette.ink3))
                 .padding(.top, 6)
             }
         }

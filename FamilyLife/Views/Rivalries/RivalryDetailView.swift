@@ -17,11 +17,11 @@ struct RivalryDetailView: View {
     }
 
     private var initiatorTotal: Double {
-        entries.filter { $0.member_name == currentRivalry.initiator_name }.reduce(0) { $0 + $1.value }
+        entries.filter { $0.member_name.localizedCaseInsensitiveCompare(currentRivalry.initiator_name) == .orderedSame }.reduce(0) { $0 + $1.value }
     }
 
     private var opponentTotal: Double {
-        entries.filter { $0.member_name == currentRivalry.opponent_name }.reduce(0) { $0 + $1.value }
+        entries.filter { $0.member_name.localizedCaseInsensitiveCompare(currentRivalry.opponent_name) == .orderedSame }.reduce(0) { $0 + $1.value }
     }
 
     private var isExpired: Bool {
@@ -143,9 +143,8 @@ struct RivalryDetailView: View {
     private func loadEntries() async {
         do {
             entries = try await api.fetchRivalryEntries(id: currentRivalry.id)
-        } catch is CancellationError {
-            // View dismissed — ignore
-            } catch {
+        } catch {
+            guard !error.isCancellation else { return }
             self.error = error.localizedDescription
         }
     }
@@ -179,9 +178,8 @@ struct RivalryDetailView: View {
                 winner_name: winnerName,
                 created_at: currentRivalry.created_at
             )
-        } catch is CancellationError {
-            // View dismissed — ignore
-            } catch {
+        } catch {
+            guard !error.isCancellation else { return }
             self.error = error.localizedDescription
         }
     }

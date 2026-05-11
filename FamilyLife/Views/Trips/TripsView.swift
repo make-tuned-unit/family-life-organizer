@@ -252,10 +252,10 @@ struct TripStatusHeader: View {
 
             if let eta = trip.eta_minutes {
                 VStack(spacing: 2) {
-                    Text("\(eta)")
+                    Text("\(max(0, eta))")
                         .font(.title.bold())
-                        .foregroundStyle(TabAccent.home.color)
-                    Text("min")
+                        .foregroundStyle(eta <= 0 ? WarmPalette.good : TabAccent.home.color)
+                    Text(eta <= 0 ? "arrived" : "min")
                         .font(.caption)
                         .foregroundStyle(WarmPalette.ink3)
                 }
@@ -449,8 +449,8 @@ struct TripLiveMapView: View {
 
         let request = MKDirections.Request()
         request.transportType = .automobile
-        request.source = MKMapItem(placemark: .init(coordinate: currentCoordinate))
-        request.destination = MKMapItem(placemark: .init(coordinate: destinationCoordinate))
+        request.source = MKMapItem(location: .init(latitude: currentCoordinate.latitude, longitude: currentCoordinate.longitude), address: nil)
+        request.destination = MKMapItem(location: .init(latitude: destinationCoordinate.latitude, longitude: destinationCoordinate.longitude), address: nil)
 
         do {
             let response = try await MKDirections(request: request).calculate()
@@ -546,4 +546,5 @@ private extension TripResponse {
     }
     .environment(APIService())
     .environment(AuthService())
+    .environment(HouseholdService())
 }

@@ -43,9 +43,20 @@ class FamilyDB {
       this.db.exec(schema, (err) => {
         if (err) {
           console.error('Schema init error:', err.message);
-          // Don't reject — partial success is OK (tables may already exist)
         }
-        resolve();
+        // Deduplicate budget_categories (keep lowest id per name)
+        this.db.run(`
+          DELETE FROM budget_categories WHERE id NOT IN (
+            SELECT MIN(id) FROM budget_categories GROUP BY name
+          )
+        `, (err2) => {
+          if (err2) console.error('Dedup error:', err2.message);
+          // Add UNIQUE index if missing (for databases created before the constraint)
+          this.db.run('CREATE UNIQUE INDEX IF NOT EXISTS idx_budget_cat_name ON budget_categories(name)', (err3) => {
+            if (err3) console.error('Index error:', err3.message);
+            resolve();
+          });
+        });
       });
     });
   }
@@ -82,7 +93,7 @@ class FamilyDB {
       const params = [];
 
       if (filters.category) {
-        sql += ' AND category = ?';
+        sql += ' AND LOWER(category) = LOWER(?)';
         params.push(filters.category);
       }
       if (filters.status) {
@@ -284,7 +295,7 @@ class FamilyDB {
         params.push(filters.month);
       }
       if (filters.category) {
-        sql += ' AND category = ?';
+        sql += ' AND LOWER(category) = LOWER(?)';
         params.push(filters.category);
       }
 
@@ -309,19 +320,79 @@ class FamilyDB {
   getBudgetSummary(month) {
     return new Promise((resolve, reject) => {
       const sql = `
-        SELECT 
+        SELECT
           c.name as category,
           c.monthly_limit,
           c.color,
           COALESCE(SUM(r.amount), 0) as spent
         FROM budget_categories c
-        LEFT JOIN receipts r ON c.name = r.category AND strftime('%Y-%m', r.date) = ?
+        LEFT JOIN receipts r ON LOWER(c.name) = LOWER(r.category) AND strftime('%Y-%m', r.date) = ?
         GROUP BY c.name
         ORDER BY c.name
       `;
       this.db.all(sql, [month], (err, rows) => {
         if (err) reject(err);
         else resolve(rows);
+      });
+    });
+  }
+
+  getBudgetCategories() {
+    return new Promise((resolve, reject) => {
+      this.db.all('SELECT * FROM budget_categories ORDER BY name', (err, rows) => {
+        if (err) reject(err);
+        else resolve(rows);
+      });
+    });
+  }
+
+  addBudgetCategory(name, monthlyLimit, color) {
+    return new Promise((resolve, reject) => {
+      this.db.run(
+        'INSERT INTO budget_categories (name, monthly_limit, color) VALUES (?, ?, ?)',
+        [name, monthlyLimit || null, color || null],
+        function(err) {
+          if (err) reject(err);
+          else resolve({ id: this.lastID });
+        }
+      );
+    });
+  }
+
+  updateBudgetCategory(id, data) {
+    return new Promise((resolve, reject) => {
+      const fields = [];
+      const values = [];
+      if (data.name !== undefined) { fields.push('name = ?'); values.push(data.name); }
+      if (data.monthly_limit !== undefined) { fields.push('monthly_limit = ?'); values.push(data.monthly_limit); }
+      if (data.color !== undefined) { fields.push('color = ?'); values.push(data.color); }
+      if (fields.length === 0) return resolve();
+      values.push(id);
+      this.db.run(`UPDATE budget_categories SET ${fields.join(', ')} WHERE id = ?`, values, (err) => {
+        if (err) reject(err);
+        else resolve();
+      });
+    });
+  }
+
+  deleteBudgetCategory(id) {
+    return new Promise((resolve, reject) => {
+      this.db.run('DELETE FROM budget_categories WHERE id = ?', [id], (err) => {
+        if (err) reject(err);
+        else resolve();
+      });
+    });
+  }
+
+  ensureBudgetCategory(name) {
+    return new Promise((resolve, reject) => {
+      this.db.get('SELECT id FROM budget_categories WHERE LOWER(name) = LOWER(?)', [name], (err, row) => {
+        if (err) return reject(err);
+        if (row) return resolve(row.id);
+        this.db.run('INSERT INTO budget_categories (name) VALUES (?)', [name], function(err2) {
+          if (err2) reject(err2);
+          else resolve(this.lastID);
+        });
       });
     });
   }
@@ -344,8 +415,8 @@ class FamilyDB {
     return new Promise((resolve, reject) => {
       let sql = 'SELECT * FROM pantry WHERE 1=1';
       const params = [];
-      if (filters.location) { sql += ' AND location = ?'; params.push(filters.location); }
-      if (filters.category) { sql += ' AND category = ?'; params.push(filters.category); }
+      if (filters.location) { sql += ' AND LOWER(location) = LOWER(?)'; params.push(filters.location); }
+      if (filters.category) { sql += ' AND LOWER(category) = LOWER(?)'; params.push(filters.category); }
       sql += ' ORDER BY category, item';
       this.db.all(sql, params, (err, rows) => {
         if (err) reject(err);

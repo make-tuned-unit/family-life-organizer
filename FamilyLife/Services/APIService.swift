@@ -127,6 +127,29 @@ final class APIService {
         try await get("/api/budget/\(month)")
     }
 
+    struct BudgetCategoryResponse: Codable, Identifiable {
+        let id: Int
+        var name: String
+        var monthly_limit: Double?
+        var color: String?
+    }
+
+    func fetchBudgetCategories() async throws -> [BudgetCategoryResponse] {
+        try await get("/api/budget-categories")
+    }
+
+    func addBudgetCategory(_ data: [String: Any]) async throws {
+        let _: SuccessResponse = try await post("/api/budget-categories", body: data)
+    }
+
+    func updateBudgetCategory(id: Int, data: [String: Any]) async throws {
+        let _: SuccessResponse = try await put("/api/budget-categories/\(id)", body: data)
+    }
+
+    func deleteBudgetCategory(id: Int) async throws {
+        let _: SuccessResponse = try await delete("/api/budget-categories/\(id)")
+    }
+
     // MARK: - Receipts
 
     func fetchReceipts(month: String? = nil, category: String? = nil) async throws -> [ReceiptResponse] {
@@ -150,20 +173,12 @@ final class APIService {
         return try await post("/api/receipts/scan", body: body)
     }
 
-    func saveScannedReceipt(result: ScanResult, addToPantry: Bool) async throws {
-        let items = result.items.map { item -> [String: Any] in
-            var d: [String: Any] = ["name": item.name]
-            if let price = item.price { d["price"] = price }
-            if let qty = item.quantity { d["quantity"] = qty }
-            return d
-        }
+    func saveScannedReceipt(result: ScanResult) async throws {
         let body: [String: Any] = [
             "merchant": result.merchant,
             "date": result.date,
             "total": result.total,
-            "category": result.category,
-            "items": items,
-            "add_to_pantry": addToPantry
+            "category": result.category
         ]
         let _: SuccessResponse = try await post("/api/receipts/save", body: body)
     }
@@ -809,5 +824,12 @@ enum APIError: LocalizedError {
         case .unauthorized: "Please sign in again"
         case .serverError(let code): "Server error (\(code))"
         }
+    }
+}
+
+extension Error {
+    /// True for both Swift CancellationError and URLSession cancellation
+    var isCancellation: Bool {
+        self is CancellationError || (self as? URLError)?.code == .cancelled
     }
 }

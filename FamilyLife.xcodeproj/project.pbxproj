@@ -79,6 +79,9 @@
 		AA00004D /* SignUpView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00004D /* SignUpView.swift */; };
 		AA00004E /* FamilyGroupsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00004E /* FamilyGroupsView.swift */; };
 		AA00004F /* EventDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00004F /* EventDetailView.swift */; };
+		AA000050 /* HouseholdService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000050 /* HouseholdService.swift */; };
+		AA000051 /* HouseholdView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000051 /* HouseholdView.swift */; };
+		AA000052 /* BudgetSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000052 /* BudgetSettingsView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -154,6 +157,9 @@
 		BB00004D /* SignUpView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignUpView.swift; sourceTree = "<group>"; };
 		BB00004E /* FamilyGroupsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FamilyGroupsView.swift; sourceTree = "<group>"; };
 		BB00004F /* EventDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventDetailView.swift; sourceTree = "<group>"; };
+		BB000050 /* HouseholdService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HouseholdService.swift; sourceTree = "<group>"; };
+		BB000051 /* HouseholdView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HouseholdView.swift; sourceTree = "<group>"; };
+		BB000052 /* BudgetSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BudgetSettingsView.swift; sourceTree = "<group>"; };
 		CC000001 /* FamilyLife.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = FamilyLife.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -233,6 +239,7 @@
 				BB00001F /* LocationService.swift */,
 				BB000020 /* NotificationService.swift */,
 				BB000026 /* HealthKitManager.swift */,
+				BB000050 /* HouseholdService.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -274,6 +281,7 @@
 				BB00001A /* SettingsView.swift */,
 				BB00001B /* AddTaskView.swift */,
 				BB000043 /* MoreView.swift */,
+				BB000051 /* HouseholdView.swift */,
 			);
 			path = Home;
 			sourceTree = "<group>";
@@ -299,6 +307,7 @@
 				BB00001C /* AddReceiptView.swift */,
 				BB00001D /* ReceiptScannerView.swift */,
 				BB00004C /* BudgetProjectsView.swift */,
+				BB000052 /* BudgetSettingsView.swift */,
 			);
 			path = Expenses;
 			sourceTree = "<group>";
@@ -435,7 +444,7 @@
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
 				LastSwiftUpdateCheck = 1600;
-				LastUpgradeCheck = 1600;
+				LastUpgradeCheck = 2640;
 				ORGANIZATIONNAME = "Atlas Atlantic";
 				TargetAttributes = {
 					FF000001 = {
@@ -548,6 +557,9 @@
 				AA00004D /* SignUpView.swift in Sources */,
 				AA00004E /* FamilyGroupsView.swift in Sources */,
 				AA00004F /* EventDetailView.swift in Sources */,
+				AA000050 /* HouseholdService.swift in Sources */,
+				AA000051 /* HouseholdView.swift in Sources */,
+				AA000052 /* BudgetSettingsView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -560,11 +572,11 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 6;
+				CURRENT_PROJECT_VERSION = 15;
 				DEVELOPMENT_ASSET_PATHS = "";
-				DEVELOPMENT_TEAM = GANM22MFCH;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_NSCameraUsageDescription = "Kinrows uses your camera to scan receipts.";
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "Kinrows uses your step count to track fitness rivalries and show daily activity on your dashboard.";
 				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Kinrows records fitness activity for family rivalries and challenges.";
@@ -594,11 +606,11 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 6;
+				CURRENT_PROJECT_VERSION = 15;
 				DEVELOPMENT_ASSET_PATHS = "";
-				DEVELOPMENT_TEAM = GANM22MFCH;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_NSCameraUsageDescription = "Kinrows uses your camera to scan receipts.";
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "Kinrows uses your step count to track fitness rivalries and show daily activity on your dashboard.";
 				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Kinrows records fitness activity for family rivalries and challenges.";
@@ -657,6 +669,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
 				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = GANM22MFCH;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
@@ -680,6 +693,7 @@
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
 				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
@@ -721,6 +735,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = GANM22MFCH;
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
@@ -737,6 +752,7 @@
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				SWIFT_VERSION = 5.0;
 				VALIDATE_PRODUCT = YES;

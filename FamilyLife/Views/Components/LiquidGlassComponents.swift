@@ -21,15 +21,24 @@ struct FamilyAvatar: View {
     }
 
     private var gradient: LinearGradient {
-        if let member = FamilyMember(rawValue: initial) {
-            return member.gradient
-        }
-        // Fallback for external people (H, T, etc.)
-        switch initial.uppercased() {
-        case "H": return LinearGradient(colors: [Color(hex: "#b97090"), Color(hex: "#7a4868")], startPoint: .topLeading, endPoint: .bottomTrailing)
-        case "T": return LinearGradient(colors: [Color(hex: "#6b8aa0"), Color(hex: "#3a5870")], startPoint: .topLeading, endPoint: .bottomTrailing)
-        default:  return LinearGradient(colors: [Color(hex: "#8a7468"), Color(hex: "#5a463a")], startPoint: .topLeading, endPoint: .bottomTrailing)
-        }
+        // Stable gradient based on initial — no hardcoded names
+        let palette: [(String, String)] = [
+            ("#c46a4a", "#8a3e2a"), // terracotta
+            ("#d99a3c", "#a86a1c"), // amber
+            ("#7ba05b", "#4a6a35"), // sage
+            ("#6b8aa0", "#3a5870"), // steel blue
+            ("#b97090", "#7a4868"), // mauve
+            ("#8a7468", "#5a463a"), // walnut
+            ("#6a9a8a", "#3a6a5a"), // teal
+            ("#9a6ab0", "#6a3a80"), // plum
+        ]
+        let hash = initial.uppercased().unicodeScalars.reduce(0) { $0 &+ Int($1.value) }
+        let pair = palette[abs(hash) % palette.count]
+        return LinearGradient(
+            colors: [Color(hex: pair.0), Color(hex: pair.1)],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
     }
 }
 

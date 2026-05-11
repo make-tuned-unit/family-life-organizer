@@ -69,9 +69,8 @@ struct FamilyAddressesView: View {
         isLoading = true
         do {
             addresses = try await api.fetchFamilyAddresses()
-        } catch is CancellationError {
-            // View dismissed — ignore
-            } catch {
+        } catch {
+            guard !error.isCancellation else { return }
             self.error = error.localizedDescription
         }
         isLoading = false
@@ -81,9 +80,8 @@ struct FamilyAddressesView: View {
         do {
             try await api.addFamilyAddress(data)
             await load()
-        } catch is CancellationError {
-            // View dismissed — ignore
-            } catch {
+        } catch {
+            guard !error.isCancellation else { return }
             self.error = error.localizedDescription
         }
     }
@@ -92,9 +90,8 @@ struct FamilyAddressesView: View {
         do {
             try await api.deleteFamilyAddress(id: id)
             addresses.removeAll { $0.id == id }
-        } catch is CancellationError {
-            // View dismissed — ignore
-            } catch {
+        } catch {
+            guard !error.isCancellation else { return }
             self.error = error.localizedDescription
         }
     }
