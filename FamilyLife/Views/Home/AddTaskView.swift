@@ -2,6 +2,8 @@ import SwiftUI
 
 struct AddTaskView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(AuthService.self) private var auth
+    @Environment(HouseholdService.self) private var household
 
     @State private var title = ""
     @State private var category = "household"
@@ -14,7 +16,12 @@ struct AddTaskView: View {
 
     private let categories = ["household", "errands", "kids", "health", "finance", "work"]
     private let priorities = ["low", "medium", "high"]
-    private let familyMembers = ["Me", "Partner"]
+
+    private var familyMembers: [String] {
+        var names = [auth.currentUser?.name ?? "Me"]
+        names += household.members.map(\.name)
+        return names
+    }
 
     var body: some View {
         NavigationStack {
@@ -101,4 +108,6 @@ struct AddTaskView: View {
 
 #Preview {
     AddTaskView { _ in }
+        .environment(AuthService())
+        .environment(HouseholdService())
 }

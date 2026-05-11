@@ -11,7 +11,7 @@ struct SettingsView: View {
     @State private var showingLogoutConfirm = false
     @State private var notificationsEnabled = false
     @State private var locationEnabled = false
-    @State private var showingAddresses = false
+    @State private var showingHousehold = false
     @State private var showingPhotoPicker = false
     @State private var selectedPhoto: PhotosPickerItem?
     @State private var profileImage: Image?
@@ -135,9 +135,9 @@ struct SettingsView: View {
                 .disabled(serverURL == api.baseURL)
             }
 
-            Section("Family Addresses") {
-                Button { showingAddresses = true } label: {
-                    Label("Manage Addresses", systemImage: "mappin.and.ellipse")
+            Section("Household") {
+                NavigationLink { HouseholdView() } label: {
+                    Label("My Household", systemImage: "house.fill")
                         .foregroundStyle(TabAccent.home.color)
                 }
             }
@@ -193,17 +193,6 @@ struct SettingsView: View {
                 profileImage = Image(uiImage: uiImage)
             }
         }
-        .sheet(isPresented: $showingAddresses) {
-            NavigationStack {
-                FamilyAddressesView()
-                    .toolbar {
-                        ToolbarItem(placement: .topBarLeading) {
-                            Button("Done") { showingAddresses = false }
-                                .foregroundStyle(WarmPalette.ink2)
-                        }
-                    }
-            }
-        }
         .confirmationDialog("Sign out?", isPresented: $showingLogoutConfirm) {
             Button("Sign Out", role: .destructive) {
                 auth.logout()
@@ -225,4 +214,5 @@ struct SettingsView: View {
     }
     .environment(AuthService())
     .environment(APIService())
+    .environment(HouseholdService())
 }

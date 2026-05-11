@@ -38,8 +38,8 @@ final class BudgetProjectStore {
         error = nil
         do {
             projects = try await api.fetchProjects()
-        } catch is CancellationError {
         } catch {
+            guard !error.isCancellation else { return }
             self.error = error.localizedDescription
         }
         isLoading = false
@@ -49,9 +49,8 @@ final class BudgetProjectStore {
         do {
             let _ = try await api.addProject(["name": name, "budget": budget])
             await loadAll(api: api)
-        } catch is CancellationError {
-            // View dismissed — ignore
-            } catch {
+        } catch {
+            guard !error.isCancellation else { return }
             self.error = error.localizedDescription
         }
     }
@@ -60,9 +59,8 @@ final class BudgetProjectStore {
         do {
             let _ = try await api.addProjectExpense(projectId: projectID, expense: expense)
             await loadAll(api: api)
-        } catch is CancellationError {
-            // View dismissed — ignore
-            } catch {
+        } catch {
+            guard !error.isCancellation else { return }
             self.error = error.localizedDescription
         }
     }
@@ -71,9 +69,8 @@ final class BudgetProjectStore {
         do {
             try await api.deleteProjectExpense(projectId: projectID, expenseId: expenseID)
             await loadAll(api: api)
-        } catch is CancellationError {
-            // View dismissed — ignore
-            } catch {
+        } catch {
+            guard !error.isCancellation else { return }
             self.error = error.localizedDescription
         }
     }
@@ -82,9 +79,8 @@ final class BudgetProjectStore {
         do {
             try await api.deleteProject(id: projectID)
             await loadAll(api: api)
-        } catch is CancellationError {
-            // View dismissed — ignore
-            } catch {
+        } catch {
+            guard !error.isCancellation else { return }
             self.error = error.localizedDescription
         }
     }
@@ -333,16 +329,15 @@ struct ProjectDetailView: View {
                     }
                 }
             }
-            .sheet(isPresented: $showingScanReceipt, onDismiss: {
-                Task {
-                    await store.loadAll(api: api)
-                    await loadExpenses()
-                }
-            }) {
+            .sheet(isPresented: $showingScanReceipt) {
                 ReceiptScannerView(
                     projectId: projectID,
                     projectName: project.name
                 )
+            }
+            .task(id: showingScanReceipt) {
+                await store.loadAll(api: api)
+                await loadExpenses()
             }
             .task { await loadExpenses() }
         }

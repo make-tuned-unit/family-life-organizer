@@ -1196,7 +1196,9 @@ app.get('/api/data', requireAuth, async (req, res) => {
 app.post('/api/appointments', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
-    await db.addAppointment(req.body);
+    const data = { ...req.body };
+    if (data.appointment_date) data.appointment_date = normalizeDate(data.appointment_date);
+    await db.addAppointment(data);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -1272,7 +1274,9 @@ app.delete('/api/appointments/:id', requireAuth, async (req, res) => {
 app.put('/api/appointments/:id', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
-    await db.updateAppointment(req.params.id, req.body);
+    const data = { ...req.body };
+    if (data.appointment_date) data.appointment_date = normalizeDate(data.appointment_date);
+    await db.updateAppointment(req.params.id, data);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -1324,11 +1328,67 @@ app.get('/api/budget/:month', requireAuth, async (req, res) => {
   }
 });
 
+// Budget categories CRUD
+app.get('/api/budget-categories', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const categories = await db.getBudgetCategories();
+    res.json(categories);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+app.post('/api/budget-categories', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const { name, monthly_limit, color } = req.body;
+    const result = await db.addBudgetCategory(name, monthly_limit, color);
+    res.json({ success: true, id: result.id });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+app.put('/api/budget-categories/:id', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    await db.updateBudgetCategory(req.params.id, req.body);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+app.delete('/api/budget-categories/:id', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    await db.deleteBudgetCategory(req.params.id);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
 // Receipts - save
 app.post('/api/receipts', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
-    const result = await db.addReceipt(req.body);
+    if (req.body.category) {
+      await db.ensureBudgetCategory(req.body.category);
+    }
+    const data = { ...req.body };
+    if (data.date) data.date = normalizeDate(data.date);
+    if (!data.added_by) data.added_by = req.session.user?.username || 'jesse';
+    const result = await db.addReceipt(data);
     res.json({ success: true, id: result.id });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -1398,33 +1458,28 @@ app.post('/api/receipts/scan', requireAuth, async (req, res) => {
 app.post('/api/receipts/save', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
-    const { merchant, date, total, category, items, add_to_pantry } = req.body;
+    const { merchant, date, total, category } = req.body;
+    const username = req.session.user?.username || 'jesse';
+
+    // Normalize date to YYYY-MM-DD for strftime compatibility
+    const normalizedDate = normalizeDate(date);
+
+    // Ensure budget category exists (auto-create if new)
+    if (category) {
+      await db.ensureBudgetCategory(category);
+    }
 
     // Save receipt
     const receipt = await db.addReceipt({
       amount: total,
       merchant,
-      date,
+      date: normalizedDate,
       category: category || 'Other',
       processed_by: 'scan',
-      added_by: req.session.user || 'jesse'
+      added_by: username
     });
 
-    // Add items to pantry if requested
-    if (add_to_pantry && items && items.length > 0) {
-      for (const item of items) {
-        await db.addPantryItem({
-          item: item.name,
-          category: category === 'Groceries' ? guessItemCategory(item.name) : 'Other',
-          location: guessLocation(item.name),
-          quantity: item.quantity || '1',
-          receipt_id: receipt.id,
-          added_by: req.session.user || 'jesse'
-        });
-      }
-    }
-
-    res.json({ success: true, receipt_id: receipt.id, pantry_items: items ? items.length : 0 });
+    res.json({ success: true, receipt_id: receipt.id });
   } catch (err) {
     res.status(500).json({ error: err.message });
   } finally {
@@ -1443,6 +1498,20 @@ app.delete('/api/receipts/:id', requireAuth, async (req, res) => {
     db.close();
   }
 });
+
+// Helper: normalize date to YYYY-MM-DD for SQLite strftime
+function normalizeDate(dateStr) {
+  if (!dateStr) return new Date().toISOString().split('T')[0];
+  // Already YYYY-MM-DD
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr;
+  // Try parsing with Date constructor
+  const parsed = new Date(dateStr);
+  if (!isNaN(parsed.getTime())) {
+    return parsed.toISOString().split('T')[0];
+  }
+  // Fallback to today
+  return new Date().toISOString().split('T')[0];
+}
 
 // Helper: guess pantry category from item name
 function guessItemCategory(name) {
@@ -1487,7 +1556,9 @@ app.get('/api/pantry', requireAuth, async (req, res) => {
 app.post('/api/pantry', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
-    const result = await db.addPantryItem(req.body);
+    const data = { ...req.body };
+    if (data.expiry_date) data.expiry_date = normalizeDate(data.expiry_date);
+    const result = await db.addPantryItem(data);
     res.json({ success: true, id: result.id });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -1499,7 +1570,9 @@ app.post('/api/pantry', requireAuth, async (req, res) => {
 app.put('/api/pantry/:id', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
-    await db.updatePantryItem(req.params.id, req.body);
+    const data = { ...req.body };
+    if (data.expiry_date) data.expiry_date = normalizeDate(data.expiry_date);
+    await db.updatePantryItem(req.params.id, data);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -1832,7 +1905,10 @@ app.get('/api/rivalries', requireAuth, async (req, res) => {
 app.post('/api/rivalries', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
-    const result = await db.addRivalry(req.body);
+    const data = { ...req.body };
+    if (data.start_date) data.start_date = normalizeDate(data.start_date);
+    if (data.end_date) data.end_date = normalizeDate(data.end_date);
+    const result = await db.addRivalry(data);
     res.json({ success: true, id: result.id });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -1844,7 +1920,10 @@ app.post('/api/rivalries', requireAuth, async (req, res) => {
 app.put('/api/rivalries/:id', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
-    await db.updateRivalry(req.params.id, req.body);
+    const data = { ...req.body };
+    if (data.start_date) data.start_date = normalizeDate(data.start_date);
+    if (data.end_date) data.end_date = normalizeDate(data.end_date);
+    await db.updateRivalry(req.params.id, data);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -1978,7 +2057,9 @@ app.get('/api/gifts/events', requireAuth, async (req, res) => {
 app.post('/api/gifts/events', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
-    const result = await db.addSpecialEvent(req.body);
+    const data = { ...req.body };
+    if (data.date) data.date = normalizeDate(data.date);
+    const result = await db.addSpecialEvent(data);
     res.json({ success: true, id: result.id });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -2461,9 +2542,11 @@ app.post('/api/coverage', requireAuth, async (req, res) => {
     // Create request
     const request = await db.createCoverageRequest({ requester_id: userId, reason, note });
 
-    // Add windows
+    // Add windows (normalize dates)
     for (const w of (windows || [])) {
-      await db.addCoverageWindow({ request_id: request.id, ...w });
+      const winData = { request_id: request.id, ...w };
+      if (winData.window_date) winData.window_date = normalizeDate(winData.window_date);
+      await db.addCoverageWindow(winData);
     }
 
     // Add recipients and generate invite tokens
@@ -2563,7 +2646,7 @@ app.post('/api/coverage/approve/:token', async (req, res) => {
       request_id: recipient.request_id,
       recipient_id: recipient.id,
       window_id,
-      approved_date,
+      approved_date: approved_date ? normalizeDate(approved_date) : null,
       approved_start,
       approved_end,
       helper_note

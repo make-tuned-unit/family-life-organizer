@@ -14,7 +14,8 @@ final class CookViewModel {
         do {
             recipes = try await api.suggestRecipes(query: query)
         } catch {
-            recipes = []
+            guard !error.isCancellation else { return }
+            // Keep previous recipes visible on error
         }
         isLoading = false
     }

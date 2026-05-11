@@ -13,11 +13,27 @@ struct DecisionsView: View {
     @State private var isLoading = false
 
     private var activeDecisions: [DecisionResponse] {
-        decisions.filter { $0.status == DecisionStatus.active.rawValue }
+        let now = Date()
+        return decisions.filter { decision in
+            guard decision.status == DecisionStatus.active.rawValue else { return false }
+            // Filter out decisions past their expiry
+            if let expiresStr = decision.expires_at,
+               let expiresDate = ISO8601DateFormatter.flexible.date(from: expiresStr),
+               expiresDate < now {
+                return false
+            }
+            return true
+        }
     }
 
     private var resolvedDecisions: [DecisionResponse] {
-        decisions.filter { $0.status == DecisionStatus.resolved.rawValue || $0.status == DecisionStatus.expired.rawValue }
+        let now = Date()
+        return decisions.filter { decision in
+            decision.status == DecisionStatus.resolved.rawValue
+            || decision.status == DecisionStatus.expired.rawValue
+            || (decision.status == DecisionStatus.active.rawValue
+                && decision.expires_at.flatMap { ISO8601DateFormatter.flexible.date(from: $0) }.map { $0 < now } == true)
+        }
     }
 
     private var filteredActive: [DecisionResponse] {
@@ -193,9 +209,8 @@ struct DecisionsView: View {
         error = nil
         do {
             decisions = try await api.fetchDecisions()
-        } catch is CancellationError {
         } catch {
-            decisions = []
+            guard !error.isCancellation else { return }
             self.error = error.localizedDescription
         }
         isLoading = false

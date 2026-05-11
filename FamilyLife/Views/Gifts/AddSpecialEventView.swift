@@ -71,9 +71,8 @@ struct AddSpecialEventView: View {
             ])
             await onSaved()
             dismiss()
-        } catch is CancellationError {
-            // View dismissed — ignore
-            } catch {
+        } catch {
+            guard !error.isCancellation else { return }
             self.error = error.localizedDescription
         }
     }
