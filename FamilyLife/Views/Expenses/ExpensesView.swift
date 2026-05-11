@@ -31,25 +31,29 @@ struct ExpensesView: View {
                 }
             }
             ToolbarItem(placement: .topBarTrailing) {
-                Menu {
-                    Button { showingScanner = true } label: {
-                        Label("Scan Receipt", systemImage: "camera")
+                HStack(spacing: 16) {
+                    NavigationLink {
+                        BudgetSettingsView()
+                    } label: {
+                        Image(systemName: "slider.horizontal.3")
+                            .foregroundStyle(WarmPalette.ink2)
                     }
-                    Button { showingAddReceipt = true } label: {
-                        Label("Add Manually", systemImage: "square.and.pencil")
+                    Menu {
+                        Button { showingScanner = true } label: {
+                            Label("Scan Receipt", systemImage: "camera")
+                        }
+                        Button { showingAddReceipt = true } label: {
+                            Label("Add Manually", systemImage: "square.and.pencil")
+                        }
+                    } label: {
+                        Image(systemName: "plus")
+                            .foregroundStyle(WarmPalette.ink2)
                     }
-                } label: {
-                    Image(systemName: "plus")
-                        .foregroundStyle(WarmPalette.ink2)
                 }
             }
         }
-        .sheet(isPresented: $showingScanner, onDismiss: {
-            Task { await viewModel.loadAll(api: api) }
-        }) { ReceiptScannerView() }
-        .sheet(isPresented: $showingAddReceipt, onDismiss: {
-            Task { await viewModel.loadAll(api: api) }
-        }) { AddReceiptView() }
+        .sheet(isPresented: $showingScanner) { ReceiptScannerView() }
+        .sheet(isPresented: $showingAddReceipt) { AddReceiptView() }
         .overlay {
             if viewModel.isLoading && viewModel.budgetItems.isEmpty { ProgressView() }
         }
@@ -59,7 +63,8 @@ struct ExpensesView: View {
             Text(viewModel.error ?? "An unexpected error occurred.")
         }
         .refreshable { await viewModel.loadAll(api: api); await projectStore.loadAll(api: api) }
-        .task { await viewModel.loadAll(api: api); await projectStore.loadAll(api: api) }
+        .task(id: showingScanner) { await viewModel.loadAll(api: api); await projectStore.loadAll(api: api) }
+        .task(id: showingAddReceipt) { await viewModel.loadAll(api: api) }
         .onChange(of: viewModel.displayedMonth) {
             Task { await viewModel.loadAll(api: api) }
         }

@@ -3,8 +3,8 @@ import SwiftUI
 struct FamilyGroupsView: View {
     @Environment(APIService.self) private var api
     @Environment(AuthService.self) private var auth
+    @Environment(HouseholdService.self) private var household
     @State private var groups: [APIService.GroupResponse] = []
-    @State private var contacts: [APIService.ContactResponse] = []
     @State private var isLoading = false
     @State private var showingNewGroup = false
     @State private var showingAddContact = false
@@ -46,7 +46,10 @@ struct FamilyGroupsView: View {
             NewGroupSheet { await loadAll() }
         }
         .sheet(isPresented: $showingAddContact) {
-            AddContactSheet { await loadAll() }
+            AddContactSheet {
+                await household.reload(api: api)
+                await loadAll()
+            }
         }
         .sheet(isPresented: $showingJoinGroup) {
             JoinGroupSheet { await loadAll() }
@@ -66,11 +69,10 @@ struct FamilyGroupsView: View {
     private func loadAll() async {
         isLoading = true
         do {
-            async let g = api.fetchGroups()
-            async let c = api.fetchContacts()
-            groups = try await g
-            contacts = try await c
-        } catch {}
+            groups = try await api.fetchGroups()
+        } catch {
+            guard !error.isCancellation else { return }
+        }
         isLoading = false
     }
 
@@ -174,12 +176,12 @@ struct FamilyGroupsView: View {
 
     private var contactsSection: some View {
         VStack(spacing: 0) {
-            if !contacts.isEmpty {
-                WarmSectionHeader(title: "Family Members", trailing: "\(contacts.count)")
+            if !household.members.isEmpty {
+                WarmSectionHeader(title: "Family Members", trailing: "\(household.members.count)")
                     .padding(.bottom, 8)
                     .padding(.top, 4)
 
-                ForEach(contacts) { contact in
+                ForEach(household.members) { contact in
                     ContactRow(contact: contact)
                         .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
                         .padding(.bottom, 6)
@@ -744,4 +746,5 @@ struct JoinGroupSheet: View {
     }
     .environment(APIService())
     .environment(AuthService())
+    .environment(HouseholdService())
 }

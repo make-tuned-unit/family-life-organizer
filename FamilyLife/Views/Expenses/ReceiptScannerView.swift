@@ -17,7 +17,6 @@ struct ReceiptScannerView: View {
     @State private var isScanning = false
     @State private var isSaving = false
     @State private var error: String?
-    @State private var addToPantry = true
     @State private var showingCamera = false
     @State private var cameraPermissionDenied = false
 
@@ -210,15 +209,11 @@ struct ReceiptScannerView: View {
                     .clipShape(Capsule())
             }
 
-            if !isProjectMode {
-                Toggle("Also add items to Pantry", isOn: $addToPantry).font(.subheadline)
-            }
-
             Button { save() } label: {
                 if isSaving {
                     ProgressView().frame(maxWidth: .infinity)
                 } else {
-                    Text(isProjectMode ? "Add to Project" : "Save Receipt\(addToPantry ? " & Stock Pantry" : "")")
+                    Text(isProjectMode ? "Add to Project" : "Save Receipt")
                         .font(.headline).frame(maxWidth: .infinity)
                 }
             }
@@ -316,7 +311,7 @@ struct ReceiptScannerView: View {
                     return
                 } else {
                     // Save as budget receipt
-                    try await api.saveScannedReceipt(result: result, addToPantry: addToPantry)
+                    try await api.saveScannedReceipt(result: result)
                 }
                 dismiss()
             } catch {

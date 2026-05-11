@@ -36,9 +36,8 @@ final class ExpensesViewModel {
     private func loadBudget(api: APIService) async {
         do {
             budgetItems = try await api.fetchBudget(month: monthParam)
-        } catch is CancellationError {
         } catch {
-            budgetItems = []
+            guard !error.isCancellation else { return }
             self.error = error.localizedDescription
         }
     }
@@ -46,19 +45,19 @@ final class ExpensesViewModel {
     private func loadReceipts(api: APIService) async {
         do {
             receipts = try await api.fetchReceipts(month: monthParam)
-        } catch is CancellationError {
         } catch {
-            receipts = []
+            guard !error.isCancellation else { return }
             self.error = error.localizedDescription
         }
     }
+
 
     func deleteReceipt(_ id: Int, api: APIService) async {
         do {
             try await api.deleteReceipt(id: id)
             receipts.removeAll { $0.id == id }
-        } catch is CancellationError {
         } catch {
+            guard !error.isCancellation else { return }
             self.error = error.localizedDescription
         }
     }

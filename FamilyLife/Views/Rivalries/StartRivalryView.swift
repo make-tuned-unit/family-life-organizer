@@ -2,20 +2,21 @@ import SwiftUI
 
 struct StartRivalryView: View {
     @Environment(APIService.self) private var api
+    @Environment(HouseholdService.self) private var household
+    @Environment(AuthService.self) private var auth
     @Environment(\.dismiss) private var dismiss
 
     let onSaved: () async -> Void
 
     @State private var title = ""
     @State private var challengeType: ChallengeType = .steps
-    @State private var opponentName = "Partner"
+    @State private var opponentName = ""
     @State private var endDate = Calendar.current.date(byAdding: .day, value: 7, to: Date()) ?? Date().addingTimeInterval(7 * 86400)
     @State private var pointValue = 100
     @State private var error: String?
     @State private var isSaving = false
 
-    private let familyMembers = ["Me", "Partner"] // TODO: load from API
-    private let currentUser = "Me"
+    private var currentUser: String { auth.currentUser?.name ?? "Me" }
 
     var body: some View {
         NavigationStack {
@@ -56,12 +57,28 @@ struct StartRivalryView: View {
                 }
 
                 Section("Opponent") {
-                    Picker("Challenge", selection: $opponentName) {
-                        ForEach(familyMembers.filter { $0 != currentUser }, id: \.self) {
-                            Text($0)
+                    ForEach(household.members) { member in
+                        Button {
+                            opponentName = member.name
+                            updateDefaultTitle()
+                        } label: {
+                            HStack {
+                                FamilyAvatar(initial: member.avatar_initial ?? String(member.name.prefix(1)).uppercased(), size: 28)
+                                Text(member.name)
+                                    .foregroundStyle(.primary)
+                                Spacer()
+                                if opponentName == member.name {
+                                    Image(systemName: "checkmark")
+                                        .foregroundStyle(TabAccent.home.color)
+                                }
+                            }
                         }
                     }
-                    .pickerStyle(.segmented)
+                    if household.members.isEmpty {
+                        Text("Add family members in Settings to challenge them")
+                            .font(.caption)
+                            .foregroundStyle(WarmPalette.ink3)
+                    }
                 }
 
                 Section("Duration & Points") {
@@ -86,7 +103,7 @@ struct StartRivalryView: View {
                     Button("Challenge!") {
                         Task { await createRivalry() }
                     }
-                    .disabled(title.isEmpty || isSaving)
+                    .disabled(title.isEmpty || opponentName.isEmpty || isSaving)
                 }
             }
         }
@@ -122,9 +139,8 @@ struct StartRivalryView: View {
             ])
             await onSaved()
             dismiss()
-        } catch is CancellationError {
-            // View dismissed — ignore
-            } catch {
+        } catch {
+            guard !error.isCancellation else { return }
             self.error = error.localizedDescription
             isSaving = false
         }
@@ -138,4 +154,6 @@ struct StartRivalryView: View {
 #Preview {
     StartRivalryView(onSaved: {})
         .environment(APIService())
+        .environment(AuthService())
+        .environment(HouseholdService())
 }

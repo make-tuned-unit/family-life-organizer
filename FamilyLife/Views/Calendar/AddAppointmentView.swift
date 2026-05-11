@@ -4,6 +4,7 @@ import MapKit
 struct AddAppointmentView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(APIService.self) private var api
+    @Environment(HouseholdService.self) private var household
 
     @State private var title = ""
     @State private var date = Date()
@@ -21,8 +22,7 @@ struct AddAppointmentView: View {
     @State private var locationCompleter = LocationCompleter()
     @State private var showingLocationSuggestions = false
 
-    // Family contacts
-    @State private var contacts: [APIService.ContactResponse] = []
+    // Family contacts from shared household
 
     let onSave: ([String: Any]) -> Void
 
@@ -94,8 +94,7 @@ struct AddAppointmentView: View {
                         }
                     }
 
-                    // Family contacts from API
-                    ForEach(contacts) { contact in
+                    ForEach(household.members) { contact in
                         Button {
                             toggleTag(contact.name)
                         } label: {
@@ -143,17 +142,12 @@ struct AddAppointmentView: View {
                     .disabled(title.isEmpty || isSaving)
                 }
             }
-            .task { await loadContacts() }
         }
     }
 
     private func toggleTag(_ name: String) {
         if personTags.contains(name) { personTags.remove(name) }
         else { personTags.insert(name) }
-    }
-
-    private func loadContacts() async {
-        do { contacts = try await api.fetchContacts() } catch {}
     }
 
     private func save() async {
@@ -220,4 +214,5 @@ final class LocationCompleter: NSObject, MKLocalSearchCompleterDelegate {
 #Preview {
     AddAppointmentView { _ in }
         .environment(APIService())
+        .environment(HouseholdService())
 }

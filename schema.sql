@@ -112,7 +112,7 @@ CREATE TABLE IF NOT EXISTS receipts (
 -- Budget categories and limits
 CREATE TABLE IF NOT EXISTS budget_categories (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  name TEXT NOT NULL,
+  name TEXT NOT NULL UNIQUE,
   monthly_limit DECIMAL(10,2),
   color TEXT,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP

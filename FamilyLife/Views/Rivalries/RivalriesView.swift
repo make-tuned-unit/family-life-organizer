@@ -14,11 +14,22 @@ struct RivalriesView: View {
     @State private var error: String?
 
     private var activeRivalries: [RivalryResponse] {
-        rivalries.filter { $0.status == RivalryStatus.active.rawValue || $0.status == RivalryStatus.pending.rawValue }
+        let now = Date()
+        return rivalries.filter { rivalry in
+            guard rivalry.status == RivalryStatus.active.rawValue || rivalry.status == RivalryStatus.pending.rawValue else { return false }
+            // Filter out rivalries past their end date
+            if let end = rivalry.endDate, end < now { return false }
+            return true
+        }
     }
 
     private var completedRivalries: [RivalryResponse] {
-        rivalries.filter { $0.status == RivalryStatus.completed.rawValue || $0.status == RivalryStatus.declined.rawValue }
+        let now = Date()
+        return rivalries.filter { rivalry in
+            rivalry.status == RivalryStatus.completed.rawValue
+            || rivalry.status == RivalryStatus.declined.rawValue
+            || (rivalry.endDate.map { $0 < now } == true)
+        }
     }
 
     var body: some View {
@@ -130,9 +141,8 @@ struct RivalriesView: View {
                 nextEntries[rivalry.id] = try await api.fetchRivalryEntries(id: rivalry.id)
             }
             entriesByRivalry = nextEntries
-        } catch is CancellationError {
-            // View dismissed — ignore
-            } catch {
+        } catch {
+            guard !error.isCancellation else { return }
             self.error = error.localizedDescription
         }
         isLoading = false
@@ -151,11 +161,11 @@ struct RivalryCardRemote: View {
     let entries: [RivalryEntryResponse]
 
     private var initiatorTotal: Double {
-        entries.filter { $0.member_name == rivalry.initiator_name }.reduce(0) { $0 + $1.value }
+        entries.filter { $0.member_name.localizedCaseInsensitiveCompare(rivalry.initiator_name) == .orderedSame }.reduce(0) { $0 + $1.value }
     }
 
     private var opponentTotal: Double {
-        entries.filter { $0.member_name == rivalry.opponent_name }.reduce(0) { $0 + $1.value }
+        entries.filter { $0.member_name.localizedCaseInsensitiveCompare(rivalry.opponent_name) == .orderedSame }.reduce(0) { $0 + $1.value }
     }
 
     var body: some View {
@@ -406,5 +416,7 @@ struct ProgressRow: View {
     NavigationStack {
         RivalriesView()
             .environment(APIService())
+            .environment(AuthService())
+            .environment(HouseholdService())
     }
 }

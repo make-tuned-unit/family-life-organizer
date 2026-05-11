@@ -1,7 +1,10 @@
 import SwiftUI
+import MapKit
 
 struct EditAppointmentView: View {
     @Environment(APIService.self) private var api
+    @Environment(HouseholdService.self) private var household
+    @Environment(AuthService.self) private var auth
     @Environment(\.dismiss) private var dismiss
 
     let appointment: AppointmentResponse
@@ -14,9 +17,12 @@ struct EditAppointmentView: View {
     @State private var location: String
     @State private var category: String
     @State private var notes: String
+    @State private var personTags: Set<String>
     @State private var isSaving = false
+    @State private var locationCompleter = LocationCompleter()
+    @State private var showingLocationSuggestions = false
 
-    private let categories = ["personal", "medical", "school", "daycare"]
+    private let categories = ["personal", "medical", "school", "daycare", "work", "social"]
 
     init(appointment: AppointmentResponse, onSaved: @escaping () -> Void) {
         self.appointment = appointment
@@ -29,6 +35,11 @@ struct EditAppointmentView: View {
         _location = State(initialValue: appointment.location ?? "")
         _category = State(initialValue: appointment.category ?? "personal")
         _notes = State(initialValue: appointment.description ?? "")
+
+        let tags = appointment.person_tags?
+            .split(separator: ",")
+            .map { $0.trimmingCharacters(in: .whitespaces) } ?? []
+        _personTags = State(initialValue: Set(tags))
     }
 
     var body: some View {
@@ -43,8 +54,73 @@ struct EditAppointmentView: View {
                     }
                 }
 
+                Section("Location") {
+                    TextField("Search for a place...", text: $location)
+                        .onChange(of: location) {
+                            locationCompleter.search(query: location)
+                            showingLocationSuggestions = !location.isEmpty
+                        }
+
+                    if showingLocationSuggestions && !locationCompleter.results.isEmpty {
+                        ForEach(locationCompleter.results, id: \.self) { result in
+                            Button {
+                                location = [result.title, result.subtitle].filter { !$0.isEmpty }.joined(separator: ", ")
+                                showingLocationSuggestions = false
+                            } label: {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(result.title)
+                                        .font(.subheadline.weight(.medium))
+                                        .foregroundStyle(.primary)
+                                    if !result.subtitle.isEmpty {
+                                        Text(result.subtitle)
+                                            .font(.caption)
+                                            .foregroundStyle(WarmPalette.ink3)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Section("Who's involved") {
+                    Button {
+                        toggleTag(auth.currentUser?.name ?? "Me")
+                    } label: {
+                        HStack {
+                            Text("Me")
+                                .foregroundStyle(.primary)
+                            Spacer()
+                            if personTags.contains(auth.currentUser?.name ?? "Me") {
+                                Image(systemName: "checkmark")
+                                    .foregroundStyle(TabAccent.home.color)
+                            }
+                        }
+                    }
+
+                    ForEach(household.members) { contact in
+                        Button {
+                            toggleTag(contact.name)
+                        } label: {
+                            HStack {
+                                FamilyAvatar(initial: contact.avatar_initial ?? String(contact.name.prefix(1)).uppercased(), size: 24)
+                                Text(contact.name)
+                                    .foregroundStyle(.primary)
+                                if let rel = contact.relationship {
+                                    Text(rel.capitalized)
+                                        .font(.caption)
+                                        .foregroundStyle(WarmPalette.ink3)
+                                }
+                                Spacer()
+                                if personTags.contains(contact.name) {
+                                    Image(systemName: "checkmark")
+                                        .foregroundStyle(TabAccent.home.color)
+                                }
+                            }
+                        }
+                    }
+                }
+
                 Section("Details") {
-                    TextField("Location", text: $location)
                     TextField("Notes (optional)", text: $notes, axis: .vertical)
                         .lineLimit(3)
                     Picker("Category", selection: $category) {
@@ -72,6 +148,11 @@ struct EditAppointmentView: View {
         }
     }
 
+    private func toggleTag(_ name: String) {
+        if personTags.contains(name) { personTags.remove(name) }
+        else { personTags.insert(name) }
+    }
+
     private func save() {
         isSaving = true
         var data: [String: Any] = [
@@ -84,6 +165,7 @@ struct EditAppointmentView: View {
         }
         if !location.isEmpty { data["location"] = location }
         if !notes.isEmpty { data["description"] = notes }
+        if !personTags.isEmpty { data["person_tags"] = Array(personTags) }
 
         Task {
             do {
@@ -108,4 +190,6 @@ struct EditAppointmentView: View {
         onSaved: {}
     )
     .environment(APIService())
+    .environment(AuthService())
+    .environment(HouseholdService())
 }

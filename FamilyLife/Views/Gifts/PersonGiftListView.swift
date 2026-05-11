@@ -116,9 +116,8 @@ struct PersonGiftListView: View {
     private func loadIdeas() async {
         do {
             ideas = try await api.fetchGiftIdeas(personId: person.id)
-        } catch is CancellationError {
-            // View dismissed — ignore
-            } catch {
+        } catch {
+            guard !error.isCancellation else { return }
             self.error = error.localizedDescription
         }
     }
@@ -127,9 +126,8 @@ struct PersonGiftListView: View {
         do {
             try await api.updateGiftIdea(id: id, data: ["status": status.rawValue])
             await loadIdeas()
-        } catch is CancellationError {
-            // View dismissed — ignore
-            } catch {
+        } catch {
+            guard !error.isCancellation else { return }
             self.error = error.localizedDescription
         }
     }
@@ -138,9 +136,8 @@ struct PersonGiftListView: View {
         do {
             try await api.deleteGiftIdea(id: id)
             await loadIdeas()
-        } catch is CancellationError {
-            // View dismissed — ignore
-            } catch {
+        } catch {
+            guard !error.isCancellation else { return }
             self.error = error.localizedDescription
         }
     }

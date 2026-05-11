@@ -10,10 +10,10 @@ struct CoverageCascadeView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(APIService.self) private var api
     @Environment(AuthService.self) private var auth
+    @Environment(HouseholdService.self) private var household
     @State private var currentStep: CoverageStep = .ask
 
-    // Step 1 state
-    @State private var contacts: [APIService.ContactResponse] = []
+    // Step 1 state (contacts come from household service)
     @State private var selectedContactIds: Set<Int> = []
     @State private var coverageReason: String = "Watch the kids"
     @State private var candidateWindows: [WindowDraft] = []
@@ -63,11 +63,6 @@ struct CoverageCascadeView: View {
                     .textCase(.uppercase).tracking(0.4)
             }
         }
-        .task { await loadContacts() }
-    }
-
-    private func loadContacts() async {
-        do { contacts = try await api.fetchContacts() } catch {}
     }
 
     // MARK: - Step 1: Ask
@@ -89,14 +84,14 @@ struct CoverageCascadeView: View {
 
                 // Care team selection
                 sectionLabel("Who to ask")
-                if contacts.isEmpty {
+                if household.members.isEmpty {
                     Text("Add family members in Family > Add Family Member first.")
                         .font(.system(size: 13)).foregroundStyle(WarmPalette.ink3)
                         .padding(.horizontal, 22).padding(.bottom, 14)
                 } else {
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 8) {
-                            ForEach(contacts) { contact in
+                            ForEach(household.members) { contact in
                                 let selected = selectedContactIds.contains(contact.id)
                                 Button {
                                     if selected { selectedContactIds.remove(contact.id) }
@@ -206,7 +201,9 @@ struct CoverageCascadeView: View {
                 inviteTokens[rec.id] = rec.invite_token
             }
             currentStep = .pending
-        } catch {}
+        } catch {
+            guard !error.isCancellation else { return }
+        }
     }
 
     // MARK: - Step 2: Pending
@@ -221,7 +218,7 @@ struct CoverageCascadeView: View {
                 .padding(.horizontal, 22).padding(.top, 10).padding(.bottom, 12)
 
                 // Recipients with share buttons
-                let selectedContacts = contacts.filter { selectedContactIds.contains($0.id) }
+                let selectedContacts = household.members.filter { selectedContactIds.contains($0.id) }
                 ForEach(selectedContacts) { contact in
                     let token = inviteTokens.values.first // simplified - in production would map per contact
                     HStack(spacing: 12) {
@@ -272,7 +269,9 @@ struct CoverageCascadeView: View {
                 selectedApproval = detail.approvals.first
                 currentStep = .confirmed
             }
-        } catch {}
+        } catch {
+            guard !error.isCancellation else { return }
+        }
     }
 
     // MARK: - Step 3: Confirmed
@@ -400,7 +399,9 @@ struct CoverageCascadeView: View {
             try await api.addAppointment(appointment)
             NotificationService.shared.scheduleCoverageBooked(title: bookingTitle, date: approval.approved_date, time: approval.approved_start)
             dismiss()
-        } catch {}
+        } catch {
+            guard !error.isCancellation else { return }
+        }
     }
 
     // MARK: - Helpers
@@ -516,4 +517,5 @@ struct BookingFormField: View {
     NavigationStack { CoverageCascadeView() }
         .environment(APIService())
         .environment(AuthService())
+        .environment(HouseholdService())
 }

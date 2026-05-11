@@ -101,9 +101,8 @@ final class CalendarViewModel {
         let month = calendar.component(.month, from: displayedMonth)
         do {
             monthAppointments = try await api.fetchAppointmentsByMonth(year: year, month: month)
-        } catch is CancellationError {
         } catch {
-            monthAppointments = []
+            guard !error.isCancellation else { return }
             self.error = error.localizedDescription
         }
         isLoading = false
@@ -113,10 +112,8 @@ final class CalendarViewModel {
         do {
             try await api.addAppointment(data)
             await loadMonth(api: api)
-        } catch is CancellationError {
-            // View dismissed — ignore
-            } catch is CancellationError {
         } catch {
+            guard !error.isCancellation else { return }
             self.error = error.localizedDescription
         }
     }
@@ -125,10 +122,8 @@ final class CalendarViewModel {
         do {
             try await api.deleteAppointment(id: id)
             monthAppointments.removeAll { $0.id == id }
-        } catch is CancellationError {
-            // View dismissed — ignore
-            } catch is CancellationError {
         } catch {
+            guard !error.isCancellation else { return }
             self.error = error.localizedDescription
         }
     }

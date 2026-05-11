@@ -11,6 +11,7 @@ struct HomeView: View {
     @State private var activityFeed: [APIService.ActivityItem] = []
     @State private var activeTrips: [TripResponse] = []
     @State private var healthKit = HealthKitManager()
+    @State private var selectedFeedEvent: AppointmentResponse?
 
     private var greeting: String {
         let hour = Calendar.current.component(.hour, from: Date())
@@ -60,6 +61,13 @@ struct HomeView: View {
             AddTaskView { task in Task { await viewModel.addTask(task, api: api) } }
         }
         .sheet(isPresented: $showingSettings) { NavigationStack { SettingsView(showsDismissButton: true) } }
+        .sheet(item: $selectedFeedEvent) { appt in
+            NavigationStack {
+                EventDetailView(appointment: appt) {
+                    await viewModel.loadAll(api: api)
+                }
+            }
+        }
         // Rivalries and Gifts accessed via More tab
         .overlay {
             if viewModel.isLoading && viewModel.summary == nil { ProgressView() }
@@ -85,6 +93,19 @@ struct HomeView: View {
         }
         do { activeTrips = try await api.fetchTrips(status: "active") } catch {}
         do { activityFeed = try await api.fetchActivity() } catch {}
+    }
+
+    private func openFeedEvent(id: Int) async {
+        if let appt = viewModel.todayAppointments.first(where: { $0.id == id }) {
+            selectedFeedEvent = appt
+            return
+        }
+        do {
+            let all = try await api.fetchAppointments()
+            if let appt = all.first(where: { $0.id == id }) {
+                selectedFeedEvent = appt
+            }
+        } catch {}
     }
 
     private var errorAlertIsPresented: Binding<Bool> {
@@ -159,11 +180,12 @@ struct HomeView: View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 10) {
                 if let trip = activeTrips.first {
+                    let eta = max(0, trip.eta_minutes ?? 0)
                     PresenceChip(
                         initial: String(trip.traveler.prefix(1)).uppercased(),
                         name: trip.traveler.capitalized,
-                        status: "On the way \u{00B7} \(trip.eta_minutes ?? 0) min",
-                        statusColor: WarmPalette.warn,
+                        status: eta <= 0 ? "Arriving now" : "On the way \u{00B7} \(eta) min",
+                        statusColor: eta <= 0 ? WarmPalette.good : WarmPalette.warn,
                         showTrip: true
                     )
                 }
@@ -310,7 +332,9 @@ struct HomeView: View {
 
             VStack(spacing: 8) {
                 ForEach(activityFeed.prefix(10)) { item in
-                    ActivityFeedCard(item: item, selectedTab: $selectedTab)
+                    ActivityFeedCard(item: item, selectedTab: $selectedTab) { eventId in
+                        Task { await openFeedEvent(id: eventId) }
+                    }
                 }
             }
             .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
@@ -414,6 +438,7 @@ struct GroceryRow: View {
 struct ActivityFeedCard: View {
     let item: APIService.ActivityItem
     @Binding var selectedTab: MainTab
+    var onEventTap: ((Int) -> Void)?
 
     var body: some View {
         Button { navigate() } label: {
@@ -512,7 +537,7 @@ struct ActivityFeedCard: View {
     private func navigate() {
         switch item.feed_type {
         case "decision": selectedTab = .decisions
-        case "event": selectedTab = .calendar
+        case "event": onEventTap?(item.ref_id)
         default: break
         }
     }
