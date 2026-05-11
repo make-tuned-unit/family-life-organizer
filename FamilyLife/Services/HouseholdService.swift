@@ -1,21 +1,26 @@
 import SwiftUI
 
+@MainActor
 @Observable
 final class HouseholdService {
     private(set) var members: [APIService.ContactResponse] = []
     private(set) var isLoaded = false
+    private var isLoading = false
 
     func load(api: APIService) async {
+        guard !isLoading else { return }
+        isLoading = true
         do {
             members = try await api.fetchContacts()
         } catch {
-            guard !error.isCancellation else { return }
-            members = []
+            guard !error.isCancellation else { isLoading = false; return }
         }
         isLoaded = true
+        isLoading = false
     }
 
     func reload(api: APIService) async {
+        isLoading = false // allow forced reload
         await load(api: api)
     }
 

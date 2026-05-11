@@ -181,14 +181,12 @@ struct SettingsView: View {
                 if let data = try? await selectedPhoto?.loadTransferable(type: Data.self),
                    let uiImage = UIImage(data: data) {
                     profileImage = Image(uiImage: uiImage)
-                    // Save to UserDefaults for persistence
-                    UserDefaults.standard.set(data, forKey: "profile_image")
+                    auth.setProfileImage(data)
                 }
             }
         }
         .onAppear {
-            // Load saved profile image
-            if let data = UserDefaults.standard.data(forKey: "profile_image"),
+            if let data = auth.profileImageData,
                let uiImage = UIImage(data: data) {
                 profileImage = Image(uiImage: uiImage)
             }

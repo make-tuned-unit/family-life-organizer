@@ -15,7 +15,6 @@ struct ExpensesView: View {
                 headerSection
                 heroSummary
                 categoriesSection
-                receiptsSection
                 projectsPreview
             }
             .padding(.bottom, DesignTokens.Spacing.bottomBuffer)
@@ -268,6 +267,11 @@ struct ExpensesView: View {
         }
     }
 
+    private func categoryColor(_ item: BudgetSummaryResponse) -> Color {
+        if let hex = item.color { return Color(hex: hex) }
+        return TabAccent.expenses.color
+    }
+
     // MARK: - Categories
 
     @ViewBuilder
@@ -278,7 +282,15 @@ struct ExpensesView: View {
 
             VStack(spacing: 8) {
                 ForEach(viewModel.budgetItems, id: \.category) { item in
-                    BudgetCategoryCard(item: item)
+                    NavigationLink {
+                        BudgetCategoryDetailView(
+                            category: item,
+                            month: viewModel.monthParam
+                        )
+                    } label: {
+                        BudgetCategoryCard(item: item)
+                    }
+                    .buttonStyle(.plain)
                 }
             }
             .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
@@ -286,50 +298,6 @@ struct ExpensesView: View {
         }
     }
 
-    // MARK: - Receipts
-
-    @ViewBuilder
-    private var receiptsSection: some View {
-        if !viewModel.receipts.isEmpty {
-            WarmSectionHeader(title: "Recent receipts", trailing: "View all")
-                .padding(.bottom, 6)
-
-            VStack(spacing: 0) {
-                ForEach(Array(viewModel.receipts.prefix(5).enumerated()), id: \.element.id) { index, receipt in
-                    if index > 0 { GlassDivider() }
-                    NavigationLink {
-                        ReceiptDetailView(receipt: receipt) {
-                            Task {
-                                try? await api.deleteReceipt(id: receipt.id)
-                                await viewModel.loadAll(api: api)
-                            }
-                        }
-                    } label: {
-                        ReceiptListRow(receipt: receipt)
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-            .glassEffect(.regular.tint(.white.opacity(0.03)), in: .rect(cornerRadius: DesignTokens.CornerRadius.card))
-            .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
-        } else if !viewModel.isLoading {
-            VStack(spacing: 8) {
-                Image(systemName: "receipt")
-                    .font(.system(size: 32))
-                    .foregroundStyle(WarmPalette.ink4)
-                Text("No receipts yet")
-                    .font(.system(size: 15))
-                    .foregroundStyle(WarmPalette.ink3)
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 40)
-        }
-    }
-
-    private func categoryColor(_ item: BudgetSummaryResponse) -> Color {
-        if let hex = item.color { return Color(hex: hex) }
-        return TabAccent.expenses.color
-    }
 }
 
 // MARK: - Budget Category Card
@@ -391,6 +359,10 @@ struct BudgetCategoryCard: View {
                 }
                 WarmProgressBar(progress: progress, color: progressColor)
             }
+
+            Image(systemName: "chevron.right")
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(WarmPalette.ink4)
         }
         .padding(14)
         .glassEffect(.regular.tint(color.opacity(0.04)), in: .rect(cornerRadius: 20))
@@ -401,10 +373,21 @@ struct BudgetCategoryCard: View {
 
 struct ReceiptListRow: View {
     let receipt: ReceiptResponse
+    @Environment(AuthService.self) private var auth
+
+    private var isCurrentUser: Bool {
+        guard let addedBy = receipt.added_by else { return false }
+        return addedBy.localizedCaseInsensitiveCompare(auth.currentUser?.username ?? "") == .orderedSame
+            || addedBy.localizedCaseInsensitiveCompare(auth.currentUser?.name ?? "") == .orderedSame
+    }
 
     var body: some View {
         HStack(spacing: 12) {
-            FamilyAvatar(initial: String(receipt.added_by?.prefix(1) ?? "?").uppercased(), size: 28)
+            if isCurrentUser {
+                ProfileAvatar(size: 28)
+            } else {
+                FamilyAvatar(initial: String(receipt.added_by?.prefix(1) ?? "?").uppercased(), size: 28)
+            }
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(receipt.merchant)
@@ -491,19 +474,47 @@ struct ReceiptDetailView: View {
                 .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
                 .padding(.bottom, 14)
 
-                // Notes
+                // Item breakdown (from scanned receipts)
                 if let notes = receipt.notes, !notes.isEmpty {
-                    WarmSectionHeader(title: "Notes")
+                    let lines = notes.split(separator: "\n").map(String.init)
+                    let hasItems = lines.contains(where: { $0.contains(" — $") })
+
+                    WarmSectionHeader(title: hasItems ? "Items" : "Notes")
                         .padding(.bottom, 6)
 
-                    Text(notes)
-                        .font(.system(size: 14))
-                        .foregroundStyle(WarmPalette.ink2)
-                        .padding(16)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                    if hasItems {
+                        VStack(spacing: 0) {
+                            ForEach(Array(lines.enumerated()), id: \.offset) { index, line in
+                                if index > 0 { GlassDivider() }
+                                let parts = line.components(separatedBy: " — $")
+                                HStack {
+                                    Text(parts.first ?? line)
+                                        .font(.system(size: 14))
+                                        .foregroundStyle(WarmPalette.ink1)
+                                    Spacer()
+                                    if parts.count > 1 {
+                                        Text("$\(parts[1])")
+                                            .font(.system(size: 14, weight: .semibold))
+                                            .foregroundStyle(WarmPalette.ink2)
+                                    }
+                                }
+                                .padding(.vertical, 10)
+                                .padding(.horizontal, 14)
+                            }
+                        }
                         .glassEffect(.regular.tint(.white.opacity(0.03)), in: .rect(cornerRadius: DesignTokens.CornerRadius.card))
                         .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
                         .padding(.bottom, 14)
+                    } else {
+                        Text(notes)
+                            .font(.system(size: 14))
+                            .foregroundStyle(WarmPalette.ink2)
+                            .padding(16)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .glassEffect(.regular.tint(.white.opacity(0.03)), in: .rect(cornerRadius: DesignTokens.CornerRadius.card))
+                            .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
+                            .padding(.bottom, 14)
+                    }
                 }
 
                 // Delete
