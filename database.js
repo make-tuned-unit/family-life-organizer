@@ -1297,16 +1297,16 @@ class FamilyDB {
           creator_name as author, status, created_at
         FROM decisions WHERE status = 'active'
         UNION ALL
-        SELECT 'event' as feed_type, id as ref_id, title, location as body,
-          person_tags as author, 'upcoming' as status,
-          created_at
-        FROM appointments WHERE appointment_date >= date('now') AND appointment_date <= date('now', '+7 days')
+        SELECT 'event' as feed_type, a.id as ref_id, a.title, a.location as body,
+          COALESCE(a.person_tags, 'Family') as author, 'upcoming' as status,
+          a.created_at
+        FROM appointments a WHERE a.appointment_date >= date('now') AND a.appointment_date <= date('now', '+7 days')
         UNION ALL
         SELECT 'coverage' as feed_type, cr.id as ref_id, cr.reason as title, cr.note as body,
-          u.name as author, cr.status,
+          COALESCE(u.name, u.username, 'Family') as author, cr.status,
           cr.created_at
         FROM coverage_requests cr
-        JOIN users u ON u.id = cr.requester_id
+        LEFT JOIN users u ON u.id = cr.requester_id
         WHERE cr.status IN ('pending', 'approved')
         UNION ALL
         SELECT 'rivalry' as feed_type, id as ref_id, title, challenge_type as body,
@@ -1315,10 +1315,10 @@ class FamilyDB {
         FROM rivalries WHERE status = 'active' AND created_at >= datetime('now', '-14 days')
         UNION ALL
         SELECT 'post' as feed_type, fp.id as ref_id, fp.title, fp.body,
-          u.name as author, fp.post_type as status,
+          COALESCE(u.name, u.username, 'Family') as author, fp.post_type as status,
           fp.created_at
         FROM feed_posts fp
-        JOIN users u ON u.id = fp.author_id
+        LEFT JOIN users u ON u.id = fp.author_id
         ORDER BY created_at DESC
         LIMIT ?
       `;

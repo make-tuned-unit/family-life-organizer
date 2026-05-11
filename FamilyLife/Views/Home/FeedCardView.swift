@@ -46,7 +46,6 @@ struct FeedCard: View {
             }
         }
         .glassEffect(.regular.tint(.white.opacity(0.03)), in: .rect(cornerRadius: 18))
-        .task { await loadMeta() }
     }
 
     // MARK: - Header
@@ -125,6 +124,9 @@ struct FeedCard: View {
             Button {
                 withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
                     showingComments.toggle()
+                }
+                if showingComments && comments.isEmpty {
+                    Task { await loadMeta() }
                 }
             } label: {
                 HStack(spacing: 5) {
