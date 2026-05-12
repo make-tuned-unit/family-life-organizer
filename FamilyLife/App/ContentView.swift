@@ -34,17 +34,11 @@ struct ContentView: View {
 
 struct MainTabView: View {
     @State private var selectedTab: MainTab = .home
-    @State private var loadedTabs: Set<MainTab> = [.home]
 
     var body: some View {
         ZStack(alignment: .bottom) {
-            ForEach(MainTab.allCases, id: \.self) { tab in
-                if loadedTabs.contains(tab) {
-                    tabView(for: tab)
-                        .opacity(selectedTab == tab ? 1 : 0)
-                        .allowsHitTesting(selectedTab == tab)
-                }
-            }
+            // Only render the active tab — no hidden opacity-0 tabs consuming GPU
+            tabView(for: selectedTab)
 
             VStack {
                 Spacer()
@@ -52,17 +46,6 @@ struct MainTabView: View {
             }
         }
         .ignoresSafeArea(.keyboard)
-        .onChange(of: selectedTab) {
-            loadedTabs.insert(selectedTab)
-        }
-        .task {
-            // Let Home tab render first, then pre-load other tabs
-            // so they're instant when tapped from the feed
-            try? await Task.sleep(for: .milliseconds(500))
-            for tab in MainTab.allCases {
-                loadedTabs.insert(tab)
-            }
-        }
     }
 
     @ViewBuilder
@@ -109,8 +92,7 @@ struct FloatingTabBar: View {
         .padding(.horizontal, 6)
         .padding(.vertical, 6)
         .background(WarmPalette.cardSurface, in: Capsule())
-        .overlay(Capsule().stroke(WarmPalette.ink1.opacity(0.08), lineWidth: 0.5))
-        .shadow(color: Color(hex: "#501e0a").opacity(0.12), radius: 4, y: 2)
+        .overlay(Capsule().stroke(WarmPalette.ink1.opacity(0.1), lineWidth: 0.5))
         .padding(.horizontal, 16)
         .padding(.bottom, 22)
     }

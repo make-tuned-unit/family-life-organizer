@@ -50,8 +50,8 @@ enum WarmPalette {
     static let rose = Color(hex: "#d97a7a")
     static let mauve = Color(hex: "#8a6585")
 
-    /// Solid card surface — visually matches ultraThinMaterial over the warm gradient, zero GPU cost
-    static let cardSurface = Color(hex: "#fbf3e8").opacity(0.78)
+    /// Opaque card surface — no alpha compositing needed. Matches the warm cream aesthetic.
+    static let cardSurface = Color(hex: "#f8f0e4")
 
     static let ink1 = Color(hex: "#2a1f1a")
     static let ink2 = Color(hex: "#5a463a")
