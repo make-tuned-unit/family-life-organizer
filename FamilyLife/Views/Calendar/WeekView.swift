@@ -69,7 +69,7 @@ struct WeekView: View {
                                 WeekAgendaRow(appointment: appt)
                             }
                         }
-                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
+                        .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
                         .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
                         .padding(.top, 8)
                     }

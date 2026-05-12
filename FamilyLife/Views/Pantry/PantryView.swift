@@ -96,7 +96,7 @@ struct PantryView: View {
                 .font(.system(size: 15))
         }
         .padding(10)
-        .background(.ultraThinMaterial, in: Capsule())
+        .background(WarmPalette.cardSurface, in: Capsule())
         .padding(.horizontal, 22)
         .padding(.bottom, 8)
     }
@@ -148,7 +148,7 @@ struct PantryView: View {
                 }
             }
             .padding(16)
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 24))
+            .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: 24))
             .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
             .padding(.bottom, 14)
         }
@@ -244,7 +244,7 @@ struct ExpiringItemCard: View {
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
         .frame(minWidth: 130, alignment: .leading)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
+        .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: 16))
     }
 }
 
@@ -303,7 +303,7 @@ struct PantryItemTile: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(14)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.tile))
+        .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.tile))
     }
 
     private var categoryIcon: String {

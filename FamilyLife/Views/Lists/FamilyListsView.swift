@@ -114,7 +114,7 @@ struct FamilyListsView: View {
                         .padding(.vertical, 8)
                         .background(isActive ? WarmPalette.ink1 : .clear)
                         .clipShape(Capsule())
-                        .background(.ultraThinMaterial, in: Capsule())
+                        .background(WarmPalette.cardSurface, in: Capsule())
                     }
                     .buttonStyle(.plain)
                 }
@@ -168,7 +168,7 @@ struct ListDetailSection: View {
                         .onSubmit { addItem() }
                 }
                 .padding(12)
-                .background(.ultraThinMaterial, in: Capsule())
+                .background(WarmPalette.cardSurface, in: Capsule())
 
                 if !newItem.isEmpty {
                     Button { addItem() } label: {
@@ -203,7 +203,7 @@ struct ListDetailSection: View {
                                 }
                             }
                         }
-                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
+                        .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
                         .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
                         .padding(.bottom, 14)
                     }
@@ -223,7 +223,7 @@ struct ListDetailSection: View {
                                 }
                             }
                         }
-                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
+                        .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
                         .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
                         .padding(.bottom, 14)
                         .opacity(0.6)

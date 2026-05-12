@@ -109,7 +109,7 @@ struct ExpensesView: View {
                                 .foregroundStyle(WarmPalette.ink4)
                         }
                         .padding(12)
-                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
+                        .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: 16))
                     }
                     .buttonStyle(.plain)
                 }
@@ -151,7 +151,7 @@ struct ExpensesView: View {
                         .foregroundStyle(WarmPalette.ink4)
                 }
                 .padding(14)
-                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
+                .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
             }
             .buttonStyle(.plain)
             .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
@@ -261,7 +261,7 @@ struct ExpensesView: View {
             .padding(20)
             } // close ZStack
             .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.cardLarge))
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.cardLarge))
+            .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.cardLarge))
             .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
             .padding(.bottom, 14)
         }
@@ -365,7 +365,7 @@ struct BudgetCategoryCard: View {
                 .foregroundStyle(WarmPalette.ink4)
         }
         .padding(14)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 20))
+        .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: 20))
     }
 }
 
@@ -450,7 +450,7 @@ struct ReceiptDetailView: View {
                 }
                 .padding(22)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.cardLarge))
+                .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.cardLarge))
                 .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
                 .padding(.top, 14)
                 .padding(.bottom, 14)
@@ -470,7 +470,7 @@ struct ReceiptDetailView: View {
                         GlassDivider()
                     }
                 }
-                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
+                .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
                 .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
                 .padding(.bottom, 14)
 
@@ -502,7 +502,7 @@ struct ReceiptDetailView: View {
                                 .padding(.horizontal, 14)
                             }
                         }
-                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
+                        .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
                         .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
                         .padding(.bottom, 14)
                     } else {
@@ -511,7 +511,7 @@ struct ReceiptDetailView: View {
                             .foregroundStyle(WarmPalette.ink2)
                             .padding(16)
                             .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
+                            .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
                             .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
                             .padding(.bottom, 14)
                     }
@@ -529,7 +529,7 @@ struct ReceiptDetailView: View {
                     .foregroundStyle(WarmPalette.bad)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 14)
-                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
+                    .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: 16))
                 }
                 .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
                 .padding(.bottom, DesignTokens.Spacing.bottomBuffer)

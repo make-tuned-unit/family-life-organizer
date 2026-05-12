@@ -40,8 +40,19 @@ extension View {
         modifier(FLCardModifier(tint: tint, interactive: interactive))
     }
 
+    /// Solid card surface with subtle tint border. Zero GPU cost — no real-time blur.
+    /// Use on all scrolling content. Reserve real glass only for fixed chrome (tab bar).
     @ViewBuilder
     func flGlassSurface<S: Shape>(tint: Color = .clear, strokeOpacity: Double = 0.15, in shape: S) -> some View {
+        self
+            .background(WarmPalette.cardSurface, in: shape)
+            .overlay(shape.stroke(tint.opacity(strokeOpacity), lineWidth: 0.5))
+    }
+
+    /// True Liquid Glass — only use on fixed UI chrome (tab bar, floating buttons).
+    /// NEVER use inside a ScrollView.
+    @ViewBuilder
+    func flGlassChrome<S: Shape>(tint: Color = .clear, strokeOpacity: Double = 0.08, in shape: S) -> some View {
         if #available(iOS 26.0, *) {
             self.glassEffect(.regular.tint(tint), in: shape)
         } else {

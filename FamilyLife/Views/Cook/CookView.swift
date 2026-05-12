@@ -98,7 +98,7 @@ struct CookView: View {
             .disabled(viewModel.query.isEmpty || viewModel.isLoading)
         }
         .padding(14)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
+        .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
         .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
         .padding(.bottom, 14)
     }
@@ -241,14 +241,14 @@ struct CookView: View {
                                 .foregroundStyle(viewModel.isRecipeSaved(recipe) ? WarmPalette.good : WarmPalette.ink1)
                                 .padding(.horizontal, 18)
                                 .padding(.vertical, 12)
-                                .background(.ultraThinMaterial, in: Capsule())
+                                .background(WarmPalette.cardSurface, in: Capsule())
                         }
                     }
                 }
                 .padding(18)
             }
             .clipShape(RoundedRectangle(cornerRadius: 26))
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 26))
+            .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: 26))
             .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
             .padding(.bottom, 14)
         } else if viewModel.hasSearched {
@@ -298,7 +298,7 @@ struct RecipeTag: View {
             .foregroundStyle(.white)
             .padding(.horizontal, 10)
             .padding(.vertical, 5)
-            .background(.ultraThinMaterial, in: Capsule())
+            .background(WarmPalette.cardSurface, in: Capsule())
     }
 }
 
@@ -344,7 +344,7 @@ struct RecipeRowCard: View {
                 .foregroundStyle(WarmPalette.ink3)
         }
         .padding(14)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 20))
+        .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: 20))
     }
 }
 
