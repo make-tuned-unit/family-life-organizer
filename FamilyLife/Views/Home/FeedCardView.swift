@@ -274,13 +274,12 @@ struct FeedCard: View {
 
     // MARK: - Attributed text with @mentions
 
+    private static let mentionRegex = try! NSRegularExpression(pattern: "@[A-Za-z]+")
+
     private func attributedBody(_ text: String) -> AttributedString {
         var result = AttributedString(text)
-        // Highlight all @mentions (any word after @)
-        let pattern = "@[A-Za-z]+"
-        guard let regex = try? NSRegularExpression(pattern: pattern) else { return result }
         let nsText = text as NSString
-        let matches = regex.matches(in: text, range: NSRange(location: 0, length: nsText.length))
+        let matches = Self.mentionRegex.matches(in: text, range: NSRange(location: 0, length: nsText.length))
         for match in matches {
             guard let swiftRange = Range(match.range, in: text),
                   let attrRange = result.range(of: String(text[swiftRange])) else { continue }

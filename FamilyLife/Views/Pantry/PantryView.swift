@@ -325,9 +325,7 @@ struct PantryItemTile: View {
         if days < 0 { return "Expired" }
         if days == 0 { return "Today" }
         if days == 1 { return "Tomorrow" }
-        let f = DateFormatter()
-        f.dateFormat = "MMM d"
-        return f.string(from: date)
+        return DateFormatter.shortMonthDay.string(from: date)
     }
 }
 
