@@ -1,7 +1,5 @@
 import SwiftUI
 
-// MARK: - Interactive Feed Card
-
 struct FeedCard: View {
     let prepared: PreparedFeedItem
     @Binding var selectedTab: MainTab
@@ -14,7 +12,7 @@ struct FeedCard: View {
     @State private var isLiked = false
     @State private var likeCount = 0
     @State private var comments: [APIService.FeedCommentResponse] = []
-    @State private var showingComments = false
+    @State private var isExpanded = false
     @State private var newComment = ""
     @State private var isSendingComment = false
     @State private var commentCount = 0
@@ -22,14 +20,17 @@ struct FeedCard: View {
     @State private var metaLoaded = false
 
     private var item: APIService.ActivityItem { prepared.item }
-
     private var displayLikeCount: Int { metaLoaded ? likeCount : (item.reaction_count ?? 0) }
     private var displayCommentCount: Int { metaLoaded ? commentCount : (item.comment_count ?? 0) }
 
+    // MARK: - Body
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            cardHeader
+            // Header — always visible
+            header
 
+            // Body text — always visible for posts
             if let body = prepared.body {
                 Text(body)
                     .font(.system(size: 15))
@@ -39,63 +40,94 @@ struct FeedCard: View {
                     .padding(.bottom, 12)
             }
 
-            if prepared.isPost {
-                actionBar
+            // Inline counts — always visible for posts, no buttons during scroll
+            if prepared.isPost && !isExpanded {
+                countsRow
+            }
 
-                if showingComments {
-                    commentsSection
-                        .transition(.opacity.combined(with: .move(edge: .top)))
-                }
+            // Action bar + comments — only when expanded (not in scroll tree otherwise)
+            if isExpanded && prepared.isPost {
+                actionBar
+                commentsSection
             }
         }
         .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: 18))
+        .contentShape(RoundedRectangle(cornerRadius: 18))
+        .onTapGesture { tapped() }
     }
 
-    // MARK: - Header
+    // MARK: - Header (no Button — just a view)
 
-    private var cardHeader: some View {
-        Button { navigate() } label: {
-            HStack(spacing: 10) {
-                if prepared.isOwnPost {
-                    ProfileAvatar(size: 32)
-                } else {
-                    FamilyAvatar(
-                        initial: String(item.author?.prefix(1) ?? "?").uppercased(),
-                        size: 32
-                    )
+    private var header: some View {
+        HStack(spacing: 10) {
+            if prepared.isOwnPost {
+                ProfileAvatar(size: 32)
+            } else {
+                FamilyAvatar(
+                    initial: String(item.author?.prefix(1) ?? "?").uppercased(),
+                    size: 32
+                )
+            }
+
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 6) {
+                    Text(item.author ?? "Someone")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(WarmPalette.ink1)
+                    Text(typeBadge)
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(prepared.accentColor)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(prepared.accentColor.opacity(0.1), in: Capsule())
                 }
+                Text(prepared.time)
+                    .font(.system(size: 11))
+                    .foregroundStyle(WarmPalette.ink4)
+            }
 
-                VStack(alignment: .leading, spacing: 2) {
-                    HStack(spacing: 6) {
-                        Text(item.author ?? "Someone")
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(WarmPalette.ink1)
-                        Text(typeBadge)
-                            .font(.system(size: 10, weight: .semibold))
-                            .foregroundStyle(prepared.accentColor)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(prepared.accentColor.opacity(0.1), in: Capsule())
-                    }
-                    Text(prepared.time)
+            Spacer()
+
+            if !prepared.isPost {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(WarmPalette.ink4)
+            }
+        }
+        .padding(14)
+    }
+
+    // MARK: - Counts Row (lightweight, no buttons)
+
+    private var countsRow: some View {
+        HStack(spacing: 16) {
+            HStack(spacing: 4) {
+                Image(systemName: isLiked ? "heart.fill" : "heart")
+                    .font(.system(size: 12))
+                    .foregroundStyle(isLiked ? WarmPalette.bad : WarmPalette.ink4)
+                if displayLikeCount > 0 {
+                    Text("\(displayLikeCount)")
                         .font(.system(size: 11))
                         .foregroundStyle(WarmPalette.ink4)
                 }
-
-                Spacer()
-
-                if !prepared.isPost {
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 10, weight: .medium))
+            }
+            HStack(spacing: 4) {
+                Image(systemName: "bubble.left")
+                    .font(.system(size: 12))
+                    .foregroundStyle(WarmPalette.ink4)
+                if displayCommentCount > 0 {
+                    Text("\(displayCommentCount)")
+                        .font(.system(size: 11))
                         .foregroundStyle(WarmPalette.ink4)
                 }
             }
-            .padding(14)
+            Spacer()
         }
-        .buttonStyle(.plain)
+        .padding(.horizontal, 14)
+        .padding(.bottom, 10)
     }
 
-    // MARK: - Action Bar
+    // MARK: - Action Bar (only when expanded)
 
     private var actionBar: some View {
         HStack(spacing: 0) {
@@ -104,7 +136,6 @@ struct FeedCard: View {
                     Image(systemName: isLiked ? "heart.fill" : "heart")
                         .font(.system(size: 14))
                         .foregroundStyle(isLiked ? WarmPalette.bad : WarmPalette.ink3)
-                        .scaleEffect(isLiked ? 1.1 : 1.0)
                     if displayLikeCount > 0 {
                         Text("\(displayLikeCount)")
                             .font(.system(size: 12, weight: .medium))
@@ -120,22 +151,17 @@ struct FeedCard: View {
                 .frame(width: 0.5, height: 20)
 
             Button {
-                withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-                    showingComments.toggle()
-                }
-                if showingComments && !metaLoaded {
-                    Task { await loadMeta() }
+                withAnimation(.spring(response: 0.3)) {
+                    isExpanded = false
                 }
             } label: {
                 HStack(spacing: 5) {
-                    Image(systemName: "bubble.left")
-                        .font(.system(size: 14))
-                        .foregroundStyle(showingComments ? prepared.accentColor : WarmPalette.ink3)
-                    if displayCommentCount > 0 {
-                        Text("\(displayCommentCount)")
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundStyle(showingComments ? prepared.accentColor : WarmPalette.ink3)
-                    }
+                    Image(systemName: "chevron.up")
+                        .font(.system(size: 12))
+                        .foregroundStyle(WarmPalette.ink3)
+                    Text("Close")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(WarmPalette.ink3)
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 10)
@@ -153,10 +179,6 @@ struct FeedCard: View {
 
     private var commentsSection: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Rectangle()
-                .fill(WarmPalette.ink1.opacity(0.06))
-                .frame(height: 0.5)
-
             if !comments.isEmpty {
                 VStack(alignment: .leading, spacing: 0) {
                     ForEach(comments) { comment in
@@ -189,7 +211,6 @@ struct FeedCard: View {
                 .padding(.vertical, 4)
                 .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: 10))
                 .padding(.horizontal, 14)
-                .transition(.opacity.combined(with: .move(edge: .bottom)))
             }
 
             HStack(spacing: 10) {
@@ -256,7 +277,7 @@ struct FeedCard: View {
             || name.localizedCaseInsensitiveCompare(auth.currentUser?.username ?? "") == .orderedSame
     }
 
-    // MARK: - Attributed text (comments only — post body is pre-computed)
+    // MARK: - Attributed text (comments only)
 
     private static func buildCommentBody(_ text: String, accent: Color) -> AttributedString {
         var result = AttributedString(text)
@@ -333,6 +354,21 @@ struct FeedCard: View {
 
     // MARK: - Helpers
 
+    private func tapped() {
+        switch item.feed_type {
+        case "decision": selectedTab = .decisions
+        case "event": onEventTap?(item.ref_id)
+        case "post":
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+                isExpanded.toggle()
+            }
+            if isExpanded && !metaLoaded {
+                Task { await loadMeta() }
+            }
+        default: break
+        }
+    }
+
     private func updateMentionSuggestions() {
         guard let atRange = newComment.range(of: "@", options: .backwards) else {
             mentionSuggestions = []
@@ -370,21 +406,6 @@ struct FeedCard: View {
         default: "Update"
         }
     }
-
-    private func navigate() {
-        switch item.feed_type {
-        case "decision": selectedTab = .decisions
-        case "event": onEventTap?(item.ref_id)
-        case "post":
-            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-                showingComments.toggle()
-            }
-            if showingComments && !metaLoaded {
-                Task { await loadMeta() }
-            }
-        default: break
-        }
-    }
 }
 
 #Preview {
@@ -395,7 +416,7 @@ struct FeedCard: View {
                     feed_type: "post",
                     ref_id: 1,
                     title: "Beautiful day for a walk",
-                    body: "Took the kids to Point Pleasant Park. @Sophie you should bring Rowan next time!",
+                    body: "Took the kids to Point Pleasant Park.",
                     author: "Jesse",
                     status: nil,
                     created_at: ISO8601DateFormatter().string(from: Date()),
