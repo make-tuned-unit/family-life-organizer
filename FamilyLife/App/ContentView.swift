@@ -28,25 +28,17 @@ struct ContentView: View {
 
 struct MainTabView: View {
     @State private var selectedTab: MainTab = .home
+    @State private var loadedTabs: Set<MainTab> = [.home]
 
     var body: some View {
         ZStack(alignment: .bottom) {
-            // Keep all tabs alive — never destroy/recreate on switch
-            NavigationStack { CalendarView() }
-                .opacity(selectedTab == .calendar ? 1 : 0)
-                .allowsHitTesting(selectedTab == .calendar)
-            NavigationStack { FamilyListsView() }
-                .opacity(selectedTab == .lists ? 1 : 0)
-                .allowsHitTesting(selectedTab == .lists)
-            NavigationStack { HomeView(selectedTab: $selectedTab) }
-                .opacity(selectedTab == .home ? 1 : 0)
-                .allowsHitTesting(selectedTab == .home)
-            NavigationStack { DecisionsView() }
-                .opacity(selectedTab == .decisions ? 1 : 0)
-                .allowsHitTesting(selectedTab == .decisions)
-            NavigationStack { MoreView() }
-                .opacity(selectedTab == .more ? 1 : 0)
-                .allowsHitTesting(selectedTab == .more)
+            ForEach(MainTab.allCases, id: \.self) { tab in
+                if loadedTabs.contains(tab) {
+                    tabView(for: tab)
+                        .opacity(selectedTab == tab ? 1 : 0)
+                        .allowsHitTesting(selectedTab == tab)
+                }
+            }
 
             VStack {
                 Spacer()
@@ -54,6 +46,20 @@ struct MainTabView: View {
             }
         }
         .ignoresSafeArea(.keyboard)
+        .onChange(of: selectedTab) {
+            loadedTabs.insert(selectedTab)
+        }
+    }
+
+    @ViewBuilder
+    private func tabView(for tab: MainTab) -> some View {
+        switch tab {
+        case .calendar:  NavigationStack { CalendarView() }
+        case .lists:     NavigationStack { FamilyListsView() }
+        case .home:      NavigationStack { HomeView(selectedTab: $selectedTab) }
+        case .decisions: NavigationStack { DecisionsView() }
+        case .more:      NavigationStack { MoreView() }
+        }
     }
 }
 

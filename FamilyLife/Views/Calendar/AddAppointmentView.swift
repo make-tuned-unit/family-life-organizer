@@ -187,6 +187,7 @@ struct AddAppointmentView: View {
 
 // MARK: - Location Autocomplete using MapKit
 
+@MainActor
 @Observable
 final class LocationCompleter: NSObject, MKLocalSearchCompleterDelegate {
     var results: [MKLocalSearchCompletion] = []
@@ -202,12 +203,13 @@ final class LocationCompleter: NSObject, MKLocalSearchCompleterDelegate {
         completer.queryFragment = query
     }
 
-    func completerDidUpdateResults(_ completer: MKLocalSearchCompleter) {
-        results = Array(completer.results.prefix(5))
+    nonisolated func completerDidUpdateResults(_ completer: MKLocalSearchCompleter) {
+        let r = Array(completer.results.prefix(5))
+        Task { @MainActor in results = r }
     }
 
-    func completer(_ completer: MKLocalSearchCompleter, didFailWithError error: Error) {
-        results = []
+    nonisolated func completer(_ completer: MKLocalSearchCompleter, didFailWithError error: Error) {
+        Task { @MainActor in results = [] }
     }
 }
 

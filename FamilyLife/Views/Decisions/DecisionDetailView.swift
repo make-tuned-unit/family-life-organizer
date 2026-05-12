@@ -18,10 +18,8 @@ struct DecisionDetailView: View {
     }
 
     private var isCurrentUserCreator: Bool {
-        let name = auth.currentUser?.username ?? ""
-        return currentDecision.creator_name.localizedCaseInsensitiveCompare(name) == .orderedSame
-            || currentDecision.creator_name.localizedCaseInsensitiveCompare(auth.currentUser?.name ?? "") == .orderedSame
-            || currentDecision.creator_name == "Me"
+        currentDecision.creator_name.localizedCaseInsensitiveCompare(auth.currentUser?.name ?? "") == .orderedSame
+            || currentDecision.creator_name.localizedCaseInsensitiveCompare(auth.currentUser?.username ?? "") == .orderedSame
     }
 
     private var myReaction: String? {
@@ -190,7 +188,7 @@ struct DecisionDetailView: View {
         .navigationTitle(currentDecision.title)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            if currentDecision.status == DecisionStatus.active.rawValue && currentDecision.creator_name == (auth.currentUser?.username ?? "Me") {
+            if currentDecision.status == DecisionStatus.active.rawValue && isCurrentUserCreator {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Resolve") {
                         Task { await resolveDecision() }

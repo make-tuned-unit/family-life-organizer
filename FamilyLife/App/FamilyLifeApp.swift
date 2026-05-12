@@ -14,7 +14,6 @@ struct FamilyLifeApp: App {
                 .environment(apiService)
                 .environment(householdService)
                 .task {
-                    await authService.validateSession()
                     if authService.isAuthenticated {
                         await householdService.load(api: apiService)
                     }
