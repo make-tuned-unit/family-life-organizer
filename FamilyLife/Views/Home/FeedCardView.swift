@@ -20,6 +20,8 @@ struct FeedCard: View {
     @State private var commentCount = 0
     @State private var mentionSuggestions: [APIService.ContactResponse] = []
     @State private var metaLoaded = false
+    @State private var cachedBody: AttributedString?
+    @State private var cachedTime: String?
 
     private var isPost: Bool { item.feed_type == "post" }
 
@@ -31,8 +33,8 @@ struct FeedCard: View {
         VStack(alignment: .leading, spacing: 0) {
             cardHeader
 
-            if let body = item.body, !body.isEmpty, isPost {
-                Text(attributedBody(body))
+            if let cachedBody, isPost {
+                Text(cachedBody)
                     .font(.system(size: 15))
                     .foregroundStyle(WarmPalette.ink1)
                     .lineSpacing(3)
@@ -51,6 +53,15 @@ struct FeedCard: View {
             }
         }
         .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: 18))
+        .task {
+            // Pre-compute expensive text once per card lifecycle
+            if cachedBody == nil, let text = item.body, !text.isEmpty, isPost {
+                cachedBody = buildAttributedBody(text)
+            }
+            if cachedTime == nil {
+                cachedTime = Self.formatRelativeTime(item.created_at)
+            }
+        }
     }
 
     // MARK: - Header
@@ -80,7 +91,7 @@ struct FeedCard: View {
                             .background(accentColor.opacity(0.1))
                             .clipShape(Capsule())
                     }
-                    Text(relativeTime)
+                    Text(cachedTime ?? "")
                         .font(.system(size: 11))
                         .foregroundStyle(WarmPalette.ink4)
                 }
@@ -259,7 +270,7 @@ struct FeedCard: View {
                             .foregroundStyle(WarmPalette.ink4)
                     }
                 }
-                Text(attributedBody(comment.text))
+                Text(buildAttributedBody(comment.text))
                     .font(.system(size: 14))
                     .foregroundStyle(WarmPalette.ink2)
                     .lineSpacing(2)
@@ -275,7 +286,7 @@ struct FeedCard: View {
 
     private static let mentionRegex = try! NSRegularExpression(pattern: "@[A-Za-z]+")
 
-    private func attributedBody(_ text: String) -> AttributedString {
+    private func buildAttributedBody(_ text: String) -> AttributedString {
         var result = AttributedString(text)
         let nsText = text as NSString
         let matches = Self.mentionRegex.matches(in: text, range: NSRange(location: 0, length: nsText.length))
@@ -286,6 +297,13 @@ struct FeedCard: View {
             result[attrRange].font = .systemFont(ofSize: 14, weight: .semibold)
         }
         return result
+    }
+
+    /// Format once, not per-render. Static so it doesn't capture self.
+    private static func formatRelativeTime(_ dateStr: String?) -> String {
+        guard let dateStr,
+              let date = ISO8601DateFormatter.flexible.date(from: dateStr) else { return "" }
+        return date.formatted(.relative(presentation: .named))
     }
 
     // MARK: - Data
@@ -379,17 +397,8 @@ struct FeedCard: View {
             || author.localizedCaseInsensitiveCompare(auth.currentUser?.username ?? "") == .orderedSame
     }
 
-    private var relativeTime: String {
-        guard let created = item.created_at,
-              let date = ISO8601DateFormatter.flexible.date(from: created) else {
-            return ""
-        }
-        return date.formatted(.relative(presentation: .named))
-    }
-
     private func relativeTimeFrom(_ dateStr: String) -> String {
-        guard let date = ISO8601DateFormatter.flexible.date(from: dateStr) else { return "" }
-        return date.formatted(.relative(presentation: .named))
+        Self.formatRelativeTime(dateStr)
     }
 
     private var accentColor: Color {

@@ -100,8 +100,9 @@ struct FloatingTabBar: View {
         }
         .padding(.horizontal, 6)
         .padding(.vertical, 6)
-        .flGlassChrome(tint: WarmPalette.ink1.opacity(0.08), strokeOpacity: 0.08, in: Capsule())
-        .shadow(color: Color(hex: "#501e0a").opacity(0.2), radius: 12, y: 4)
+        .background(WarmPalette.cardSurface, in: Capsule())
+        .overlay(Capsule().stroke(WarmPalette.ink1.opacity(0.08), lineWidth: 0.5))
+        .shadow(color: Color(hex: "#501e0a").opacity(0.12), radius: 4, y: 2)
         .padding(.horizontal, 16)
         .padding(.bottom, 22)
     }
