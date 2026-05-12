@@ -34,11 +34,17 @@ struct ContentView: View {
 
 struct MainTabView: View {
     @State private var selectedTab: MainTab = .home
+    @State private var loadedTabs: Set<MainTab> = [.home]
 
     var body: some View {
         ZStack(alignment: .bottom) {
-            // Only render the active tab — no hidden opacity-0 tabs consuming GPU
-            tabView(for: selectedTab)
+            ForEach(MainTab.allCases, id: \.self) { tab in
+                if loadedTabs.contains(tab) {
+                    tabView(for: tab)
+                        .opacity(selectedTab == tab ? 1 : 0)
+                        .allowsHitTesting(selectedTab == tab)
+                }
+            }
 
             VStack {
                 Spacer()
@@ -46,6 +52,14 @@ struct MainTabView: View {
             }
         }
         .ignoresSafeArea(.keyboard)
+        .onChange(of: selectedTab) {
+            loadedTabs.insert(selectedTab)
+        }
+        .task {
+            // Load remaining tabs after Home renders
+            try? await Task.sleep(for: .seconds(1))
+            for tab in MainTab.allCases { loadedTabs.insert(tab) }
+        }
     }
 
     @ViewBuilder
