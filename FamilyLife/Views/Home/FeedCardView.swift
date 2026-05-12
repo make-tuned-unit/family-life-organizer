@@ -56,7 +56,7 @@ struct FeedCard: View {
     private var cardHeader: some View {
         Button { navigate() } label: {
             HStack(spacing: 10) {
-                if isCurrentUserAuthor {
+                if prepared.isOwnPost {
                     ProfileAvatar(size: 32)
                 } else {
                     FamilyAvatar(
@@ -259,12 +259,10 @@ struct FeedCard: View {
 
     // MARK: - Attributed text (comments only — post body is pre-computed)
 
-    private static let mentionRegex = try! NSRegularExpression(pattern: "@[A-Z][a-zA-Z'-]+(?:\\s[A-Z][a-zA-Z'-]+)*")
-
     private static func buildCommentBody(_ text: String, accent: Color) -> AttributedString {
         var result = AttributedString(text)
         let nsText = text as NSString
-        let matches = mentionRegex.matches(in: text, range: NSRange(location: 0, length: nsText.length))
+        let matches = HomeViewModel.mentionRegex.matches(in: text, range: NSRange(location: 0, length: nsText.length))
         for match in matches {
             guard let swiftRange = Range(match.range, in: text),
                   let attrRange = result.range(of: String(text[swiftRange])) else { continue }
@@ -363,12 +361,6 @@ struct FeedCard: View {
         mentionSuggestions = []
     }
 
-    private var isCurrentUserAuthor: Bool {
-        guard let author = item.author else { return false }
-        return author.localizedCaseInsensitiveCompare(auth.currentUser?.name ?? "") == .orderedSame
-            || author.localizedCaseInsensitiveCompare(auth.currentUser?.username ?? "") == .orderedSame
-    }
-
     private var typeBadge: String {
         switch item.feed_type {
         case "decision": "Decision"
@@ -414,7 +406,8 @@ struct FeedCard: View {
                 body: AttributedString("Took the kids to Point Pleasant Park."),
                 time: "2 hours ago",
                 isPost: true,
-                accentColor: AccentTheme.ocean.color
+                accentColor: AccentTheme.ocean.color,
+                isOwnPost: true
             ),
             selectedTab: .constant(.home)
         )

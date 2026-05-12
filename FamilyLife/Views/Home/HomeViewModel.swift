@@ -1,13 +1,14 @@
 import Foundation
 import SwiftUI
 
-/// Pre-computed display data for a feed card — eliminates per-card .task work
+/// Pre-computed display data for a feed card — eliminates per-card work
 struct PreparedFeedItem: Identifiable {
     let item: APIService.ActivityItem
     let body: AttributedString?
     let time: String
     let isPost: Bool
     let accentColor: Color
+    let isOwnPost: Bool
 
     var id: UUID { item.id }
 }
@@ -25,12 +26,22 @@ final class HomeViewModel {
     var error: String?
 
     static let statColumns = Array(repeating: GridItem(.flexible(), spacing: 8), count: 4)
+    static let mentionRegex = try! NSRegularExpression(pattern: "@[A-Z][a-zA-Z'-]+(?:\\s[A-Z][a-zA-Z'-]+)*")
 
-    func loadAll(api: APIService) async {
+    private var currentUserName: String?
+    private var currentUsername: String?
+
+    func loadAll(api: APIService, userName: String? = nil, username: String? = nil) async {
+        currentUserName = userName ?? currentUserName
+        currentUsername = username ?? currentUsername
         isLoading = true
         error = nil
         clearStaleDismissals()
 
+        // Cache dismissed IDs once instead of reading UserDefaults per appointment
+        let dismissed = dismissedHeroIds
+
+        var firstError: String?
         async let d = Self.safeFetch { try await api.fetchDashboard() }
         async let t = Self.safeFetch { try await api.fetchTasks(status: "active") }
         async let a = Self.safeFetch { try await api.fetchAppointments(dateFrom: Self.todayString(), dateTo: Self.todayString()) }
@@ -39,12 +50,16 @@ final class HomeViewModel {
 
         let (dashboard, tasks, appointments, feed, trips) = await (d, t, a, f, tr)
 
-        if let data = dashboard {
+        // Batch apply — single re-render
+        if let data = dashboard.value {
             summary = data.summary
             groceries = data.groceries
-        }
-        if let tasks { activeTasks = tasks }
-        if let appointments {
+        } else if let e = dashboard.error { firstError = firstError ?? e }
+
+        if let tasks = tasks.value { activeTasks = tasks }
+        else if let e = tasks.error { firstError = firstError ?? e }
+
+        if let appointments = appointments.value {
             let now = Date()
             todayAppointments = appointments
                 .filter { appt in
@@ -52,20 +67,22 @@ final class HomeViewModel {
                           let eventTime = Self.todayDate(from: timeStr) else { return true }
                     return now < eventTime.addingTimeInterval(30 * 60)
                 }
-                .filter { !dismissedHeroIds.contains($0.id) }
+                .filter { !dismissed.contains($0.id) }
                 .sorted { ($0.appointment_time ?? "") < ($1.appointment_time ?? "") }
-        }
-        if let feed { activityFeed = Self.prepareFeed(feed) }
-        if let trips { activeTrips = trips }
+        } else if let e = appointments.error { firstError = firstError ?? e }
 
+        if let feed = feed.value { activityFeed = Self.prepareFeed(feed, currentUserName: currentUserName, currentUsername: currentUsername) }
+        else if let e = feed.error { firstError = firstError ?? e }
+
+        if let trips = trips.value { activeTrips = trips }
+
+        error = firstError
         isLoading = false
     }
 
     // MARK: - Feed preparation
 
-    private static let mentionRegex = try! NSRegularExpression(pattern: "@[A-Z][a-zA-Z'-]+(?:\\s[A-Z][a-zA-Z'-]+)*")
-
-    static func prepareFeed(_ items: [APIService.ActivityItem]) -> [PreparedFeedItem] {
+    static func prepareFeed(_ items: [APIService.ActivityItem], currentUserName: String? = nil, currentUsername: String? = nil) -> [PreparedFeedItem] {
         items.prefix(10).map { item in
             let isPost = item.feed_type == "post"
             let accent = accentColor(for: item.feed_type)
@@ -74,12 +91,18 @@ final class HomeViewModel {
             } else {
                 nil
             }
+            let isOwn: Bool = {
+                guard let author = item.author else { return false }
+                return author.localizedCaseInsensitiveCompare(currentUserName ?? "") == .orderedSame
+                    || author.localizedCaseInsensitiveCompare(currentUsername ?? "") == .orderedSame
+            }()
             return PreparedFeedItem(
                 item: item,
                 body: body,
                 time: formatRelativeTime(item.created_at),
                 isPost: isPost,
-                accentColor: accent
+                accentColor: accent,
+                isOwnPost: isOwn
             )
         }
     }
@@ -116,9 +139,17 @@ final class HomeViewModel {
 
     // MARK: - Data helpers
 
-    private static func safeFetch<T>(_ block: () async throws -> T) async -> T? {
-        do { return try await block() }
-        catch { return nil }
+    struct FetchResult<T> {
+        let value: T?
+        let error: String?
+    }
+
+    private static func safeFetch<T>(_ block: () async throws -> T) async -> FetchResult<T> {
+        do { return FetchResult(value: try await block(), error: nil) }
+        catch {
+            if error.isCancellation { return FetchResult(value: nil, error: nil) }
+            return FetchResult(value: nil, error: error.localizedDescription)
+        }
     }
 
     private static func todayDate(from timeStr: String) -> Date? {
@@ -200,7 +231,7 @@ final class HomeViewModel {
     func reloadFeed(api: APIService) async {
         do {
             let items = try await api.fetchActivity()
-            activityFeed = Self.prepareFeed(items)
+            activityFeed = Self.prepareFeed(items, currentUserName: currentUserName, currentUsername: currentUsername)
         } catch {
             guard !error.isCancellation else { return }
         }
