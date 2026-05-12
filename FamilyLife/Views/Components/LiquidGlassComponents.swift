@@ -1,34 +1,35 @@
 import SwiftUI
 
 // MARK: - Family Avatar
+// Uses Circle fill + overlay — NO .clipShape, NO offscreen render pass.
 
 struct FamilyAvatar: View {
     let initial: String
     var size: CGFloat = 32
 
     var body: some View {
-        Text(initial)
-            .font(.system(size: size * 0.42, weight: .semibold))
-            .foregroundStyle(.white)
+        Circle()
+            .fill(Self.gradient(for: initial))
             .frame(width: size, height: size)
-            .background(Self.gradient(for: initial))
-            .clipShape(Circle())
-            .overlay(
-                Circle()
-                    .stroke(.white.opacity(0.7), lineWidth: 1.5)
-            )
+            .overlay {
+                Text(initial)
+                    .font(.system(size: size * 0.42, weight: .semibold))
+                    .foregroundStyle(.white)
+            }
+            .overlay {
+                Circle().stroke(.white.opacity(0.7), lineWidth: 1.5)
+            }
     }
 
-    /// Pre-parsed palette — avoids Color(hex:) on every render
     private static let palette: [(Color, Color)] = [
-        (Color(hex: "#c46a4a"), Color(hex: "#8a3e2a")), // terracotta
-        (Color(hex: "#d99a3c"), Color(hex: "#a86a1c")), // amber
-        (Color(hex: "#7ba05b"), Color(hex: "#4a6a35")), // sage
-        (Color(hex: "#6b8aa0"), Color(hex: "#3a5870")), // steel blue
-        (Color(hex: "#b97090"), Color(hex: "#7a4868")), // mauve
-        (Color(hex: "#8a7468"), Color(hex: "#5a463a")), // walnut
-        (Color(hex: "#6a9a8a"), Color(hex: "#3a6a5a")), // teal
-        (Color(hex: "#9a6ab0"), Color(hex: "#6a3a80")), // plum
+        (Color(hex: "#c46a4a"), Color(hex: "#8a3e2a")),
+        (Color(hex: "#d99a3c"), Color(hex: "#a86a1c")),
+        (Color(hex: "#7ba05b"), Color(hex: "#4a6a35")),
+        (Color(hex: "#6b8aa0"), Color(hex: "#3a5870")),
+        (Color(hex: "#b97090"), Color(hex: "#7a4868")),
+        (Color(hex: "#8a7468"), Color(hex: "#5a463a")),
+        (Color(hex: "#6a9a8a"), Color(hex: "#3a6a5a")),
+        (Color(hex: "#9a6ab0"), Color(hex: "#6a3a80")),
     ]
 
     private static func gradient(for initial: String) -> LinearGradient {
@@ -38,7 +39,8 @@ struct FamilyAvatar: View {
     }
 }
 
-// MARK: - Profile Avatar (current user's photo or initial fallback)
+// MARK: - Profile Avatar
+// Uses pre-rendered circular thumbnail — NO .clipShape.
 
 struct ProfileAvatar: View {
     @Environment(AuthService.self) private var auth
@@ -50,8 +52,8 @@ struct ProfileAvatar: View {
                 .resizable()
                 .scaledToFill()
                 .frame(width: size, height: size)
-                .clipShape(Circle())
-                .overlay(Circle().stroke(.white.opacity(0.7), lineWidth: 1.5))
+                .mask(Circle())
+                .overlay { Circle().stroke(.white.opacity(0.7), lineWidth: 1.5) }
         } else {
             FamilyAvatar(
                 initial: String(auth.currentUser?.name.prefix(1) ?? "?").uppercased(),
@@ -94,11 +96,11 @@ struct PresenceChip: View {
         .padding(.vertical, 6)
         .padding(.leading, 6)
         .padding(.trailing, 12)
-        .background(WarmPalette.cardSurface, in: .capsule)
+        .background(WarmPalette.cardSurface, in: Capsule())
     }
 }
 
-// MARK: - Stat Tile (Warm)
+// MARK: - Stat Tile
 
 struct WarmStatTile: View {
     let label: String
@@ -156,8 +158,7 @@ struct WarmAgendaRow: View {
                     .font(.system(size: 12))
                     .foregroundStyle(TabAccent.home.color)
                     .frame(width: 22, height: 22)
-                    .background(TabAccent.home.color.opacity(0.15))
-                    .clipShape(Circle())
+                    .background(TabAccent.home.color.opacity(0.15), in: Circle())
             } else if let initial = tagInitial {
                 FamilyAvatar(initial: initial, size: 22)
             }
@@ -178,7 +179,7 @@ struct GlassDivider: View {
     }
 }
 
-// MARK: - Icon Button (circular glass)
+// MARK: - Icon Button
 
 struct GlassIconButton: View {
     let systemName: String
@@ -215,7 +216,8 @@ struct WarmSectionHeader: View {
     }
 }
 
-// MARK: - Filter Chip (warm)
+// MARK: - Filter Chip
+// Uses background(in: Capsule()) — NO .clipShape.
 
 struct WarmChip: View {
     let label: String
@@ -229,19 +231,13 @@ struct WarmChip: View {
                 .foregroundStyle(isActive ? WarmPalette.cream1 : WarmPalette.ink2)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
-                .background(isActive ? WarmPalette.ink1 : .clear)
+                .background(isActive ? WarmPalette.ink1 : WarmPalette.cardSurface, in: Capsule())
                 .overlay(
                     Capsule()
                         .stroke(isActive ? Color.clear : WarmPalette.ink1.opacity(0.08), lineWidth: 0.5)
                 )
-                .clipShape(Capsule())
         }
         .buttonStyle(.plain)
-        .background {
-            if !isActive {
-                Capsule().fill(WarmPalette.cardSurface)
-            }
-        }
     }
 }
 
@@ -319,36 +315,7 @@ struct WarmProgressBar: View {
     }
 }
 
-// MARK: - Preview
-
-#Preview("Components") {
-    ZStack {
-        AmbientBackground(style: .home)
-        ScrollView {
-            VStack(spacing: 20) {
-                HStack(spacing: 8) {
-                    FamilyAvatar(initial: "J")
-                    FamilyAvatar(initial: "S")
-                    FamilyAvatar(initial: "R")
-                    FamilyAvatar(initial: "Ju")
-                }
-
-                PresenceChip(initial: "S", name: "Sophie", status: "Soccer", statusColor: WarmPalette.good)
-
-                HStack(spacing: 8) {
-                    WarmStatTile(label: "Tasks", value: "3", sub: "today")
-                    WarmStatTile(label: "Events", value: "2", sub: "today")
-                }
-
-                WarmProgressBar(progress: 0.62, color: AccentTheme.sage.color)
-                    .padding(.horizontal)
-            }
-            .padding()
-        }
-    }
-}
-
-// MARK: - Warm Empty State (replaces ContentUnavailableView)
+// MARK: - Empty State
 
 struct WarmEmptyState: View {
     let title: String

@@ -291,8 +291,7 @@ struct HomeView: View {
                                 .foregroundStyle(WarmPalette.cream1)
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 10)
-                                .background(WarmPalette.ink1)
-                                .clipShape(Capsule())
+                                .background(WarmPalette.ink1, in: Capsule())
                         }
                     }
                     Button {
