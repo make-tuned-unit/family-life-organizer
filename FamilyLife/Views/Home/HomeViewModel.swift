@@ -83,7 +83,8 @@ final class HomeViewModel {
     // MARK: - Feed preparation
 
     static func prepareFeed(_ items: [APIService.ActivityItem], currentUserName: String? = nil, currentUsername: String? = nil) -> [PreparedFeedItem] {
-        items.prefix(5).map { item in
+        // Filter out comment/reaction events — those are for notifications only
+        items.filter { $0.feed_type != "comment" && $0.feed_type != "reaction" }.prefix(5).map { item in
             let isPost = item.feed_type == "post"
             let accent = accentColor(for: item.feed_type)
             let body: AttributedString? = if isPost, let text = item.body, !text.isEmpty {
