@@ -1,6 +1,17 @@
 import Foundation
 import SwiftUI
 
+/// Pre-computed display data for a feed card — eliminates per-card .task work
+struct PreparedFeedItem: Identifiable {
+    let item: APIService.ActivityItem
+    let body: AttributedString?
+    let time: String
+    let isPost: Bool
+    let accentColor: Color
+
+    var id: UUID { item.id }
+}
+
 @MainActor
 @Observable
 final class HomeViewModel {
@@ -8,12 +19,11 @@ final class HomeViewModel {
     var todayAppointments: [AppointmentResponse] = []
     var activeTasks: [TaskResponse] = []
     var groceries: [GroceryResponse] = []
-    var activityFeed: [APIService.ActivityItem] = []
+    var activityFeed: [PreparedFeedItem] = []
     var activeTrips: [TripResponse] = []
     var isLoading = false
     var error: String?
 
-    // Static grid columns — avoids recreating the array on every render
     static let statColumns = Array(repeating: GridItem(.flexible(), spacing: 8), count: 4)
 
     func loadAll(api: APIService) async {
@@ -21,7 +31,6 @@ final class HomeViewModel {
         error = nil
         clearStaleDismissals()
 
-        // Fetch all data in parallel WITHOUT mutating state
         async let d = Self.safeFetch { try await api.fetchDashboard() }
         async let t = Self.safeFetch { try await api.fetchTasks(status: "active") }
         async let a = Self.safeFetch { try await api.fetchAppointments(dateFrom: Self.todayString(), dateTo: Self.todayString()) }
@@ -30,8 +39,6 @@ final class HomeViewModel {
 
         let (dashboard, tasks, appointments, feed, trips) = await (d, t, a, f, tr)
 
-        // Batch apply — all property sets happen synchronously,
-        // so @Observable coalesces into a SINGLE re-render.
         if let data = dashboard {
             summary = data.summary
             groceries = data.groceries
@@ -48,18 +55,70 @@ final class HomeViewModel {
                 .filter { !dismissedHeroIds.contains($0.id) }
                 .sorted { ($0.appointment_time ?? "") < ($1.appointment_time ?? "") }
         }
-        if let feed { activityFeed = feed }
+        if let feed { activityFeed = Self.prepareFeed(feed) }
         if let trips { activeTrips = trips }
 
         isLoading = false
     }
 
+    // MARK: - Feed preparation
+
+    private static let mentionRegex = try! NSRegularExpression(pattern: "@[A-Z][a-zA-Z'-]+(?:\\s[A-Z][a-zA-Z'-]+)*")
+
+    static func prepareFeed(_ items: [APIService.ActivityItem]) -> [PreparedFeedItem] {
+        items.prefix(10).map { item in
+            let isPost = item.feed_type == "post"
+            let accent = accentColor(for: item.feed_type)
+            let body: AttributedString? = if isPost, let text = item.body, !text.isEmpty {
+                buildAttributedBody(text, accent: accent)
+            } else {
+                nil
+            }
+            return PreparedFeedItem(
+                item: item,
+                body: body,
+                time: formatRelativeTime(item.created_at),
+                isPost: isPost,
+                accentColor: accent
+            )
+        }
+    }
+
+    private static func buildAttributedBody(_ text: String, accent: Color) -> AttributedString {
+        var result = AttributedString(text)
+        let nsText = text as NSString
+        let matches = mentionRegex.matches(in: text, range: NSRange(location: 0, length: nsText.length))
+        for match in matches {
+            guard let swiftRange = Range(match.range, in: text),
+                  let attrRange = result.range(of: String(text[swiftRange])) else { continue }
+            result[attrRange].foregroundColor = UIColor(accent)
+            result[attrRange].font = .systemFont(ofSize: 14, weight: .semibold)
+        }
+        return result
+    }
+
+    static func formatRelativeTime(_ dateStr: String?) -> String {
+        guard let dateStr,
+              let date = ISO8601DateFormatter.flexible.date(from: dateStr) else { return "" }
+        return date.formatted(.relative(presentation: .named))
+    }
+
+    private static func accentColor(for feedType: String) -> Color {
+        switch feedType {
+        case "decision": TabAccent.decisions.color
+        case "event":    TabAccent.calendar.color
+        case "coverage": TabAccent.care.color
+        case "rivalry":  AccentTheme.saffron.color
+        case "post":     AccentTheme.ocean.color
+        default:         WarmPalette.ink3
+        }
+    }
+
+    // MARK: - Data helpers
+
     private static func safeFetch<T>(_ block: () async throws -> T) async -> T? {
         do { return try await block() }
-        catch {
-            if error.isCancellation { return nil }
-            return nil
-        }
+        catch { return nil }
     }
 
     private static func todayDate(from timeStr: String) -> Date? {
@@ -98,12 +157,8 @@ final class HomeViewModel {
     }
 
     private var dismissedHeroIds: Set<Int> {
-        get {
-            Set((UserDefaults.standard.array(forKey: "dismissed_hero_ids") as? [Int]) ?? [])
-        }
-        set {
-            UserDefaults.standard.set(Array(newValue), forKey: "dismissed_hero_ids")
-        }
+        get { Set((UserDefaults.standard.array(forKey: "dismissed_hero_ids") as? [Int]) ?? []) }
+        set { UserDefaults.standard.set(Array(newValue), forKey: "dismissed_hero_ids") }
     }
 
     func dismissHeroCard() {
@@ -144,7 +199,8 @@ final class HomeViewModel {
 
     func reloadFeed(api: APIService) async {
         do {
-            activityFeed = try await api.fetchActivity()
+            let items = try await api.fetchActivity()
+            activityFeed = Self.prepareFeed(items)
         } catch {
             guard !error.isCancellation else { return }
         }

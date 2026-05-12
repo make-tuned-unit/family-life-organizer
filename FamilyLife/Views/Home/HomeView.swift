@@ -134,12 +134,12 @@ struct HomeView: View {
     }
 
     private func checkFeedNotifications() {
-        let feed = viewModel.activityFeed
-        guard !feed.isEmpty else { return }
+        let items = viewModel.activityFeed.map(\.item)
+        guard !items.isEmpty else { return }
         Task {
             guard await NotificationService.shared.isAuthorized() else { return }
             NotificationService.shared.checkForNewFeedItems(
-                feed,
+                items,
                 currentUser: auth.currentUser?.name ?? ""
             )
         }
@@ -150,9 +150,12 @@ struct HomeView: View {
             selectedFeedEvent = appt
             return
         }
+        // Fetch only upcoming week instead of ALL appointments
+        let today = DateFormatter.isoDate.string(from: Date())
+        let nextWeek = DateFormatter.isoDate.string(from: Date().addingTimeInterval(7 * 86400))
         do {
-            let all = try await api.fetchAppointments()
-            if let appt = all.first(where: { $0.id == id }) {
+            let recent = try await api.fetchAppointments(dateFrom: today, dateTo: nextWeek)
+            if let appt = recent.first(where: { $0.id == id }) {
                 selectedFeedEvent = appt
             }
         } catch {}
@@ -381,8 +384,8 @@ struct HomeView: View {
                 .padding(.bottom, 8)
 
             LazyVStack(spacing: 10) {
-                ForEach(viewModel.activityFeed.prefix(10)) { item in
-                    FeedCard(item: item, selectedTab: $selectedTab) { eventId in
+                ForEach(viewModel.activityFeed) { prepared in
+                    FeedCard(prepared: prepared, selectedTab: $selectedTab) { eventId in
                         Task { await openFeedEvent(id: eventId) }
                     }
                 }

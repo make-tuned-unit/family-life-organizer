@@ -3,7 +3,7 @@ import SwiftUI
 // MARK: - Interactive Feed Card
 
 struct FeedCard: View {
-    let item: APIService.ActivityItem
+    let prepared: PreparedFeedItem
     @Binding var selectedTab: MainTab
     var onEventTap: ((Int) -> Void)?
 
@@ -20,12 +20,9 @@ struct FeedCard: View {
     @State private var commentCount = 0
     @State private var mentionSuggestions: [APIService.ContactResponse] = []
     @State private var metaLoaded = false
-    @State private var cachedBody: AttributedString?
-    @State private var cachedTime: String?
 
-    private var isPost: Bool { item.feed_type == "post" }
+    private var item: APIService.ActivityItem { prepared.item }
 
-    /// Show server-provided counts until full meta is loaded
     private var displayLikeCount: Int { metaLoaded ? likeCount : (item.reaction_count ?? 0) }
     private var displayCommentCount: Int { metaLoaded ? commentCount : (item.comment_count ?? 0) }
 
@@ -33,8 +30,8 @@ struct FeedCard: View {
         VStack(alignment: .leading, spacing: 0) {
             cardHeader
 
-            if let cachedBody, isPost {
-                Text(cachedBody)
+            if let body = prepared.body {
+                Text(body)
                     .font(.system(size: 15))
                     .foregroundStyle(WarmPalette.ink1)
                     .lineSpacing(3)
@@ -42,8 +39,7 @@ struct FeedCard: View {
                     .padding(.bottom, 12)
             }
 
-            // Only posts get interactive reactions/comments
-            if isPost {
+            if prepared.isPost {
                 actionBar
 
                 if showingComments {
@@ -53,15 +49,6 @@ struct FeedCard: View {
             }
         }
         .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: 18))
-        .task {
-            // Pre-compute expensive text once per card lifecycle
-            if cachedBody == nil, let text = item.body, !text.isEmpty, isPost {
-                cachedBody = buildAttributedBody(text)
-            }
-            if cachedTime == nil {
-                cachedTime = Self.formatRelativeTime(item.created_at)
-            }
-        }
     }
 
     // MARK: - Header
@@ -85,20 +72,20 @@ struct FeedCard: View {
                             .foregroundStyle(WarmPalette.ink1)
                         Text(typeBadge)
                             .font(.system(size: 10, weight: .semibold))
-                            .foregroundStyle(accentColor)
+                            .foregroundStyle(prepared.accentColor)
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
-                            .background(accentColor.opacity(0.1))
+                            .background(prepared.accentColor.opacity(0.1))
                             .clipShape(Capsule())
                     }
-                    Text(cachedTime ?? "")
+                    Text(prepared.time)
                         .font(.system(size: 11))
                         .foregroundStyle(WarmPalette.ink4)
                 }
 
                 Spacer()
 
-                if !isPost {
+                if !prepared.isPost {
                     Image(systemName: "chevron.right")
                         .font(.system(size: 10, weight: .medium))
                         .foregroundStyle(WarmPalette.ink4)
@@ -113,10 +100,7 @@ struct FeedCard: View {
 
     private var actionBar: some View {
         HStack(spacing: 0) {
-            // Like
-            Button {
-                toggleLike()
-            } label: {
+            Button { toggleLike() } label: {
                 HStack(spacing: 5) {
                     Image(systemName: isLiked ? "heart.fill" : "heart")
                         .font(.system(size: 14))
@@ -132,9 +116,10 @@ struct FeedCard: View {
                 .padding(.vertical, 10)
             }
 
-            divider
+            Rectangle()
+                .fill(WarmPalette.ink1.opacity(0.06))
+                .frame(width: 0.5, height: 20)
 
-            // Comment
             Button {
                 withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
                     showingComments.toggle()
@@ -146,11 +131,11 @@ struct FeedCard: View {
                 HStack(spacing: 5) {
                     Image(systemName: "bubble.left")
                         .font(.system(size: 14))
-                        .foregroundStyle(showingComments ? accentColor : WarmPalette.ink3)
+                        .foregroundStyle(showingComments ? prepared.accentColor : WarmPalette.ink3)
                     if displayCommentCount > 0 {
                         Text("\(displayCommentCount)")
                             .font(.system(size: 12, weight: .medium))
-                            .foregroundStyle(showingComments ? accentColor : WarmPalette.ink3)
+                            .foregroundStyle(showingComments ? prepared.accentColor : WarmPalette.ink3)
                     }
                 }
                 .frame(maxWidth: .infinity)
@@ -163,12 +148,6 @@ struct FeedCard: View {
                 .fill(WarmPalette.ink1.opacity(0.06))
                 .frame(height: 0.5)
         }
-    }
-
-    private var divider: some View {
-        Rectangle()
-            .fill(WarmPalette.ink1.opacity(0.06))
-            .frame(width: 0.5, height: 20)
     }
 
     // MARK: - Comments Section
@@ -189,13 +168,10 @@ struct FeedCard: View {
                 .padding(.bottom, 4)
             }
 
-            // @mention suggestions
             if !mentionSuggestions.isEmpty {
                 VStack(alignment: .leading, spacing: 0) {
                     ForEach(mentionSuggestions, id: \.name) { member in
-                        Button {
-                            insertMention(member.name)
-                        } label: {
+                        Button { insertMention(member.name) } label: {
                             HStack(spacing: 8) {
                                 FamilyAvatar(
                                     initial: member.avatar_initial ?? String(member.name.prefix(1)).uppercased(),
@@ -217,7 +193,6 @@ struct FeedCard: View {
                 .transition(.opacity.combined(with: .move(edge: .bottom)))
             }
 
-            // Compose
             HStack(spacing: 10) {
                 ProfileAvatar(size: 24)
 
@@ -232,7 +207,7 @@ struct FeedCard: View {
                     } label: {
                         Image(systemName: "arrow.up.circle.fill")
                             .font(.system(size: 22))
-                            .foregroundStyle(accentColor)
+                            .foregroundStyle(prepared.accentColor)
                     }
                     .disabled(isSendingComment)
                 }
@@ -240,12 +215,6 @@ struct FeedCard: View {
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
         }
-    }
-
-    private func isCommentByCurrentUser(_ comment: APIService.FeedCommentResponse) -> Bool {
-        guard let name = comment.user_name else { return false }
-        return name.localizedCaseInsensitiveCompare(auth.currentUser?.name ?? "") == .orderedSame
-            || name.localizedCaseInsensitiveCompare(auth.currentUser?.username ?? "") == .orderedSame
     }
 
     private func commentRow(_ comment: APIService.FeedCommentResponse) -> some View {
@@ -265,12 +234,12 @@ struct FeedCard: View {
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(WarmPalette.ink1)
                     if let created = comment.created_at {
-                        Text(relativeTimeFrom(created))
+                        Text(HomeViewModel.formatRelativeTime(created))
                             .font(.system(size: 11))
                             .foregroundStyle(WarmPalette.ink4)
                     }
                 }
-                Text(buildAttributedBody(comment.text))
+                Text(Self.buildCommentBody(comment.text, accent: prepared.accentColor))
                     .font(.system(size: 14))
                     .foregroundStyle(WarmPalette.ink2)
                     .lineSpacing(2)
@@ -282,35 +251,33 @@ struct FeedCard: View {
         .padding(.vertical, 6)
     }
 
-    // MARK: - Attributed text with @mentions
+    private func isCommentByCurrentUser(_ comment: APIService.FeedCommentResponse) -> Bool {
+        guard let name = comment.user_name else { return false }
+        return name.localizedCaseInsensitiveCompare(auth.currentUser?.name ?? "") == .orderedSame
+            || name.localizedCaseInsensitiveCompare(auth.currentUser?.username ?? "") == .orderedSame
+    }
 
-    /// Matches @FirstName or @FirstName LastName (capitalized words after @)
+    // MARK: - Attributed text (comments only — post body is pre-computed)
+
     private static let mentionRegex = try! NSRegularExpression(pattern: "@[A-Z][a-zA-Z'-]+(?:\\s[A-Z][a-zA-Z'-]+)*")
 
-    private func buildAttributedBody(_ text: String) -> AttributedString {
+    private static func buildCommentBody(_ text: String, accent: Color) -> AttributedString {
         var result = AttributedString(text)
         let nsText = text as NSString
-        let matches = Self.mentionRegex.matches(in: text, range: NSRange(location: 0, length: nsText.length))
+        let matches = mentionRegex.matches(in: text, range: NSRange(location: 0, length: nsText.length))
         for match in matches {
             guard let swiftRange = Range(match.range, in: text),
                   let attrRange = result.range(of: String(text[swiftRange])) else { continue }
-            result[attrRange].foregroundColor = UIColor(accentColor)
+            result[attrRange].foregroundColor = UIColor(accent)
             result[attrRange].font = .systemFont(ofSize: 14, weight: .semibold)
         }
         return result
     }
 
-    /// Format once, not per-render. Static so it doesn't capture self.
-    private static func formatRelativeTime(_ dateStr: String?) -> String {
-        guard let dateStr,
-              let date = ISO8601DateFormatter.flexible.date(from: dateStr) else { return "" }
-        return date.formatted(.relative(presentation: .named))
-    }
-
     // MARK: - Data
 
     private func loadMeta() async {
-        guard isPost, item.ref_id > 0, !metaLoaded else { return }
+        guard prepared.isPost, item.ref_id > 0, !metaLoaded else { return }
         do {
             async let reactionsReq = api.fetchFeedReactions(postId: item.ref_id)
             async let commentsReq = api.fetchFeedComments(postId: item.ref_id)
@@ -326,7 +293,7 @@ struct FeedCard: View {
     }
 
     private func toggleLike() {
-        guard isPost, item.ref_id > 0 else { return }
+        guard prepared.isPost, item.ref_id > 0 else { return }
         Task {
             if !metaLoaded { await loadMeta() }
             guard metaLoaded else { return }
@@ -377,16 +344,14 @@ struct FeedCard: View {
         let afterAt = String(newComment[atRange.upperBound...])
         let query = afterAt.lowercased().trimmingCharacters(in: .whitespaces)
 
-        // Filter members whose name starts with the typed query
         let matches = household.members.filter {
             query.isEmpty || $0.name.lowercased().hasPrefix(query)
         }
 
-        // Close if no matches or if the full name was already inserted (trailing space after exact match)
         if !query.isEmpty && matches.isEmpty {
             mentionSuggestions = []
         } else if afterAt.hasSuffix(" ") && matches.contains(where: { $0.name.lowercased() == query }) {
-            mentionSuggestions = [] // exact match already inserted
+            mentionSuggestions = []
         } else {
             mentionSuggestions = matches
         }
@@ -402,21 +367,6 @@ struct FeedCard: View {
         guard let author = item.author else { return false }
         return author.localizedCaseInsensitiveCompare(auth.currentUser?.name ?? "") == .orderedSame
             || author.localizedCaseInsensitiveCompare(auth.currentUser?.username ?? "") == .orderedSame
-    }
-
-    private func relativeTimeFrom(_ dateStr: String) -> String {
-        Self.formatRelativeTime(dateStr)
-    }
-
-    private var accentColor: Color {
-        switch item.feed_type {
-        case "decision": TabAccent.decisions.color
-        case "event": TabAccent.calendar.color
-        case "coverage": TabAccent.care.color
-        case "rivalry": AccentTheme.saffron.color
-        case "post": AccentTheme.ocean.color
-        default: WarmPalette.ink3
-        }
     }
 
     private var typeBadge: String {
@@ -449,16 +399,22 @@ struct FeedCard: View {
 #Preview {
     VStack(spacing: 12) {
         FeedCard(
-            item: APIService.ActivityItem(
-                feed_type: "post",
-                ref_id: 1,
-                title: "Beautiful day for a walk",
-                body: "Took the kids to Point Pleasant Park. @Sophie you should bring Rowan next time!",
-                author: "Jesse",
-                status: nil,
-                created_at: ISO8601DateFormatter().string(from: Date()),
-                reaction_count: 2,
-                comment_count: 1
+            prepared: PreparedFeedItem(
+                item: APIService.ActivityItem(
+                    feed_type: "post",
+                    ref_id: 1,
+                    title: "Beautiful day for a walk",
+                    body: "Took the kids to Point Pleasant Park. @Sophie you should bring Rowan next time!",
+                    author: "Jesse",
+                    status: nil,
+                    created_at: ISO8601DateFormatter().string(from: Date()),
+                    reaction_count: 2,
+                    comment_count: 1
+                ),
+                body: AttributedString("Took the kids to Point Pleasant Park."),
+                time: "2 hours ago",
+                isPost: true,
+                accentColor: AccentTheme.ocean.color
             ),
             selectedTab: .constant(.home)
         )
