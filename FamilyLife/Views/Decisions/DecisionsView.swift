@@ -52,7 +52,6 @@ struct DecisionsView: View {
             }
             .padding(.bottom, DesignTokens.Spacing.bottomBuffer)
         }
-        .background { AmbientBackground(style: .decisions) }
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackgroundVisibility(.hidden, for: .navigationBar)
         .toolbar {
