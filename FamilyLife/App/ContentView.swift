@@ -55,6 +55,14 @@ struct MainTabView: View {
         .onChange(of: selectedTab) {
             loadedTabs.insert(selectedTab)
         }
+        .task {
+            // Let Home tab render first, then pre-load other tabs
+            // so they're instant when tapped from the feed
+            try? await Task.sleep(for: .milliseconds(500))
+            for tab in MainTab.allCases {
+                loadedTabs.insert(tab)
+            }
+        }
     }
 
     @ViewBuilder
