@@ -43,10 +43,6 @@ struct HomeView: View {
             .padding(.bottom, DesignTokens.Spacing.bottomBuffer)
         }
         .background { AmbientBackground(style: .home) }
-        .refreshable {
-            await viewModel.loadAll(api: api, userName: auth.currentUser?.name, username: auth.currentUser?.username)
-            checkFeedNotifications()
-        }
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackgroundVisibility(.hidden, for: .navigationBar)
         .toolbar {
@@ -56,22 +52,34 @@ struct HomeView: View {
                 }
             }
             ToolbarItem(placement: .topBarTrailing) {
-                Menu {
-                    Button { showingNewPost = true } label: {
-                        Label("New Post", systemImage: "text.bubble")
+                HStack(spacing: 14) {
+                    Button {
+                        Task {
+                            await viewModel.loadAll(api: api, userName: auth.currentUser?.name, username: auth.currentUser?.username)
+                            checkFeedNotifications()
+                        }
+                    } label: {
+                        Image(systemName: "arrow.clockwise")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundStyle(WarmPalette.ink2)
                     }
-                    Button { showingNewDecision = true } label: {
-                        Label("New Decision", systemImage: "bubble.left.and.bubble.right")
+                    Menu {
+                        Button { showingNewPost = true } label: {
+                            Label("New Post", systemImage: "text.bubble")
+                        }
+                        Button { showingNewDecision = true } label: {
+                            Label("New Decision", systemImage: "bubble.left.and.bubble.right")
+                        }
+                        Button { showingAddTask = true } label: {
+                            Label("New Task", systemImage: "checkmark.circle")
+                        }
+                        Button { showingNewEvent = true } label: {
+                            Label("New Event", systemImage: "calendar.badge.plus")
+                        }
+                    } label: {
+                        Image(systemName: "plus")
+                            .foregroundStyle(WarmPalette.ink2)
                     }
-                    Button { showingAddTask = true } label: {
-                        Label("New Task", systemImage: "checkmark.circle")
-                    }
-                    Button { showingNewEvent = true } label: {
-                        Label("New Event", systemImage: "calendar.badge.plus")
-                    }
-                } label: {
-                    Image(systemName: "plus")
-                        .foregroundStyle(WarmPalette.ink2)
                 }
             }
         }
