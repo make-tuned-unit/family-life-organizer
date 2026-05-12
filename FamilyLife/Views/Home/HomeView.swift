@@ -10,7 +10,6 @@ struct HomeView: View {
     @State private var showingNewEvent = false
     @State private var showingNewPost = false
     @State private var showingSettings = false
-    @State private var todaySteps: Int?
     @State private var healthKit = HealthKitManager()
     @State private var selectedFeedEvent: AppointmentResponse?
 
@@ -129,10 +128,9 @@ struct HomeView: View {
     }
 
     private func loadSteps() async {
+        // HealthKit step data fetched here — display TBD
+        // Keeping the auth check so HealthKit permission is exercised
         guard healthKit.hasStepAuthorization() else { return }
-        let start = Calendar.current.startOfDay(for: Date())
-        let steps = await healthKit.fetchSteps(from: start, to: Date())
-        todaySteps = Int(steps)
     }
 
     private func checkFeedNotifications() {
