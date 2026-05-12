@@ -48,11 +48,11 @@ struct ProfileAvatar: View {
 
     var body: some View {
         if let uiImage = auth.profileUIImage {
+            // Image is pre-rendered as circle in AuthService — no mask/clip needed
             Image(uiImage: uiImage)
                 .resizable()
-                .scaledToFill()
+                .scaledToFit()
                 .frame(width: size, height: size)
-                .mask(Circle())
                 .overlay { Circle().stroke(.white.opacity(0.7), lineWidth: 1.5) }
         } else {
             FamilyAvatar(
