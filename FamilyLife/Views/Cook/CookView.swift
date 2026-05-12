@@ -98,7 +98,7 @@ struct CookView: View {
             .disabled(viewModel.query.isEmpty || viewModel.isLoading)
         }
         .padding(14)
-        .glassEffect(.regular.tint(.white.opacity(0.03)), in: .rect(cornerRadius: DesignTokens.CornerRadius.card))
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
         .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
         .padding(.bottom, 14)
     }
@@ -241,14 +241,14 @@ struct CookView: View {
                                 .foregroundStyle(viewModel.isRecipeSaved(recipe) ? WarmPalette.good : WarmPalette.ink1)
                                 .padding(.horizontal, 18)
                                 .padding(.vertical, 12)
-                                .glassEffect(.regular.tint(.white.opacity(0.05)), in: .capsule)
+                                .background(.ultraThinMaterial, in: Capsule())
                         }
                     }
                 }
                 .padding(18)
             }
             .clipShape(RoundedRectangle(cornerRadius: 26))
-            .glassEffect(.regular.tint(.white.opacity(0.03)), in: .rect(cornerRadius: 26))
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 26))
             .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
             .padding(.bottom, 14)
         } else if viewModel.hasSearched {
@@ -298,7 +298,7 @@ struct RecipeTag: View {
             .foregroundStyle(.white)
             .padding(.horizontal, 10)
             .padding(.vertical, 5)
-            .glassEffect(.regular.tint(.black.opacity(0.35)), in: .capsule)
+            .background(.ultraThinMaterial, in: Capsule())
     }
 }
 
@@ -344,7 +344,7 @@ struct RecipeRowCard: View {
                 .foregroundStyle(WarmPalette.ink3)
         }
         .padding(14)
-        .glassEffect(.regular.tint(color.opacity(0.04)), in: .rect(cornerRadius: 20))
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 20))
     }
 }
 

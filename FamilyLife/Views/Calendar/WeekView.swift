@@ -69,7 +69,7 @@ struct WeekView: View {
                                 WeekAgendaRow(appointment: appt)
                             }
                         }
-                        .glassEffect(.regular.tint(.white.opacity(0.03)), in: .rect(cornerRadius: DesignTokens.CornerRadius.card))
+                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
                         .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
                         .padding(.top, 8)
                     }

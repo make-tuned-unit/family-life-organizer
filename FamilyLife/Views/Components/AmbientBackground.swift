@@ -18,6 +18,7 @@ struct AmbientBackground: View {
                 orb3(geo: geo)
             }
         }
+        .drawingGroup()
         .ignoresSafeArea()
     }
 

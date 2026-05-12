@@ -69,7 +69,7 @@ struct ReceiptScannerView: View {
                             .font(.subheadline.weight(.medium))
                         }
                         .padding()
-                        .glassEffect(.regular.tint(.white.opacity(0.03)), in: .rect(cornerRadius: 16))
+                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
                         .padding(.horizontal)
                     }
 
@@ -146,7 +146,7 @@ struct ReceiptScannerView: View {
                 .foregroundStyle(WarmPalette.ink1)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 16)
-                .glassEffect(.regular.tint(.white.opacity(0.05)), in: .rect(cornerRadius: 16))
+                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
             }
             .padding(.horizontal, 22)
         }

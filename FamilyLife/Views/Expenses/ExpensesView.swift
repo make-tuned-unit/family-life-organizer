@@ -109,7 +109,7 @@ struct ExpensesView: View {
                                 .foregroundStyle(WarmPalette.ink4)
                         }
                         .padding(12)
-                        .glassEffect(.regular.tint(.white.opacity(0.03)), in: .rect(cornerRadius: 16))
+                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
                     }
                     .buttonStyle(.plain)
                 }
@@ -151,7 +151,7 @@ struct ExpensesView: View {
                         .foregroundStyle(WarmPalette.ink4)
                 }
                 .padding(14)
-                .glassEffect(.regular.tint(.white.opacity(0.03)), in: .rect(cornerRadius: DesignTokens.CornerRadius.card))
+                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
             }
             .buttonStyle(.plain)
             .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
@@ -261,7 +261,7 @@ struct ExpensesView: View {
             .padding(20)
             } // close ZStack
             .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.cardLarge))
-            .glassEffect(.regular.tint(AccentTheme.terracotta.color.opacity(0.04)), in: .rect(cornerRadius: DesignTokens.CornerRadius.cardLarge))
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.cardLarge))
             .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
             .padding(.bottom, 14)
         }
@@ -365,7 +365,7 @@ struct BudgetCategoryCard: View {
                 .foregroundStyle(WarmPalette.ink4)
         }
         .padding(14)
-        .glassEffect(.regular.tint(color.opacity(0.04)), in: .rect(cornerRadius: 20))
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 20))
     }
 }
 
@@ -450,7 +450,7 @@ struct ReceiptDetailView: View {
                 }
                 .padding(22)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .glassEffect(.regular.tint(.white.opacity(0.03)), in: .rect(cornerRadius: DesignTokens.CornerRadius.cardLarge))
+                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.cardLarge))
                 .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
                 .padding(.top, 14)
                 .padding(.bottom, 14)
@@ -470,7 +470,7 @@ struct ReceiptDetailView: View {
                         GlassDivider()
                     }
                 }
-                .glassEffect(.regular.tint(.white.opacity(0.03)), in: .rect(cornerRadius: DesignTokens.CornerRadius.card))
+                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
                 .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
                 .padding(.bottom, 14)
 
@@ -502,7 +502,7 @@ struct ReceiptDetailView: View {
                                 .padding(.horizontal, 14)
                             }
                         }
-                        .glassEffect(.regular.tint(.white.opacity(0.03)), in: .rect(cornerRadius: DesignTokens.CornerRadius.card))
+                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
                         .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
                         .padding(.bottom, 14)
                     } else {
@@ -511,7 +511,7 @@ struct ReceiptDetailView: View {
                             .foregroundStyle(WarmPalette.ink2)
                             .padding(16)
                             .frame(maxWidth: .infinity, alignment: .leading)
-                            .glassEffect(.regular.tint(.white.opacity(0.03)), in: .rect(cornerRadius: DesignTokens.CornerRadius.card))
+                            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
                             .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
                             .padding(.bottom, 14)
                     }
@@ -529,7 +529,7 @@ struct ReceiptDetailView: View {
                     .foregroundStyle(WarmPalette.bad)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 14)
-                    .glassEffect(.regular.tint(WarmPalette.bad.opacity(0.04)), in: .rect(cornerRadius: 16))
+                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
                 }
                 .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
                 .padding(.bottom, DesignTokens.Spacing.bottomBuffer)
