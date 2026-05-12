@@ -31,18 +31,22 @@ struct MainTabView: View {
 
     var body: some View {
         ZStack(alignment: .bottom) {
-            switch selectedTab {
-            case .calendar:
-                NavigationStack { CalendarView() }
-            case .lists:
-                NavigationStack { FamilyListsView() }
-            case .home:
-                NavigationStack { HomeView(selectedTab: $selectedTab) }
-            case .decisions:
-                NavigationStack { DecisionsView() }
-            case .more:
-                NavigationStack { MoreView() }
-            }
+            // Keep all tabs alive — never destroy/recreate on switch
+            NavigationStack { CalendarView() }
+                .opacity(selectedTab == .calendar ? 1 : 0)
+                .allowsHitTesting(selectedTab == .calendar)
+            NavigationStack { FamilyListsView() }
+                .opacity(selectedTab == .lists ? 1 : 0)
+                .allowsHitTesting(selectedTab == .lists)
+            NavigationStack { HomeView(selectedTab: $selectedTab) }
+                .opacity(selectedTab == .home ? 1 : 0)
+                .allowsHitTesting(selectedTab == .home)
+            NavigationStack { DecisionsView() }
+                .opacity(selectedTab == .decisions ? 1 : 0)
+                .allowsHitTesting(selectedTab == .decisions)
+            NavigationStack { MoreView() }
+                .opacity(selectedTab == .more ? 1 : 0)
+                .allowsHitTesting(selectedTab == .more)
 
             VStack {
                 Spacer()

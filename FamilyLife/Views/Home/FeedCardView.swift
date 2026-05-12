@@ -201,12 +201,22 @@ struct FeedCard: View {
         }
     }
 
+    private func isCommentByCurrentUser(_ comment: APIService.FeedCommentResponse) -> Bool {
+        guard let name = comment.user_name else { return false }
+        return name.localizedCaseInsensitiveCompare(auth.currentUser?.name ?? "") == .orderedSame
+            || name.localizedCaseInsensitiveCompare(auth.currentUser?.username ?? "") == .orderedSame
+    }
+
     private func commentRow(_ comment: APIService.FeedCommentResponse) -> some View {
         HStack(alignment: .top, spacing: 10) {
-            FamilyAvatar(
-                initial: String(comment.user_name?.prefix(1) ?? "?").uppercased(),
-                size: 22
-            )
+            if isCommentByCurrentUser(comment) {
+                ProfileAvatar(size: 22)
+            } else {
+                FamilyAvatar(
+                    initial: String(comment.user_name?.prefix(1) ?? "?").uppercased(),
+                    size: 22
+                )
+            }
 
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 6) {
