@@ -179,6 +179,18 @@ final class NotificationService {
         UNUserNotificationCenter.current().add(request)
     }
 
+    func notifyLocal(title: String, body: String, category: String) {
+        let content = UNMutableNotificationContent()
+        content.title = title
+        content.body = String(body.prefix(80))
+        content.sound = .default
+        content.categoryIdentifier = category
+
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 1, repeats: false)
+        let request = UNNotificationRequest(identifier: "\(category.lowercased())-\(UUID().uuidString)", content: content, trigger: trigger)
+        UNUserNotificationCenter.current().add(request)
+    }
+
     func notifyMention(author: String, inPost: String) {
         let content = UNMutableNotificationContent()
         content.title = "\(author) mentioned you"
@@ -268,6 +280,18 @@ final class NotificationService {
                 if let body = item.body, body.localizedStandardContains("@\(currentUser)") {
                     notifyMention(author: author, inPost: body)
                 }
+            case "comment":
+                notifyLocal(
+                    title: "\(author) commented",
+                    body: item.body ?? "on a post",
+                    category: "FEED"
+                )
+            case "reaction":
+                notifyLocal(
+                    title: "\(author) liked a post",
+                    body: item.title ?? "",
+                    category: "FEED"
+                )
             case "decision":
                 notifyNewDecision(author: author, title: item.title ?? "New decision")
             case "rivalry":
@@ -277,7 +301,7 @@ final class NotificationService {
             case "coverage":
                 notifyCoverageRequest(author: author, reason: item.title ?? "Coverage needed")
             default:
-                continue // don't count unknown types
+                continue
             }
             notified += 1
         }
