@@ -124,7 +124,7 @@ struct WarmStatTile: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(12)
-        .glassEffect(.regular.tint(.white.opacity(0.05)), in: .rect(cornerRadius: DesignTokens.CornerRadius.tile))
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.tile))
     }
 }
 
@@ -297,7 +297,8 @@ struct EventCard: View {
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .glassEffect(.regular.tint(color.opacity(0.05)), in: .rect(cornerRadius: 20))
+        .background(color.opacity(0.06), in: RoundedRectangle(cornerRadius: 20))
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 20))
     }
 }
 

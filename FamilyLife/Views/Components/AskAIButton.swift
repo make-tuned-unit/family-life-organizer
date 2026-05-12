@@ -121,7 +121,7 @@ struct AskAISheet: View {
                             .disabled(query.isEmpty || isLoading)
                         }
                         .padding(14)
-                        .glassEffect(.regular.tint(.white.opacity(0.03)), in: .rect(cornerRadius: 18))
+                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18))
                     }
 
                     if isLoading {
@@ -167,7 +167,7 @@ struct AskAISheet: View {
                             }
                         }
                         .padding(16)
-                        .glassEffect(.regular.tint(AccentTheme.terracotta.color.opacity(0.04)), in: .rect(cornerRadius: 20))
+                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 20))
                     }
                 }
                 .padding(22)

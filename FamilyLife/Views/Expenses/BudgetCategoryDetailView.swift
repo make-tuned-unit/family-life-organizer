@@ -52,7 +52,7 @@ struct BudgetCategoryDetailView: View {
                     }
                 }
                 .padding(20)
-                .glassEffect(.regular.tint(color.opacity(0.04)), in: .rect(cornerRadius: DesignTokens.CornerRadius.cardLarge))
+                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.cardLarge))
                 .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
                 .padding(.top, 14)
                 .padding(.bottom, 14)
@@ -78,7 +78,7 @@ struct BudgetCategoryDetailView: View {
                             .buttonStyle(.plain)
                         }
                     }
-                    .glassEffect(.regular.tint(.white.opacity(0.03)), in: .rect(cornerRadius: DesignTokens.CornerRadius.card))
+                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
                     .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
                 } else if !isLoading {
                     VStack(spacing: 8) {

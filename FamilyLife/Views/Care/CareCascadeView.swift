@@ -108,7 +108,7 @@ struct CoverageCascadeView: View {
                                         }
                                     }
                                     .padding(.vertical, 8).padding(.leading, 8).padding(.trailing, 14)
-                                    .glassEffect(.regular.tint(selected ? TabAccent.care.color.opacity(0.08) : .white.opacity(0.05)), in: .capsule)
+                                    .background(.ultraThinMaterial, in: Capsule())
                                     .overlay(Capsule().stroke(selected ? TabAccent.care.color.opacity(0.3) : .clear, lineWidth: 1))
                                 }
                                 .buttonStyle(.plain)
@@ -133,7 +133,7 @@ struct CoverageCascadeView: View {
                             .font(.system(size: 15)).foregroundStyle(WarmPalette.ink1)
                     }
                     .padding(12)
-                    .glassEffect(.regular.tint(.white.opacity(0.03)), in: .rect(cornerRadius: 16))
+                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
                 }
                 .padding(.horizontal, 22).padding(.bottom, 18)
 
@@ -162,7 +162,7 @@ struct CoverageCascadeView: View {
                         .font(.system(size: 15)).foregroundStyle(WarmPalette.ink2)
                 }
                 .padding(14).frame(maxWidth: .infinity, alignment: .leading)
-                .glassEffect(.regular.tint(.white.opacity(0.03)), in: .rect(cornerRadius: 18))
+                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18))
                 .padding(.horizontal, DesignTokens.Spacing.horizontalMargin).padding(.bottom, 14)
 
                 // Send
@@ -236,12 +236,12 @@ struct CoverageCascadeView: View {
                                 Text("Share Link")
                                     .font(.system(size: 12, weight: .semibold))
                                     .padding(.horizontal, 12).padding(.vertical, 8)
-                                    .glassEffect(.regular.tint(TabAccent.care.color.opacity(0.08)), in: .capsule)
+                                    .background(.ultraThinMaterial, in: Capsule())
                             }
                         }
                     }
                     .padding(14)
-                    .glassEffect(.regular.tint(WarmPalette.warn.opacity(0.04)), in: .rect(cornerRadius: 18))
+                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18))
                     .padding(.horizontal, DesignTokens.Spacing.horizontalMargin).padding(.bottom, 8)
                 }
 
@@ -254,7 +254,7 @@ struct CoverageCascadeView: View {
                         Text("Check for approvals").font(.system(size: 14, weight: .semibold))
                     }
                     .foregroundStyle(TabAccent.care.color).frame(maxWidth: .infinity).padding(.vertical, 14)
-                    .glassEffect(.regular.tint(TabAccent.care.color.opacity(0.06)), in: .rect(cornerRadius: 22))
+                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 22))
                 }
                 .padding(.horizontal, DesignTokens.Spacing.horizontalMargin).padding(.top, 8).padding(.bottom, 40)
             }
@@ -312,7 +312,7 @@ struct CoverageCascadeView: View {
                         .clipShape(RoundedRectangle(cornerRadius: 18))
                     }
                     .padding(22)
-                    .glassEffect(.regular.tint(WarmPalette.good.opacity(0.03)), in: .rect(cornerRadius: DesignTokens.CornerRadius.cardLarge))
+                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.cardLarge))
                     .overlay(alignment: .top) {
                         Rectangle()
                             .fill(LinearGradient(colors: [WarmPalette.good, .clear], startPoint: .leading, endPoint: .trailing))
@@ -379,7 +379,7 @@ struct CoverageCascadeView: View {
                         .padding(.top, 16)
                     }
                     .padding(18)
-                    .glassEffect(.regular.tint(.white.opacity(0.03)), in: .rect(cornerRadius: 22))
+                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 22))
                     .padding(.horizontal, DesignTokens.Spacing.horizontalMargin).padding(.bottom, 40)
                 }
             }
@@ -443,7 +443,7 @@ struct CoverageCascadeView: View {
             }
         }
         .padding(12)
-        .glassEffect(.regular.tint(selected ? TabAccent.care.color.opacity(0.06) : .white.opacity(0.03)), in: .rect(cornerRadius: 16))
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
         .overlay(RoundedRectangle(cornerRadius: 16).stroke(selected ? TabAccent.care.color.opacity(0.3) : .clear, lineWidth: 1))
     }
 
@@ -462,28 +462,28 @@ struct CoverageCascadeView: View {
                     TextField("YYYY-MM-DD", text: $candidateWindows[index].date)
                         .font(.system(size: 14, design: .monospaced))
                         .padding(8)
-                        .glassEffect(.regular.tint(.white.opacity(0.03)), in: .rect(cornerRadius: 10))
+                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10))
                 }
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Start").font(.system(size: 10, weight: .semibold)).foregroundStyle(WarmPalette.ink3)
                     TextField("HH:MM", text: $candidateWindows[index].startTime)
                         .font(.system(size: 14, design: .monospaced))
                         .padding(8)
-                        .glassEffect(.regular.tint(.white.opacity(0.03)), in: .rect(cornerRadius: 10))
+                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10))
                 }
                 VStack(alignment: .leading, spacing: 4) {
                     Text("End").font(.system(size: 10, weight: .semibold)).foregroundStyle(WarmPalette.ink3)
                     TextField("HH:MM", text: $candidateWindows[index].endTime)
                         .font(.system(size: 14, design: .monospaced))
                         .padding(8)
-                        .glassEffect(.regular.tint(.white.opacity(0.03)), in: .rect(cornerRadius: 10))
+                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10))
                 }
             }
             TextField("What's happening? (optional)", text: $candidateWindows[index].description)
                 .font(.system(size: 13)).foregroundStyle(WarmPalette.ink3)
         }
         .padding(14)
-        .glassEffect(.regular.tint(.white.opacity(0.03)), in: .rect(cornerRadius: 20))
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 20))
     }
 }
 

@@ -17,10 +17,10 @@ struct FLCardModifier: ViewModifier {
     func body(content: Content) -> some View {
         if interactive {
             content
-                .glassEffect(.regular.tint(tint.opacity(DesignTokens.Opacity.interactiveTint)).interactive(), in: .rect(cornerRadius: DesignTokens.CornerRadius.card))
+                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
         } else {
             content
-                .glassEffect(.regular.tint(tint.opacity(DesignTokens.Opacity.cardTint)), in: .rect(cornerRadius: DesignTokens.CornerRadius.card))
+                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
         }
     }
 }
