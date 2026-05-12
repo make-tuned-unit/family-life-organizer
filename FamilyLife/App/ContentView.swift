@@ -55,11 +55,6 @@ struct MainTabView: View {
         .onChange(of: selectedTab) {
             loadedTabs.insert(selectedTab)
         }
-        .task {
-            // Load remaining tabs after Home renders
-            try? await Task.sleep(for: .seconds(1))
-            for tab in MainTab.allCases { loadedTabs.insert(tab) }
-        }
     }
 
     @ViewBuilder
