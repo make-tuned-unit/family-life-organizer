@@ -31,7 +31,7 @@ struct HomeView: View {
 
     var body: some View {
         ScrollView(showsIndicators: false) {
-            VStack(spacing: 0) {
+            LazyVStack(spacing: 0) {
                 headerSection
                 greetingSection
                 presenceRow
@@ -223,19 +223,18 @@ struct HomeView: View {
     @ViewBuilder
     private var presenceRow: some View {
         if let trip = viewModel.activeTrips.first {
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 10) {
-                    let eta = max(0, trip.eta_minutes ?? 0)
-                    PresenceChip(
-                        initial: String(trip.traveler.prefix(1)).uppercased(),
-                        name: trip.traveler.capitalized,
-                        status: eta <= 0 ? "Arriving now" : "On the way \u{00B7} \(eta) min",
-                        statusColor: eta <= 0 ? WarmPalette.good : WarmPalette.warn,
-                        showTrip: true
-                    )
-                }
-                .padding(.horizontal, 22)
+            let eta = max(0, trip.eta_minutes ?? 0)
+            HStack {
+                PresenceChip(
+                    initial: String(trip.traveler.prefix(1)).uppercased(),
+                    name: trip.traveler.capitalized,
+                    status: eta <= 0 ? "Arriving now" : "On the way \u{00B7} \(eta) min",
+                    statusColor: eta <= 0 ? WarmPalette.good : WarmPalette.warn,
+                    showTrip: true
+                )
+                Spacer()
             }
+            .padding(.horizontal, 22)
             .padding(.bottom, 16)
         }
     }
@@ -374,15 +373,13 @@ struct HomeView: View {
             WarmSectionHeader(title: "Feed")
                 .padding(.bottom, 8)
 
-            LazyVStack(spacing: 10) {
-                ForEach(viewModel.activityFeed) { prepared in
-                    FeedCard(prepared: prepared, selectedTab: $selectedTab) { eventId in
-                        Task { await openFeedEvent(id: eventId) }
-                    }
+            ForEach(viewModel.activityFeed) { prepared in
+                FeedCard(prepared: prepared, selectedTab: $selectedTab) { eventId in
+                    Task { await openFeedEvent(id: eventId) }
                 }
+                .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
+                .padding(.bottom, 10)
             }
-            .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
-            .padding(.bottom, 18)
         }
     }
 }
