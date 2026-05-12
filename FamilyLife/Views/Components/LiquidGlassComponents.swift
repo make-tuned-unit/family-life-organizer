@@ -11,34 +11,30 @@ struct FamilyAvatar: View {
             .font(.system(size: size * 0.42, weight: .semibold))
             .foregroundStyle(.white)
             .frame(width: size, height: size)
-            .background(gradient)
+            .background(Self.gradient(for: initial))
             .clipShape(Circle())
             .overlay(
                 Circle()
                     .stroke(.white.opacity(0.7), lineWidth: 1.5)
             )
-            // No drop shadow — clean glass look
     }
 
-    private var gradient: LinearGradient {
-        // Stable gradient based on initial — no hardcoded names
-        let palette: [(String, String)] = [
-            ("#c46a4a", "#8a3e2a"), // terracotta
-            ("#d99a3c", "#a86a1c"), // amber
-            ("#7ba05b", "#4a6a35"), // sage
-            ("#6b8aa0", "#3a5870"), // steel blue
-            ("#b97090", "#7a4868"), // mauve
-            ("#8a7468", "#5a463a"), // walnut
-            ("#6a9a8a", "#3a6a5a"), // teal
-            ("#9a6ab0", "#6a3a80"), // plum
-        ]
+    /// Pre-parsed palette — avoids Color(hex:) on every render
+    private static let palette: [(Color, Color)] = [
+        (Color(hex: "#c46a4a"), Color(hex: "#8a3e2a")), // terracotta
+        (Color(hex: "#d99a3c"), Color(hex: "#a86a1c")), // amber
+        (Color(hex: "#7ba05b"), Color(hex: "#4a6a35")), // sage
+        (Color(hex: "#6b8aa0"), Color(hex: "#3a5870")), // steel blue
+        (Color(hex: "#b97090"), Color(hex: "#7a4868")), // mauve
+        (Color(hex: "#8a7468"), Color(hex: "#5a463a")), // walnut
+        (Color(hex: "#6a9a8a"), Color(hex: "#3a6a5a")), // teal
+        (Color(hex: "#9a6ab0"), Color(hex: "#6a3a80")), // plum
+    ]
+
+    private static func gradient(for initial: String) -> LinearGradient {
         let hash = initial.uppercased().unicodeScalars.reduce(0) { $0 &+ Int($1.value) }
         let pair = palette[abs(hash) % palette.count]
-        return LinearGradient(
-            colors: [Color(hex: pair.0), Color(hex: pair.1)],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
+        return LinearGradient(colors: [pair.0, pair.1], startPoint: .topLeading, endPoint: .bottomTrailing)
     }
 }
 
