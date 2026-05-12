@@ -457,8 +457,8 @@ struct TripLiveMapView: View {
 
         let request = MKDirections.Request()
         request.transportType = .automobile
-        request.source = MKMapItem(location: .init(latitude: currentCoordinate.latitude, longitude: currentCoordinate.longitude), address: nil)
-        request.destination = MKMapItem(location: .init(latitude: destinationCoordinate.latitude, longitude: destinationCoordinate.longitude), address: nil)
+        request.source = MKMapItem(placemark: MKPlacemark(coordinate: currentCoordinate))
+        request.destination = MKMapItem(placemark: MKPlacemark(coordinate: destinationCoordinate))
 
         do {
             let response = try await MKDirections(request: request).calculate()

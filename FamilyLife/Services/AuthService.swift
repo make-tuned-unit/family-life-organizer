@@ -5,6 +5,7 @@ import UIKit
 @Observable
 final class AuthService {
     var isAuthenticated = false
+    var isRestoringSession = false
     var currentUser: UserProfile?
     var needsOnboarding = false
     var profileImageData: Data?
@@ -25,6 +26,7 @@ final class AuthService {
             let id = UserDefaults.standard.integer(forKey: "auth_user_id")
             currentUser = UserProfile(id: id > 0 ? id : nil, username: username, name: name, avatar: "")
             isAuthenticated = true
+            isRestoringSession = true
         }
         profileImageData = Self.loadProfileImageFromDisk()
         if let profileImageData { profileUIImage = UIImage(data: profileImageData) }
@@ -55,9 +57,32 @@ final class AuthService {
         return nil
     }
 
-    func validateSession() async {
-        // Trust local credentials — actual API calls will handle 401 if session expired
-        guard isAuthenticated else { return }
+    func validateSession(api: APIService) async {
+        guard isAuthenticated else {
+            isRestoringSession = false
+            return
+        }
+
+        do {
+            let response = try await api.fetchMe()
+            if let user = response.user {
+                currentUser = UserProfile(
+                    id: user.id,
+                    username: user.username,
+                    name: user.name,
+                    avatar: user.avatar ?? ""
+                )
+                UserDefaults.standard.set(user.username, forKey: "auth_username")
+                UserDefaults.standard.set(user.name, forKey: "auth_name")
+                UserDefaults.standard.set(user.id, forKey: "auth_user_id")
+            }
+        } catch APIError.unauthorized {
+            logout()
+        } catch {
+            // Keep cached credentials for transient connectivity failures.
+        }
+
+        isRestoringSession = false
     }
 
     func login(username: String, password: String) async throws {
@@ -93,6 +118,7 @@ final class AuthService {
 
     func logout() {
         isAuthenticated = false
+        isRestoringSession = false
         currentUser = nil
         needsOnboarding = false
         UserDefaults.standard.removeObject(forKey: "auth_username")

@@ -53,7 +53,7 @@ struct SignUpView: View {
                                 Spacer()
                             }
                             .padding(14)
-                            .glassEffect(.regular.tint(.white.opacity(0.03)), in: .rect(cornerRadius: 14))
+                            .flGlassSurface(tint: .white.opacity(0.03), strokeOpacity: 0.08, in: RoundedRectangle(cornerRadius: 14))
                         }
 
                         if hasInviteCode {
@@ -132,7 +132,7 @@ struct SignUpView: View {
             }
         }
         .padding(16)
-        .glassEffect(.regular.tint(.white.opacity(0.03)), in: .rect(cornerRadius: 14))
+        .flGlassSurface(tint: .white.opacity(0.03), strokeOpacity: 0.08, in: RoundedRectangle(cornerRadius: 14))
     }
 
     private func signUp() {

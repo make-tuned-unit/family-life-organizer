@@ -19,15 +19,18 @@ struct FeedCard: View {
     @State private var isSendingComment = false
     @State private var commentCount = 0
     @State private var mentionSuggestions: [APIService.ContactResponse] = []
+    @State private var metaLoaded = false
 
     private var isPost: Bool { item.feed_type == "post" }
 
+    /// Show server-provided counts until full meta is loaded
+    private var displayLikeCount: Int { metaLoaded ? likeCount : (item.reaction_count ?? 0) }
+    private var displayCommentCount: Int { metaLoaded ? commentCount : (item.comment_count ?? 0) }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Header
             cardHeader
 
-            // Body content
             if let body = item.body, !body.isEmpty, isPost {
                 Text(attributedBody(body))
                     .font(.system(size: 15))
@@ -37,13 +40,14 @@ struct FeedCard: View {
                     .padding(.bottom, 12)
             }
 
-            // Action bar
-            actionBar
+            // Only posts get interactive reactions/comments
+            if isPost {
+                actionBar
 
-            // Expandable comments
-            if showingComments {
-                commentsSection
-                    .transition(.opacity.combined(with: .move(edge: .top)))
+                if showingComments {
+                    commentsSection
+                        .transition(.opacity.combined(with: .move(edge: .top)))
+                }
             }
         }
         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18))
@@ -100,17 +104,15 @@ struct FeedCard: View {
         HStack(spacing: 0) {
             // Like
             Button {
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
-                    toggleLike()
-                }
+                toggleLike()
             } label: {
                 HStack(spacing: 5) {
                     Image(systemName: isLiked ? "heart.fill" : "heart")
                         .font(.system(size: 14))
                         .foregroundStyle(isLiked ? WarmPalette.bad : WarmPalette.ink3)
                         .scaleEffect(isLiked ? 1.1 : 1.0)
-                    if likeCount > 0 {
-                        Text("\(likeCount)")
+                    if displayLikeCount > 0 {
+                        Text("\(displayLikeCount)")
                             .font(.system(size: 12, weight: .medium))
                             .foregroundStyle(isLiked ? WarmPalette.bad : WarmPalette.ink3)
                     }
@@ -126,7 +128,7 @@ struct FeedCard: View {
                 withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
                     showingComments.toggle()
                 }
-                if showingComments && comments.isEmpty {
+                if showingComments && !metaLoaded {
                     Task { await loadMeta() }
                 }
             } label: {
@@ -134,8 +136,8 @@ struct FeedCard: View {
                     Image(systemName: "bubble.left")
                         .font(.system(size: 14))
                         .foregroundStyle(showingComments ? accentColor : WarmPalette.ink3)
-                    if commentCount > 0 {
-                        Text("\(commentCount)")
+                    if displayCommentCount > 0 {
+                        Text("\(displayCommentCount)")
                             .font(.system(size: 12, weight: .medium))
                             .foregroundStyle(showingComments ? accentColor : WarmPalette.ink3)
                     }
@@ -222,13 +224,10 @@ struct FeedCard: View {
                             .foregroundStyle(accentColor)
                     }
                     .disabled(isSendingComment)
-                    .transition(.scale.combined(with: .opacity))
                 }
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
-            .animation(.spring(response: 0.25), value: newComment.isEmpty)
-            .animation(.spring(response: 0.25), value: mentionSuggestions.isEmpty)
         }
     }
 
@@ -292,23 +291,30 @@ struct FeedCard: View {
     // MARK: - Data
 
     private func loadMeta() async {
-        guard isPost, item.ref_id > 0 else { return }
+        guard isPost, item.ref_id > 0, !metaLoaded else { return }
         do {
-            let reactions = try await api.fetchFeedReactions(postId: item.ref_id)
+            async let reactionsReq = api.fetchFeedReactions(postId: item.ref_id)
+            async let commentsReq = api.fetchFeedComments(postId: item.ref_id)
+            let (reactions, fetchedComments) = try await (reactionsReq, commentsReq)
             likeCount = reactions.count
             isLiked = reactions.contains { $0.user_name == auth.currentUser?.name || $0.user_name == auth.currentUser?.username }
-            let fetchedComments = try await api.fetchFeedComments(postId: item.ref_id)
             comments = fetchedComments
             commentCount = fetchedComments.count
+            metaLoaded = true
         } catch {
             guard !error.isCancellation else { return }
         }
     }
 
     private func toggleLike() {
-        isLiked.toggle()
-        likeCount += isLiked ? 1 : -1
+        guard isPost, item.ref_id > 0 else { return }
         Task {
+            if !metaLoaded { await loadMeta() }
+            guard metaLoaded else { return }
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+                isLiked.toggle()
+                likeCount += isLiked ? 1 : -1
+            }
             do {
                 if isLiked {
                     try await api.addFeedReaction(postId: item.ref_id)
@@ -427,7 +433,9 @@ struct FeedCard: View {
                 body: "Took the kids to Point Pleasant Park. @Sophie you should bring Rowan next time!",
                 author: "Jesse",
                 status: nil,
-                created_at: ISO8601DateFormatter().string(from: Date())
+                created_at: ISO8601DateFormatter().string(from: Date()),
+                reaction_count: 2,
+                comment_count: 1
             ),
             selectedTab: .constant(.home)
         )

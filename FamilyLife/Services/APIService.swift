@@ -2,6 +2,8 @@ import Foundation
 
 @Observable
 final class APIService {
+    static let unauthorizedNotification = Notification.Name("APIServiceUnauthorizedNotification")
+
     var baseURL: String
 
     private let session: URLSession
@@ -19,6 +21,8 @@ final class APIService {
         let config = URLSessionConfiguration.default
         config.httpCookieAcceptPolicy = .always
         config.httpCookieStorage = .shared
+        config.timeoutIntervalForRequest = 20
+        config.timeoutIntervalForResource = 30
         self.session = URLSession(configuration: config)
     }
 
@@ -582,7 +586,7 @@ final class APIService {
     // MARK: - Activity Feed
 
     struct ActivityItem: Codable, Identifiable {
-        var id: String { "\(feed_type)-\(ref_id)-\(created_at ?? "")" }
+        let id = UUID()
         let feed_type: String   // decision | event | coverage | post
         let ref_id: Int
         let title: String?
@@ -590,6 +594,15 @@ final class APIService {
         let author: String?
         let status: String?
         let created_at: String?
+        let reaction_count: Int?
+        let comment_count: Int?
+
+        /// Stable key for notification watermarking (not affected by UUID regeneration)
+        var stableKey: String { "\(feed_type)-\(ref_id)-\(created_at ?? "")" }
+
+        private enum CodingKeys: String, CodingKey {
+            case feed_type, ref_id, title, body, author, status, created_at, reaction_count, comment_count
+        }
     }
 
     func fetchActivity(limit: Int = 20) async throws -> [ActivityItem] {
@@ -810,6 +823,7 @@ final class APIService {
             throw APIError.invalidResponse
         }
         if http.statusCode == 401 {
+            NotificationCenter.default.post(name: Self.unauthorizedNotification, object: nil)
             throw APIError.unauthorized
         }
         guard (200...299).contains(http.statusCode) else {
