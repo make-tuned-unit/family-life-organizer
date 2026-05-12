@@ -1328,6 +1328,26 @@ class FamilyDB {
           (SELECT COUNT(*) FROM feed_comments WHERE post_id = fp.id) as comment_count
         FROM feed_posts fp
         LEFT JOIN users u ON u.id = fp.author_id
+        UNION ALL
+        SELECT 'comment' as feed_type, fc.post_id as ref_id,
+          (SELECT title FROM feed_posts WHERE id = fc.post_id) as title,
+          fc.text as body,
+          u.name as author, 'comment' as status,
+          fc.created_at,
+          0 as reaction_count, 0 as comment_count
+        FROM feed_comments fc
+        JOIN users u ON u.id = fc.user_id
+        WHERE fc.created_at >= datetime('now', '-7 days')
+        UNION ALL
+        SELECT 'reaction' as feed_type, fr.post_id as ref_id,
+          (SELECT title FROM feed_posts WHERE id = fr.post_id) as title,
+          fr.reaction_type as body,
+          u.name as author, 'reaction' as status,
+          fr.created_at,
+          0 as reaction_count, 0 as comment_count
+        FROM feed_reactions fr
+        JOIN users u ON u.id = fr.user_id
+        WHERE fr.created_at >= datetime('now', '-7 days')
         ORDER BY created_at DESC
         LIMIT ?
       `;
