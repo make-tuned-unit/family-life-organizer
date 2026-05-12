@@ -17,10 +17,16 @@ struct FLCardModifier: ViewModifier {
     func body(content: Content) -> some View {
         if interactive {
             content
-                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
+                .flGlassSurface(
+                    tint: tint,
+                    in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card)
+                )
         } else {
             content
-                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
+                .flGlassSurface(
+                    tint: tint,
+                    in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card)
+                )
         }
     }
 }
@@ -32,6 +38,17 @@ extension View {
     ///   - interactive: If true, adds `.interactive()` for scale/shimmer on press. Use for tappable rows.
     func flCard(tint: Color = .clear, interactive: Bool = false) -> some View {
         modifier(FLCardModifier(tint: tint, interactive: interactive))
+    }
+
+    @ViewBuilder
+    func flGlassSurface<S: Shape>(tint: Color = .clear, strokeOpacity: Double = 0.15, in shape: S) -> some View {
+        if #available(iOS 26.0, *) {
+            self.glassEffect(.regular.tint(tint), in: shape)
+        } else {
+            self
+                .background(.ultraThinMaterial, in: shape)
+                .overlay(shape.stroke(tint.opacity(strokeOpacity), lineWidth: 0.5))
+        }
     }
 }
 

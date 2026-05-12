@@ -247,7 +247,7 @@ final class NotificationService {
         // First launch — just mark current state, don't spam notifications
         if lastSeenId.isEmpty {
             if let first = items.first {
-                UserDefaults.standard.set(first.id, forKey: lastSeenKey)
+                UserDefaults.standard.set(first.stableKey, forKey: lastSeenKey)
             }
             return
         }
@@ -255,7 +255,7 @@ final class NotificationService {
         // Max 3 notifications per refresh to avoid overwhelming the user
         var notified = 0
         for item in items {
-            guard item.id != lastSeenId else { break }
+            guard item.stableKey != lastSeenId else { break }
             guard notified < 3 else { break }
             // Skip own actions
             guard item.author?.localizedCaseInsensitiveCompare(currentUser) != .orderedSame else { continue }
@@ -283,7 +283,7 @@ final class NotificationService {
         }
 
         if let first = items.first {
-            UserDefaults.standard.set(first.id, forKey: lastSeenKey)
+            UserDefaults.standard.set(first.stableKey, forKey: lastSeenKey)
         }
     }
 

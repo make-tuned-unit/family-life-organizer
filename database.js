@@ -1294,29 +1294,35 @@ class FamilyDB {
     return new Promise((resolve, reject) => {
       const sql = `
         SELECT 'decision' as feed_type, id as ref_id, title, NULL as body,
-          creator_name as author, status, created_at
+          creator_name as author, status, created_at,
+          0 as reaction_count, 0 as comment_count
         FROM decisions WHERE status = 'active'
         UNION ALL
         SELECT 'event' as feed_type, a.id as ref_id, a.title, a.location as body,
           COALESCE(a.person_tags, 'Family') as author, 'upcoming' as status,
-          a.created_at
+          a.created_at,
+          0 as reaction_count, 0 as comment_count
         FROM appointments a WHERE a.appointment_date >= date('now') AND a.appointment_date <= date('now', '+7 days')
         UNION ALL
         SELECT 'coverage' as feed_type, cr.id as ref_id, cr.reason as title, cr.note as body,
           COALESCE(u.name, u.username, 'Family') as author, cr.status,
-          cr.created_at
+          cr.created_at,
+          0 as reaction_count, 0 as comment_count
         FROM coverage_requests cr
         LEFT JOIN users u ON u.id = cr.requester_id
         WHERE cr.status IN ('pending', 'approved')
         UNION ALL
         SELECT 'rivalry' as feed_type, id as ref_id, title, challenge_type as body,
           initiator_name as author, status,
-          created_at
+          created_at,
+          0 as reaction_count, 0 as comment_count
         FROM rivalries WHERE status = 'active' AND created_at >= datetime('now', '-14 days')
         UNION ALL
         SELECT 'post' as feed_type, fp.id as ref_id, fp.title, fp.body,
           COALESCE(u.name, u.username, 'Family') as author, fp.post_type as status,
-          fp.created_at
+          fp.created_at,
+          (SELECT COUNT(*) FROM feed_reactions WHERE post_id = fp.id) as reaction_count,
+          (SELECT COUNT(*) FROM feed_comments WHERE post_id = fp.id) as comment_count
         FROM feed_posts fp
         LEFT JOIN users u ON u.id = fp.author_id
         ORDER BY created_at DESC

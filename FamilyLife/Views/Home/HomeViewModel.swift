@@ -7,6 +7,8 @@ final class HomeViewModel {
     var todayAppointments: [AppointmentResponse] = []
     var activeTasks: [TaskResponse] = []
     var groceries: [GroceryResponse] = []
+    var activityFeed: [APIService.ActivityItem] = []
+    var activeTrips: [TripResponse] = []
     var isLoading = false
     var error: String?
 
@@ -19,6 +21,8 @@ final class HomeViewModel {
             group.addTask { await self.loadDashboard(api: api) }
             group.addTask { await self.loadTasks(api: api) }
             group.addTask { await self.loadTodayAppointments(api: api) }
+            group.addTask { await self.loadFeed(api: api) }
+            group.addTask { await self.loadTrips(api: api) }
         }
 
         isLoading = false
@@ -145,6 +149,30 @@ final class HomeViewModel {
         } catch {
             guard !error.isCancellation else { return }
             self.error = error.localizedDescription
+        }
+    }
+
+    private func loadFeed(api: APIService) async {
+        do {
+            activityFeed = try await api.fetchActivity()
+        } catch {
+            guard !error.isCancellation else { return }
+        }
+    }
+
+    private func loadTrips(api: APIService) async {
+        do {
+            activeTrips = try await api.fetchTrips(status: "active")
+        } catch {
+            guard !error.isCancellation else { return }
+        }
+    }
+
+    func reloadFeed(api: APIService) async {
+        do {
+            activityFeed = try await api.fetchActivity()
+        } catch {
+            guard !error.isCancellation else { return }
         }
     }
 
