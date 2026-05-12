@@ -69,7 +69,7 @@ struct ReceiptScannerView: View {
                             .font(.subheadline.weight(.medium))
                         }
                         .padding()
-                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
+                        .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: 16))
                         .padding(.horizontal)
                     }
 
@@ -146,7 +146,7 @@ struct ReceiptScannerView: View {
                 .foregroundStyle(WarmPalette.ink1)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 16)
-                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
+                .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: 16))
             }
             .padding(.horizontal, 22)
         }

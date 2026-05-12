@@ -30,7 +30,7 @@ struct FLSecondaryButtonStyle: ButtonStyle {
             .font(.subheadline.weight(.medium))
             .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
             .padding(.vertical, 12)
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
+            .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
             .scaleEffect(configuration.isPressed ? 0.97 : 1.0)
             .animation(.spring(response: 0.2, dampingFraction: 0.7), value: configuration.isPressed)
     }

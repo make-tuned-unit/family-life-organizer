@@ -144,7 +144,7 @@ struct BudgetProjectsView: View {
                     .foregroundStyle(TabAccent.home.color)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 14)
-                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
+                    .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
                 }
                 .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
                 .padding(.bottom, 40)
@@ -208,7 +208,7 @@ struct ProjectCard: View {
             )
         }
         .padding(16)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
+        .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
     }
 }
 
@@ -268,7 +268,7 @@ struct ProjectDetailView: View {
                         }
                     }
                     .padding(20)
-                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.cardLarge))
+                    .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.cardLarge))
                     .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
                     .padding(.top, 14)
                     .padding(.bottom, 14)
@@ -292,7 +292,7 @@ struct ProjectDetailView: View {
                                 .buttonStyle(.plain)
                             }
                         }
-                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
+                        .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
                         .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
                     } else if !isLoading {
                         WarmEmptyState(
@@ -418,7 +418,7 @@ struct ExpenseDetailView: View {
                 }
                 .padding(22)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.cardLarge))
+                .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.cardLarge))
                 .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
                 .padding(.top, 14)
                 .padding(.bottom, 14)
@@ -436,7 +436,7 @@ struct ExpenseDetailView: View {
                         GlassDivider()
                     }
                 }
-                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
+                .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
                 .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
                 .padding(.bottom, 14)
 
@@ -463,7 +463,7 @@ struct ExpenseDetailView: View {
                     }
                     .padding(16)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
+                    .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
                     .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
                     .padding(.bottom, 14)
                 }
@@ -484,7 +484,7 @@ struct ExpenseDetailView: View {
                     .foregroundStyle(WarmPalette.bad)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 14)
-                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
+                    .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: 16))
                 }
                 .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
                 .padding(.bottom, DesignTokens.Spacing.bottomBuffer)

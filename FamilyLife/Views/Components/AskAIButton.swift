@@ -121,7 +121,7 @@ struct AskAISheet: View {
                             .disabled(query.isEmpty || isLoading)
                         }
                         .padding(14)
-                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18))
+                        .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: 18))
                     }
 
                     if isLoading {
@@ -167,7 +167,7 @@ struct AskAISheet: View {
                             }
                         }
                         .padding(16)
-                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 20))
+                        .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: 20))
                     }
                 }
                 .padding(22)

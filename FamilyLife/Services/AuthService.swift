@@ -8,10 +8,15 @@ final class AuthService {
     var isRestoringSession = false
     var currentUser: UserProfile?
     var needsOnboarding = false
-    var profileImageData: Data?
+
+    /// Thumbnail-sized UIImage for ProfileAvatar (max 256x256)
     private(set) var profileUIImage: UIImage?
 
-    struct UserProfile {
+    /// Raw image data — only used for disk persistence, not for rendering.
+    @ObservationIgnored
+    private var profileImageData: Data?
+
+    struct UserProfile: Equatable {
         let id: Int?
         let username: String
         let name: String
@@ -29,15 +34,32 @@ final class AuthService {
             isRestoringSession = true
         }
         profileImageData = Self.loadProfileImageFromDisk()
-        if let profileImageData { profileUIImage = UIImage(data: profileImageData) }
+        if let profileImageData {
+            profileUIImage = Self.thumbnail(from: profileImageData)
+        }
     }
 
     func setProfileImage(_ data: Data) {
         let compressed = UIImage(data: data)?.jpegData(compressionQuality: 0.6) ?? data
         profileImageData = compressed
-        profileUIImage = UIImage(data: compressed)
+        profileUIImage = Self.thumbnail(from: compressed)
         try? compressed.write(to: Self.profileImageURL)
         UserDefaults.standard.removeObject(forKey: "profile_image")
+    }
+
+    /// Downscale to 256x256 max — prevents full-res UIImage in memory and
+    /// eliminates expensive per-frame downscaling in Image(uiImage:).
+    private static func thumbnail(from data: Data) -> UIImage? {
+        guard let source = UIImage(data: data) else { return nil }
+        let maxDim: CGFloat = 256
+        let size = source.size
+        guard size.width > maxDim || size.height > maxDim else { return source }
+        let scale = min(maxDim / size.width, maxDim / size.height)
+        let newSize = CGSize(width: size.width * scale, height: size.height * scale)
+        let renderer = UIGraphicsImageRenderer(size: newSize)
+        return renderer.image { _ in
+            source.draw(in: CGRect(origin: .zero, size: newSize))
+        }
     }
 
     private static var profileImageURL: URL {
@@ -46,10 +68,8 @@ final class AuthService {
     }
 
     private static func loadProfileImageFromDisk() -> Data? {
-        // Try disk first, fall back to legacy UserDefaults
         if let data = try? Data(contentsOf: profileImageURL) { return data }
         if let legacy = UserDefaults.standard.data(forKey: "profile_image") {
-            // Migrate to disk
             try? legacy.write(to: profileImageURL)
             UserDefaults.standard.removeObject(forKey: "profile_image")
             return legacy
@@ -66,12 +86,14 @@ final class AuthService {
         do {
             let response = try await api.fetchMe()
             if let user = response.user {
-                currentUser = UserProfile(
+                let profile = UserProfile(
                     id: user.id,
                     username: user.username,
                     name: user.name,
                     avatar: user.avatar ?? ""
                 )
+                // Only mutate if changed — prevents cascading re-renders
+                if currentUser != profile { currentUser = profile }
                 UserDefaults.standard.set(user.username, forKey: "auth_username")
                 UserDefaults.standard.set(user.name, forKey: "auth_name")
                 UserDefaults.standard.set(user.id, forKey: "auth_user_id")
