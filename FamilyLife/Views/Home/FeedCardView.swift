@@ -284,7 +284,8 @@ struct FeedCard: View {
 
     // MARK: - Attributed text with @mentions
 
-    private static let mentionRegex = try! NSRegularExpression(pattern: "@[A-Za-z]+")
+    /// Matches @FirstName or @FirstName LastName (capitalized words after @)
+    private static let mentionRegex = try! NSRegularExpression(pattern: "@[A-Z][a-zA-Z'-]+(?:\\s[A-Z][a-zA-Z'-]+)*")
 
     private func buildAttributedBody(_ text: String) -> AttributedString {
         var result = AttributedString(text)
@@ -374,14 +375,20 @@ struct FeedCard: View {
             return
         }
         let afterAt = String(newComment[atRange.upperBound...])
-        // If there's a space after the @query, close suggestions
-        if afterAt.contains(" ") {
-            mentionSuggestions = []
-            return
-        }
-        let query = afterAt.lowercased()
-        mentionSuggestions = household.members.filter {
+        let query = afterAt.lowercased().trimmingCharacters(in: .whitespaces)
+
+        // Filter members whose name starts with the typed query
+        let matches = household.members.filter {
             query.isEmpty || $0.name.lowercased().hasPrefix(query)
+        }
+
+        // Close if no matches or if the full name was already inserted (trailing space after exact match)
+        if !query.isEmpty && matches.isEmpty {
+            mentionSuggestions = []
+        } else if afterAt.hasSuffix(" ") && matches.contains(where: { $0.name.lowercased() == query }) {
+            mentionSuggestions = [] // exact match already inserted
+        } else {
+            mentionSuggestions = matches
         }
     }
 
@@ -427,6 +434,13 @@ struct FeedCard: View {
         switch item.feed_type {
         case "decision": selectedTab = .decisions
         case "event": onEventTap?(item.ref_id)
+        case "post":
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                showingComments.toggle()
+            }
+            if showingComments && !metaLoaded {
+                Task { await loadMeta() }
+            }
         default: break
         }
     }
