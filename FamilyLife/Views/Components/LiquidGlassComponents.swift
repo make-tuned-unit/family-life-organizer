@@ -98,7 +98,7 @@ struct PresenceChip: View {
         .padding(.vertical, 6)
         .padding(.leading, 6)
         .padding(.trailing, 12)
-        .background(.ultraThinMaterial, in: .capsule)
+        .background(WarmPalette.cardSurface, in: .capsule)
     }
 }
 
@@ -124,7 +124,7 @@ struct WarmStatTile: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(12)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.tile))
+        .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.tile))
     }
 }
 
@@ -243,7 +243,7 @@ struct WarmChip: View {
         .buttonStyle(.plain)
         .background {
             if !isActive {
-                Capsule().fill(.ultraThinMaterial)
+                Capsule().fill(WarmPalette.cardSurface)
             }
         }
     }
@@ -298,7 +298,7 @@ struct EventCard: View {
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(color.opacity(0.06), in: RoundedRectangle(cornerRadius: 20))
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 20))
+        .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: 20))
     }
 }
 

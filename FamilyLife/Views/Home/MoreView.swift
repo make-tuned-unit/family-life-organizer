@@ -78,7 +78,7 @@ struct MoreView: View {
                 .foregroundStyle(WarmPalette.ink4)
         }
         .padding(14)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
+        .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
     }
 }
 
