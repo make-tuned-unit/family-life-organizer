@@ -83,9 +83,7 @@ struct FloatingTabBar: View {
         HStack(spacing: 0) {
             ForEach(MainTab.allCases, id: \.self) { tab in
                 Button {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                        selectedTab = tab
-                    }
+                    selectedTab = tab
                 } label: {
                     Image(systemName: tab.icon)
                         .font(.system(size: 20, weight: .medium))
