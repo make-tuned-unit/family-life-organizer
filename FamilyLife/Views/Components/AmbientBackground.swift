@@ -101,26 +101,32 @@ struct AmbientBackground: View {
     }
 
     private func orb1(geo: GeometryProxy) -> some View {
-        Circle()
-            .fill(orbColor1.opacity(0.35))
-            .frame(width: geo.size.width * 0.6)
-            .blur(radius: 80)
+        Ellipse()
+            .fill(
+                RadialGradient(colors: [orbColor1.opacity(0.3), orbColor1.opacity(0)],
+                               center: .center, startRadius: 0, endRadius: geo.size.width * 0.3)
+            )
+            .frame(width: geo.size.width * 0.7, height: geo.size.width * 0.7)
             .offset(x: -geo.size.width * 0.25, y: -geo.size.height * 0.05)
     }
 
     private func orb2(geo: GeometryProxy) -> some View {
-        Circle()
-            .fill(orbColor2.opacity(0.25))
-            .frame(width: geo.size.width * 0.5)
-            .blur(radius: 60)
+        Ellipse()
+            .fill(
+                RadialGradient(colors: [orbColor2.opacity(0.2), orbColor2.opacity(0)],
+                               center: .center, startRadius: 0, endRadius: geo.size.width * 0.25)
+            )
+            .frame(width: geo.size.width * 0.6, height: geo.size.width * 0.6)
             .offset(x: geo.size.width * 0.45, y: geo.size.height * 0.25)
     }
 
     private func orb3(geo: GeometryProxy) -> some View {
-        Circle()
-            .fill(orbColor3.opacity(0.2))
-            .frame(width: geo.size.width * 0.55)
-            .blur(radius: 70)
+        Ellipse()
+            .fill(
+                RadialGradient(colors: [orbColor3.opacity(0.18), orbColor3.opacity(0)],
+                               center: .center, startRadius: 0, endRadius: geo.size.width * 0.28)
+            )
+            .frame(width: geo.size.width * 0.65, height: geo.size.width * 0.65)
             .offset(x: geo.size.width * 0.05, y: geo.size.height * 0.55)
     }
 

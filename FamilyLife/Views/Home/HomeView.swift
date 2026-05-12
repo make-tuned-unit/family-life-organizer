@@ -23,10 +23,14 @@ struct HomeView: View {
         return "Good evening"
     }
 
-    private var dateString: String {
+    private static let dateFmt: DateFormatter = {
         let f = DateFormatter()
         f.dateFormat = "EEEE '\u{00B7}' MMMM d"
-        return f.string(from: Date())
+        return f
+    }()
+
+    private var dateString: String {
+        Self.dateFmt.string(from: Date())
     }
 
     var body: some View {
@@ -372,7 +376,7 @@ struct HomeView: View {
             WarmSectionHeader(title: "Feed")
                 .padding(.bottom, 8)
 
-            VStack(spacing: 10) {
+            LazyVStack(spacing: 10) {
                 ForEach(activityFeed.prefix(10)) { item in
                     FeedCard(item: item, selectedTab: $selectedTab) { eventId in
                         Task { await openFeedEvent(id: eventId) }
