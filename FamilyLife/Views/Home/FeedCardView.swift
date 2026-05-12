@@ -75,8 +75,7 @@ struct FeedCard: View {
                             .foregroundStyle(prepared.accentColor)
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
-                            .background(prepared.accentColor.opacity(0.1))
-                            .clipShape(Capsule())
+                            .background(prepared.accentColor.opacity(0.1), in: Capsule())
                     }
                     Text(prepared.time)
                         .font(.system(size: 11))
