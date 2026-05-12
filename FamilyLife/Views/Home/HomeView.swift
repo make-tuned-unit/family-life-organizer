@@ -10,7 +10,6 @@ struct HomeView: View {
     @State private var showingNewEvent = false
     @State private var showingNewPost = false
     @State private var showingSettings = false
-    @State private var healthKit = HealthKitManager()
     @State private var selectedFeedEvent: AppointmentResponse?
 
     private var greeting: String {
@@ -45,7 +44,7 @@ struct HomeView: View {
         }
         .background { AmbientBackground(style: .home) }
         .refreshable {
-            await viewModel.loadAll(api: api)
+            await viewModel.loadAll(api: api, userName: auth.currentUser?.name, username: auth.currentUser?.username)
             checkFeedNotifications()
         }
         .navigationBarTitleDisplayMode(.inline)
@@ -120,26 +119,18 @@ struct HomeView: View {
             Text(viewModel.error ?? "An unexpected error occurred.")
         }
         .task {
-            async let load: () = viewModel.loadAll(api: api)
-            async let steps: () = loadSteps()
-            _ = await (load, steps)
+            await viewModel.loadAll(api: api, userName: auth.currentUser?.name, username: auth.currentUser?.username)
             checkFeedNotifications()
         }
     }
 
-    private func loadSteps() async {
-        // HealthKit step data fetched here — display TBD
-        // Keeping the auth check so HealthKit permission is exercised
-        guard healthKit.hasStepAuthorization() else { return }
-    }
-
     private func checkFeedNotifications() {
-        let items = viewModel.activityFeed.map(\.item)
-        guard !items.isEmpty else { return }
+        let feed = viewModel.activityFeed
+        guard !feed.isEmpty else { return }
         Task {
             guard await NotificationService.shared.isAuthorized() else { return }
             NotificationService.shared.checkForNewFeedItems(
-                items,
+                feed.map(\.item),
                 currentUser: auth.currentUser?.name ?? ""
             )
         }
@@ -229,10 +220,11 @@ struct HomeView: View {
 
     // MARK: - Presence Row
 
+    @ViewBuilder
     private var presenceRow: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 10) {
-                if let trip = viewModel.activeTrips.first {
+        if let trip = viewModel.activeTrips.first {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 10) {
                     let eta = max(0, trip.eta_minutes ?? 0)
                     PresenceChip(
                         initial: String(trip.traveler.prefix(1)).uppercased(),
@@ -242,11 +234,10 @@ struct HomeView: View {
                         showTrip: true
                     )
                 }
-                // Additional family members would be populated from API
+                .padding(.horizontal, 22)
             }
-            .padding(.horizontal, 22)
+            .padding(.bottom, 16)
         }
-        .padding(.bottom, 16)
     }
 
     // MARK: - Hero Focus Card
