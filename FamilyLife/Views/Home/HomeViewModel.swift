@@ -24,6 +24,7 @@ final class HomeViewModel {
     var activeTrips: [TripResponse] = []
     var isLoading = false
     var error: String?
+    var visibleFeedCount = 15
 
     static let statColumns = Array(repeating: GridItem(.flexible(), spacing: 8), count: 4)
     static let mentionRegex = try! NSRegularExpression(pattern: "@[A-Z][a-zA-Z'-]+(?:\\s[A-Z][a-zA-Z'-]+)*")
@@ -84,7 +85,7 @@ final class HomeViewModel {
 
     static func prepareFeed(_ items: [APIService.ActivityItem], currentUserName: String? = nil, currentUsername: String? = nil) -> [PreparedFeedItem] {
         // Filter out comment/reaction events — those are for notifications only
-        items.filter { $0.feed_type != "comment" && $0.feed_type != "reaction" }.prefix(5).map { item in
+        items.filter { $0.feed_type != "comment" && $0.feed_type != "reaction" }.map { item in
             let isPost = item.feed_type == "post"
             let accent = accentColor(for: item.feed_type)
             let body: AttributedString? = if isPost, let text = item.body, !text.isEmpty {
