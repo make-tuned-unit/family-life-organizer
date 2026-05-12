@@ -8,6 +8,7 @@ final class AuthService {
     var currentUser: UserProfile?
     var needsOnboarding = false
     var profileImageData: Data?
+    private(set) var profileUIImage: UIImage?
 
     struct UserProfile {
         let id: Int?
@@ -26,14 +27,14 @@ final class AuthService {
             isAuthenticated = true
         }
         profileImageData = Self.loadProfileImageFromDisk()
+        if let profileImageData { profileUIImage = UIImage(data: profileImageData) }
     }
 
     func setProfileImage(_ data: Data) {
-        // Compress to JPEG and save to disk (not UserDefaults)
         let compressed = UIImage(data: data)?.jpegData(compressionQuality: 0.6) ?? data
         profileImageData = compressed
+        profileUIImage = UIImage(data: compressed)
         try? compressed.write(to: Self.profileImageURL)
-        // Remove legacy UserDefaults entry
         UserDefaults.standard.removeObject(forKey: "profile_image")
     }
 
