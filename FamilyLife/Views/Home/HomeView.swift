@@ -11,8 +11,6 @@ struct HomeView: View {
     @State private var showingNewPost = false
     @State private var showingSettings = false
     @State private var todaySteps: Int?
-    @State private var activityFeed: [APIService.ActivityItem] = []
-    @State private var activeTrips: [TripResponse] = []
     @State private var healthKit = HealthKitManager()
     @State private var selectedFeedEvent: AppointmentResponse?
 
@@ -47,7 +45,10 @@ struct HomeView: View {
             .padding(.bottom, DesignTokens.Spacing.bottomBuffer)
         }
         .background { AmbientBackground(style: .home) }
-        .refreshable { await viewModel.loadAll(api: api) }
+        .refreshable {
+            await viewModel.loadAll(api: api)
+            checkFeedNotifications()
+        }
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackgroundVisibility(.hidden, for: .navigationBar)
         .toolbar {
@@ -82,7 +83,6 @@ struct HomeView: View {
         .sheet(isPresented: $showingNewDecision) {
             NewDecisionView {
                 await viewModel.loadAll(api: api)
-                do { activityFeed = try await api.fetchActivity() } catch {}
             }
         }
         .sheet(isPresented: $showingNewEvent) {
@@ -95,7 +95,7 @@ struct HomeView: View {
         }
         .sheet(isPresented: $showingNewPost) {
             NewPostView {
-                do { activityFeed = try await api.fetchActivity() } catch {}
+                await viewModel.reloadFeed(api: api)
             }
         }
         .sheet(isPresented: $showingSettings) { NavigationStack { SettingsView(showsDismissButton: true) } }
@@ -111,34 +111,40 @@ struct HomeView: View {
             if viewModel.isLoading && viewModel.summary == nil { ProgressView() }
         }
         .alert("Something went wrong", isPresented: errorAlertIsPresented) {
-            Button("OK") { viewModel.error = nil }
+            Button("OK") {
+                if viewModel.error == APIError.unauthorized.localizedDescription {
+                    auth.logout()
+                }
+                viewModel.error = nil
+            }
         } message: {
             Text(viewModel.error ?? "An unexpected error occurred.")
         }
         .task {
-            await viewModel.loadAll(api: api)
-            await loadLiveData()
+            async let load: () = viewModel.loadAll(api: api)
+            async let steps: () = loadSteps()
+            _ = await (load, steps)
+            checkFeedNotifications()
         }
     }
 
-    private func loadLiveData() async {
-        if healthKit.isAvailable {
-            if await healthKit.requestStepAuthorization() {
-                let start = Calendar.current.startOfDay(for: Date())
-                let steps = await healthKit.fetchSteps(from: start, to: Date())
-                todaySteps = Int(steps)
-            }
+    private func loadSteps() async {
+        guard healthKit.hasStepAuthorization() else { return }
+        let start = Calendar.current.startOfDay(for: Date())
+        let steps = await healthKit.fetchSteps(from: start, to: Date())
+        todaySteps = Int(steps)
+    }
+
+    private func checkFeedNotifications() {
+        let feed = viewModel.activityFeed
+        guard !feed.isEmpty else { return }
+        Task {
+            guard await NotificationService.shared.isAuthorized() else { return }
+            NotificationService.shared.checkForNewFeedItems(
+                feed,
+                currentUser: auth.currentUser?.name ?? ""
+            )
         }
-        do { activeTrips = try await api.fetchTrips(status: "active") } catch {}
-        do {
-            activityFeed = try await api.fetchActivity()
-            if await NotificationService.shared.isAuthorized() {
-                NotificationService.shared.checkForNewFeedItems(
-                    activityFeed,
-                    currentUser: auth.currentUser?.name ?? ""
-                )
-            }
-        } catch {}
     }
 
     private func openFeedEvent(id: Int) async {
@@ -209,7 +215,7 @@ struct HomeView: View {
 
     @ViewBuilder
     private var familyStatusSubtitle: some View {
-        if let trip = activeTrips.first {
+        if let trip = viewModel.activeTrips.first {
             Text("\(trip.traveler.capitalized) is on the way home.")
                 .font(.system(size: 15))
                 .foregroundStyle(WarmPalette.ink2)
@@ -225,7 +231,7 @@ struct HomeView: View {
     private var presenceRow: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 10) {
-                if let trip = activeTrips.first {
+                if let trip = viewModel.activeTrips.first {
                     let eta = max(0, trip.eta_minutes ?? 0)
                     PresenceChip(
                         initial: String(trip.traveler.prefix(1)).uppercased(),
@@ -372,12 +378,12 @@ struct HomeView: View {
 
     @ViewBuilder
     private var activityFeedSection: some View {
-        if !activityFeed.isEmpty {
+        if !viewModel.activityFeed.isEmpty {
             WarmSectionHeader(title: "Feed")
                 .padding(.bottom, 8)
 
             LazyVStack(spacing: 10) {
-                ForEach(activityFeed.prefix(10)) { item in
+                ForEach(viewModel.activityFeed.prefix(10)) { item in
                     FeedCard(item: item, selectedTab: $selectedTab) { eventId in
                         Task { await openFeedEvent(id: eventId) }
                     }

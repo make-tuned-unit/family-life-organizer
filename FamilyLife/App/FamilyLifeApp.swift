@@ -1,5 +1,4 @@
 import SwiftUI
-import SwiftData
 
 @main
 struct FamilyLifeApp: App {
@@ -15,28 +14,23 @@ struct FamilyLifeApp: App {
                 .environment(householdService)
                 .task {
                     if authService.isAuthenticated {
-                        await householdService.load(api: apiService)
+                        await authService.validateSession(api: apiService)
                     }
+                    if authService.isAuthenticated {
+                        await householdService.reload(api: apiService)
+                    }
+                }
+                .onChange(of: authService.isAuthenticated) { _, isAuthenticated in
+                    if isAuthenticated {
+                        Task {
+                            await householdService.reload(api: apiService)
+                        }
+                    }
+                }
+                .onReceive(NotificationCenter.default.publisher(for: APIService.unauthorizedNotification)) { _ in
+                    authService.logout()
                 }
                 .preferredColorScheme(.light)
         }
-        .modelContainer(for: [
-            FLTask.self,
-            Grocery.self,
-            Appointment.self,
-            Receipt.self,
-            BudgetCategory.self,
-            PantryItem.self,
-            Trip.self,
-            Rivalry.self,
-            RivalryEntry.self,
-            FamilyMemberPoints.self,
-            Decision.self,
-            DecisionReaction.self,
-            DecisionComment.self,
-            GiftPerson.self,
-            GiftIdea.self,
-            SpecialEvent.self
-        ])
     }
 }

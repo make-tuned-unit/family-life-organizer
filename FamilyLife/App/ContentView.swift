@@ -18,7 +18,13 @@ struct ContentView: View {
     @Environment(AuthService.self) private var authService
 
     var body: some View {
-        if authService.isAuthenticated {
+        if authService.isRestoringSession {
+            ZStack {
+                AmbientBackground(style: .home)
+                ProgressView()
+                    .tint(WarmPalette.ink2)
+            }
+        } else if authService.isAuthenticated {
             MainTabView()
         } else {
             LoginView()
@@ -94,7 +100,7 @@ struct FloatingTabBar: View {
         }
         .padding(.horizontal, 6)
         .padding(.vertical, 6)
-        .glassEffect(.regular.tint(WarmPalette.ink1.opacity(0.08)), in: .capsule)
+        .flGlassSurface(tint: WarmPalette.ink1.opacity(0.08), strokeOpacity: 0.08, in: Capsule())
         .shadow(color: Color(hex: "#501e0a").opacity(0.2), radius: 12, y: 4)
         .padding(.horizontal, 16)
         .padding(.bottom, 22)

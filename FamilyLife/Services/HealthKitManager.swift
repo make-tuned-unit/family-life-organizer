@@ -28,6 +28,12 @@ final class HealthKitManager {
         }
     }
 
+    func hasStepAuthorization() -> Bool {
+        guard let store, isAvailable else { return false }
+        guard let stepType = HKQuantityType.quantityType(forIdentifier: .stepCount) else { return false }
+        return store.authorizationStatus(for: stepType) == .sharingAuthorized
+    }
+
     func fetchSteps(from startDate: Date, to endDate: Date) async -> Double {
         guard let store, isAvailable else { return 0 }
         guard let stepType = HKQuantityType.quantityType(forIdentifier: .stepCount) else { return 0 }
