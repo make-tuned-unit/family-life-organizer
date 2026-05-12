@@ -56,14 +56,8 @@ final class AuthService {
     }
 
     func validateSession() async {
+        // Trust local credentials — actual API calls will handle 401 if session expired
         guard isAuthenticated else { return }
-        guard let url = URL(string: AppConfig.apiBaseURL + "/api/data") else { return }
-        do {
-            let (_, response) = try await URLSession.shared.data(from: url)
-            if let http = response as? HTTPURLResponse, http.statusCode == 401 {
-                logout()
-            }
-        } catch {}
     }
 
     func login(username: String, password: String) async throws {
