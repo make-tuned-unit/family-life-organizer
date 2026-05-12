@@ -47,18 +47,21 @@ final class AuthService {
         UserDefaults.standard.removeObject(forKey: "profile_image")
     }
 
-    /// Downscale to 256x256 max — prevents full-res UIImage in memory and
-    /// eliminates expensive per-frame downscaling in Image(uiImage:).
+    /// Pre-renders a circular thumbnail at 128x128. The circular crop is baked into the
+    /// UIImage so ProfileAvatar needs NO .clipShape or .mask (zero offscreen render passes).
     private static func thumbnail(from data: Data) -> UIImage? {
         guard let source = UIImage(data: data) else { return nil }
-        let maxDim: CGFloat = 256
-        let size = source.size
-        guard size.width > maxDim || size.height > maxDim else { return source }
-        let scale = min(maxDim / size.width, maxDim / size.height)
-        let newSize = CGSize(width: size.width * scale, height: size.height * scale)
-        let renderer = UIGraphicsImageRenderer(size: newSize)
-        return renderer.image { _ in
-            source.draw(in: CGRect(origin: .zero, size: newSize))
+        let dim: CGFloat = 128
+        let renderer = UIGraphicsImageRenderer(size: CGSize(width: dim, height: dim))
+        return renderer.image { ctx in
+            let rect = CGRect(origin: .zero, size: CGSize(width: dim, height: dim))
+            UIBezierPath(ovalIn: rect).addClip()
+            // Center-crop the source into the circle
+            let srcSize = source.size
+            let scale = max(dim / srcSize.width, dim / srcSize.height)
+            let drawSize = CGSize(width: srcSize.width * scale, height: srcSize.height * scale)
+            let drawOrigin = CGPoint(x: (dim - drawSize.width) / 2, y: (dim - drawSize.height) / 2)
+            source.draw(in: CGRect(origin: drawOrigin, size: drawSize))
         }
     }
 
