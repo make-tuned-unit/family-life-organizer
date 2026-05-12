@@ -30,7 +30,6 @@ struct FamilyListsView: View {
 
             Spacer()
         }
-        .background { AmbientBackground(style: .home) }
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackgroundVisibility(.hidden, for: .navigationBar)
         .toolbar {

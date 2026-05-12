@@ -42,7 +42,6 @@ struct HomeView: View {
             }
             .padding(.bottom, DesignTokens.Spacing.bottomBuffer)
         }
-        .background { AmbientBackground(style: .home) }
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackgroundVisibility(.hidden, for: .navigationBar)
         .toolbar {
