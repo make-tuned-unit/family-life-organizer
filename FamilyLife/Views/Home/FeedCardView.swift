@@ -46,7 +46,7 @@ struct FeedCard: View {
                     .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
-        .glassEffect(.regular.tint(.white.opacity(0.03)), in: .rect(cornerRadius: 18))
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18))
     }
 
     // MARK: - Header

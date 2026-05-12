@@ -114,7 +114,7 @@ struct FamilyListsView: View {
                         .padding(.vertical, 8)
                         .background(isActive ? WarmPalette.ink1 : .clear)
                         .clipShape(Capsule())
-                        .glassEffect(.regular.tint(isActive ? .clear : .white.opacity(0.05)), in: .capsule)
+                        .background(.ultraThinMaterial, in: Capsule())
                     }
                     .buttonStyle(.plain)
                 }
@@ -168,7 +168,7 @@ struct ListDetailSection: View {
                         .onSubmit { addItem() }
                 }
                 .padding(12)
-                .glassEffect(.regular.tint(.white.opacity(0.03)), in: .capsule)
+                .background(.ultraThinMaterial, in: Capsule())
 
                 if !newItem.isEmpty {
                     Button { addItem() } label: {
@@ -203,7 +203,7 @@ struct ListDetailSection: View {
                                 }
                             }
                         }
-                        .glassEffect(.regular.tint(.white.opacity(0.03)), in: .rect(cornerRadius: DesignTokens.CornerRadius.card))
+                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
                         .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
                         .padding(.bottom, 14)
                     }
@@ -223,7 +223,7 @@ struct ListDetailSection: View {
                                 }
                             }
                         }
-                        .glassEffect(.regular.tint(.white.opacity(0.03)), in: .rect(cornerRadius: DesignTokens.CornerRadius.card))
+                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
                         .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
                         .padding(.bottom, 14)
                         .opacity(0.6)

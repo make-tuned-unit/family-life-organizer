@@ -126,7 +126,7 @@ struct CalendarView: View {
                     .foregroundStyle(WarmPalette.ink4)
             }
             .padding(14)
-            .glassEffect(.regular.tint(TabAccent.care.color.opacity(0.04)), in: .rect(cornerRadius: DesignTokens.CornerRadius.card))
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
         }
         .buttonStyle(.plain)
         .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
@@ -181,7 +181,7 @@ struct CalendarView: View {
             }
         }
         .padding(4)
-        .glassEffect(.regular.tint(.white.opacity(0.05)), in: .capsule)
+        .background(.ultraThinMaterial, in: Capsule())
         .padding(.horizontal, 22)
         .padding(.bottom, 8)
     }
@@ -219,7 +219,7 @@ struct CalendarView: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 16)
-        .glassEffect(.regular.tint(.white.opacity(0.03)), in: .rect(cornerRadius: 24))
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 24))
         .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
         .padding(.bottom, 14)
     }
@@ -443,7 +443,7 @@ struct CalendarEventCard: View {
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .glassEffect(.regular.tint(categoryColor.opacity(0.05)), in: .rect(cornerRadius: 20))
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 20))
     }
 
     private var categoryColor: Color {

@@ -15,10 +15,7 @@ struct FLPrimaryButtonStyle: ButtonStyle {
             .foregroundStyle(.white)
             .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
             .padding(.vertical, 12)
-            .glassEffect(
-                .regular.tint(tint.opacity(DesignTokens.Opacity.primaryButtonTint)).interactive(),
-                in: .rect(cornerRadius: DesignTokens.CornerRadius.card)
-            )
+            .background(tint, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
             .scaleEffect(configuration.isPressed ? 0.97 : 1.0)
             .animation(.spring(response: 0.2, dampingFraction: 0.7), value: configuration.isPressed)
     }
@@ -33,7 +30,7 @@ struct FLSecondaryButtonStyle: ButtonStyle {
             .font(.subheadline.weight(.medium))
             .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
             .padding(.vertical, 12)
-            .glassEffect(.regular.interactive(), in: .rect(cornerRadius: DesignTokens.CornerRadius.card))
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
             .scaleEffect(configuration.isPressed ? 0.97 : 1.0)
             .animation(.spring(response: 0.2, dampingFraction: 0.7), value: configuration.isPressed)
     }
@@ -49,10 +46,7 @@ struct FLDestructiveButtonStyle: ButtonStyle {
             .foregroundStyle(.white)
             .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
             .padding(.vertical, 12)
-            .glassEffect(
-                .regular.tint(.red.opacity(DesignTokens.Opacity.primaryButtonTint)).interactive(),
-                in: .rect(cornerRadius: DesignTokens.CornerRadius.card)
-            )
+            .background(.red, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
             .scaleEffect(configuration.isPressed ? 0.97 : 1.0)
             .animation(.spring(response: 0.2, dampingFraction: 0.7), value: configuration.isPressed)
     }

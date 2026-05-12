@@ -300,7 +300,7 @@ struct HomeView: View {
             }
             .padding(.vertical, 20)
             .padding(.horizontal, 22)
-            .glassEffect(.regular.tint(TabAccent.home.color.opacity(0.04)), in: .rect(cornerRadius: DesignTokens.CornerRadius.cardLarge))
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.cardLarge))
             .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
             .padding(.bottom, 14)
         }
@@ -357,7 +357,7 @@ struct HomeView: View {
                         }
                     }
                 }
-                .glassEffect(.regular.tint(.white.opacity(0.03)), in: .rect(cornerRadius: DesignTokens.CornerRadius.card))
+                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
                 .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
             }
             .padding(.bottom, 14)

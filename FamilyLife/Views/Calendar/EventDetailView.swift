@@ -83,7 +83,7 @@ struct EventDetailView: View {
                     }
                 }
                 .padding(22)
-                .glassEffect(.regular.tint(categoryColor.opacity(0.04)), in: .rect(cornerRadius: DesignTokens.CornerRadius.cardLarge))
+                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.cardLarge))
                 .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
                 .padding(.top, 14)
                 .padding(.bottom, 14)
@@ -108,7 +108,7 @@ struct EventDetailView: View {
                             .padding(.horizontal, 14)
                         }
                     }
-                    .glassEffect(.regular.tint(.white.opacity(0.03)), in: .rect(cornerRadius: DesignTokens.CornerRadius.card))
+                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
                     .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
                     .padding(.bottom, 14)
                 }
@@ -126,7 +126,7 @@ struct EventDetailView: View {
                         .foregroundStyle(TabAccent.calendar.color)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 14)
-                        .glassEffect(.regular.tint(TabAccent.calendar.color.opacity(0.06)), in: .rect(cornerRadius: 16))
+                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
                     }
 
                     // Edit
@@ -142,7 +142,7 @@ struct EventDetailView: View {
                         .foregroundStyle(WarmPalette.ink2)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 14)
-                        .glassEffect(.regular.tint(.white.opacity(0.03)), in: .rect(cornerRadius: 16))
+                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
                     }
 
                     // Delete
@@ -162,7 +162,7 @@ struct EventDetailView: View {
                         .foregroundStyle(WarmPalette.bad)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 14)
-                        .glassEffect(.regular.tint(WarmPalette.bad.opacity(0.04)), in: .rect(cornerRadius: 16))
+                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
                     }
                 }
                 .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
@@ -221,7 +221,7 @@ struct EventDetailView: View {
             .foregroundStyle(categoryColor)
             .padding(.horizontal, 10)
             .padding(.vertical, 4)
-            .glassEffect(.regular.tint(categoryColor.opacity(0.08)), in: .capsule)
+            .background(.ultraThinMaterial, in: Capsule())
     }
 }
 
