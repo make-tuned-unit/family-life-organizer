@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 
 @MainActor
 @Observable
@@ -12,62 +13,52 @@ final class HomeViewModel {
     var isLoading = false
     var error: String?
 
+    // Static grid columns — avoids recreating the array on every render
+    static let statColumns = Array(repeating: GridItem(.flexible(), spacing: 8), count: 4)
+
     func loadAll(api: APIService) async {
         isLoading = true
         error = nil
         clearStaleDismissals()
 
-        await withTaskGroup(of: Void.self) { group in
-            group.addTask { await self.loadDashboard(api: api) }
-            group.addTask { await self.loadTasks(api: api) }
-            group.addTask { await self.loadTodayAppointments(api: api) }
-            group.addTask { await self.loadFeed(api: api) }
-            group.addTask { await self.loadTrips(api: api) }
-        }
+        // Fetch all data in parallel WITHOUT mutating state
+        async let d = Self.safeFetch { try await api.fetchDashboard() }
+        async let t = Self.safeFetch { try await api.fetchTasks(status: "active") }
+        async let a = Self.safeFetch { try await api.fetchAppointments(dateFrom: Self.todayString(), dateTo: Self.todayString()) }
+        async let f = Self.safeFetch { try await api.fetchActivity() }
+        async let tr = Self.safeFetch { try await api.fetchTrips(status: "active") }
 
-        isLoading = false
-    }
+        let (dashboard, tasks, appointments, feed, trips) = await (d, t, a, f, tr)
 
-    private func loadDashboard(api: APIService) async {
-        do {
-            let data = try await api.fetchDashboard()
+        // Batch apply — all property sets happen synchronously,
+        // so @Observable coalesces into a SINGLE re-render.
+        if let data = dashboard {
             summary = data.summary
             groceries = data.groceries
-        } catch {
-            guard !error.isCancellation else { return }
-            self.error = error.localizedDescription
         }
-    }
-
-    private func loadTasks(api: APIService) async {
-        do {
-            activeTasks = try await api.fetchTasks(status: "active")
-        } catch {
-            guard !error.isCancellation else { return }
-            self.error = error.localizedDescription
-        }
-    }
-
-    private func loadTodayAppointments(api: APIService) async {
-        do {
-            let today = Self.todayString()
-            let all = try await api.fetchAppointments(dateFrom: today, dateTo: today)
+        if let tasks { activeTasks = tasks }
+        if let appointments {
             let now = Date()
-            todayAppointments = all
+            todayAppointments = appointments
                 .filter { appt in
-                    // Keep events with no time, or whose time hasn't passed yet
                     guard let timeStr = appt.appointment_time,
-                          let eventTime = Self.todayDate(from: timeStr) else {
-                        return true
-                    }
-                    // Give a 30-minute buffer after the event time
+                          let eventTime = Self.todayDate(from: timeStr) else { return true }
                     return now < eventTime.addingTimeInterval(30 * 60)
                 }
                 .filter { !dismissedHeroIds.contains($0.id) }
                 .sorted { ($0.appointment_time ?? "") < ($1.appointment_time ?? "") }
-        } catch {
-            guard !error.isCancellation else { return }
-            self.error = error.localizedDescription
+        }
+        if let feed { activityFeed = feed }
+        if let trips { activeTrips = trips }
+
+        isLoading = false
+    }
+
+    private static func safeFetch<T>(_ block: () async throws -> T) async -> T? {
+        do { return try await block() }
+        catch {
+            if error.isCancellation { return nil }
+            return nil
         }
     }
 
@@ -124,7 +115,6 @@ final class HomeViewModel {
         }
     }
 
-    /// Clear stale dismissed IDs (called on new day)
     private func clearStaleDismissals() {
         let today = Self.todayString()
         let lastClear = UserDefaults.standard.string(forKey: "dismissed_hero_date")
@@ -149,22 +139,6 @@ final class HomeViewModel {
         } catch {
             guard !error.isCancellation else { return }
             self.error = error.localizedDescription
-        }
-    }
-
-    private func loadFeed(api: APIService) async {
-        do {
-            activityFeed = try await api.fetchActivity()
-        } catch {
-            guard !error.isCancellation else { return }
-        }
-    }
-
-    private func loadTrips(api: APIService) async {
-        do {
-            activeTrips = try await api.fetchTrips(status: "active")
-        } catch {
-            guard !error.isCancellation else { return }
         }
     }
 
