@@ -3,6 +3,7 @@ import SwiftUI
 struct NewPostView: View {
     @Environment(APIService.self) private var api
     @Environment(AuthService.self) private var auth
+    @Environment(HouseholdService.self) private var household
     @Environment(\.dismiss) private var dismiss
 
     let onSaved: () async -> Void
@@ -12,13 +13,38 @@ struct NewPostView: View {
     @State private var selectedGroupId: Int?
     @State private var isSaving = false
     @State private var error: String?
+    @State private var mentionSuggestions: [APIService.ContactResponse] = []
 
     var body: some View {
         NavigationStack {
             Form {
                 Section {
-                    TextField("What's on your mind?", text: $bodyText, axis: .vertical)
-                        .lineLimit(5...10)
+                    VStack(alignment: .leading, spacing: 0) {
+                        TextField("What's on your mind?", text: $bodyText, axis: .vertical)
+                            .lineLimit(5...10)
+                            .onChange(of: bodyText) { updateMentionSuggestions() }
+
+                        if !mentionSuggestions.isEmpty {
+                            VStack(alignment: .leading, spacing: 0) {
+                                ForEach(mentionSuggestions, id: \.name) { member in
+                                    Button { insertMention(member.name) } label: {
+                                        HStack(spacing: 8) {
+                                            FamilyAvatar(
+                                                initial: member.avatar_initial ?? String(member.name.prefix(1)).uppercased(),
+                                                size: 24
+                                            )
+                                            Text(member.name)
+                                                .font(.system(size: 14, weight: .medium))
+                                                .foregroundStyle(WarmPalette.ink1)
+                                        }
+                                        .padding(.vertical, 6)
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
+                            .padding(.top, 8)
+                        }
+                    }
                 }
 
                 Section("Share with") {
@@ -78,6 +104,37 @@ struct NewPostView: View {
             .task { await loadGroups() }
         }
     }
+
+    // MARK: - @mention autocomplete
+
+    private func updateMentionSuggestions() {
+        guard let atRange = bodyText.range(of: "@", options: .backwards) else {
+            mentionSuggestions = []
+            return
+        }
+        let afterAt = String(bodyText[atRange.upperBound...])
+        let query = afterAt.lowercased().trimmingCharacters(in: .whitespaces)
+
+        let matches = household.members.filter {
+            query.isEmpty || $0.name.lowercased().hasPrefix(query)
+        }
+
+        if !query.isEmpty && matches.isEmpty {
+            mentionSuggestions = []
+        } else if afterAt.hasSuffix(" ") && matches.contains(where: { $0.name.lowercased() == query }) {
+            mentionSuggestions = []
+        } else {
+            mentionSuggestions = matches
+        }
+    }
+
+    private func insertMention(_ name: String) {
+        guard let atRange = bodyText.range(of: "@", options: .backwards) else { return }
+        bodyText = String(bodyText[..<atRange.lowerBound]) + "@\(name) "
+        mentionSuggestions = []
+    }
+
+    // MARK: - Data
 
     private func loadGroups() async {
         do {
@@ -145,4 +202,5 @@ struct NewPostView: View {
     NewPostView(onSaved: {})
         .environment(APIService())
         .environment(AuthService())
+        .environment(HouseholdService())
 }
