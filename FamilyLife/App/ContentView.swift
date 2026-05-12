@@ -84,10 +84,8 @@ struct FloatingTabBar: View {
                         .background {
                             if selectedTab == tab {
                                 Circle()
-                                    .fill(.clear)
+                                    .fill(accentColor(for: tab).opacity(0.15))
                                     .frame(width: 48, height: 48)
-                                    .glassEffect(.regular.tint(accentColor(for: tab).opacity(0.2)), in: .circle)
-                                    .shadow(color: accentColor(for: tab).opacity(0.25), radius: 8, y: 2)
                             }
                         }
                 }
@@ -97,9 +95,7 @@ struct FloatingTabBar: View {
         .padding(.horizontal, 6)
         .padding(.vertical, 6)
         .glassEffect(.regular.tint(WarmPalette.ink1.opacity(0.08)), in: .capsule)
-        .shadow(color: .white.opacity(0.6), radius: 0.5, y: -0.5)
-        .shadow(color: Color(hex: "#501e0a").opacity(0.3), radius: 18, y: 8)
-        .shadow(color: Color(hex: "#501e0a").opacity(0.2), radius: 5, y: 2)
+        .shadow(color: Color(hex: "#501e0a").opacity(0.2), radius: 12, y: 4)
         .padding(.horizontal, 16)
         .padding(.bottom, 22)
     }
