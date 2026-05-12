@@ -83,7 +83,7 @@ struct EventDetailView: View {
                     }
                 }
                 .padding(22)
-                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.cardLarge))
+                .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.cardLarge))
                 .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
                 .padding(.top, 14)
                 .padding(.bottom, 14)
@@ -108,7 +108,7 @@ struct EventDetailView: View {
                             .padding(.horizontal, 14)
                         }
                     }
-                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
+                    .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
                     .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
                     .padding(.bottom, 14)
                 }
@@ -126,7 +126,7 @@ struct EventDetailView: View {
                         .foregroundStyle(TabAccent.calendar.color)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 14)
-                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
+                        .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: 16))
                     }
 
                     // Edit
@@ -142,7 +142,7 @@ struct EventDetailView: View {
                         .foregroundStyle(WarmPalette.ink2)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 14)
-                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
+                        .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: 16))
                     }
 
                     // Delete
@@ -162,7 +162,7 @@ struct EventDetailView: View {
                         .foregroundStyle(WarmPalette.bad)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 14)
-                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
+                        .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: 16))
                     }
                 }
                 .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
@@ -221,7 +221,7 @@ struct EventDetailView: View {
             .foregroundStyle(categoryColor)
             .padding(.horizontal, 10)
             .padding(.vertical, 4)
-            .background(.ultraThinMaterial, in: Capsule())
+            .background(WarmPalette.cardSurface, in: Capsule())
     }
 }
 

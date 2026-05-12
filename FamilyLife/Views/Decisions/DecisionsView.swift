@@ -150,7 +150,7 @@ struct DecisionsView: View {
                     .foregroundStyle(WarmPalette.ink4)
             }
             .padding(14)
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
+            .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
         }
         .buttonStyle(.plain)
         .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
@@ -319,7 +319,7 @@ struct DecisionCard: View {
             }
         }
         .padding(16)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
+        .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
         .task { await loadMeta() }
     }
 

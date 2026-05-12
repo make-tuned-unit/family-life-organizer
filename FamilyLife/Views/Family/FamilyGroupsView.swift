@@ -132,7 +132,7 @@ struct FamilyGroupsView: View {
                             .foregroundStyle(WarmPalette.ink2)
                             .padding(.horizontal, 10)
                             .padding(.vertical, 6)
-                            .background(.ultraThinMaterial, in: Capsule())
+                            .background(WarmPalette.cardSurface, in: Capsule())
                         }
                     }
                 }
@@ -141,7 +141,7 @@ struct FamilyGroupsView: View {
                     .foregroundStyle(WarmPalette.ink3)
             }
             .padding(16)
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
+            .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
             .overlay(
                 RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card)
                     .stroke(AccentTheme.sage.color.opacity(0.15), lineWidth: 1)
@@ -198,7 +198,7 @@ struct FamilyGroupsView: View {
                         .foregroundStyle(AccentTheme.sage.color)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 14)
-                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
+                        .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
                     }
                 }
                 .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
@@ -238,7 +238,7 @@ struct GroupRow: View {
                 .foregroundStyle(WarmPalette.ink4)
         }
         .padding(14)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
+        .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: 16))
     }
 }
 
@@ -268,7 +268,7 @@ struct ContactRow: View {
             }
         }
         .padding(12)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14))
+        .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: 14))
     }
 }
 
@@ -308,7 +308,7 @@ struct GroupDetailView: View {
                         .foregroundStyle(WarmPalette.ink3)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 6)
-                        .background(.ultraThinMaterial, in: Capsule())
+                        .background(WarmPalette.cardSurface, in: Capsule())
                     }
                 }
                 .padding(.top, 14)
@@ -329,7 +329,7 @@ struct GroupDetailView: View {
                     }
                 }
                 .padding(4)
-                .background(.ultraThinMaterial, in: Capsule())
+                .background(WarmPalette.cardSurface, in: Capsule())
                 .padding(.horizontal, 22)
                 .padding(.bottom, 14)
 
@@ -409,7 +409,7 @@ struct GroupDetailView: View {
                     }
                 }
                 .padding(12)
-                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14))
+                .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: 14))
                 .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
             }
         }
@@ -489,7 +489,7 @@ struct FeedPostCard: View {
             .foregroundStyle(WarmPalette.ink3)
         }
         .padding(16)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 20))
+        .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: 20))
     }
 
     @ViewBuilder
@@ -512,7 +512,7 @@ struct FeedPostCard: View {
         .foregroundStyle(color)
         .padding(.horizontal, 8)
         .padding(.vertical, 4)
-        .background(.ultraThinMaterial, in: Capsule())
+        .background(WarmPalette.cardSurface, in: Capsule())
     }
 }
 

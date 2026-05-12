@@ -178,17 +178,17 @@ struct SettingsView: View {
         .photosPicker(isPresented: $showingPhotoPicker, selection: $selectedPhoto, matching: .images)
         .onChange(of: selectedPhoto) {
             Task {
-                if let data = try? await selectedPhoto?.loadTransferable(type: Data.self),
-                   let uiImage = UIImage(data: data) {
-                    profileImage = Image(uiImage: uiImage)
+                if let data = try? await selectedPhoto?.loadTransferable(type: Data.self) {
                     auth.setProfileImage(data)
+                    if let thumb = auth.profileUIImage {
+                        profileImage = Image(uiImage: thumb)
+                    }
                 }
             }
         }
         .onAppear {
-            if let data = auth.profileImageData,
-               let uiImage = UIImage(data: data) {
-                profileImage = Image(uiImage: uiImage)
+            if let thumb = auth.profileUIImage {
+                profileImage = Image(uiImage: thumb)
             }
         }
         .confirmationDialog("Sign out?", isPresented: $showingLogoutConfirm) {

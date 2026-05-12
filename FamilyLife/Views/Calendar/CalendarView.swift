@@ -126,7 +126,7 @@ struct CalendarView: View {
                     .foregroundStyle(WarmPalette.ink4)
             }
             .padding(14)
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
+            .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
         }
         .buttonStyle(.plain)
         .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
@@ -181,7 +181,7 @@ struct CalendarView: View {
             }
         }
         .padding(4)
-        .background(.ultraThinMaterial, in: Capsule())
+        .background(WarmPalette.cardSurface, in: Capsule())
         .padding(.horizontal, 22)
         .padding(.bottom, 8)
     }
@@ -219,7 +219,7 @@ struct CalendarView: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 16)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 24))
+        .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: 24))
         .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
         .padding(.bottom, 14)
     }
@@ -443,7 +443,7 @@ struct CalendarEventCard: View {
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 20))
+        .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: 20))
     }
 
     private var categoryColor: Color {
