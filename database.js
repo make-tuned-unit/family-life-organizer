@@ -66,7 +66,10 @@ class FamilyDB {
         `, (err) => {
           if (err) console.error('Dedup error:', err.message);
         });
-        this.db.run('CREATE UNIQUE INDEX IF NOT EXISTS idx_budget_cat_name ON budget_categories(name)', (err) => {
+        this.db.run('CREATE UNIQUE INDEX IF NOT EXISTS idx_budget_cat_name ON budget_categories(name)');
+        this.db.run('CREATE INDEX IF NOT EXISTS idx_feed_reactions_post ON feed_reactions(post_id)');
+        this.db.run('CREATE INDEX IF NOT EXISTS idx_feed_comments_post ON feed_comments(post_id)');
+        this.db.run('CREATE INDEX IF NOT EXISTS idx_feed_posts_group ON feed_posts(group_id, id DESC)', (err) => {
           if (err) console.error('Index error:', err.message);
           resolve();
         });
