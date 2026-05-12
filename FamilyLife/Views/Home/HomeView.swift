@@ -373,9 +373,27 @@ struct HomeView: View {
             WarmSectionHeader(title: "Feed")
                 .padding(.bottom, 8)
 
-            ForEach(viewModel.activityFeed) { prepared in
+            let visible = viewModel.activityFeed.prefix(viewModel.visibleFeedCount)
+            ForEach(visible) { prepared in
                 FeedCard(prepared: prepared, selectedTab: $selectedTab) { eventId in
                     Task { await openFeedEvent(id: eventId) }
+                }
+                .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
+                .padding(.bottom, 10)
+            }
+
+            if viewModel.activityFeed.count > viewModel.visibleFeedCount {
+                Button {
+                    withAnimation(.spring(response: 0.3)) {
+                        viewModel.visibleFeedCount += 15
+                    }
+                } label: {
+                    Text("Show more")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(TabAccent.home.color)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: 12))
                 }
                 .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
                 .padding(.bottom, 10)

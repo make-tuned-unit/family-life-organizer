@@ -605,7 +605,7 @@ final class APIService {
         }
     }
 
-    func fetchActivity(limit: Int = 20) async throws -> [ActivityItem] {
+    func fetchActivity(limit: Int = 50) async throws -> [ActivityItem] {
         try await get("/api/activity", queryParams: ["limit": String(limit)])
     }
 
