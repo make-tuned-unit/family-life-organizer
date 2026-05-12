@@ -18,6 +18,7 @@ struct FeedCard: View {
     @State private var newComment = ""
     @State private var isSendingComment = false
     @State private var commentCount = 0
+    @State private var mentionSuggestions: [APIService.ContactResponse] = []
 
     private var isPost: Bool { item.feed_type == "post" }
 
@@ -175,6 +176,34 @@ struct FeedCard: View {
                 .padding(.bottom, 4)
             }
 
+            // @mention suggestions
+            if !mentionSuggestions.isEmpty {
+                VStack(alignment: .leading, spacing: 0) {
+                    ForEach(mentionSuggestions, id: \.name) { member in
+                        Button {
+                            insertMention(member.name)
+                        } label: {
+                            HStack(spacing: 8) {
+                                FamilyAvatar(
+                                    initial: member.avatar_initial ?? String(member.name.prefix(1)).uppercased(),
+                                    size: 20
+                                )
+                                Text(member.name)
+                                    .font(.system(size: 13, weight: .medium))
+                                    .foregroundStyle(WarmPalette.ink1)
+                            }
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 6)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.vertical, 4)
+                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10))
+                .padding(.horizontal, 14)
+                .transition(.opacity.combined(with: .move(edge: .bottom)))
+            }
+
             // Compose
             HStack(spacing: 10) {
                 ProfileAvatar(size: 24)
@@ -182,6 +211,7 @@ struct FeedCard: View {
                 TextField("Add a comment...", text: $newComment)
                     .font(.system(size: 14))
                     .textFieldStyle(.plain)
+                    .onChange(of: newComment) { updateMentionSuggestions() }
 
                 if !newComment.trimmingCharacters(in: .whitespaces).isEmpty {
                     Button {
@@ -198,6 +228,7 @@ struct FeedCard: View {
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
             .animation(.spring(response: 0.25), value: newComment.isEmpty)
+            .animation(.spring(response: 0.25), value: mentionSuggestions.isEmpty)
         }
     }
 
@@ -245,17 +276,16 @@ struct FeedCard: View {
 
     private func attributedBody(_ text: String) -> AttributedString {
         var result = AttributedString(text)
-        let memberNames = household.members.map(\.name)
-        let allNames = memberNames + [auth.currentUser?.name].compactMap { $0 }
-
-        for name in allNames {
-            let tag = "@\(name)"
-            var searchStart = result.startIndex
-            while let range = result[searchStart...].range(of: tag) {
-                result[range].foregroundColor = UIColor(accentColor)
-                result[range].font = .systemFont(ofSize: 14, weight: .semibold)
-                searchStart = range.upperBound
-            }
+        // Highlight all @mentions (any word after @)
+        let pattern = "@[A-Za-z]+"
+        guard let regex = try? NSRegularExpression(pattern: pattern) else { return result }
+        let nsText = text as NSString
+        let matches = regex.matches(in: text, range: NSRange(location: 0, length: nsText.length))
+        for match in matches {
+            guard let swiftRange = Range(match.range, in: text),
+                  let attrRange = result.range(of: String(text[swiftRange])) else { continue }
+            result[attrRange].foregroundColor = UIColor(accentColor)
+            result[attrRange].font = .systemFont(ofSize: 14, weight: .semibold)
         }
         return result
     }
@@ -314,6 +344,29 @@ struct FeedCard: View {
     }
 
     // MARK: - Helpers
+
+    private func updateMentionSuggestions() {
+        guard let atRange = newComment.range(of: "@", options: .backwards) else {
+            mentionSuggestions = []
+            return
+        }
+        let afterAt = String(newComment[atRange.upperBound...])
+        // If there's a space after the @query, close suggestions
+        if afterAt.contains(" ") {
+            mentionSuggestions = []
+            return
+        }
+        let query = afterAt.lowercased()
+        mentionSuggestions = household.members.filter {
+            query.isEmpty || $0.name.lowercased().hasPrefix(query)
+        }
+    }
+
+    private func insertMention(_ name: String) {
+        guard let atRange = newComment.range(of: "@", options: .backwards) else { return }
+        newComment = String(newComment[..<atRange.lowerBound]) + "@\(name) "
+        mentionSuggestions = []
+    }
 
     private var isCurrentUserAuthor: Bool {
         guard let author = item.author else { return false }
