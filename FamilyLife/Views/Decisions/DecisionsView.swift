@@ -232,10 +232,8 @@ struct DecisionCard: View {
     @State private var comments: [DecisionCommentResponse] = []
 
     private var isCurrentUserCreator: Bool {
-        let name = auth.currentUser?.username ?? ""
-        return decision.creator_name.localizedCaseInsensitiveCompare(name) == .orderedSame
-            || decision.creator_name.localizedCaseInsensitiveCompare(auth.currentUser?.name ?? "") == .orderedSame
-            || decision.creator_name == "Me"
+        decision.creator_name.localizedCaseInsensitiveCompare(auth.currentUser?.name ?? "") == .orderedSame
+            || decision.creator_name.localizedCaseInsensitiveCompare(auth.currentUser?.username ?? "") == .orderedSame
     }
 
     var body: some View {
