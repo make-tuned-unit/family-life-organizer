@@ -36,21 +36,8 @@ struct MainTabView: View {
     @State private var selectedTab: MainTab = .home
     @State private var loadedTabs: Set<MainTab> = [.home]
 
-    private var backgroundStyle: AmbientBackground.AmbientStyle {
-        switch selectedTab {
-        case .calendar:  .calendar
-        case .lists:     .home
-        case .home:      .home
-        case .decisions: .decisions
-        case .more:      .settings
-        }
-    }
-
     var body: some View {
         ZStack(alignment: .bottom) {
-            // Single shared background — not 5 per-tab Canvas renders
-            AmbientBackground(style: backgroundStyle)
-
             ForEach(MainTab.allCases, id: \.self) { tab in
                 if loadedTabs.contains(tab) {
                     tabView(for: tab)
