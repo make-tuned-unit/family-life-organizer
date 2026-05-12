@@ -111,35 +111,6 @@ enum TabAccent {
     }
 }
 
-// MARK: - Family Member
-
-enum FamilyMember: String, CaseIterable, Identifiable {
-    case jesse = "J"
-    case sophie = "S"
-    case rowan = "R"
-    case jude = "Ju"
-
-    var id: String { rawValue }
-
-    var name: String {
-        switch self {
-        case .jesse:  "Jesse"
-        case .sophie: "Sophie"
-        case .rowan:  "Rowan"
-        case .jude:   "Jude"
-        }
-    }
-
-    var gradient: LinearGradient {
-        switch self {
-        case .jesse:  LinearGradient(colors: [Color(hex: "#c46a4a"), Color(hex: "#8a3e2a")], startPoint: .topLeading, endPoint: .bottomTrailing)
-        case .sophie: LinearGradient(colors: [Color(hex: "#d99a3c"), Color(hex: "#a86a1c")], startPoint: .topLeading, endPoint: .bottomTrailing)
-        case .rowan:  LinearGradient(colors: [Color(hex: "#7ba05b"), Color(hex: "#4a6a35")], startPoint: .topLeading, endPoint: .bottomTrailing)
-        case .jude:   LinearGradient(colors: [Color(hex: "#6b8aa0"), Color(hex: "#3a5870")], startPoint: .topLeading, endPoint: .bottomTrailing)
-        }
-    }
-}
-
 // MARK: - Color Extension
 
 extension Color {

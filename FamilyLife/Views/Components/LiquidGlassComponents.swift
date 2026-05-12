@@ -49,7 +49,7 @@ struct ProfileAvatar: View {
     var size: CGFloat = 32
 
     var body: some View {
-        if let data = auth.profileImageData, let uiImage = UIImage(data: data) {
+        if let uiImage = auth.profileUIImage {
             Image(uiImage: uiImage)
                 .resizable()
                 .scaledToFill()

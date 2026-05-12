@@ -231,8 +231,8 @@ struct CoverageCascadeView: View {
                             }
                         }
                         Spacer()
-                        if let token {
-                            ShareLink(item: approvalURL(token: token)) {
+                        if let token, let url = approvalURL(token: token) {
+                            ShareLink(item: url) {
                                 Text("Share Link")
                                     .font(.system(size: 12, weight: .semibold))
                                     .padding(.horizontal, 12).padding(.vertical, 8)
@@ -406,8 +406,8 @@ struct CoverageCascadeView: View {
 
     // MARK: - Helpers
 
-    private func approvalURL(token: String) -> URL {
-        URL(string: "\(api.baseURL)/api/coverage/approve/\(token)")!
+    private func approvalURL(token: String) -> URL? {
+        URL(string: "\(api.baseURL)/api/coverage/approve/\(token)")
     }
 
     private func addWindow() {
