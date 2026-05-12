@@ -184,7 +184,7 @@ struct HomeView: View {
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 6)
-            .background(.ultraThinMaterial, in: Capsule())
+            .background(WarmPalette.cardSurface, in: Capsule())
         }
         .padding(.horizontal, 22)
         .padding(.top, 14)
@@ -304,13 +304,13 @@ struct HomeView: View {
                             .foregroundStyle(WarmPalette.ink1)
                             .padding(.horizontal, 18)
                             .padding(.vertical, 10)
-                            .background(.ultraThinMaterial, in: Capsule())
+                            .background(WarmPalette.cardSurface, in: Capsule())
                     }
                 }
             }
             .padding(.vertical, 20)
             .padding(.horizontal, 22)
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.cardLarge))
+            .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.cardLarge))
             .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
             .padding(.bottom, 14)
         }
@@ -367,7 +367,7 @@ struct HomeView: View {
                         }
                     }
                 }
-                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
+                .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
                 .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
             }
             .padding(.bottom, 14)

@@ -50,7 +50,7 @@ struct FeedCard: View {
                 }
             }
         }
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18))
+        .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: 18))
     }
 
     // MARK: - Header
@@ -201,7 +201,7 @@ struct FeedCard: View {
                     }
                 }
                 .padding(.vertical, 4)
-                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10))
+                .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: 10))
                 .padding(.horizontal, 14)
                 .transition(.opacity.combined(with: .move(edge: .bottom)))
             }
