@@ -112,7 +112,6 @@ struct WarmStatTile: View {
             Text(label.uppercased())
                 .font(.system(size: 10, weight: .semibold))
                 .foregroundStyle(WarmPalette.ink3)
-                .tracking(0.4)
             Text(value)
                 .font(.system(size: 22, weight: .bold, design: .default))
                 .foregroundStyle(WarmPalette.ink1)
