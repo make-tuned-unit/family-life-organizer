@@ -83,7 +83,7 @@ final class HomeViewModel {
     // MARK: - Feed preparation
 
     static func prepareFeed(_ items: [APIService.ActivityItem], currentUserName: String? = nil, currentUsername: String? = nil) -> [PreparedFeedItem] {
-        items.prefix(10).map { item in
+        items.prefix(5).map { item in
             let isPost = item.feed_type == "post"
             let accent = accentColor(for: item.feed_type)
             let body: AttributedString? = if isPost, let text = item.body, !text.isEmpty {

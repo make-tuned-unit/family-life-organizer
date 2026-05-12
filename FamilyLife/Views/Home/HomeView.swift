@@ -170,9 +170,7 @@ struct HomeView: View {
         HStack {
             Text(dateString)
                 .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(WarmPalette.ink2)
-                .opacity(0.7)
-                .tracking(0.4)
+                .foregroundStyle(WarmPalette.ink3)
             Spacer()
             HStack(spacing: 6) {
                 Circle()
@@ -199,11 +197,9 @@ struct HomeView: View {
                 Text("\(greeting),")
                     .font(.system(size: 34, weight: .bold))
                     .foregroundStyle(WarmPalette.ink1)
-                    .tracking(-0.68)
                 Text("\(auth.currentUser?.name ?? "there").")
                     .font(.system(size: 34, weight: .bold))
                     .foregroundStyle(TabAccent.home.color)
-                    .tracking(-0.68)
             }
             familyStatusSubtitle
         }
@@ -257,7 +253,6 @@ struct HomeView: View {
                     Text("TODAY'S FOCUS")
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundStyle(TabAccent.home.color)
-                        .tracking(0.4)
                     Spacer()
                     if let time = appt.appointment_time {
                         Text(time)
@@ -269,7 +264,6 @@ struct HomeView: View {
                 Text(appt.title)
                     .font(.system(size: 28, weight: .bold))
                     .foregroundStyle(WarmPalette.ink1)
-                    .tracking(-0.56)
 
                 if let location = appt.location, !location.isEmpty {
                     Text(location)
@@ -317,7 +311,7 @@ struct HomeView: View {
     // MARK: - Stats Grid
 
     private var statsGrid: some View {
-        LazyVGrid(columns: HomeViewModel.statColumns, spacing: 8) {
+        HStack(spacing: 8) {
             WarmStatTile(label: "Tasks", value: "\(viewModel.summary?.tasks_today ?? 0)", sub: "today")
             WarmStatTile(label: "Events", value: "\(viewModel.summary?.appointments_today ?? 0)", sub: "today")
             WarmStatTile(label: "Grocery", value: "\(viewModel.summary?.groceries_needed ?? 0)", sub: "needed")
