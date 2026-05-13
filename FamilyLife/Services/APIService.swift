@@ -629,6 +629,62 @@ final class APIService {
         try await get("/api/activity", queryParams: ["limit": String(limit)])
     }
 
+    // MARK: - Direct Messages
+
+    struct ConversationResponse: Codable, Identifiable {
+        let id: Int
+        var partner_id: Int
+        var partner_name: String
+        var partner_image: String?
+        var text: String
+        var unread_count: Int
+        var created_at: String?
+    }
+
+    struct DirectMessageResponse: Codable, Identifiable {
+        let id: Int
+        var sender_id: Int
+        var recipient_id: Int
+        var sender_name: String?
+        var text: String
+        var reference_type: String?
+        var reference_id: Int?
+        var reference_title: String?
+        var read_at: String?
+        var created_at: String?
+    }
+
+    struct UnreadCountResponse: Codable {
+        let count: Int
+    }
+
+    func fetchConversations() async throws -> [ConversationResponse] {
+        try await get("/api/messages")
+    }
+
+    func fetchMessages(partnerId: Int, limit: Int = 50, beforeId: Int? = nil) async throws -> [DirectMessageResponse] {
+        var params = ["limit": String(limit)]
+        if let beforeId { params["before_id"] = String(beforeId) }
+        return try await get("/api/messages/\(partnerId)", queryParams: params)
+    }
+
+    func sendMessage(recipientId: Int, text: String, referenceType: String? = nil, referenceId: Int? = nil, referenceTitle: String? = nil) async throws -> IDResponse {
+        var body: [String: Any] = ["recipient_id": recipientId, "text": text]
+        if let referenceType { body["reference_type"] = referenceType }
+        if let referenceId { body["reference_id"] = referenceId }
+        if let referenceTitle { body["reference_title"] = referenceTitle }
+        return try await post("/api/messages", body: body)
+    }
+
+    func markMessagesRead(partnerId: Int) async throws {
+        let _: SuccessResponse = try await post("/api/messages/\(partnerId)/read", body: [:] as [String: String])
+    }
+
+    func fetchUnreadMessageCount() async throws -> Int {
+        let response: UnreadCountResponse = try await get("/api/messages/unread-count")
+        return response.count
+    }
+
     // MARK: - Profile Image
 
     struct AvatarResponse: Codable {
