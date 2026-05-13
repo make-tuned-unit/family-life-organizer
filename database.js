@@ -1317,19 +1317,19 @@ class FamilyDB {
       const sql = `
         SELECT 'decision' as feed_type, id as ref_id, title, NULL as body,
           creator_name as author, status, created_at,
-          0 as reaction_count, 0 as comment_count, NULL as author_id
+          0 as reaction_count, 0 as comment_count, NULL as author_id, NULL as group_id, NULL as group_name
         FROM decisions WHERE status = 'active'
         UNION ALL
         SELECT 'event' as feed_type, a.id as ref_id, a.title, a.location as body,
           COALESCE(a.person_tags, 'Family') as author, 'upcoming' as status,
           a.created_at,
-          0 as reaction_count, 0 as comment_count, NULL as author_id
+          0 as reaction_count, 0 as comment_count, NULL as author_id, NULL as group_id, NULL as group_name
         FROM appointments a WHERE a.appointment_date >= date('now') AND a.appointment_date <= date('now', '+7 days')
         UNION ALL
         SELECT 'coverage' as feed_type, cr.id as ref_id, cr.reason as title, cr.note as body,
           COALESCE(u.name, u.username, 'Family') as author, cr.status,
           cr.created_at,
-          0 as reaction_count, 0 as comment_count, cr.requester_id as author_id
+          0 as reaction_count, 0 as comment_count, cr.requester_id as author_id, NULL as group_id, NULL as group_name
         FROM coverage_requests cr
         LEFT JOIN users u ON u.id = cr.requester_id
         WHERE cr.status IN ('pending', 'approved')
@@ -1337,7 +1337,7 @@ class FamilyDB {
         SELECT 'rivalry' as feed_type, id as ref_id, title, challenge_type as body,
           initiator_name as author, status,
           created_at,
-          0 as reaction_count, 0 as comment_count, NULL as author_id
+          0 as reaction_count, 0 as comment_count, NULL as author_id, NULL as group_id, NULL as group_name
         FROM rivalries WHERE status = 'active' AND created_at >= datetime('now', '-14 days')
         UNION ALL
         SELECT 'post' as feed_type, fp.id as ref_id, fp.title, fp.body,
@@ -1345,18 +1345,22 @@ class FamilyDB {
           fp.created_at,
           (SELECT COUNT(*) FROM feed_reactions WHERE post_id = fp.id) as reaction_count,
           (SELECT COUNT(*) FROM feed_comments WHERE post_id = fp.id) as comment_count,
-          fp.author_id
+          fp.author_id, fp.group_id, g.name as group_name
         FROM feed_posts fp
         LEFT JOIN users u ON u.id = fp.author_id
+        LEFT JOIN groups g ON g.id = fp.group_id
         UNION ALL
         SELECT 'comment' as feed_type, fc.post_id as ref_id,
           (SELECT title FROM feed_posts WHERE id = fc.post_id) as title,
           fc.text as body,
           u.name as author, 'comment' as status,
           fc.created_at,
-          0 as reaction_count, 0 as comment_count, fc.user_id as author_id
+          0 as reaction_count, 0 as comment_count, fc.user_id as author_id,
+          fp2.group_id, g2.name as group_name
         FROM feed_comments fc
         JOIN users u ON u.id = fc.user_id
+        LEFT JOIN feed_posts fp2 ON fp2.id = fc.post_id
+        LEFT JOIN groups g2 ON g2.id = fp2.group_id
         WHERE fc.created_at >= datetime('now', '-7 days')
         UNION ALL
         SELECT 'reaction' as feed_type, fr.post_id as ref_id,
@@ -1364,9 +1368,12 @@ class FamilyDB {
           fr.reaction_type as body,
           u.name as author, 'reaction' as status,
           fr.created_at,
-          0 as reaction_count, 0 as comment_count, fr.user_id as author_id
+          0 as reaction_count, 0 as comment_count, fr.user_id as author_id,
+          fp3.group_id, g3.name as group_name
         FROM feed_reactions fr
         JOIN users u ON u.id = fr.user_id
+        LEFT JOIN feed_posts fp3 ON fp3.id = fr.post_id
+        LEFT JOIN groups g3 ON g3.id = fp3.group_id
         WHERE fr.created_at >= datetime('now', '-7 days')
         ORDER BY created_at DESC
         LIMIT ?

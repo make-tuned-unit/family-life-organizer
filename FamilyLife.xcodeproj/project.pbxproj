@@ -69,6 +69,7 @@
 		AA000042 /* DateFormatters.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000042 /* DateFormatters.swift */; };
 		AA000043 /* MoreView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000043 /* MoreView.swift */; };
 		AA000044 /* LiquidGlassComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000044 /* LiquidGlassComponents.swift */; };
+		AA000071 /* ShareWithSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000071 /* ShareWithSection.swift */; };
 		AA000045 /* CareCascadeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000045 /* CareCascadeView.swift */; };
 		AA000046 /* AIDisclosureView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000046 /* AIDisclosureView.swift */; };
 		AA000047 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = BB000047 /* PrivacyInfo.xcprivacy */; };
@@ -81,11 +82,11 @@
 		AA00004F /* EventDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00004F /* EventDetailView.swift */; };
 		AA000050 /* HouseholdService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000050 /* HouseholdService.swift */; };
 		AA000051 /* HouseholdView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000051 /* HouseholdView.swift */; };
-		AA000070 /* ProfileImageCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000070 /* ProfileImageCache.swift */; };
 		AA000052 /* BudgetSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000052 /* BudgetSettingsView.swift */; };
 		AA000053 /* BudgetCategoryDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000053 /* BudgetCategoryDetailView.swift */; };
 		AA000054 /* NewPostView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000054 /* NewPostView.swift */; };
 		AA000055 /* FeedCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000055 /* FeedCardView.swift */; };
+		AA000070 /* ProfileImageCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000070 /* ProfileImageCache.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -151,6 +152,7 @@
 		BB000042 /* DateFormatters.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DateFormatters.swift; sourceTree = "<group>"; };
 		BB000043 /* MoreView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoreView.swift; sourceTree = "<group>"; };
 		BB000044 /* LiquidGlassComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiquidGlassComponents.swift; sourceTree = "<group>"; };
+		BB000071 /* ShareWithSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareWithSection.swift; sourceTree = "<group>"; };
 		BB000045 /* CareCascadeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CareCascadeView.swift; sourceTree = "<group>"; };
 		BB000046 /* AIDisclosureView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIDisclosureView.swift; sourceTree = "<group>"; };
 		BB000047 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
@@ -162,12 +164,12 @@
 		BB00004E /* FamilyGroupsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FamilyGroupsView.swift; sourceTree = "<group>"; };
 		BB00004F /* EventDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventDetailView.swift; sourceTree = "<group>"; };
 		BB000050 /* HouseholdService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HouseholdService.swift; sourceTree = "<group>"; };
-		BB000070 /* ProfileImageCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileImageCache.swift; sourceTree = "<group>"; };
 		BB000051 /* HouseholdView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HouseholdView.swift; sourceTree = "<group>"; };
 		BB000052 /* BudgetSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BudgetSettingsView.swift; sourceTree = "<group>"; };
 		BB000053 /* BudgetCategoryDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BudgetCategoryDetailView.swift; sourceTree = "<group>"; };
 		BB000054 /* NewPostView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewPostView.swift; sourceTree = "<group>"; };
 		BB000055 /* FeedCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedCardView.swift; sourceTree = "<group>"; };
+		BB000070 /* ProfileImageCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileImageCache.swift; sourceTree = "<group>"; };
 		CC000001 /* FamilyLife.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = FamilyLife.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -399,6 +401,7 @@
 				BB000041 /* ButtonStyles.swift */,
 				BB000042 /* DateFormatters.swift */,
 				BB000044 /* LiquidGlassComponents.swift */,
+				BB000071 /* ShareWithSection.swift */,
 				BB00004B /* AskAIButton.swift */,
 			);
 			path = Components;
@@ -559,6 +562,7 @@
 				AA000041 /* ButtonStyles.swift in Sources */,
 				AA000042 /* DateFormatters.swift in Sources */,
 				AA000044 /* LiquidGlassComponents.swift in Sources */,
+				AA000071 /* ShareWithSection.swift in Sources */,
 				AA000045 /* CareCascadeView.swift in Sources */,
 				AA000046 /* AIDisclosureView.swift in Sources */,
 				AA000048 /* AppConfig.swift in Sources */,
@@ -588,7 +592,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 39;
+				CURRENT_PROJECT_VERSION = 41;
 				DEVELOPMENT_ASSET_PATHS = "";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -622,7 +626,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 39;
+				CURRENT_PROJECT_VERSION = 41;
 				DEVELOPMENT_ASSET_PATHS = "";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;

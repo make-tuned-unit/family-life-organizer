@@ -12,6 +12,7 @@ struct HomeView: View {
     @State private var showingSettings = false
     @State private var selectedFeedEvent: AppointmentResponse?
     @State private var selectedFeedRivalry: RivalryResponse?
+    @State private var selectedFeedGroup: APIService.GroupResponse?
 
     private var greeting: String {
         let hour = Calendar.current.component(.hour, from: Date())
@@ -122,6 +123,11 @@ struct HomeView: View {
                                 .foregroundStyle(WarmPalette.ink2)
                         }
                     }
+            }
+        }
+        .sheet(item: $selectedFeedGroup) { group in
+            NavigationStack {
+                GroupDetailView(group: group)
             }
         }
         .overlay {
@@ -396,7 +402,8 @@ struct HomeView: View {
                     selectedTab: $selectedTab,
                     onEventTap: { eventId in Task { await openFeedEvent(id: eventId) } },
                     onRivalryTap: { rivalryId in Task { await openFeedRivalry(id: rivalryId) } },
-                    onCoverageTap: { selectedTab = .calendar }
+                    onCoverageTap: { selectedTab = .calendar },
+                    onGroupTap: { group in selectedFeedGroup = group }
                 )
                 .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
                 .padding(.bottom, 10)
