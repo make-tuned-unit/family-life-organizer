@@ -407,7 +407,7 @@ struct FeedCard: View {
 
     private func tapped() {
         switch item.feed_type {
-        case "decision": selectedTab = .decisions
+        case "decision": break // decisions accessed via chat/feed
         case "event": onEventTap?(item.ref_id)
         case "rivalry": onRivalryTap?(item.ref_id)
         case "coverage": onCoverageTap?()

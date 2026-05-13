@@ -1,14 +1,14 @@
 import SwiftUI
 
 enum MainTab: Hashable, CaseIterable {
-    case calendar, lists, home, decisions, more
+    case calendar, lists, home, budget, more
 
     var icon: String {
         switch self {
         case .calendar:  "calendar"
         case .lists:     "list.bullet.rectangle.fill"
         case .home:      "house.fill"
-        case .decisions: "chart.bar.fill"
+        case .budget:    "creditcard.fill"
         case .more:      "ellipsis.circle.fill"
         }
     }
@@ -63,7 +63,7 @@ struct MainTabView: View {
         case .calendar:  NavigationStack { CalendarView() }
         case .lists:     NavigationStack { FamilyListsView() }
         case .home:      NavigationStack { HomeView(selectedTab: $selectedTab) }
-        case .decisions: NavigationStack { DecisionsView() }
+        case .budget:    NavigationStack { ExpensesView() }
         case .more:      NavigationStack { MoreView() }
         }
     }
@@ -110,7 +110,7 @@ struct FloatingTabBar: View {
         case .calendar:  TabAccent.calendar.color
         case .lists:     TabAccent.home.color
         case .home:      TabAccent.home.color
-        case .decisions: TabAccent.decisions.color
+        case .budget:    AccentTheme.terracotta.color
         case .more:      WarmPalette.ink2
         }
     }
