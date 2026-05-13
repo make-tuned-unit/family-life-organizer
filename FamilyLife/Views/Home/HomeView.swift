@@ -13,6 +13,10 @@ struct HomeView: View {
     @State private var selectedFeedEvent: AppointmentResponse?
     @State private var selectedFeedRivalry: RivalryResponse?
     @State private var selectedFeedGroup: APIService.GroupResponse?
+    @State private var showingChat = false
+    @State private var chatPartnerId: Int?
+    @State private var chatPartnerName: String?
+    @State private var unreadCount = 0
 
     private var greeting: String {
         let hour = Calendar.current.component(.hour, from: Date())
@@ -130,8 +134,36 @@ struct HomeView: View {
                 GroupDetailView(group: group)
             }
         }
-        .overlay {
-            if viewModel.isLoading && viewModel.summary == nil { ProgressView() }
+        .overlay(alignment: .bottomTrailing) {
+            if viewModel.isLoading && viewModel.summary == nil {
+                ProgressView()
+            } else {
+                // Floating chat button
+                Button { showingChat = true } label: {
+                    ZStack(alignment: .topTrailing) {
+                        Image(systemName: "bubble.left.and.text.bubble.right.fill")
+                            .font(.system(size: 20))
+                            .foregroundStyle(.white)
+                            .frame(width: 52, height: 52)
+                            .background(TabAccent.home.color, in: Circle())
+                            .shadow(color: .black.opacity(0.15), radius: 8, y: 4)
+
+                        if unreadCount > 0 {
+                            Text("\(unreadCount)")
+                                .font(.system(size: 10, weight: .bold))
+                                .foregroundStyle(.white)
+                                .frame(minWidth: 18, minHeight: 18)
+                                .background(AccentTheme.rose.color, in: Circle())
+                                .offset(x: 4, y: -4)
+                        }
+                    }
+                }
+                .padding(.trailing, 20)
+                .padding(.bottom, 80)
+            }
+        }
+        .sheet(isPresented: $showingChat) {
+            ChatSheet()
         }
         .alert("Something went wrong", isPresented: errorAlertIsPresented) {
             Button("OK") {
@@ -146,6 +178,7 @@ struct HomeView: View {
         .task {
             await viewModel.loadAll(api: api, userName: auth.currentUser?.name, username: auth.currentUser?.username)
             checkFeedNotifications()
+            unreadCount = (try? await api.fetchUnreadMessageCount()) ?? 0
         }
     }
 

@@ -1,8 +1,6 @@
 import SwiftUI
 
 struct MoreView: View {
-    @Environment(APIService.self) private var api
-    @State private var unreadCount = 0
 
     var body: some View {
         ScrollView(showsIndicators: false) {
@@ -19,42 +17,6 @@ struct MoreView: View {
                 .padding(.bottom, 18)
 
                 VStack(spacing: 10) {
-                    NavigationLink { MessagesView() } label: {
-                        HStack(spacing: 14) {
-                            Image(systemName: "bubble.left.and.text.bubble.right.fill")
-                                .font(.system(size: 18, weight: .medium))
-                                .foregroundStyle(AccentTheme.ocean.color)
-                                .frame(width: 36, height: 36)
-                                .background(AccentTheme.ocean.color.opacity(0.15))
-                                .clipShape(Circle())
-
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Messages")
-                                    .font(.system(size: 15, weight: .semibold))
-                                    .foregroundStyle(WarmPalette.ink1)
-                                Text("Private messages with family")
-                                    .font(.system(size: 13))
-                                    .foregroundStyle(WarmPalette.ink3)
-                            }
-
-                            Spacer()
-
-                            if unreadCount > 0 {
-                                Text("\(unreadCount)")
-                                    .font(.system(size: 12, weight: .bold))
-                                    .foregroundStyle(.white)
-                                    .frame(minWidth: 22, minHeight: 22)
-                                    .background(AccentTheme.rose.color, in: Circle())
-                            }
-
-                            Image(systemName: "chevron.right")
-                                .font(.system(size: 12, weight: .medium))
-                                .foregroundStyle(WarmPalette.ink4)
-                        }
-                        .padding(14)
-                        .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
-                    }
-
                     NavigationLink { ExpensesView() } label: {
                         moreRow(icon: "creditcard.fill", title: "Budget", subtitle: "Track spending, receipts, and categories", color: AccentTheme.terracotta.color)
                     }
@@ -86,12 +48,6 @@ struct MoreView: View {
         .background { AmbientBackground(style: .home) }
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackgroundVisibility(.hidden, for: .navigationBar)
-        .task { await loadUnread() }
-        .onAppear { Task { await loadUnread() } }
-    }
-
-    private func loadUnread() async {
-        unreadCount = (try? await api.fetchUnreadMessageCount()) ?? 0
     }
 
     private func moreRow(icon: String, title: String, subtitle: String, color: Color) -> some View {

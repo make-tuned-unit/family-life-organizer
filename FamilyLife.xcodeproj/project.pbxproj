@@ -90,6 +90,7 @@
 		AA000072 /* MessagesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000072 /* MessagesView.swift */; };
 		AA000073 /* ConversationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000073 /* ConversationView.swift */; };
 		AA000074 /* QuotedItemCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000074 /* QuotedItemCard.swift */; };
+		AA000075 /* ChatSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000075 /* ChatSheet.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -176,6 +177,7 @@
 		BB000072 /* MessagesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessagesView.swift; sourceTree = "<group>"; };
 		BB000073 /* ConversationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConversationView.swift; sourceTree = "<group>"; };
 		BB000074 /* QuotedItemCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuotedItemCard.swift; sourceTree = "<group>"; };
+		BB000075 /* ChatSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatSheet.swift; sourceTree = "<group>"; };
 		CC000001 /* FamilyLife.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = FamilyLife.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -371,6 +373,7 @@
 				BB000072 /* MessagesView.swift */,
 				BB000073 /* ConversationView.swift */,
 				BB000074 /* QuotedItemCard.swift */,
+				BB000075 /* ChatSheet.swift */,
 			);
 			path = Messages;
 			sourceTree = "<group>";
@@ -583,6 +586,7 @@
 				AA000072 /* MessagesView.swift in Sources */,
 				AA000073 /* ConversationView.swift in Sources */,
 				AA000074 /* QuotedItemCard.swift in Sources */,
+				AA000075 /* ChatSheet.swift in Sources */,
 				AA000045 /* CareCascadeView.swift in Sources */,
 				AA000046 /* AIDisclosureView.swift in Sources */,
 				AA000048 /* AppConfig.swift in Sources */,
