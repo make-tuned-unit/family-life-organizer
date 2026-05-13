@@ -70,8 +70,9 @@ app.post('/api/auth/register', async (req, res) => {
 
     // If no invite code (or invalid), create a new household
     if (!household) {
+      const householdName = req.body.household_name || (name + "'s Home");
       const newHousehold = await db.createGroup({
-        name: name + "'s Home",
+        name: householdName,
         group_type: 'household',
         created_by: user.id
       });

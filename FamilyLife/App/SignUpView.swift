@@ -7,6 +7,7 @@ struct SignUpView: View {
     @State private var username = ""
     @State private var password = ""
     @State private var inviteCode = ""
+    @State private var householdName = ""
     @State private var hasInviteCode = false
     @State private var isLoading = false
     @State private var errorMessage: String?
@@ -61,6 +62,9 @@ struct SignUpView: View {
                                 .textInputAutocapitalization(.characters)
                                 .autocorrectionDisabled()
                                 .transition(.move(edge: .top).combined(with: .opacity))
+                        } else {
+                            formField(icon: "house.fill", placeholder: "Household name (e.g. The Smiths)", text: $householdName)
+                                .transition(.move(edge: .top).combined(with: .opacity))
                         }
 
                         if let errorMessage {
@@ -94,12 +98,10 @@ struct SignUpView: View {
 
                     if !hasInviteCode {
                         VStack(spacing: 6) {
-                            Text("You'll create a new household.")
+                            Text("Name your household and invite your partner after signing up.")
                                 .font(.system(size: 13))
                                 .foregroundStyle(WarmPalette.ink3)
-                            Text("Invite your partner after signing up.")
-                                .font(.system(size: 13))
-                                .foregroundStyle(WarmPalette.ink3)
+                                .multilineTextAlignment(.center)
                         }
                         .padding(.top, 16)
                     }
@@ -144,7 +146,8 @@ struct SignUpView: View {
                     username: username,
                     password: password,
                     name: name,
-                    inviteCode: hasInviteCode ? inviteCode : nil
+                    inviteCode: hasInviteCode ? inviteCode : nil,
+                    householdName: !hasInviteCode && !householdName.isEmpty ? householdName : nil
                 )
                 dismiss()
             } catch APIError.serverError(409) {
