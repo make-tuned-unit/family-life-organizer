@@ -6,6 +6,7 @@ struct FeedCard: View {
     var onEventTap: ((Int) -> Void)?
     var onRivalryTap: ((Int) -> Void)?
     var onCoverageTap: (() -> Void)?
+    var onGroupTap: ((APIService.GroupResponse) -> Void)?
 
     @Environment(APIService.self) private var api
     @Environment(AuthService.self) private var auth
@@ -96,9 +97,31 @@ struct FeedCard: View {
                         .padding(.vertical, 2)
                         .background(prepared.accentColor.opacity(0.1), in: Capsule())
                 }
-                Text(prepared.time)
-                    .font(.system(size: 11))
-                    .foregroundStyle(WarmPalette.ink4)
+                HStack(spacing: 4) {
+                    Text(prepared.time)
+                        .font(.system(size: 11))
+                        .foregroundStyle(WarmPalette.ink4)
+                    if let groupName = item.group_name {
+                        Text("\u{00B7}")
+                            .foregroundStyle(WarmPalette.ink4)
+                        Button {
+                            if let gid = item.group_id {
+                                onGroupTap?(APIService.GroupResponse(
+                                    id: gid, name: groupName,
+                                    group_type: "", description: nil,
+                                    invite_code: nil, role: nil,
+                                    member_count: nil, created_by: nil,
+                                    created_at: nil
+                                ))
+                            }
+                        } label: {
+                            Text(groupName)
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundStyle(AccentTheme.mauve.color)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
             }
 
             Spacer()
@@ -439,7 +462,9 @@ struct FeedCard: View {
                     status: nil,
                     created_at: ISO8601DateFormatter().string(from: Date()),
                     reaction_count: 2,
-                    comment_count: 1
+                    comment_count: 1,
+                    group_id: 1,
+                    group_name: "Fairbanks"
                 ),
                 body: AttributedString("Took the kids to Point Pleasant Park."),
                 time: "2 hours ago",

@@ -18,6 +18,7 @@ struct NewDecisionView: View {
     @State private var selectedPhoto: PhotosPickerItem?
     @State private var selectedImageData: Data?
     @State private var expiryChoice: ExpiryChoice = .day
+    @State private var shareGroupId: Int?
 
     enum ExpiryChoice: String, CaseIterable, Identifiable {
         case tonight = "Tonight"
@@ -131,6 +132,8 @@ struct NewDecisionView: View {
                     }
                     .pickerStyle(.menu)
                 }
+
+                ShareWithSection(selectedGroupId: $shareGroupId)
             }
             .scrollContentBackground(.hidden)
             .background { AmbientBackground(style: .decisions) }
@@ -187,6 +190,13 @@ struct NewDecisionView: View {
 
         do {
             try await api.addDecision(body)
+            if let groupId = shareGroupId {
+                _ = try? await api.addFeedPost(groupId: groupId, data: [
+                    "post_type": "decision",
+                    "title": title,
+                    "body": "\(auth.currentUser?.name ?? "Someone") wants input: \(title)"
+                ])
+            }
             await onSaved()
             dismiss()
         } catch {

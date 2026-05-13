@@ -602,12 +602,14 @@ final class APIService {
         let created_at: String?
         let reaction_count: Int?
         let comment_count: Int?
+        let group_id: Int?
+        let group_name: String?
 
         /// Stable key for notification watermarking (not affected by UUID regeneration)
         var stableKey: String { "\(feed_type)-\(ref_id)-\(created_at ?? "")" }
 
         private enum CodingKeys: String, CodingKey {
-            case feed_type, ref_id, title, body, author, author_id, status, created_at, reaction_count, comment_count
+            case feed_type, ref_id, title, body, author, author_id, status, created_at, reaction_count, comment_count, group_id, group_name
         }
     }
 

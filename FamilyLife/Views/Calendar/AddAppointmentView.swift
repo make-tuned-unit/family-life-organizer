@@ -18,6 +18,7 @@ struct AddAppointmentView: View {
     @State private var recurrenceEnd: Date? = nil
     @State private var showRecurrenceEnd = false
     @State private var addReminder = true
+    @State private var shareGroupId: Int?
     @State private var isSaving = false
     @State private var error: String?
 
@@ -140,6 +141,8 @@ struct AddAppointmentView: View {
                     }
                 }
 
+                ShareWithSection(selectedGroupId: $shareGroupId)
+
                 Section("Reminder") {
                     Toggle("Notify me before this event", isOn: $addReminder)
                 }
@@ -194,6 +197,15 @@ struct AddAppointmentView: View {
         }
 
         onSave(data)
+        if let groupId = shareGroupId {
+            let dateStr = date.formatted(date: .abbreviated, time: .omitted)
+            let timeStr = includeTime ? " at \(DateFormatter.hourMinute.string(from: time))" : ""
+            _ = try? await api.addFeedPost(groupId: groupId, data: [
+                "post_type": "event",
+                "title": title,
+                "body": "\(dateStr)\(timeStr)\(!location.isEmpty ? " \u{00B7} \(location)" : "")"
+            ])
+        }
         if addReminder {
             let authorized = await NotificationService.shared.ensurePermissionIfNeeded()
             if authorized {

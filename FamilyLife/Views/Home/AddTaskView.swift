@@ -2,6 +2,7 @@ import SwiftUI
 
 struct AddTaskView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(APIService.self) private var api
     @Environment(AuthService.self) private var auth
     @Environment(HouseholdService.self) private var household
 
@@ -11,6 +12,7 @@ struct AddTaskView: View {
     @State private var assignedTo = "Me"
     @State private var hasDueDate = false
     @State private var dueDate = Date()
+    @State private var shareGroupId: Int?
 
     let onSave: ([String: Any]) -> Void
 
@@ -64,6 +66,8 @@ struct AddTaskView: View {
                         DatePicker("Due", selection: $dueDate, displayedComponents: .date)
                     }
                 }
+
+                ShareWithSection(selectedGroupId: $shareGroupId)
             }
             .scrollContentBackground(.hidden)
             .background { AmbientBackground(style: .home) }
@@ -103,6 +107,15 @@ struct AddTaskView: View {
             data["due_date"] = DateFormatter.isoDate.string(from: dueDate)
         }
         onSave(data)
+        if let groupId = shareGroupId {
+            Task {
+                _ = try? await api.addFeedPost(groupId: groupId, data: [
+                    "post_type": "text",
+                    "title": "New task: \(title)",
+                    "body": "\(auth.currentUser?.name ?? "Someone") added a task: \(title)"
+                ])
+            }
+        }
     }
 }
 
