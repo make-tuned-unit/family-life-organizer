@@ -1868,6 +1868,29 @@ app.post('/api/addresses', requireAuth, async (req, res) => {
   }
 });
 
+app.put('/api/addresses/:id', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const { name, address, lat, lng } = req.body;
+    const fields = [];
+    const params = [];
+    if (name) { fields.push('name = ?'); params.push(name); }
+    if (address !== undefined) { fields.push('address = ?'); params.push(address); }
+    if (lat !== undefined) { fields.push('lat = ?'); params.push(lat); }
+    if (lng !== undefined) { fields.push('lng = ?'); params.push(lng); }
+    if (fields.length === 0) return res.status(400).json({ error: 'Nothing to update' });
+    params.push(req.params.id);
+    await new Promise((resolve, reject) => {
+      db.db.run(`UPDATE family_addresses SET ${fields.join(', ')} WHERE id = ?`, params, (err) => err ? reject(err) : resolve());
+    });
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
 app.delete('/api/addresses/:id', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
