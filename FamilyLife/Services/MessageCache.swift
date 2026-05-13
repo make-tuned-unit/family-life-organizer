@@ -60,11 +60,17 @@ final class MessageCache {
         }
     }
 
-    /// Preload conversations so cache is warm
+    /// Preload conversations so cache is warm + check for new message notifications
     func preload(api: APIService, userId: Int) {
         Task {
             do {
                 let convos = try await api.fetchConversations()
+
+                // Fire notifications for new messages
+                if await NotificationService.shared.isAuthorized() {
+                    NotificationService.shared.checkForNewMessages(convos)
+                }
+
                 for convo in convos {
                     if cache[convo.partner_id] == nil {
                         let msgs = try await api.fetchMessages(partnerId: convo.partner_id)

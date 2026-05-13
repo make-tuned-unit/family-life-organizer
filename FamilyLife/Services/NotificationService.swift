@@ -251,6 +251,45 @@ final class NotificationService {
         UNUserNotificationCenter.current().add(request)
     }
 
+    func notifyNewMessage(from sender: String, text: String, hasImage: Bool = false) {
+        let content = UNMutableNotificationContent()
+        content.title = sender
+        content.body = hasImage ? "Sent a photo" : String(text.prefix(100))
+        content.sound = .default
+        content.categoryIdentifier = "MESSAGE"
+
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 1, repeats: false)
+        let request = UNNotificationRequest(identifier: "dm-\(UUID().uuidString)", content: content, trigger: trigger)
+        UNUserNotificationCenter.current().add(request)
+    }
+
+    /// Check for new DMs since last check and fire notifications
+    func checkForNewMessages(_ conversations: [APIService.ConversationResponse]) {
+        let lastSeenKey = "last_seen_dm_id"
+        let lastSeenId = UserDefaults.standard.integer(forKey: lastSeenKey)
+
+        // First launch — mark current state
+        if lastSeenId == 0 {
+            if let maxId = conversations.map(\.id).max() {
+                UserDefaults.standard.set(maxId, forKey: lastSeenKey)
+            }
+            return
+        }
+
+        var notified = 0
+        for convo in conversations {
+            guard convo.id > lastSeenId else { continue }
+            guard convo.unread_count > 0 else { continue }
+            guard notified < 3 else { break }
+            notifyNewMessage(from: convo.partner_name, text: convo.text)
+            notified += 1
+        }
+
+        if let maxId = conversations.map(\.id).max(), maxId > lastSeenId {
+            UserDefaults.standard.set(maxId, forKey: lastSeenKey)
+        }
+    }
+
     /// Check feed for new items since last check and fire notifications
     func checkForNewFeedItems(_ items: [APIService.ActivityItem], currentUser: String) {
         let lastSeenKey = "last_seen_feed_id"
