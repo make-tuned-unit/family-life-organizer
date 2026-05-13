@@ -30,7 +30,9 @@ struct FamilyLifeApp: App {
                     }
                 }
                 .onReceive(NotificationCenter.default.publisher(for: APIService.unauthorizedNotification)) { _ in
-                    authService.logout()
+                    Task {
+                        await authService.validateSession(api: apiService)
+                    }
                 }
                 .preferredColorScheme(.light)
         }
