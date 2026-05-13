@@ -14,9 +14,11 @@ struct NewTripView: View {
     @State private var selectedAddress: FamilyAddressResponse?
     @State private var familyAddresses: [FamilyAddressResponse] = []
     @State private var etaMinutes = 30
+    @State private var notifyPercent = 10
     @State private var error: String?
     @State private var locationCompleter = LocationCompleter()
     @State private var showingLocationSuggestions = false
+    @State private var isSelectingSavedAddress = false
 
     let onSave: ([String: Any]) -> Void
 
@@ -37,17 +39,17 @@ struct NewTripView: View {
                 }
 
                 Section("Destination") {
+                    // Saved addresses — single tap selects
                     if !familyAddresses.isEmpty {
                         ForEach(familyAddresses) { addr in
                             Button {
-                                selectedAddress = addr
-                                destination = addr.name
+                                selectSavedAddress(addr)
                             } label: {
                                 HStack {
                                     VStack(alignment: .leading) {
                                         Text(addr.name)
                                             .font(.subheadline.weight(.medium))
-                                            .foregroundStyle(.primary)
+                                            .foregroundStyle(selectedAddress?.id == addr.id ? TabAccent.home.color : .primary)
                                         if let address = addr.address {
                                             Text(address)
                                                 .font(.caption)
@@ -56,7 +58,7 @@ struct NewTripView: View {
                                     }
                                     Spacer()
                                     if selectedAddress?.id == addr.id {
-                                        Image(systemName: "checkmark")
+                                        Image(systemName: "checkmark.circle.fill")
                                             .foregroundStyle(TabAccent.home.color)
                                     }
                                 }
@@ -64,30 +66,42 @@ struct NewTripView: View {
                         }
                     }
 
-                    TextField("Or search for a place...", text: $destination)
-                        .onChange(of: destination) {
-                            selectedAddress = nil
-                            locationCompleter.search(query: destination)
-                            showingLocationSuggestions = !destination.isEmpty
-                        }
+                    // Search field — only shows when no saved address is selected
+                    if selectedAddress == nil {
+                        TextField("Or search for a place...", text: $destination)
+                            .onChange(of: destination) {
+                                guard !isSelectingSavedAddress else { return }
+                                locationCompleter.search(query: destination)
+                                showingLocationSuggestions = !destination.isEmpty
+                            }
 
-                    if showingLocationSuggestions && !locationCompleter.results.isEmpty {
-                        ForEach(locationCompleter.results, id: \.self) { result in
-                            Button {
-                                destination = [result.title, result.subtitle].filter { !$0.isEmpty }.joined(separator: ", ")
-                                showingLocationSuggestions = false
-                            } label: {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(result.title)
-                                        .font(.subheadline.weight(.medium))
-                                        .foregroundStyle(.primary)
-                                    if !result.subtitle.isEmpty {
-                                        Text(result.subtitle)
-                                            .font(.caption)
-                                            .foregroundStyle(WarmPalette.ink3)
+                        if showingLocationSuggestions && !locationCompleter.results.isEmpty {
+                            ForEach(locationCompleter.results, id: \.self) { result in
+                                Button {
+                                    destination = [result.title, result.subtitle].filter { !$0.isEmpty }.joined(separator: ", ")
+                                    showingLocationSuggestions = false
+                                } label: {
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(result.title)
+                                            .font(.subheadline.weight(.medium))
+                                            .foregroundStyle(.primary)
+                                        if !result.subtitle.isEmpty {
+                                            Text(result.subtitle)
+                                                .font(.caption)
+                                                .foregroundStyle(WarmPalette.ink3)
+                                        }
                                     }
                                 }
                             }
+                        }
+                    } else {
+                        Button {
+                            selectedAddress = nil
+                            destination = ""
+                        } label: {
+                            Label("Change destination", systemImage: "arrow.triangle.2.circlepath")
+                                .font(.caption)
+                                .foregroundStyle(WarmPalette.ink3)
                         }
                     }
                 }
@@ -96,13 +110,21 @@ struct NewTripView: View {
                     TextField("Purpose (optional)", text: $purpose)
 
                     Stepper("ETA: \(etaMinutes) min", value: $etaMinutes, in: 5...480, step: 5)
+
+                    Picker("Notify when", selection: $notifyPercent) {
+                        Text("10% away").tag(10)
+                        Text("25% away").tag(25)
+                        Text("50% away").tag(50)
+                        Text("5 min away").tag(-5)
+                        Text("15 min away").tag(-15)
+                    }
                 }
             }
             .scrollContentBackground(.hidden)
             .background { AmbientBackground(style: .trips) }
             .navigationTitle("Start Trip")
             .navigationBarTitleDisplayMode(.inline)
-            .alert("Couldn’t load trip setup", isPresented: errorAlertIsPresented) {
+            .alert("Couldn't load trip setup", isPresented: errorAlertIsPresented) {
                 Button("OK") { error = nil }
             } message: {
                 Text(error ?? "An unexpected error occurred.")
@@ -116,7 +138,7 @@ struct NewTripView: View {
                         startTrip()
                         dismiss()
                     }
-                    .disabled(destination.isEmpty)
+                    .disabled(destination.isEmpty && selectedAddress == nil)
                 }
             }
             .task {
@@ -126,6 +148,17 @@ struct NewTripView: View {
                     traveler = auth.currentUser?.name ?? "Me"
                 }
             }
+        }
+    }
+
+    private func selectSavedAddress(_ addr: FamilyAddressResponse) {
+        isSelectingSavedAddress = true
+        selectedAddress = addr
+        destination = addr.name
+        showingLocationSuggestions = false
+        // Reset flag after onChange fires
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            isSelectingSavedAddress = false
         }
     }
 
@@ -140,8 +173,9 @@ struct NewTripView: View {
     private func startTrip() {
         var data: [String: Any] = [
             "traveler": traveler.lowercased(),
-            "destination": destination,
-            "eta_minutes": etaMinutes
+            "destination": selectedAddress?.name ?? destination,
+            "eta_minutes": etaMinutes,
+            "notify_percent": notifyPercent
         ]
         if !purpose.isEmpty { data["purpose"] = purpose }
         if let addr = selectedAddress {
