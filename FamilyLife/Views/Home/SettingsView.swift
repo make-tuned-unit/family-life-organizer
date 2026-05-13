@@ -182,6 +182,13 @@ struct SettingsView: View {
                 }
             }
 
+            Section("Groups & Circles") {
+                NavigationLink { FamilyGroupsView() } label: {
+                    Label("Family Groups", systemImage: "person.3.fill")
+                        .foregroundStyle(TabAccent.home.color)
+                }
+            }
+
             Section("About") {
                 HStack {
                     Text("Version")
