@@ -13,6 +13,7 @@ struct FeedCard: View {
     @Environment(HouseholdService.self) private var household
     @Environment(ProfileImageCache.self) private var profileCache
 
+    @State private var showingSendTo = false
     @State private var isLiked = false
     @State private var likeCount = 0
     @State private var comments: [APIService.FeedCommentResponse] = []
@@ -57,6 +58,18 @@ struct FeedCard: View {
         }
         .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: 18))
         .contentShape(RoundedRectangle(cornerRadius: 18))
+        .contextMenu {
+            Button { showingSendTo = true } label: {
+                Label("Send to...", systemImage: "arrowshape.turn.up.right")
+            }
+        }
+        .sheet(isPresented: $showingSendTo) {
+            SendToSheet(quotedItem: QuotedItem(
+                type: item.feed_type,
+                id: item.ref_id,
+                title: item.title ?? item.body ?? "Feed item"
+            ))
+        }
         .onTapGesture { tapped() }
     }
 
