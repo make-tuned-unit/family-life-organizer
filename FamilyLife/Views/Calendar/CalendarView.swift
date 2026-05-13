@@ -410,8 +410,9 @@ struct CalendarEventCard: View {
                         if let tags = appointment.person_tags, !tags.isEmpty {
                             Text(tags)
                         }
-                        if appointment.category == "recurring" {
-                            Text("recurring")
+                        if let rule = appointment.recurrence_rule, !rule.isEmpty {
+                            Image(systemName: "repeat")
+                                .font(.system(size: 11))
                         }
                     }
                     .font(.system(size: 13))

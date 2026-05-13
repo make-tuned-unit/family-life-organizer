@@ -108,9 +108,13 @@ struct AddAddressView: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var name = ""
-    @State private var address = ""
+    @State private var addressQuery = ""
+    @State private var resolvedAddress = ""
     @State private var position = MapCameraPosition.automatic
-    @State private var markerCoord = CLLocationCoordinate2D(latitude: 44.6488, longitude: -63.5752) // Halifax default
+    @State private var markerCoord = CLLocationCoordinate2D(latitude: 44.6488, longitude: -63.5752)
+    @State private var locationCompleter = LocationCompleter()
+    @State private var showingSuggestions = false
+    @State private var hasSelectedLocation = false
 
     let onSave: ([String: Any]) -> Void
 
@@ -119,36 +123,48 @@ struct AddAddressView: View {
             Form {
                 Section {
                     TextField("Name (e.g. Jesse's House)", text: $name)
-                    TextField("Street address (optional)", text: $address)
                 }
 
-                Section("Location") {
-                    Map(position: $position, interactionModes: .all) {
-                        Marker(name.isEmpty ? "Location" : name, coordinate: markerCoord)
-                            .tint(TabAccent.home.color)
-                    }
-                    .frame(height: 200)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                    .onTapGesture { location in
-                        // Map tap doesn't give coordinates in SwiftUI Map directly
-                        // User would need to manually enter or use search
-                    }
+                Section("Address") {
+                    TextField("Search for an address...", text: $addressQuery)
+                        .onChange(of: addressQuery) {
+                            locationCompleter.search(query: addressQuery)
+                            showingSuggestions = !addressQuery.isEmpty
+                            hasSelectedLocation = false
+                        }
 
-                    HStack {
-                        Text("Lat")
-                        TextField("Latitude", value: Binding(
-                            get: { markerCoord.latitude },
-                            set: { markerCoord = CLLocationCoordinate2D(latitude: $0, longitude: markerCoord.longitude) }
-                        ), format: .number)
-                        .keyboardType(.decimalPad)
+                    if showingSuggestions && !locationCompleter.results.isEmpty {
+                        ForEach(locationCompleter.results, id: \.self) { result in
+                            Button {
+                                let fullAddress = [result.title, result.subtitle].filter { !$0.isEmpty }.joined(separator: ", ")
+                                addressQuery = fullAddress
+                                resolvedAddress = fullAddress
+                                showingSuggestions = false
+                                resolveCoordinates(for: result)
+                            } label: {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(result.title)
+                                        .font(.subheadline.weight(.medium))
+                                        .foregroundStyle(.primary)
+                                    if !result.subtitle.isEmpty {
+                                        Text(result.subtitle)
+                                            .font(.caption)
+                                            .foregroundStyle(WarmPalette.ink3)
+                                    }
+                                }
+                            }
+                        }
                     }
-                    HStack {
-                        Text("Lng")
-                        TextField("Longitude", value: Binding(
-                            get: { markerCoord.longitude },
-                            set: { markerCoord = CLLocationCoordinate2D(latitude: markerCoord.latitude, longitude: $0) }
-                        ), format: .number)
-                        .keyboardType(.decimalPad)
+                }
+
+                if hasSelectedLocation {
+                    Section("Location") {
+                        Map(position: $position, interactionModes: .all) {
+                            Marker(name.isEmpty ? "Location" : name, coordinate: markerCoord)
+                                .tint(TabAccent.home.color)
+                        }
+                        .frame(height: 200)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
                     }
                 }
             }
@@ -165,13 +181,28 @@ struct AddAddressView: View {
                             "lat": markerCoord.latitude,
                             "lng": markerCoord.longitude
                         ]
-                        if !address.isEmpty { data["address"] = address }
+                        if !resolvedAddress.isEmpty { data["address"] = resolvedAddress }
                         onSave(data)
                         dismiss()
                     }
-                    .disabled(name.isEmpty)
+                    .disabled(name.isEmpty || !hasSelectedLocation)
                 }
             }
+        }
+    }
+
+    private func resolveCoordinates(for completion: MKLocalSearchCompletion) {
+        let request = MKLocalSearch.Request(completion: completion)
+        let search = MKLocalSearch(request: request)
+        search.start { response, _ in
+            guard let item = response?.mapItems.first else { return }
+            markerCoord = item.placemark.coordinate
+            position = .region(MKCoordinateRegion(
+                center: markerCoord,
+                latitudinalMeters: 500,
+                longitudinalMeters: 500
+            ))
+            hasSelectedLocation = true
         }
     }
 }

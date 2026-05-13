@@ -15,6 +15,8 @@ struct NewTripView: View {
     @State private var familyAddresses: [FamilyAddressResponse] = []
     @State private var etaMinutes = 30
     @State private var error: String?
+    @State private var locationCompleter = LocationCompleter()
+    @State private var showingLocationSuggestions = false
 
     let onSave: ([String: Any]) -> Void
 
@@ -62,7 +64,32 @@ struct NewTripView: View {
                         }
                     }
 
-                    TextField("Or type a destination", text: $destination)
+                    TextField("Or search for a place...", text: $destination)
+                        .onChange(of: destination) {
+                            selectedAddress = nil
+                            locationCompleter.search(query: destination)
+                            showingLocationSuggestions = !destination.isEmpty
+                        }
+
+                    if showingLocationSuggestions && !locationCompleter.results.isEmpty {
+                        ForEach(locationCompleter.results, id: \.self) { result in
+                            Button {
+                                destination = [result.title, result.subtitle].filter { !$0.isEmpty }.joined(separator: ", ")
+                                showingLocationSuggestions = false
+                            } label: {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(result.title)
+                                        .font(.subheadline.weight(.medium))
+                                        .foregroundStyle(.primary)
+                                    if !result.subtitle.isEmpty {
+                                        Text(result.subtitle)
+                                            .font(.caption)
+                                            .foregroundStyle(WarmPalette.ink3)
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
 
                 Section("Details") {

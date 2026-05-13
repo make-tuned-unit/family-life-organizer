@@ -1250,6 +1250,23 @@ app.get('/api/appointments/:year/:month', requireAuth, async (req, res) => {
     const year = parseInt(req.params.year);
     const month = parseInt(req.params.month);
     const appointments = await db.getAppointmentsByMonth(year, month);
+
+    // Expand recurring events into the queried month
+    const rangeStart = new Date(year, month - 1, 1);
+    const rangeEnd = new Date(month === 12 ? year + 1 : year, month === 12 ? 0 : month, 1);
+    const recurring = await db.getRecurringAppointments();
+    for (const appt of recurring) {
+      const originDate = new Date(appt.appointment_date + 'T00:00:00');
+      if (originDate >= rangeStart && originDate < rangeEnd) continue; // already in results
+      const endDate = appt.recurrence_end ? new Date(appt.recurrence_end + 'T23:59:59') : null;
+      const occurrences = expandRecurrence(appt.recurrence_rule, originDate, rangeStart, rangeEnd, endDate);
+      for (const date of occurrences) {
+        const dateStr = date.toISOString().slice(0, 10);
+        appointments.push({ ...appt, appointment_date: dateStr, _recurring_source: appt.id });
+      }
+    }
+
+    appointments.sort((a, b) => (a.appointment_date + (a.appointment_time || '')).localeCompare(b.appointment_date + (b.appointment_time || '')));
     res.json(appointments);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -1501,6 +1518,30 @@ app.delete('/api/receipts/:id', requireAuth, async (req, res) => {
 });
 
 // Helper: normalize date to YYYY-MM-DD for SQLite strftime
+// Expand a recurrence rule into dates within [rangeStart, rangeEnd)
+function expandRecurrence(rule, origin, rangeStart, rangeEnd, endDate) {
+  const dates = [];
+  let cursor = new Date(origin);
+  const step = { daily: 1, weekly: 7, biweekly: 14 }[rule];
+  for (let i = 0; i < 400; i++) {
+    if (step) {
+      cursor = new Date(cursor.getTime() + step * 86400000);
+    } else if (rule === 'monthly') {
+      cursor = new Date(cursor);
+      cursor.setMonth(cursor.getMonth() + 1);
+    } else if (rule === 'yearly') {
+      cursor = new Date(cursor);
+      cursor.setFullYear(cursor.getFullYear() + 1);
+    } else {
+      break;
+    }
+    if (endDate && cursor > endDate) break;
+    if (cursor >= rangeEnd) break;
+    if (cursor >= rangeStart) dates.push(new Date(cursor));
+  }
+  return dates;
+}
+
 function normalizeDate(dateStr) {
   if (!dateStr) return new Date().toISOString().split('T')[0];
   // Already YYYY-MM-DD
