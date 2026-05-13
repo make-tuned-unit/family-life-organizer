@@ -14,6 +14,9 @@ struct AddAppointmentView: View {
     @State private var category = "personal"
     @State private var notes = ""
     @State private var personTags: Set<String> = []
+    @State private var recurrence: RecurrenceRule = .none
+    @State private var recurrenceEnd: Date? = nil
+    @State private var showRecurrenceEnd = false
     @State private var addReminder = true
     @State private var isSaving = false
     @State private var error: String?
@@ -74,6 +77,26 @@ struct AddAppointmentView: View {
                     Picker("Category", selection: $category) {
                         ForEach(categories, id: \.self) { cat in
                             Text(cat.capitalized).tag(cat)
+                        }
+                    }
+                }
+
+                Section("Repeat") {
+                    Picker(selection: $recurrence) {
+                        ForEach(RecurrenceRule.allCases) { rule in
+                            Label(rule.displayName, systemImage: rule.icon).tag(rule)
+                        }
+                    } label: {
+                        Label("Repeats", systemImage: "repeat")
+                    }
+
+                    if recurrence != .none {
+                        Toggle("End date", isOn: $showRecurrenceEnd)
+                        if showRecurrenceEnd {
+                            DatePicker("Ends on", selection: Binding(
+                                get: { recurrenceEnd ?? Calendar.current.date(byAdding: .month, value: 3, to: date)! },
+                                set: { recurrenceEnd = $0 }
+                            ), in: date..., displayedComponents: .date)
                         }
                     }
                 }
@@ -163,6 +186,12 @@ struct AddAppointmentView: View {
         if !location.isEmpty { data["location"] = location }
         if !notes.isEmpty { data["description"] = notes }
         if !personTags.isEmpty { data["person_tags"] = Array(personTags) }
+        if recurrence != .none {
+            data["recurrence_rule"] = recurrence.rawValue
+            if showRecurrenceEnd, let end = recurrenceEnd {
+                data["recurrence_end"] = DateFormatter.isoDate.string(from: end)
+            }
+        }
 
         onSave(data)
         if addReminder {

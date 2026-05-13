@@ -69,6 +69,9 @@ class FamilyDB {
         this.db.run('CREATE UNIQUE INDEX IF NOT EXISTS idx_budget_cat_name ON budget_categories(name)');
         this.db.run('CREATE INDEX IF NOT EXISTS idx_feed_reactions_post ON feed_reactions(post_id)');
         this.db.run('CREATE INDEX IF NOT EXISTS idx_feed_comments_post ON feed_comments(post_id)');
+        // Recurring events columns
+        this.db.run('ALTER TABLE appointments ADD COLUMN recurrence_rule TEXT', () => {});
+        this.db.run('ALTER TABLE appointments ADD COLUMN recurrence_end TEXT', () => {});
         this.db.run('CREATE INDEX IF NOT EXISTS idx_feed_posts_group ON feed_posts(group_id, id DESC)', (err) => {
           if (err) console.error('Index error:', err.message);
           resolve();
@@ -187,7 +190,7 @@ class FamilyDB {
   addAppointment(appointment) {
     return new Promise((resolve, reject) => {
       this.db.run(
-        'INSERT INTO appointments (title, description, appointment_date, appointment_time, location, with_person, category, person_tags) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        'INSERT INTO appointments (title, description, appointment_date, appointment_time, location, with_person, category, person_tags, recurrence_rule, recurrence_end) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
         [
           appointment.title,
           appointment.description || null,
@@ -196,7 +199,9 @@ class FamilyDB {
           appointment.location || null,
           appointment.with_person || null,
           appointment.category || 'appointments',
-          appointment.person_tags ? appointment.person_tags.join(',') : null
+          appointment.person_tags ? appointment.person_tags.join(',') : null,
+          appointment.recurrence_rule || null,
+          appointment.recurrence_end || null
         ],
         function(err) {
           if (err) reject(err);
@@ -246,6 +251,18 @@ class FamilyDB {
         (err, rows) => {
           if (err) reject(err);
           else resolve(rows);
+        }
+      );
+    });
+  }
+
+  getRecurringAppointments() {
+    return new Promise((resolve, reject) => {
+      this.db.all(
+        'SELECT * FROM appointments WHERE recurrence_rule IS NOT NULL AND recurrence_rule != ""',
+        (err, rows) => {
+          if (err) reject(err);
+          else resolve(rows || []);
         }
       );
     });
