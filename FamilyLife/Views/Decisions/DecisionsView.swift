@@ -11,6 +11,7 @@ struct DecisionsView: View {
     @State private var filterType: DecisionType?
     @State private var error: String?
     @State private var isLoading = false
+    @State private var sendToDecision: DecisionResponse?
 
     private var activeDecisions: [DecisionResponse] {
         let now = Date()
@@ -81,6 +82,13 @@ struct DecisionsView: View {
             Text(error ?? "An unexpected error occurred.")
         }
         .task { await loadDecisions() }
+        .sheet(item: $sendToDecision) { decision in
+            SendToSheet(quotedItem: QuotedItem(
+                type: "decision",
+                id: decision.id,
+                title: decision.title
+            ))
+        }
     }
 
     // MARK: - Header
@@ -176,6 +184,9 @@ struct DecisionsView: View {
                 }
                 .buttonStyle(.plain)
                 .contextMenu {
+                    Button { sendToDecision = decision } label: {
+                        Label("Send to...", systemImage: "arrowshape.turn.up.right")
+                    }
                     Button(role: .destructive) {
                         Task { await deleteDecision(decision.id) }
                     } label: {
