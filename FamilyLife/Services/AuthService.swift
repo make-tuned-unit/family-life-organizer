@@ -1,5 +1,6 @@
 import Foundation
 import UIKit
+import Security
 
 @MainActor
 @Observable
@@ -107,7 +108,13 @@ final class AuthService {
                 UserDefaults.standard.set(user.id, forKey: "auth_user_id")
             }
         } catch APIError.unauthorized {
-            logout()
+            // Session expired — try silent re-login with saved credentials
+            if await silentRelogin(api: api) {
+                // Re-validate after successful login
+                await validateSession(api: api)
+            } else {
+                logout()
+            }
         } catch {
             // Keep cached credentials for transient connectivity failures.
         }
@@ -126,6 +133,9 @@ final class AuthService {
         UserDefaults.standard.set(user.username, forKey: "auth_username")
         UserDefaults.standard.set(user.name, forKey: "auth_name")
         if let id = user.id { UserDefaults.standard.set(id, forKey: "auth_user_id") }
+
+        // Save password to Keychain for session restoration
+        Self.savePassword(password, for: username)
     }
 
     func register(username: String, password: String, name: String, inviteCode: String? = nil) async throws {
@@ -144,17 +154,77 @@ final class AuthService {
         if let household = response.household {
             UserDefaults.standard.set(household.invite_code, forKey: "household_invite_code")
         }
+
+        // Save password to Keychain for session restoration
+        Self.savePassword(password, for: username)
     }
 
     func logout() {
         isAuthenticated = false
         isRestoringSession = false
+        let username = currentUser?.username
         currentUser = nil
         needsOnboarding = false
         UserDefaults.standard.removeObject(forKey: "auth_username")
         UserDefaults.standard.removeObject(forKey: "auth_name")
         UserDefaults.standard.removeObject(forKey: "auth_user_id")
         UserDefaults.standard.removeObject(forKey: "household_invite_code")
+        if let username { Self.deletePassword(for: username) }
         HTTPCookieStorage.shared.cookies?.forEach { HTTPCookieStorage.shared.deleteCookie($0) }
+    }
+
+    // MARK: - Silent Re-login
+
+    private func silentRelogin(api: APIService) async -> Bool {
+        guard let username = currentUser?.username ?? UserDefaults.standard.string(forKey: "auth_username"),
+              let password = Self.loadPassword(for: username) else {
+            return false
+        }
+        do {
+            let response = try await api.login(username: username, password: password)
+            return response.success
+        } catch {
+            return false
+        }
+    }
+
+    // MARK: - Keychain
+
+    private static let keychainService = "com.atlasatlantic.familylife"
+
+    private static func savePassword(_ password: String, for username: String) {
+        let data = Data(password.utf8)
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: keychainService,
+            kSecAttrAccount as String: username
+        ]
+        SecItemDelete(query as CFDictionary)
+        var add = query
+        add[kSecValueData as String] = data
+        SecItemAdd(add as CFDictionary, nil)
+    }
+
+    private static func loadPassword(for username: String) -> String? {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: keychainService,
+            kSecAttrAccount as String: username,
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne
+        ]
+        var result: AnyObject?
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+        guard status == errSecSuccess, let data = result as? Data else { return nil }
+        return String(data: data, encoding: .utf8)
+    }
+
+    private static func deletePassword(for username: String) {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: keychainService,
+            kSecAttrAccount as String: username
+        ]
+        SecItemDelete(query as CFDictionary)
     }
 }
