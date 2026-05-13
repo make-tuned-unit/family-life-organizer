@@ -17,8 +17,8 @@ struct MoreView: View {
                 .padding(.bottom, 18)
 
                 VStack(spacing: 10) {
-                    NavigationLink { ExpensesView() } label: {
-                        moreRow(icon: "creditcard.fill", title: "Budget", subtitle: "Track spending, receipts, and categories", color: AccentTheme.terracotta.color)
+                    NavigationLink { DecisionsView() } label: {
+                        moreRow(icon: "chart.bar.fill", title: "Decisions", subtitle: "Polls and family decisions", color: TabAccent.decisions.color)
                     }
 
                     NavigationLink { RivalriesView() } label: {

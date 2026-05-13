@@ -74,7 +74,7 @@ struct HomeView: View {
                             Label("New Post", systemImage: "text.bubble")
                         }
                         Button { showingNewDecision = true } label: {
-                            Label("New Decision", systemImage: "bubble.left.and.bubble.right")
+                            Label("New Decision", systemImage: "chart.bar.fill")
                         }
                         Button { showingAddTask = true } label: {
                             Label("New Task", systemImage: "checkmark.circle")
