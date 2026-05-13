@@ -75,51 +75,47 @@ struct HouseholdView: View {
     private var inviteSection: some View {
         if let code = household.householdGroup?.invite_code {
             Section {
-                VStack(spacing: 12) {
-                    HStack(spacing: 12) {
-                        Image(systemName: "person.2.badge.key.fill")
-                            .font(.system(size: 20))
-                            .foregroundStyle(TabAccent.home.color)
+                // One-tap copy
+                Button {
+                    UIPasteboard.general.string = code
+                    copiedCode = true
+                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                    Task {
+                        try? await Task.sleep(for: .seconds(2))
+                        copiedCode = false
+                    }
+                } label: {
+                    HStack {
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Invite Code")
-                                .font(.system(size: 15, weight: .semibold))
-                            Text("Share this with your partner so they can join your household.")
-                                .font(.system(size: 12))
+                                .font(.system(size: 13, weight: .medium))
                                 .foregroundStyle(WarmPalette.ink3)
+                            Text(code)
+                                .font(.system(size: 22, weight: .bold, design: .monospaced))
+                                .foregroundStyle(WarmPalette.ink1)
+                                .tracking(2)
                         }
-                    }
-
-                    HStack {
-                        Text(code)
-                            .font(.system(size: 24, weight: .bold, design: .monospaced))
-                            .foregroundStyle(WarmPalette.ink1)
-                            .tracking(2)
-
                         Spacer()
-
-                        Button {
-                            UIPasteboard.general.string = code
-                            copiedCode = true
-                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            Task {
-                                try? await Task.sleep(for: .seconds(2))
-                                copiedCode = false
-                            }
-                        } label: {
-                            Label(copiedCode ? "Copied" : "Copy", systemImage: copiedCode ? "checkmark" : "doc.on.doc")
-                                .font(.system(size: 13, weight: .medium))
-                                .foregroundStyle(copiedCode ? WarmPalette.good : TabAccent.home.color)
-                        }
-
-                        ShareLink(item: "Join my household on FamilyLife! Use invite code: \(code)") {
-                            Label("Share", systemImage: "square.and.arrow.up")
-                                .font(.system(size: 13, weight: .medium))
-                                .foregroundStyle(TabAccent.home.color)
-                        }
+                        Image(systemName: copiedCode ? "checkmark.circle.fill" : "doc.on.doc")
+                            .font(.system(size: 18))
+                            .foregroundStyle(copiedCode ? WarmPalette.good : WarmPalette.ink3)
                     }
+                }
+                .buttonStyle(.plain)
+
+                // Send via iMessage / share sheet
+                ShareLink(
+                    item: "Join my household on Kinrows! Use invite code: \(code)",
+                    subject: Text("Join my household"),
+                    message: Text("I set up our family organizer. Use this code to join: \(code)")
+                ) {
+                    Label("Send invite to partner", systemImage: "message.fill")
+                        .foregroundStyle(TabAccent.home.color)
                 }
             } header: {
                 Text("Invite")
+            } footer: {
+                Text("Tap the code to copy it, or send it directly via text.")
             }
         }
 

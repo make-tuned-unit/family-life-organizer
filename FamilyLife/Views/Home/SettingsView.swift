@@ -5,6 +5,7 @@ struct SettingsView: View {
     var showsDismissButton = false
     @Environment(AuthService.self) private var auth
     @Environment(APIService.self) private var api
+    @Environment(HouseholdService.self) private var household
     @Environment(\.dismiss) private var dismiss
 
     @State private var serverURL: String = ""
@@ -15,6 +16,7 @@ struct SettingsView: View {
     @State private var showingPhotoPicker = false
     @State private var selectedPhoto: PhotosPickerItem?
     @State private var profileImage: Image?
+    @State private var copiedCode = false
 
     var body: some View {
         Form {
@@ -139,6 +141,44 @@ struct SettingsView: View {
                 NavigationLink { HouseholdView() } label: {
                     Label("My Household", systemImage: "house.fill")
                         .foregroundStyle(TabAccent.home.color)
+                }
+
+                if let code = household.householdGroup?.invite_code {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Invite Code")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(WarmPalette.ink3)
+                        HStack {
+                            Text(code)
+                                .font(.system(size: 22, weight: .bold, design: .monospaced))
+                                .foregroundStyle(WarmPalette.ink1)
+                                .tracking(2)
+                            Spacer()
+                            Button {
+                                UIPasteboard.general.string = code
+                                copiedCode = true
+                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                Task {
+                                    try? await Task.sleep(for: .seconds(2))
+                                    copiedCode = false
+                                }
+                            } label: {
+                                Image(systemName: copiedCode ? "checkmark.circle.fill" : "doc.on.doc")
+                                    .font(.system(size: 16))
+                                    .foregroundStyle(copiedCode ? WarmPalette.good : WarmPalette.ink3)
+                            }
+                        }
+                    }
+                    .padding(.vertical, 2)
+
+                    ShareLink(
+                        item: "Join my household on Kinrows! Use invite code: \(code)",
+                        subject: Text("Join my household"),
+                        message: Text("I set up our family organizer. Use this code to join: \(code)")
+                    ) {
+                        Label("Send invite to partner", systemImage: "message.fill")
+                            .foregroundStyle(TabAccent.home.color)
+                    }
                 }
             }
 
