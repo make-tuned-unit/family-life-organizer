@@ -72,6 +72,8 @@ class FamilyDB {
         // Recurring events columns
         this.db.run('ALTER TABLE appointments ADD COLUMN recurrence_rule TEXT', () => {});
         this.db.run('ALTER TABLE appointments ADD COLUMN recurrence_end TEXT', () => {});
+        // Profile image column
+        this.db.run('ALTER TABLE users ADD COLUMN profile_image TEXT', () => {});
         this.db.run('CREATE INDEX IF NOT EXISTS idx_feed_posts_group ON feed_posts(group_id, id DESC)', (err) => {
           if (err) console.error('Index error:', err.message);
           resolve();
@@ -1051,7 +1053,7 @@ class FamilyDB {
     return new Promise((resolve, reject) => {
       this.db.all(`
         SELECT gm.*,
-          u.name as user_name, u.username, u.avatar as user_avatar,
+          u.name as user_name, u.username, u.avatar as user_avatar, u.profile_image,
           c.name as contact_name, c.relationship, c.avatar_initial, c.phone as contact_phone
         FROM group_members gm
         LEFT JOIN users u ON u.id = gm.user_id
@@ -1315,19 +1317,19 @@ class FamilyDB {
       const sql = `
         SELECT 'decision' as feed_type, id as ref_id, title, NULL as body,
           creator_name as author, status, created_at,
-          0 as reaction_count, 0 as comment_count
+          0 as reaction_count, 0 as comment_count, NULL as author_id
         FROM decisions WHERE status = 'active'
         UNION ALL
         SELECT 'event' as feed_type, a.id as ref_id, a.title, a.location as body,
           COALESCE(a.person_tags, 'Family') as author, 'upcoming' as status,
           a.created_at,
-          0 as reaction_count, 0 as comment_count
+          0 as reaction_count, 0 as comment_count, NULL as author_id
         FROM appointments a WHERE a.appointment_date >= date('now') AND a.appointment_date <= date('now', '+7 days')
         UNION ALL
         SELECT 'coverage' as feed_type, cr.id as ref_id, cr.reason as title, cr.note as body,
           COALESCE(u.name, u.username, 'Family') as author, cr.status,
           cr.created_at,
-          0 as reaction_count, 0 as comment_count
+          0 as reaction_count, 0 as comment_count, cr.requester_id as author_id
         FROM coverage_requests cr
         LEFT JOIN users u ON u.id = cr.requester_id
         WHERE cr.status IN ('pending', 'approved')
@@ -1335,14 +1337,15 @@ class FamilyDB {
         SELECT 'rivalry' as feed_type, id as ref_id, title, challenge_type as body,
           initiator_name as author, status,
           created_at,
-          0 as reaction_count, 0 as comment_count
+          0 as reaction_count, 0 as comment_count, NULL as author_id
         FROM rivalries WHERE status = 'active' AND created_at >= datetime('now', '-14 days')
         UNION ALL
         SELECT 'post' as feed_type, fp.id as ref_id, fp.title, fp.body,
           COALESCE(u.name, u.username, 'Family') as author, fp.post_type as status,
           fp.created_at,
           (SELECT COUNT(*) FROM feed_reactions WHERE post_id = fp.id) as reaction_count,
-          (SELECT COUNT(*) FROM feed_comments WHERE post_id = fp.id) as comment_count
+          (SELECT COUNT(*) FROM feed_comments WHERE post_id = fp.id) as comment_count,
+          fp.author_id
         FROM feed_posts fp
         LEFT JOIN users u ON u.id = fp.author_id
         UNION ALL
@@ -1351,7 +1354,7 @@ class FamilyDB {
           fc.text as body,
           u.name as author, 'comment' as status,
           fc.created_at,
-          0 as reaction_count, 0 as comment_count
+          0 as reaction_count, 0 as comment_count, fc.user_id as author_id
         FROM feed_comments fc
         JOIN users u ON u.id = fc.user_id
         WHERE fc.created_at >= datetime('now', '-7 days')

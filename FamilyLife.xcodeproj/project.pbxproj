@@ -81,6 +81,7 @@
 		AA00004F /* EventDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00004F /* EventDetailView.swift */; };
 		AA000050 /* HouseholdService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000050 /* HouseholdService.swift */; };
 		AA000051 /* HouseholdView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000051 /* HouseholdView.swift */; };
+		AA000070 /* ProfileImageCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000070 /* ProfileImageCache.swift */; };
 		AA000052 /* BudgetSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000052 /* BudgetSettingsView.swift */; };
 		AA000053 /* BudgetCategoryDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000053 /* BudgetCategoryDetailView.swift */; };
 		AA000054 /* NewPostView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000054 /* NewPostView.swift */; };
@@ -161,6 +162,7 @@
 		BB00004E /* FamilyGroupsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FamilyGroupsView.swift; sourceTree = "<group>"; };
 		BB00004F /* EventDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventDetailView.swift; sourceTree = "<group>"; };
 		BB000050 /* HouseholdService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HouseholdService.swift; sourceTree = "<group>"; };
+		BB000070 /* ProfileImageCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileImageCache.swift; sourceTree = "<group>"; };
 		BB000051 /* HouseholdView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HouseholdView.swift; sourceTree = "<group>"; };
 		BB000052 /* BudgetSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BudgetSettingsView.swift; sourceTree = "<group>"; };
 		BB000053 /* BudgetCategoryDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BudgetCategoryDetailView.swift; sourceTree = "<group>"; };
@@ -246,6 +248,7 @@
 				BB000020 /* NotificationService.swift */,
 				BB000026 /* HealthKitManager.swift */,
 				BB000050 /* HouseholdService.swift */,
+				BB000070 /* ProfileImageCache.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -567,6 +570,7 @@
 				AA00004E /* FamilyGroupsView.swift in Sources */,
 				AA00004F /* EventDetailView.swift in Sources */,
 				AA000050 /* HouseholdService.swift in Sources */,
+				AA000070 /* ProfileImageCache.swift in Sources */,
 				AA000051 /* HouseholdView.swift in Sources */,
 				AA000052 /* BudgetSettingsView.swift in Sources */,
 				AA000053 /* BudgetCategoryDetailView.swift in Sources */,
@@ -584,7 +588,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 36;
+				CURRENT_PROJECT_VERSION = 39;
 				DEVELOPMENT_ASSET_PATHS = "";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -618,7 +622,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 36;
+				CURRENT_PROJECT_VERSION = 39;
 				DEVELOPMENT_ASSET_PATHS = "";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;

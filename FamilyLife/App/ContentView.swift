@@ -120,4 +120,5 @@ struct FloatingTabBar: View {
         .environment(AuthService())
         .environment(APIService())
         .environment(HouseholdService())
+        .environment(ProfileImageCache())
 }

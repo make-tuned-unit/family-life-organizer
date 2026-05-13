@@ -149,6 +149,41 @@ app.get('/api/auth/me', requireAuth, async (req, res) => {
   }
 });
 
+// Profile image upload
+app.put('/api/users/me/avatar', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const userId = req.session.user?.id;
+    if (!userId) return res.status(401).json({ error: 'Not authenticated' });
+    const { image } = req.body;
+    if (!image) return res.status(400).json({ error: 'No image provided' });
+    await new Promise((resolve, reject) => {
+      db.db.run('UPDATE users SET profile_image = ? WHERE id = ?', [image, userId], (err) => err ? reject(err) : resolve());
+    });
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+// Profile image for any user
+app.get('/api/users/:id/avatar', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const row = await new Promise((resolve, reject) => {
+      db.db.get('SELECT profile_image FROM users WHERE id = ?', [req.params.id], (err, row) => err ? reject(err) : resolve(row));
+    });
+    if (!row?.profile_image) return res.status(404).json({ error: 'No avatar' });
+    res.json({ image: row.profile_image });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
 // Login page - Modern Design
 app.get('/login', (req, res) => {
   res.send(`<!DOCTYPE html>

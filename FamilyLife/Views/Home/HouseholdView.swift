@@ -9,7 +9,9 @@ struct HouseholdView: View {
     @State private var showingAddMember = false
     @State private var editingMember: APIService.ContactResponse?
     @State private var showingAddresses = false
+    @State private var showingJoinSheet = false
     @State private var error: String?
+    @State private var copiedCode = false
 
     private var otherMembers: [APIService.ContactResponse] {
         guard let user = auth.currentUser else { return household.members }
@@ -21,6 +23,7 @@ struct HouseholdView: View {
 
     var body: some View {
         List {
+            inviteSection
             membersSection
             addressSection
         }
@@ -42,6 +45,11 @@ struct HouseholdView: View {
         .sheet(item: $editingMember) { member in
             EditMemberSheet(member: member) { await household.reload(api: api) }
         }
+        .sheet(isPresented: $showingJoinSheet) {
+            JoinHouseholdSheet {
+                await household.reload(api: api)
+            }
+        }
         .sheet(isPresented: $showingAddresses) {
             NavigationStack {
                 FamilyAddressesView()
@@ -59,6 +67,70 @@ struct HouseholdView: View {
             Text(error ?? "")
         }
         .task { await household.reload(api: api) }
+    }
+
+    // MARK: - Invite Code
+
+    @ViewBuilder
+    private var inviteSection: some View {
+        if let code = household.householdGroup?.invite_code {
+            Section {
+                VStack(spacing: 12) {
+                    HStack(spacing: 12) {
+                        Image(systemName: "person.2.badge.key.fill")
+                            .font(.system(size: 20))
+                            .foregroundStyle(TabAccent.home.color)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Invite Code")
+                                .font(.system(size: 15, weight: .semibold))
+                            Text("Share this with your partner so they can join your household.")
+                                .font(.system(size: 12))
+                                .foregroundStyle(WarmPalette.ink3)
+                        }
+                    }
+
+                    HStack {
+                        Text(code)
+                            .font(.system(size: 24, weight: .bold, design: .monospaced))
+                            .foregroundStyle(WarmPalette.ink1)
+                            .tracking(2)
+
+                        Spacer()
+
+                        Button {
+                            UIPasteboard.general.string = code
+                            copiedCode = true
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            Task {
+                                try? await Task.sleep(for: .seconds(2))
+                                copiedCode = false
+                            }
+                        } label: {
+                            Label(copiedCode ? "Copied" : "Copy", systemImage: copiedCode ? "checkmark" : "doc.on.doc")
+                                .font(.system(size: 13, weight: .medium))
+                                .foregroundStyle(copiedCode ? WarmPalette.good : TabAccent.home.color)
+                        }
+
+                        ShareLink(item: "Join my household on FamilyLife! Use invite code: \(code)") {
+                            Label("Share", systemImage: "square.and.arrow.up")
+                                .font(.system(size: 13, weight: .medium))
+                                .foregroundStyle(TabAccent.home.color)
+                        }
+                    }
+                }
+            } header: {
+                Text("Invite")
+            }
+        }
+
+        Section {
+            Button { showingJoinSheet = true } label: {
+                Label("Join another household", systemImage: "person.badge.plus")
+                    .foregroundStyle(TabAccent.home.color)
+            }
+        } footer: {
+            Text("If your partner already created a household, enter their invite code to join it.")
+        }
     }
 
     // MARK: - Members
@@ -149,7 +221,7 @@ struct HouseholdView: View {
                     Text("No family members yet")
                         .font(.system(size: 14))
                         .foregroundStyle(WarmPalette.ink3)
-                    Text("Add your family here and they'll appear everywhere in the app.")
+                    Text("Share your invite code or add family members manually.")
                         .font(.system(size: 12))
                         .foregroundStyle(WarmPalette.ink4)
                         .multilineTextAlignment(.center)
@@ -189,6 +261,74 @@ struct HouseholdView: View {
 
     private var errorBinding: Binding<Bool> {
         Binding(get: { error != nil }, set: { if !$0 { error = nil } })
+    }
+}
+
+// MARK: - Join Household Sheet
+
+struct JoinHouseholdSheet: View {
+    @Environment(APIService.self) private var api
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var code = ""
+    @State private var isJoining = false
+    @State private var error: String?
+
+    let onJoined: () async -> Void
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    TextField("Enter invite code", text: $code)
+                        .font(.system(size: 20, weight: .semibold, design: .monospaced))
+                        .textInputAutocapitalization(.characters)
+                        .autocorrectionDisabled()
+                        .multilineTextAlignment(.center)
+                } header: {
+                    Text("Invite Code")
+                } footer: {
+                    Text("Ask your partner for their household invite code. You'll find it in their Household settings.")
+                }
+            }
+            .scrollContentBackground(.hidden)
+            .background { AmbientBackground(style: .settings) }
+            .navigationTitle("Join Household")
+            .navigationBarTitleDisplayMode(.inline)
+            .alert("Couldn't join", isPresented: Binding(
+                get: { error != nil },
+                set: { if !$0 { error = nil } }
+            )) {
+                Button("OK") { error = nil }
+            } message: {
+                Text(error ?? "")
+            }
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                        .foregroundStyle(WarmPalette.ink2)
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Join") {
+                        Task { await join() }
+                    }
+                    .disabled(code.count < 4 || isJoining)
+                }
+            }
+        }
+    }
+
+    private func join() async {
+        isJoining = true
+        do {
+            _ = try await api.joinGroup(inviteCode: code.trimmingCharacters(in: .whitespaces))
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            await onJoined()
+            dismiss()
+        } catch {
+            self.error = "Invalid invite code. Check with your partner and try again."
+            isJoining = false
+        }
     }
 }
 
@@ -305,4 +445,5 @@ struct EditMemberSheet: View {
     .environment(APIService())
     .environment(AuthService())
     .environment(HouseholdService())
+    .environment(ProfileImageCache())
 }
