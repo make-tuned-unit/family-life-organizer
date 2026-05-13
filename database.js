@@ -1364,7 +1364,7 @@ class FamilyDB {
           fr.reaction_type as body,
           u.name as author, 'reaction' as status,
           fr.created_at,
-          0 as reaction_count, 0 as comment_count
+          0 as reaction_count, 0 as comment_count, fr.user_id as author_id
         FROM feed_reactions fr
         JOIN users u ON u.id = fr.user_id
         WHERE fr.created_at >= datetime('now', '-7 days')

@@ -16,10 +16,6 @@ struct MoreView: View {
                 .padding(.bottom, 18)
 
                 VStack(spacing: 10) {
-                    NavigationLink { FamilyGroupsView() } label: {
-                        moreRow(icon: "person.3.fill", title: "Family", subtitle: "Your people, groups, and tribe", color: AccentTheme.sage.color)
-                    }
-
                     NavigationLink { ExpensesView() } label: {
                         moreRow(icon: "creditcard.fill", title: "Budget", subtitle: "Track spending, receipts, and categories", color: AccentTheme.terracotta.color)
                     }
