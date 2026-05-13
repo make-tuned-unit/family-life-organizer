@@ -66,10 +66,11 @@ struct HouseholdView: View {
     @ViewBuilder
     private var membersSection: some View {
         Section {
-            // Current user row (non-editable here)
+            // Current user row — enriched with contact info if available
             if let user = auth.currentUser {
+                let myContact = household.member(named: user.name)
                 HStack(spacing: 12) {
-                    FamilyAvatar(initial: String(user.name.prefix(1)).uppercased(), size: 36)
+                    ProfileAvatar(size: 36)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(user.name)
                             .font(.system(size: 15, weight: .semibold))
@@ -78,6 +79,19 @@ struct HouseholdView: View {
                             .foregroundStyle(WarmPalette.ink3)
                     }
                     Spacer()
+                    VStack(alignment: .trailing, spacing: 2) {
+                        if let phone = myContact?.phone, !phone.isEmpty {
+                            Label(phone, systemImage: "phone")
+                                .font(.system(size: 11))
+                                .foregroundStyle(WarmPalette.ink3)
+                        }
+                        if let email = myContact?.email, !email.isEmpty {
+                            Label(email, systemImage: "envelope")
+                                .font(.system(size: 11))
+                                .foregroundStyle(WarmPalette.ink3)
+                                .lineLimit(1)
+                        }
+                    }
                 }
                 .padding(.vertical, 2)
             }
