@@ -4,6 +4,8 @@ struct FeedCard: View {
     let prepared: PreparedFeedItem
     @Binding var selectedTab: MainTab
     var onEventTap: ((Int) -> Void)?
+    var onRivalryTap: ((Int) -> Void)?
+    var onCoverageTap: (() -> Void)?
 
     @Environment(APIService.self) private var api
     @Environment(AuthService.self) private var auth
@@ -69,7 +71,6 @@ struct FeedCard: View {
                     .scaledToFill()
                     .frame(width: 32, height: 32)
                     .clipShape(Circle())
-                    .overlay { Circle().stroke(.white.opacity(0.7), lineWidth: 1.5) }
                     .onAppear { profileCache.fetchIfNeeded(userId: authorId, api: api) }
             } else {
                 FamilyAvatar(
@@ -372,7 +373,9 @@ struct FeedCard: View {
         switch item.feed_type {
         case "decision": selectedTab = .decisions
         case "event": onEventTap?(item.ref_id)
-        case "post":
+        case "rivalry": onRivalryTap?(item.ref_id)
+        case "coverage": onCoverageTap?()
+        case "post", "comment", "reaction":
             withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
                 isExpanded.toggle()
             }
