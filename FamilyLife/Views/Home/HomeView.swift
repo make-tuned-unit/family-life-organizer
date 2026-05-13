@@ -11,6 +11,7 @@ struct HomeView: View {
     @State private var showingNewPost = false
     @State private var showingSettings = false
     @State private var selectedFeedEvent: AppointmentResponse?
+    @State private var selectedFeedRivalry: RivalryResponse?
 
     private var greeting: String {
         let hour = Calendar.current.component(.hour, from: Date())
@@ -112,7 +113,17 @@ struct HomeView: View {
                 }
             }
         }
-        // Rivalries and Gifts accessed via More tab
+        .sheet(item: $selectedFeedRivalry) { rivalry in
+            NavigationStack {
+                RivalryDetailView(rivalry: rivalry)
+                    .toolbar {
+                        ToolbarItem(placement: .topBarLeading) {
+                            Button("Done") { selectedFeedRivalry = nil }
+                                .foregroundStyle(WarmPalette.ink2)
+                        }
+                    }
+            }
+        }
         .overlay {
             if viewModel.isLoading && viewModel.summary == nil { ProgressView() }
         }
@@ -156,6 +167,15 @@ struct HomeView: View {
             let recent = try await api.fetchAppointments(dateFrom: today, dateTo: nextWeek)
             if let appt = recent.first(where: { $0.id == id }) {
                 selectedFeedEvent = appt
+            }
+        } catch {}
+    }
+
+    private func openFeedRivalry(id: Int) async {
+        do {
+            let rivalries = try await api.fetchRivalries()
+            if let rivalry = rivalries.first(where: { $0.id == id }) {
+                selectedFeedRivalry = rivalry
             }
         } catch {}
     }
@@ -371,9 +391,13 @@ struct HomeView: View {
 
             let visible = viewModel.activityFeed.prefix(viewModel.visibleFeedCount)
             ForEach(visible) { prepared in
-                FeedCard(prepared: prepared, selectedTab: $selectedTab) { eventId in
-                    Task { await openFeedEvent(id: eventId) }
-                }
+                FeedCard(
+                    prepared: prepared,
+                    selectedTab: $selectedTab,
+                    onEventTap: { eventId in Task { await openFeedEvent(id: eventId) } },
+                    onRivalryTap: { rivalryId in Task { await openFeedRivalry(id: rivalryId) } },
+                    onCoverageTap: { selectedTab = .calendar }
+                )
                 .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
                 .padding(.bottom, 10)
             }
