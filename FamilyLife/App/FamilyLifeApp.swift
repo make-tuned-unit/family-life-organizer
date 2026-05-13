@@ -6,6 +6,7 @@ struct FamilyLifeApp: App {
     @State private var apiService = APIService()
     @State private var householdService = HouseholdService()
     @State private var profileImageCache = ProfileImageCache()
+    @State private var messageCache = MessageCache()
 
     var body: some Scene {
         WindowGroup {
@@ -14,12 +15,16 @@ struct FamilyLifeApp: App {
                 .environment(apiService)
                 .environment(householdService)
                 .environment(profileImageCache)
+                .environment(messageCache)
                 .task {
                     if authService.isAuthenticated {
                         await authService.validateSession(api: apiService)
                     }
                     if authService.isAuthenticated {
                         await householdService.reload(api: apiService, profileCache: profileImageCache)
+                        if let userId = authService.currentUser?.id {
+                            messageCache.preload(api: apiService, userId: userId)
+                        }
                     }
                 }
                 .onChange(of: authService.isAuthenticated) { _, isAuthenticated in
