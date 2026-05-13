@@ -317,6 +317,7 @@ CREATE TABLE IF NOT EXISTS users (
     email TEXT,
     phone TEXT,
     avatar TEXT,
+    profile_image TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 

@@ -45,6 +45,11 @@ final class AuthService {
         profileUIImage = Self.thumbnail(from: compressed)
         try? compressed.write(to: Self.profileImageURL)
         UserDefaults.standard.removeObject(forKey: "profile_image")
+
+        // Sync to server so other users can see our profile picture
+        Task {
+            try? await api.uploadProfileImage(compressed.base64EncodedString())
+        }
     }
 
     /// Pre-renders a circular thumbnail at 128x128. The circular crop is baked into the

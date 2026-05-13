@@ -404,4 +404,5 @@ struct HomeView: View {
     }
     .environment(APIService())
     .environment(AuthService())
+    .environment(ProfileImageCache())
 }

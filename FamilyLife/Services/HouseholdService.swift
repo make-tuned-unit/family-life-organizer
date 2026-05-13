@@ -4,10 +4,11 @@ import SwiftUI
 @Observable
 final class HouseholdService {
     private(set) var members: [APIService.ContactResponse] = []
+    private(set) var householdGroup: APIService.GroupResponse?
     private(set) var isLoaded = false
     private var isLoading = false
 
-    func load(api: APIService) async {
+    func load(api: APIService, profileCache: ProfileImageCache? = nil) async {
         guard !isLoading else { return }
         isLoading = true
         do {
@@ -18,6 +19,9 @@ final class HouseholdService {
             let contacts = (try? await contactsReq) ?? []
             let groups = (try? await groupsReq) ?? []
 
+            // Cache the household group for invite code display
+            householdGroup = groups.first { $0.group_type == "household" }
+
             // Start with contacts
             var combined = contacts
             let contactNames = Set(contacts.map { $0.name.lowercased() })
@@ -25,6 +29,9 @@ final class HouseholdService {
             // Add users from household/family groups who aren't already in contacts
             for group in groups where group.group_type == "household" || group.group_type == "family" {
                 if let groupMembers = try? await api.fetchGroupMembers(groupId: group.id) {
+                    // Load profile images into cache
+                    profileCache?.loadFromHousehold(groupMembers)
+
                     for member in groupMembers {
                         let name = member.displayName
                         guard !contactNames.contains(name.lowercased()) else { continue }
@@ -53,9 +60,9 @@ final class HouseholdService {
         isLoading = false
     }
 
-    func reload(api: APIService) async {
+    func reload(api: APIService, profileCache: ProfileImageCache? = nil) async {
         isLoading = false
-        await load(api: api)
+        await load(api: api, profileCache: profileCache)
     }
 
     func member(named name: String) -> APIService.ContactResponse? {

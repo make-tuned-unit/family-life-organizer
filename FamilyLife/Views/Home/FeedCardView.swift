@@ -8,6 +8,7 @@ struct FeedCard: View {
     @Environment(APIService.self) private var api
     @Environment(AuthService.self) private var auth
     @Environment(HouseholdService.self) private var household
+    @Environment(ProfileImageCache.self) private var profileCache
 
     @State private var isLiked = false
     @State private var likeCount = 0
@@ -62,11 +63,24 @@ struct FeedCard: View {
         HStack(spacing: 10) {
             if prepared.isOwnPost {
                 ProfileAvatar(size: 32)
+            } else if let authorId = item.author_id, let img = profileCache.image(for: authorId) {
+                Image(uiImage: img)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: 32, height: 32)
+                    .clipShape(Circle())
+                    .overlay { Circle().stroke(.white.opacity(0.7), lineWidth: 1.5) }
+                    .onAppear { profileCache.fetchIfNeeded(userId: authorId, api: api) }
             } else {
                 FamilyAvatar(
                     initial: String(item.author?.prefix(1) ?? "?").uppercased(),
                     size: 32
                 )
+                .onAppear {
+                    if let authorId = item.author_id {
+                        profileCache.fetchIfNeeded(userId: authorId, api: api)
+                    }
+                }
             }
 
             VStack(alignment: .leading, spacing: 2) {
