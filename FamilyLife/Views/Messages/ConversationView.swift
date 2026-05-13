@@ -19,6 +19,7 @@ struct ConversationView: View {
     @State private var pendingImageData: Data?
     @State private var showingNewDecision = false
     @State private var openDecisions: [DecisionResponse] = []
+    @State private var fullscreenImage: UIImage?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -57,7 +58,8 @@ struct ConversationView: View {
                         ForEach(messages.reversed()) { msg in
                             MessageBubble(
                                 message: msg,
-                                isOwn: msg.sender_id == auth.currentUser?.id
+                                isOwn: msg.sender_id == auth.currentUser?.id,
+                                onImageTap: { image in fullscreenImage = image }
                             )
                             .id(msg.id)
                         }
@@ -157,6 +159,14 @@ struct ConversationView: View {
                 await loadDecisions()
             }
         }
+        .fullScreenCover(item: Binding(
+            get: { fullscreenImage.map { IdentifiableImage(image: $0) } },
+            set: { fullscreenImage = $0?.image }
+        )) { item in
+            ImagePreviewView(image: item.image) {
+                fullscreenImage = nil
+            }
+        }
         .task {
             pendingQuote = quotedItem
             await loadMessages()
@@ -227,6 +237,7 @@ struct ConversationView: View {
 struct MessageBubble: View {
     let message: APIService.DirectMessageResponse
     let isOwn: Bool
+    var onImageTap: ((UIImage) -> Void)?
 
     var body: some View {
         HStack {
@@ -242,11 +253,13 @@ struct MessageBubble: View {
                 if let base64 = message.image_data,
                    let data = Data(base64Encoded: base64),
                    let uiImage = UIImage(data: data) {
-                    Image(uiImage: uiImage)
-                        .resizable()
-                        .scaledToFit()
-                        .frame(maxWidth: 200, maxHeight: 200)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                    Button { onImageTap?(uiImage) } label: {
+                        Image(uiImage: uiImage)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(maxWidth: 200, maxHeight: 200)
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                    }
                 }
 
                 if message.text != "Sent a photo" || message.image_data == nil {
@@ -275,5 +288,45 @@ struct MessageBubble: View {
     private func relativeTime(_ dateStr: String) -> String {
         guard let date = ISO8601DateFormatter.flexible.date(from: dateStr) else { return "" }
         return date.formatted(.relative(presentation: .named))
+    }
+}
+
+// MARK: - Fullscreen Image Preview
+
+struct IdentifiableImage: Identifiable {
+    let id = UUID()
+    let image: UIImage
+}
+
+struct ImagePreviewView: View {
+    let image: UIImage
+    let onDismiss: () -> Void
+
+    @State private var scale: CGFloat = 1
+    @State private var offset: CGSize = .zero
+
+    var body: some View {
+        ZStack(alignment: .topTrailing) {
+            Color.black.ignoresSafeArea()
+
+            Image(uiImage: image)
+                .resizable()
+                .scaledToFit()
+                .scaleEffect(scale)
+                .offset(offset)
+                .gesture(
+                    MagnifyGesture()
+                        .onChanged { value in scale = value.magnification }
+                        .onEnded { _ in withAnimation { scale = max(1, scale) } }
+                )
+
+            Button(action: onDismiss) {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.system(size: 28))
+                    .foregroundStyle(.white.opacity(0.8))
+                    .padding(16)
+            }
+        }
+        .statusBarHidden()
     }
 }
