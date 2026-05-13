@@ -1314,8 +1314,13 @@ class FamilyDB {
 
   // Get daily summary
   // Unified activity feed — merges recent decisions, events, coverage, and posts
-  getActivityFeed(limit = 20) {
+  // Posts/comments/reactions are filtered to groups the user belongs to
+  getActivityFeed(limit = 20, userId = null) {
     return new Promise((resolve, reject) => {
+      // Subquery for user's group IDs
+      const myGroups = userId
+        ? `SELECT group_id FROM group_members WHERE user_id = ${parseInt(userId)}`
+        : `SELECT id FROM groups`;
       const sql = `
         SELECT 'decision' as feed_type, id as ref_id, title, NULL as body,
           creator_name as author, status, created_at,
@@ -1351,6 +1356,7 @@ class FamilyDB {
         FROM feed_posts fp
         LEFT JOIN users u ON u.id = fp.author_id
         LEFT JOIN groups g ON g.id = fp.group_id
+        WHERE fp.group_id IN (${myGroups})
         UNION ALL
         SELECT 'comment' as feed_type, fc.post_id as ref_id,
           (SELECT title FROM feed_posts WHERE id = fc.post_id) as title,
@@ -1364,6 +1370,7 @@ class FamilyDB {
         LEFT JOIN feed_posts fp2 ON fp2.id = fc.post_id
         LEFT JOIN groups g2 ON g2.id = fp2.group_id
         WHERE fc.created_at >= datetime('now', '-7 days')
+          AND fp2.group_id IN (${myGroups})
         UNION ALL
         SELECT 'reaction' as feed_type, fr.post_id as ref_id,
           (SELECT title FROM feed_posts WHERE id = fr.post_id) as title,
@@ -1377,6 +1384,7 @@ class FamilyDB {
         LEFT JOIN feed_posts fp3 ON fp3.id = fr.post_id
         LEFT JOIN groups g3 ON g3.id = fp3.group_id
         WHERE fr.created_at >= datetime('now', '-7 days')
+          AND fp3.group_id IN (${myGroups})
         ORDER BY created_at DESC
         LIMIT ?
       `;
