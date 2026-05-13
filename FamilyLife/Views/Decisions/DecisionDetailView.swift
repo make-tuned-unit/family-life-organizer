@@ -11,6 +11,7 @@ struct DecisionDetailView: View {
     @State private var currentDecision: DecisionResponse
     @State private var error: String?
     @State private var showingDeleteConfirm = false
+    @State private var showingSendTo = false
 
     @Environment(AuthService.self) private var auth
     @Environment(\.dismiss) private var dismiss
@@ -240,6 +241,9 @@ struct DecisionDetailView: View {
                                 Label("Mark Resolved", systemImage: "checkmark.circle")
                             }
                         }
+                        Button { showingSendTo = true } label: {
+                            Label("Send to...", systemImage: "arrowshape.turn.up.right")
+                        }
                         Button(role: .destructive) {
                             showingDeleteConfirm = true
                         } label: {
@@ -251,6 +255,13 @@ struct DecisionDetailView: View {
                     }
                 }
             }
+        }
+        .sheet(isPresented: $showingSendTo) {
+            SendToSheet(quotedItem: QuotedItem(
+                type: "decision",
+                id: currentDecision.id,
+                title: currentDecision.title
+            ))
         }
         .confirmationDialog("Delete this decision?", isPresented: $showingDeleteConfirm, titleVisibility: .visible) {
             Button("Delete", role: .destructive) {

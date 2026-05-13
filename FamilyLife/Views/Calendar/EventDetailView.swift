@@ -8,6 +8,7 @@ struct EventDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var showingEdit = false
     @State private var showingShareSheet = false
+    @State private var showingSendTo = false
 
     var body: some View {
         ScrollView(showsIndicators: false) {
@@ -147,6 +148,20 @@ struct EventDetailView: View {
                         .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: 16))
                     }
 
+                    // Send to family member
+                    Button { showingSendTo = true } label: {
+                        HStack(spacing: 10) {
+                            Image(systemName: "arrowshape.turn.up.right")
+                                .font(.system(size: 16))
+                            Text("Send to...")
+                                .font(.system(size: 15, weight: .semibold))
+                        }
+                        .foregroundStyle(AccentTheme.ocean.color)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                        .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: 16))
+                    }
+
                     // Edit
                     Button {
                         showingEdit = true
@@ -194,6 +209,13 @@ struct EventDetailView: View {
             EditAppointmentView(appointment: appointment) {
                 Task { await onUpdate?() }
             }
+        }
+        .sheet(isPresented: $showingSendTo) {
+            SendToSheet(quotedItem: QuotedItem(
+                type: "event",
+                id: appointment.id,
+                title: appointment.title
+            ))
         }
     }
 
