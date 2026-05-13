@@ -67,6 +67,8 @@ CREATE TABLE IF NOT EXISTS appointments (
     with_person TEXT,
     category TEXT,
     person_tags TEXT,
+    recurrence_rule TEXT,
+    recurrence_end TEXT,
     reminder_sent BOOLEAN DEFAULT 0,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );

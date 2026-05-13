@@ -48,6 +48,41 @@ struct AppointmentResponse: Codable, Identifiable {
     let with_person: String?
     let category: String?
     let person_tags: String?
+    let recurrence_rule: String?
+    let recurrence_end: String?
     let reminder_sent: Int?
     let created_at: String?
+}
+
+enum RecurrenceRule: String, CaseIterable, Identifiable {
+    case none = ""
+    case daily = "daily"
+    case weekly = "weekly"
+    case biweekly = "biweekly"
+    case monthly = "monthly"
+    case yearly = "yearly"
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .none: "None"
+        case .daily: "Every day"
+        case .weekly: "Every week"
+        case .biweekly: "Every 2 weeks"
+        case .monthly: "Every month"
+        case .yearly: "Every year"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .none: "calendar"
+        case .daily: "arrow.clockwise"
+        case .weekly: "calendar.badge.clock"
+        case .biweekly: "calendar.badge.clock"
+        case .monthly: "calendar.circle"
+        case .yearly: "calendar.circle.fill"
+        }
+    }
 }

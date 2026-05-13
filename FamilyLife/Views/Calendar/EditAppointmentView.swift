@@ -18,6 +18,9 @@ struct EditAppointmentView: View {
     @State private var category: String
     @State private var notes: String
     @State private var personTags: Set<String>
+    @State private var recurrence: RecurrenceRule
+    @State private var recurrenceEnd: Date?
+    @State private var showRecurrenceEnd: Bool
     @State private var isSaving = false
     @State private var locationCompleter = LocationCompleter()
     @State private var showingLocationSuggestions = false
@@ -40,6 +43,12 @@ struct EditAppointmentView: View {
             .split(separator: ",")
             .map { $0.trimmingCharacters(in: .whitespaces) } ?? []
         _personTags = State(initialValue: Set(tags))
+
+        let rule = RecurrenceRule(rawValue: appointment.recurrence_rule ?? "") ?? .none
+        _recurrence = State(initialValue: rule)
+        let endDate = appointment.recurrence_end.flatMap { DateFormatter.isoDate.date(from: $0) }
+        _recurrenceEnd = State(initialValue: endDate)
+        _showRecurrenceEnd = State(initialValue: endDate != nil)
     }
 
     var body: some View {
@@ -78,6 +87,26 @@ struct EditAppointmentView: View {
                                     }
                                 }
                             }
+                        }
+                    }
+                }
+
+                Section("Repeat") {
+                    Picker(selection: $recurrence) {
+                        ForEach(RecurrenceRule.allCases) { rule in
+                            Label(rule.displayName, systemImage: rule.icon).tag(rule)
+                        }
+                    } label: {
+                        Label("Repeats", systemImage: "repeat")
+                    }
+
+                    if recurrence != .none {
+                        Toggle("End date", isOn: $showRecurrenceEnd)
+                        if showRecurrenceEnd {
+                            DatePicker("Ends on", selection: Binding(
+                                get: { recurrenceEnd ?? Calendar.current.date(byAdding: .month, value: 3, to: date)! },
+                                set: { recurrenceEnd = $0 }
+                            ), in: date..., displayedComponents: .date)
                         }
                     }
                 }
@@ -166,6 +195,15 @@ struct EditAppointmentView: View {
         if !location.isEmpty { data["location"] = location }
         if !notes.isEmpty { data["description"] = notes }
         if !personTags.isEmpty { data["person_tags"] = Array(personTags) }
+        if recurrence != .none {
+            data["recurrence_rule"] = recurrence.rawValue
+            if showRecurrenceEnd, let end = recurrenceEnd {
+                data["recurrence_end"] = DateFormatter.isoDate.string(from: end)
+            }
+        } else {
+            data["recurrence_rule"] = NSNull()
+            data["recurrence_end"] = NSNull()
+        }
 
         Task {
             do {
@@ -185,7 +223,8 @@ struct EditAppointmentView: View {
             id: 1, title: "Doctor", description: nil,
             appointment_date: "2026-03-25", appointment_time: "10:00",
             location: "Halifax", with_person: nil, category: "medical",
-            person_tags: nil, reminder_sent: nil, created_at: nil
+            person_tags: nil, recurrence_rule: nil, recurrence_end: nil,
+            reminder_sent: nil, created_at: nil
         ),
         onSaved: {}
     )

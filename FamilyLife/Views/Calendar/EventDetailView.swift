@@ -38,6 +38,24 @@ struct EventDetailView: View {
                             .foregroundStyle(WarmPalette.ink2)
                     }
 
+                    // Recurrence
+                    if let rule = appointment.recurrence_rule, !rule.isEmpty,
+                       let recurrence = RecurrenceRule(rawValue: rule) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "repeat")
+                                .foregroundStyle(TabAccent.calendar.color)
+                            Text(recurrence.displayName)
+                                .font(.system(size: 15))
+                                .foregroundStyle(WarmPalette.ink2)
+                            if let endStr = appointment.recurrence_end,
+                               let endDate = DateFormatter.isoDate.date(from: endStr) {
+                                Text("until \(DateFormatter.longDate.string(from: endDate))")
+                                    .font(.system(size: 13))
+                                    .foregroundStyle(WarmPalette.ink3)
+                            }
+                        }
+                    }
+
                     // Location
                     if let location = appointment.location, !location.isEmpty {
                         HStack(spacing: 8) {
@@ -237,6 +255,8 @@ struct EventDetailView: View {
             with_person: nil,
             category: "social",
             person_tags: "Jesse,Sophie",
+            recurrence_rule: "weekly",
+            recurrence_end: nil,
             reminder_sent: nil,
             created_at: nil
         ))
