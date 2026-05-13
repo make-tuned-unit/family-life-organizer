@@ -53,7 +53,6 @@ struct ProfileAvatar: View {
                 .resizable()
                 .scaledToFit()
                 .frame(width: size, height: size)
-                .overlay { Circle().stroke(.white.opacity(0.7), lineWidth: 1.5) }
         } else {
             FamilyAvatar(
                 initial: String(auth.currentUser?.name.prefix(1) ?? "?").uppercased(),
