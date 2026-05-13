@@ -1678,7 +1678,10 @@ class FamilyDB {
   getMessages(userId, partnerId, { limit = 50, before_id } = {}) {
     return new Promise((resolve, reject) => {
       let sql = `
-        SELECT dm.*, u.name as sender_name
+        SELECT dm.id, dm.sender_id, dm.recipient_id, dm.text, dm.reference_type,
+          dm.reference_id, dm.reference_title, dm.read_at, dm.created_at,
+          CASE WHEN dm.image_data IS NOT NULL THEN 1 ELSE 0 END as has_image,
+          u.name as sender_name
         FROM direct_messages dm
         JOIN users u ON u.id = dm.sender_id
         WHERE ((dm.sender_id = ? AND dm.recipient_id = ?) OR (dm.sender_id = ? AND dm.recipient_id = ?))
@@ -1688,6 +1691,13 @@ class FamilyDB {
       sql += ' ORDER BY dm.id DESC LIMIT ?';
       params.push(limit);
       this.db.all(sql, params, (err, rows) => err ? reject(err) : resolve(rows || []));
+    });
+  }
+
+  getMessageImage(messageId) {
+    return new Promise((resolve, reject) => {
+      this.db.get('SELECT image_data FROM direct_messages WHERE id = ?', [messageId],
+        (err, row) => err ? reject(err) : resolve(row?.image_data || null));
     });
   }
 

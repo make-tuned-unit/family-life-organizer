@@ -2607,6 +2607,16 @@ app.get('/api/messages/:partnerId', requireAuth, async (req, res) => {
   finally { db.close(); }
 });
 
+app.get('/api/messages/:partnerId/:messageId/image', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const image = await db.getMessageImage(parseInt(req.params.messageId));
+    if (!image) return res.status(404).json({ error: 'No image' });
+    res.json({ image });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+  finally { db.close(); }
+});
+
 app.post('/api/messages', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
