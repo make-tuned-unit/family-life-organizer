@@ -2572,6 +2572,65 @@ app.delete('/api/projects/:projectId/expenses/:id', requireAuth, async (req, res
 });
 
 // Activity feed (unified home feed)
+// ============================================
+// Direct Messages
+// ============================================
+
+app.get('/api/messages/unread-count', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const count = await db.getUnreadCount(req.session.user.id);
+    res.json({ count });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+  finally { db.close(); }
+});
+
+app.get('/api/messages', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const conversations = await db.getConversations(req.session.user.id);
+    res.json(conversations);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+  finally { db.close(); }
+});
+
+app.get('/api/messages/:partnerId', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const messages = await db.getMessages(req.session.user.id, parseInt(req.params.partnerId), {
+      limit: parseInt(req.query.limit) || 50,
+      before_id: req.query.before_id ? parseInt(req.query.before_id) : undefined
+    });
+    res.json(messages);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+  finally { db.close(); }
+});
+
+app.post('/api/messages', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const result = await db.sendMessage({
+      sender_id: req.session.user.id,
+      recipient_id: req.body.recipient_id,
+      text: req.body.text,
+      reference_type: req.body.reference_type,
+      reference_id: req.body.reference_id,
+      reference_title: req.body.reference_title
+    });
+    res.json({ success: true, id: result.id });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+  finally { db.close(); }
+});
+
+app.post('/api/messages/:partnerId/read', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    await db.markRead(req.session.user.id, parseInt(req.params.partnerId));
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+  finally { db.close(); }
+});
+
 app.get('/api/activity', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {

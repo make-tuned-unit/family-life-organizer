@@ -69,7 +69,6 @@
 		AA000042 /* DateFormatters.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000042 /* DateFormatters.swift */; };
 		AA000043 /* MoreView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000043 /* MoreView.swift */; };
 		AA000044 /* LiquidGlassComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000044 /* LiquidGlassComponents.swift */; };
-		AA000071 /* ShareWithSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000071 /* ShareWithSection.swift */; };
 		AA000045 /* CareCascadeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000045 /* CareCascadeView.swift */; };
 		AA000046 /* AIDisclosureView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000046 /* AIDisclosureView.swift */; };
 		AA000047 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = BB000047 /* PrivacyInfo.xcprivacy */; };
@@ -87,6 +86,10 @@
 		AA000054 /* NewPostView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000054 /* NewPostView.swift */; };
 		AA000055 /* FeedCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000055 /* FeedCardView.swift */; };
 		AA000070 /* ProfileImageCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000070 /* ProfileImageCache.swift */; };
+		AA000071 /* ShareWithSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000071 /* ShareWithSection.swift */; };
+		AA000072 /* MessagesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000072 /* MessagesView.swift */; };
+		AA000073 /* ConversationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000073 /* ConversationView.swift */; };
+		AA000074 /* QuotedItemCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000074 /* QuotedItemCard.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -152,7 +155,6 @@
 		BB000042 /* DateFormatters.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DateFormatters.swift; sourceTree = "<group>"; };
 		BB000043 /* MoreView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoreView.swift; sourceTree = "<group>"; };
 		BB000044 /* LiquidGlassComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiquidGlassComponents.swift; sourceTree = "<group>"; };
-		BB000071 /* ShareWithSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareWithSection.swift; sourceTree = "<group>"; };
 		BB000045 /* CareCascadeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CareCascadeView.swift; sourceTree = "<group>"; };
 		BB000046 /* AIDisclosureView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIDisclosureView.swift; sourceTree = "<group>"; };
 		BB000047 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
@@ -170,6 +172,10 @@
 		BB000054 /* NewPostView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewPostView.swift; sourceTree = "<group>"; };
 		BB000055 /* FeedCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedCardView.swift; sourceTree = "<group>"; };
 		BB000070 /* ProfileImageCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileImageCache.swift; sourceTree = "<group>"; };
+		BB000071 /* ShareWithSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareWithSection.swift; sourceTree = "<group>"; };
+		BB000072 /* MessagesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessagesView.swift; sourceTree = "<group>"; };
+		BB000073 /* ConversationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConversationView.swift; sourceTree = "<group>"; };
+		BB000074 /* QuotedItemCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuotedItemCard.swift; sourceTree = "<group>"; };
 		CC000001 /* FamilyLife.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = FamilyLife.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -264,6 +270,7 @@
 				EE00000C /* Pantry */,
 				EE00000D /* Cook */,
 				EE00000E /* Trips */,
+				EE000020 /* Messages */,
 				EE00000F /* Rivalries */,
 				EE000010 /* Decisions */,
 				EE000011 /* Gifts */,
@@ -356,6 +363,16 @@
 				BB000024 /* FamilyAddressesView.swift */,
 			);
 			path = Trips;
+			sourceTree = "<group>";
+		};
+		EE000020 /* Messages */ = {
+			isa = PBXGroup;
+			children = (
+				BB000072 /* MessagesView.swift */,
+				BB000073 /* ConversationView.swift */,
+				BB000074 /* QuotedItemCard.swift */,
+			);
+			path = Messages;
 			sourceTree = "<group>";
 		};
 		EE00000F /* Rivalries */ = {
@@ -563,6 +580,9 @@
 				AA000042 /* DateFormatters.swift in Sources */,
 				AA000044 /* LiquidGlassComponents.swift in Sources */,
 				AA000071 /* ShareWithSection.swift in Sources */,
+				AA000072 /* MessagesView.swift in Sources */,
+				AA000073 /* ConversationView.swift in Sources */,
+				AA000074 /* QuotedItemCard.swift in Sources */,
 				AA000045 /* CareCascadeView.swift in Sources */,
 				AA000046 /* AIDisclosureView.swift in Sources */,
 				AA000048 /* AppConfig.swift in Sources */,
@@ -592,7 +612,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 41;
+				CURRENT_PROJECT_VERSION = 44;
 				DEVELOPMENT_ASSET_PATHS = "";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -626,7 +646,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 41;
+				CURRENT_PROJECT_VERSION = 44;
 				DEVELOPMENT_ASSET_PATHS = "";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;

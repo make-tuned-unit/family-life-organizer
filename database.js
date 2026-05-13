@@ -1639,6 +1639,72 @@ class FamilyDB {
     });
   }
 
+  // ============================================
+  // Direct Messages
+  // ============================================
+
+  sendMessage({ sender_id, recipient_id, text, reference_type, reference_id, reference_title }) {
+    return new Promise((resolve, reject) => {
+      this.db.run(
+        'INSERT INTO direct_messages (sender_id, recipient_id, text, reference_type, reference_id, reference_title) VALUES (?, ?, ?, ?, ?, ?)',
+        [sender_id, recipient_id, text, reference_type || null, reference_id || null, reference_title || null],
+        function(err) { err ? reject(err) : resolve({ id: this.lastID }); }
+      );
+    });
+  }
+
+  getConversations(userId) {
+    return new Promise((resolve, reject) => {
+      this.db.all(`
+        SELECT dm.*, u.name as partner_name, u.profile_image as partner_image,
+          CASE WHEN dm.sender_id = ? THEN dm.recipient_id ELSE dm.sender_id END as partner_id,
+          (SELECT COUNT(*) FROM direct_messages dm2
+           WHERE dm2.sender_id = CASE WHEN dm.sender_id = ? THEN dm.recipient_id ELSE dm.sender_id END
+           AND dm2.recipient_id = ? AND dm2.read_at IS NULL) as unread_count
+        FROM direct_messages dm
+        JOIN users u ON u.id = CASE WHEN dm.sender_id = ? THEN dm.recipient_id ELSE dm.sender_id END
+        WHERE dm.id IN (
+          SELECT MAX(id) FROM direct_messages
+          WHERE sender_id = ? OR recipient_id = ?
+          GROUP BY CASE WHEN sender_id = ? THEN recipient_id ELSE sender_id END
+        )
+        ORDER BY dm.id DESC
+      `, [userId, userId, userId, userId, userId, userId, userId], (err, rows) => err ? reject(err) : resolve(rows || []));
+    });
+  }
+
+  getMessages(userId, partnerId, { limit = 50, before_id } = {}) {
+    return new Promise((resolve, reject) => {
+      let sql = `
+        SELECT dm.*, u.name as sender_name
+        FROM direct_messages dm
+        JOIN users u ON u.id = dm.sender_id
+        WHERE ((dm.sender_id = ? AND dm.recipient_id = ?) OR (dm.sender_id = ? AND dm.recipient_id = ?))
+      `;
+      const params = [userId, partnerId, partnerId, userId];
+      if (before_id) { sql += ' AND dm.id < ?'; params.push(before_id); }
+      sql += ' ORDER BY dm.id DESC LIMIT ?';
+      params.push(limit);
+      this.db.all(sql, params, (err, rows) => err ? reject(err) : resolve(rows || []));
+    });
+  }
+
+  markRead(userId, partnerId) {
+    return new Promise((resolve, reject) => {
+      this.db.run(
+        'UPDATE direct_messages SET read_at = CURRENT_TIMESTAMP WHERE sender_id = ? AND recipient_id = ? AND read_at IS NULL',
+        [partnerId, userId], (err) => err ? reject(err) : resolve()
+      );
+    });
+  }
+
+  getUnreadCount(userId) {
+    return new Promise((resolve, reject) => {
+      this.db.get('SELECT COUNT(*) as count FROM direct_messages WHERE recipient_id = ? AND read_at IS NULL', [userId],
+        (err, row) => err ? reject(err) : resolve(row?.count || 0));
+    });
+  }
+
   close() {
     // No-op: using shared connection for WAL mode concurrency
   }

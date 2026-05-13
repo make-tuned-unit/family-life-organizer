@@ -514,6 +514,23 @@ CREATE INDEX IF NOT EXISTS idx_appointments_date ON appointments(appointment_dat
 CREATE INDEX IF NOT EXISTS idx_receipts_date ON receipts(date);
 CREATE INDEX IF NOT EXISTS idx_receipts_category ON receipts(category);
 
+-- Direct messages
+CREATE TABLE IF NOT EXISTS direct_messages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    sender_id INTEGER NOT NULL,
+    recipient_id INTEGER NOT NULL,
+    text TEXT NOT NULL,
+    reference_type TEXT,
+    reference_id INTEGER,
+    reference_title TEXT,
+    read_at DATETIME,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (sender_id) REFERENCES users(id),
+    FOREIGN KEY (recipient_id) REFERENCES users(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_dm_conversation ON direct_messages(sender_id, recipient_id, id DESC);
+
 -- Seed budget categories (last so any failure doesn't block table creation)
 INSERT OR IGNORE INTO budget_categories (name, monthly_limit, color)
   SELECT 'Groceries', 800.00, '#43e97b' WHERE NOT EXISTS (SELECT 1 FROM budget_categories WHERE name='Groceries');
