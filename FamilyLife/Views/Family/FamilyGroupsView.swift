@@ -277,11 +277,14 @@ struct ContactRow: View {
 struct GroupDetailView: View {
     let group: APIService.GroupResponse
     @Environment(APIService.self) private var api
+    @Environment(HouseholdService.self) private var household
     @Environment(\.dismiss) private var dismiss
     @State private var members: [APIService.GroupMemberResponse] = []
     @State private var feed: [APIService.FeedPostResponse] = []
     @State private var showingNewPost = false
+    @State private var showingAddMember = false
     @State private var selectedTab = 0
+    @State private var copiedCode = false
 
     var body: some View {
         ScrollView(showsIndicators: false) {
@@ -291,28 +294,61 @@ struct GroupDetailView: View {
                     Text(group.name)
                         .font(.system(size: 24, weight: .bold))
                         .foregroundStyle(WarmPalette.ink1)
-                    Text("\(group.group_type.capitalized) - \(members.count) members")
+                    Text("\(group.group_type.capitalized) \u{00B7} \(members.count) members")
                         .font(.system(size: 13))
                         .foregroundStyle(WarmPalette.ink3)
-                    if let code = group.invite_code {
-                        HStack(spacing: 6) {
-                            Text("Invite: \(code)")
-                                .font(.system(size: 12, weight: .medium, design: .monospaced))
-                            Button {
-                                UIPasteboard.general.string = code
-                            } label: {
-                                Image(systemName: "doc.on.doc")
-                                    .font(.system(size: 11))
-                            }
-                        }
-                        .foregroundStyle(WarmPalette.ink3)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(WarmPalette.cardSurface, in: Capsule())
-                    }
                 }
                 .padding(.top, 14)
-                .padding(.bottom, 16)
+                .padding(.bottom, 12)
+
+                // Invite code section
+                if let code = group.invite_code {
+                    VStack(spacing: 10) {
+                        Button {
+                            UIPasteboard.general.string = code
+                            copiedCode = true
+                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                            Task {
+                                try? await Task.sleep(for: .seconds(2))
+                                copiedCode = false
+                            }
+                        } label: {
+                            HStack {
+                                Text(code)
+                                    .font(.system(size: 20, weight: .bold, design: .monospaced))
+                                    .foregroundStyle(WarmPalette.ink1)
+                                    .tracking(2)
+                                Spacer()
+                                Image(systemName: copiedCode ? "checkmark.circle.fill" : "doc.on.doc")
+                                    .font(.system(size: 16))
+                                    .foregroundStyle(copiedCode ? WarmPalette.good : WarmPalette.ink3)
+                            }
+                        }
+                        .buttonStyle(.plain)
+
+                        ShareLink(
+                            item: "Join my \(group.name) circle on Kinrows! Use invite code: \(code)",
+                            subject: Text("Join \(group.name)"),
+                            message: Text("Join our family circle on Kinrows. Use this code: \(code)")
+                        ) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "message.fill")
+                                    .font(.system(size: 14))
+                                Text("Send invite")
+                                    .font(.system(size: 14, weight: .semibold))
+                            }
+                            .foregroundStyle(WarmPalette.cream1)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 10)
+                            .background(TabAccent.home.color)
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                        }
+                    }
+                    .padding(14)
+                    .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: 16))
+                    .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
+                    .padding(.bottom, 14)
+                }
 
                 // Tab selector
                 HStack(spacing: 0) {
@@ -349,11 +385,24 @@ struct GroupDetailView: View {
                     .foregroundStyle(WarmPalette.ink2)
             }
             ToolbarItem(placement: .topBarTrailing) {
-                GlassIconButton(systemName: "plus") { showingNewPost = true }
+                Menu {
+                    Button { showingNewPost = true } label: {
+                        Label("New Post", systemImage: "text.bubble")
+                    }
+                    Button { showingAddMember = true } label: {
+                        Label("Add Member", systemImage: "person.badge.plus")
+                    }
+                } label: {
+                    Image(systemName: "plus")
+                        .foregroundStyle(WarmPalette.ink2)
+                }
             }
         }
         .sheet(isPresented: $showingNewPost) {
             NewFeedPostSheet(groupId: group.id) { await loadFeed() }
+        }
+        .sheet(isPresented: $showingAddMember) {
+            AddGroupMemberSheet(groupId: group.id) { await loadMembers() }
         }
         .task {
             async let m: () = loadMembers()
@@ -412,6 +461,21 @@ struct GroupDetailView: View {
                 .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: 14))
                 .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
             }
+
+            // Add member button inline
+            Button { showingAddMember = true } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "person.badge.plus")
+                        .font(.system(size: 14))
+                    Text("Add a family member")
+                        .font(.system(size: 14, weight: .medium))
+                }
+                .foregroundStyle(TabAccent.home.color)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
+                .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: 14))
+            }
+            .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
         }
     }
 
@@ -421,6 +485,116 @@ struct GroupDetailView: View {
 
     private func loadFeed() async {
         do { feed = try await api.fetchFeed(groupId: group.id) } catch {}
+    }
+}
+
+// MARK: - Add Member to Group Sheet
+
+struct AddGroupMemberSheet: View {
+    let groupId: Int
+    let onComplete: () async -> Void
+
+    @Environment(APIService.self) private var api
+    @Environment(HouseholdService.self) private var household
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var name = ""
+    @State private var relationship = "sister"
+    @State private var phone = ""
+    @State private var isSaving = false
+
+    private let relationships = [
+        "mom", "dad", "sister", "brother",
+        "mother-in-law", "father-in-law",
+        "sister-in-law", "brother-in-law",
+        "grandparent", "aunt", "uncle", "cousin",
+        "wife", "husband", "partner",
+        "son", "daughter", "child",
+        "friend", "other"
+    ]
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    TextField("Name", text: $name)
+                    Picker("Relationship", selection: $relationship) {
+                        ForEach(relationships, id: \.self) { rel in
+                            Text(rel.capitalized).tag(rel)
+                        }
+                    }
+                    TextField("Phone (optional)", text: $phone)
+                        .keyboardType(.phonePad)
+                } footer: {
+                    Text("Add someone who doesn't have the app yet. If they join later with the invite code, they'll appear as a connected user.")
+                }
+
+                if !household.members.isEmpty {
+                    Section("Or add from your contacts") {
+                        ForEach(household.members) { contact in
+                            Button {
+                                Task {
+                                    _ = try? await api.addGroupMember(groupId: groupId, data: [
+                                        "contact_id": contact.id,
+                                        "role": "member"
+                                    ])
+                                    await onComplete()
+                                    dismiss()
+                                }
+                            } label: {
+                                HStack(spacing: 10) {
+                                    FamilyAvatar(
+                                        initial: contact.avatar_initial ?? String(contact.name.prefix(1)).uppercased(),
+                                        size: 28
+                                    )
+                                    Text(contact.name)
+                                        .font(.system(size: 15))
+                                        .foregroundStyle(.primary)
+                                    if let rel = contact.relationship {
+                                        Text(rel.capitalized)
+                                            .font(.system(size: 12))
+                                            .foregroundStyle(WarmPalette.ink3)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            .scrollContentBackground(.hidden)
+            .background { AmbientBackground(style: .home) }
+            .navigationTitle("Add Member")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                        .foregroundStyle(WarmPalette.ink2)
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Add") {
+                        Task { await addNewContact() }
+                    }
+                    .disabled(name.isEmpty || isSaving)
+                }
+            }
+        }
+    }
+
+    private func addNewContact() async {
+        isSaving = true
+        do {
+            var contactData: [String: Any] = ["name": name, "relationship": relationship]
+            if !phone.isEmpty { contactData["phone"] = phone }
+            let result: APIService.IDResponse = try await api.addContact(contactData)
+            _ = try? await api.addGroupMember(groupId: groupId, data: [
+                "contact_id": result.id,
+                "role": "member"
+            ])
+            await onComplete()
+            dismiss()
+        } catch {
+            isSaving = false
+        }
     }
 }
 
@@ -591,21 +765,62 @@ struct NewGroupSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var name = ""
     @State private var groupType = "family"
+    @State private var description = ""
+
+    private let types: [(String, String, String, String)] = [
+        ("family", "Family Circle", "person.3.fill", "Your side of the family — parents, siblings, and their households"),
+        ("tribe", "Tribe", "globe", "A wider circle — friends, neighbours, anyone you want to stay connected with"),
+    ]
 
     var body: some View {
         NavigationStack {
             Form {
-                Section("Group") {
-                    TextField("Group name", text: $name)
-                    Picker("Type", selection: $groupType) {
-                        Text("Family").tag("family")
-                        Text("Tribe").tag("tribe")
+                Section {
+                    TextField("e.g. The Sharratts, Mom's Side", text: $name)
+                } header: {
+                    Text("Name")
+                } footer: {
+                    Text("Pick a name everyone in the circle will recognize.")
+                }
+
+                Section("Type") {
+                    ForEach(types, id: \.0) { type in
+                        Button {
+                            groupType = type.0
+                        } label: {
+                            HStack(spacing: 12) {
+                                Image(systemName: type.2)
+                                    .font(.system(size: 16))
+                                    .foregroundStyle(groupType == type.0 ? TabAccent.home.color : WarmPalette.ink3)
+                                    .frame(width: 32)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(type.1)
+                                        .font(.system(size: 15, weight: .medium))
+                                        .foregroundStyle(.primary)
+                                    Text(type.3)
+                                        .font(.system(size: 12))
+                                        .foregroundStyle(WarmPalette.ink3)
+                                }
+                                Spacer()
+                                if groupType == type.0 {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .foregroundStyle(TabAccent.home.color)
+                                }
+                            }
+                        }
                     }
+                }
+
+                Section {
+                    TextField("Optional description", text: $description, axis: .vertical)
+                        .lineLimit(2)
+                } header: {
+                    Text("Description")
                 }
             }
             .scrollContentBackground(.hidden)
             .background { AmbientBackground(style: .home) }
-            .navigationTitle("New Group")
+            .navigationTitle("New Circle")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -615,7 +830,9 @@ struct NewGroupSheet: View {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Create") {
                         Task {
-                            let _ = try? await api.createGroup(["name": name, "group_type": groupType])
+                            var data: [String: Any] = ["name": name, "group_type": groupType]
+                            if !description.isEmpty { data["description"] = description }
+                            let _ = try? await api.createGroup(data)
                             await onComplete()
                             dismiss()
                         }
