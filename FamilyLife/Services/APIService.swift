@@ -257,6 +257,10 @@ final class APIService {
         let _: SuccessResponse = try await post("/api/addresses", body: address)
     }
 
+    func updateFamilyAddress(id: Int, data: [String: Any]) async throws {
+        let _: SuccessResponse = try await put("/api/addresses/\(id)", body: data)
+    }
+
     func deleteFamilyAddress(id: Int) async throws {
         let _: SuccessResponse = try await delete("/api/addresses/\(id)")
     }

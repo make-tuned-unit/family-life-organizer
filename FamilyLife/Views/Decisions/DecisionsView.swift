@@ -175,6 +175,13 @@ struct DecisionsView: View {
                     DecisionCard(decision: decision)
                 }
                 .buttonStyle(.plain)
+                .contextMenu {
+                    Button(role: .destructive) {
+                        Task { await deleteDecision(decision.id) }
+                    } label: {
+                        Label("Delete", systemImage: "trash")
+                    }
+                }
                 .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
                 .padding(.bottom, 10)
             }
@@ -197,10 +204,28 @@ struct DecisionsView: View {
                     DecisionCard(decision: decision)
                 }
                 .buttonStyle(.plain)
+                .contextMenu {
+                    Button(role: .destructive) {
+                        Task { await deleteDecision(decision.id) }
+                    } label: {
+                        Label("Delete", systemImage: "trash")
+                    }
+                }
                 .opacity(0.6)
                 .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
                 .padding(.bottom, 10)
             }
+        }
+    }
+
+    private func deleteDecision(_ id: Int) async {
+        do {
+            try await api.deleteDecision(id: id)
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            await loadDecisions()
+        } catch {
+            guard !error.isCancellation else { return }
+            self.error = error.localizedDescription
         }
     }
 
