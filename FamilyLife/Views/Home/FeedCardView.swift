@@ -432,6 +432,7 @@ struct FeedCard: View {
                     title: "Beautiful day for a walk",
                     body: "Took the kids to Point Pleasant Park.",
                     author: "Jesse",
+                    author_id: 1,
                     status: nil,
                     created_at: ISO8601DateFormatter().string(from: Date()),
                     reaction_count: 2,
