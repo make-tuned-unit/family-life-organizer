@@ -10,7 +10,6 @@ struct ChatSheet: View {
     @State private var conversations: [APIService.ConversationResponse] = []
     @State private var groups: [APIService.GroupResponse] = []
     @State private var selectedThread: ChatThread?
-    @State private var showingNewDecision = false
 
     enum ChatThread: Equatable {
         case dm(partnerId: Int, name: String)
@@ -137,22 +136,9 @@ struct ChatSheet: View {
             .navigationTitle(threadTitle)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    if case .group = selectedThread {
-                        Button { showingNewDecision = true } label: {
-                            Image(systemName: "chart.bar.fill")
-                                .foregroundStyle(TabAccent.decisions.color)
-                        }
-                    }
-                }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Done") { dismiss() }
                         .foregroundStyle(WarmPalette.ink2)
-                }
-            }
-            .sheet(isPresented: $showingNewDecision) {
-                NewDecisionView {
-                    // Decision created — it'll appear in the feed
                 }
             }
             .task {

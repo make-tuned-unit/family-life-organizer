@@ -74,6 +74,8 @@ class FamilyDB {
         this.db.run('ALTER TABLE appointments ADD COLUMN recurrence_end TEXT', () => {});
         // Profile image column
         this.db.run('ALTER TABLE users ADD COLUMN profile_image TEXT', () => {});
+        // DM image support
+        this.db.run('ALTER TABLE direct_messages ADD COLUMN image_data TEXT', () => {});
         this.db.run('CREATE INDEX IF NOT EXISTS idx_feed_posts_group ON feed_posts(group_id, id DESC)', (err) => {
           if (err) console.error('Index error:', err.message);
           resolve();
@@ -1643,11 +1645,11 @@ class FamilyDB {
   // Direct Messages
   // ============================================
 
-  sendMessage({ sender_id, recipient_id, text, reference_type, reference_id, reference_title }) {
+  sendMessage({ sender_id, recipient_id, text, reference_type, reference_id, reference_title, image_data }) {
     return new Promise((resolve, reject) => {
       this.db.run(
-        'INSERT INTO direct_messages (sender_id, recipient_id, text, reference_type, reference_id, reference_title) VALUES (?, ?, ?, ?, ?, ?)',
-        [sender_id, recipient_id, text, reference_type || null, reference_id || null, reference_title || null],
+        'INSERT INTO direct_messages (sender_id, recipient_id, text, reference_type, reference_id, reference_title, image_data) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        [sender_id, recipient_id, text, reference_type || null, reference_id || null, reference_title || null, image_data || null],
         function(err) { err ? reject(err) : resolve({ id: this.lastID }); }
       );
     });
