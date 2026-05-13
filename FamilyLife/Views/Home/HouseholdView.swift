@@ -1,4 +1,5 @@
 import SwiftUI
+import MapKit
 
 struct HouseholdView: View {
     @Environment(APIService.self) private var api
@@ -63,6 +64,11 @@ struct HouseholdView: View {
         .sheet(isPresented: $showingAddAddress) {
             AddAddressView { address in
                 Task { await addAddress(address) }
+            }
+        }
+        .sheet(item: $editingAddress) { addr in
+            EditAddressSheet(address: addr) {
+                await loadAddresses()
             }
         }
         .alert("Rename Household", isPresented: $showingRenameSheet) {
@@ -274,19 +280,31 @@ struct HouseholdView: View {
 
     // MARK: - Address
 
+    @State private var editingAddress: FamilyAddressResponse?
+
     @ViewBuilder
     private var addressSection: some View {
         Section {
             ForEach(addresses) { addr in
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(addr.name)
-                        .font(.system(size: 15, weight: .medium))
-                    if let address = addr.address, !address.isEmpty {
-                        Text(address)
-                            .font(.system(size: 13))
-                            .foregroundStyle(WarmPalette.ink3)
+                Button { editingAddress = addr } label: {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(addr.name)
+                                .font(.system(size: 15, weight: .medium))
+                                .foregroundStyle(WarmPalette.ink1)
+                            if let address = addr.address, !address.isEmpty {
+                                Text(address)
+                                    .font(.system(size: 13))
+                                    .foregroundStyle(WarmPalette.ink3)
+                            }
+                        }
+                        Spacer()
+                        Image(systemName: "pencil")
+                            .font(.system(size: 12))
+                            .foregroundStyle(WarmPalette.ink4)
                     }
                 }
+                .buttonStyle(.plain)
                 .swipeActions(edge: .trailing) {
                     Button(role: .destructive) {
                         Task { await deleteAddress(addr.id) }
@@ -303,7 +321,7 @@ struct HouseholdView: View {
         } header: {
             Text("Addresses")
         } footer: {
-            Text("Saved locations appear in Trips and Calendar for quick access.")
+            Text("Tap to edit, swipe to delete. Saved locations appear in Trips and Calendar.")
         }
     }
 
@@ -516,6 +534,125 @@ struct EditMemberSheet: View {
         } catch {
             guard !error.isCancellation else { return }
             isSaving = false
+        }
+    }
+}
+
+// MARK: - Edit Address Sheet
+
+struct EditAddressSheet: View {
+    let address: FamilyAddressResponse
+    let onSaved: () async -> Void
+
+    @Environment(APIService.self) private var api
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var name: String
+    @State private var addressQuery: String
+    @State private var lat: Double
+    @State private var lng: Double
+    @State private var locationCompleter = LocationCompleter()
+    @State private var showingSuggestions = false
+    @State private var isSaving = false
+
+    init(address: FamilyAddressResponse, onSaved: @escaping () async -> Void) {
+        self.address = address
+        self.onSaved = onSaved
+        _name = State(initialValue: address.name)
+        _addressQuery = State(initialValue: address.address ?? "")
+        _lat = State(initialValue: address.lat)
+        _lng = State(initialValue: address.lng)
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    TextField("Name", text: $name)
+                }
+
+                Section("Address") {
+                    TextField("Search for a new address...", text: $addressQuery)
+                        .onChange(of: addressQuery) {
+                            locationCompleter.search(query: addressQuery)
+                            showingSuggestions = !addressQuery.isEmpty
+                        }
+
+                    if showingSuggestions && !locationCompleter.results.isEmpty {
+                        ForEach(locationCompleter.results, id: \.self) { result in
+                            Button {
+                                let full = [result.title, result.subtitle].filter { !$0.isEmpty }.joined(separator: ", ")
+                                addressQuery = full
+                                showingSuggestions = false
+                                resolveCoordinates(for: result)
+                            } label: {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(result.title)
+                                        .font(.subheadline.weight(.medium))
+                                        .foregroundStyle(.primary)
+                                    if !result.subtitle.isEmpty {
+                                        Text(result.subtitle)
+                                            .font(.caption)
+                                            .foregroundStyle(WarmPalette.ink3)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Section {
+                    Button(role: .destructive) {
+                        Task {
+                            try? await api.deleteFamilyAddress(id: address.id)
+                            await onSaved()
+                            dismiss()
+                        }
+                    } label: {
+                        Label("Delete Address", systemImage: "trash")
+                            .foregroundStyle(WarmPalette.bad)
+                    }
+                }
+            }
+            .scrollContentBackground(.hidden)
+            .background { AmbientBackground(style: .settings) }
+            .navigationTitle("Edit Address")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                        .foregroundStyle(WarmPalette.ink2)
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") {
+                        Task { await save() }
+                    }
+                    .disabled(name.isEmpty || isSaving)
+                }
+            }
+        }
+    }
+
+    private func save() async {
+        isSaving = true
+        do {
+            var data: [String: Any] = ["name": name, "lat": lat, "lng": lng]
+            if !addressQuery.isEmpty { data["address"] = addressQuery }
+            try await api.updateFamilyAddress(id: address.id, data: data)
+            await onSaved()
+            dismiss()
+        } catch {
+            isSaving = false
+        }
+    }
+
+    private func resolveCoordinates(for completion: MKLocalSearchCompletion) {
+        let request = MKLocalSearch.Request(completion: completion)
+        let search = MKLocalSearch(request: request)
+        search.start { response, _ in
+            guard let item = response?.mapItems.first else { return }
+            lat = item.placemark.coordinate.latitude
+            lng = item.placemark.coordinate.longitude
         }
     }
 }
