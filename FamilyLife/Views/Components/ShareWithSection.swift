@@ -14,10 +14,28 @@ struct ShareWithSection: View {
             } else {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
+                        // "None" chip
+                        Button {
+                            withAnimation(.spring(response: 0.25)) { selectedGroupId = nil }
+                        } label: {
+                            Text("None")
+                                .font(.system(size: 13, weight: .medium))
+                                .foregroundStyle(selectedGroupId == nil ? WarmPalette.cream1 : WarmPalette.ink2)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 8)
+                                .background(
+                                    selectedGroupId == nil
+                                        ? AnyShapeStyle(WarmPalette.ink2)
+                                        : AnyShapeStyle(WarmPalette.ink1.opacity(0.06)),
+                                    in: Capsule()
+                                )
+                        }
+                        .buttonStyle(.plain)
+
                         ForEach(groups) { group in
                             Button {
                                 withAnimation(.spring(response: 0.25)) {
-                                    selectedGroupId = selectedGroupId == group.id ? nil : group.id
+                                    selectedGroupId = group.id
                                 }
                             } label: {
                                 HStack(spacing: 6) {
