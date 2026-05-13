@@ -459,6 +459,10 @@ final class APIService {
         let _: SuccessResponse = try await delete("/api/groups/\(groupId)/members/\(memberId)")
     }
 
+    func updateGroup(id: Int, data: [String: Any]) async throws {
+        let _: SuccessResponse = try await put("/api/groups/\(id)", body: data)
+    }
+
     func deleteGroup(id: Int) async throws {
         let _: SuccessResponse = try await delete("/api/groups/\(id)")
     }
