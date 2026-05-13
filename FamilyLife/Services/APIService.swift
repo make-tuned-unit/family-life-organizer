@@ -396,9 +396,10 @@ final class APIService {
         }
     }
 
-    func register(username: String, password: String, name: String, inviteCode: String? = nil) async throws -> RegisterResponse {
+    func register(username: String, password: String, name: String, inviteCode: String? = nil, householdName: String? = nil) async throws -> RegisterResponse {
         var body: [String: Any] = ["username": username, "password": password, "name": name]
         if let inviteCode { body["invite_code"] = inviteCode }
+        if let householdName { body["household_name"] = householdName }
         return try await post("/api/auth/register", body: body)
     }
 
