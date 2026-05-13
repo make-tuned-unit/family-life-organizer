@@ -651,6 +651,7 @@ final class APIService {
         var reference_type: String?
         var reference_id: Int?
         var reference_title: String?
+        var image_data: String?
         var read_at: String?
         var created_at: String?
     }
@@ -669,11 +670,12 @@ final class APIService {
         return try await get("/api/messages/\(partnerId)", queryParams: params)
     }
 
-    func sendMessage(recipientId: Int, text: String, referenceType: String? = nil, referenceId: Int? = nil, referenceTitle: String? = nil) async throws -> IDResponse {
+    func sendMessage(recipientId: Int, text: String, referenceType: String? = nil, referenceId: Int? = nil, referenceTitle: String? = nil, imageData: String? = nil) async throws -> IDResponse {
         var body: [String: Any] = ["recipient_id": recipientId, "text": text]
         if let referenceType { body["reference_type"] = referenceType }
         if let referenceId { body["reference_id"] = referenceId }
         if let referenceTitle { body["reference_title"] = referenceTitle }
+        if let imageData { body["image_data"] = imageData }
         return try await post("/api/messages", body: body)
     }
 

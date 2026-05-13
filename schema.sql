@@ -523,6 +523,7 @@ CREATE TABLE IF NOT EXISTS direct_messages (
     reference_type TEXT,
     reference_id INTEGER,
     reference_title TEXT,
+    image_data TEXT,
     read_at DATETIME,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (sender_id) REFERENCES users(id),
