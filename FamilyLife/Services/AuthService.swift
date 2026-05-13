@@ -138,8 +138,8 @@ final class AuthService {
         Self.savePassword(password, for: username)
     }
 
-    func register(username: String, password: String, name: String, inviteCode: String? = nil) async throws {
-        let response = try await api.register(username: username, password: password, name: name, inviteCode: inviteCode)
+    func register(username: String, password: String, name: String, inviteCode: String? = nil, householdName: String? = nil) async throws {
+        let response = try await api.register(username: username, password: password, name: name, inviteCode: inviteCode, householdName: householdName)
         guard response.success, let user = response.user else {
             throw APIError.serverError(400)
         }
