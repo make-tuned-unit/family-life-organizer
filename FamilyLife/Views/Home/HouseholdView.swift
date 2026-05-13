@@ -11,6 +11,14 @@ struct HouseholdView: View {
     @State private var showingAddresses = false
     @State private var error: String?
 
+    private var otherMembers: [APIService.ContactResponse] {
+        guard let user = auth.currentUser else { return household.members }
+        return household.members.filter {
+            $0.name.localizedCaseInsensitiveCompare(user.name) != .orderedSame
+            && $0.name.localizedCaseInsensitiveCompare(user.username) != .orderedSame
+        }
+    }
+
     var body: some View {
         List {
             membersSection
@@ -74,8 +82,8 @@ struct HouseholdView: View {
                 .padding(.vertical, 2)
             }
 
-            // Family contacts
-            ForEach(household.members) { member in
+            // Family contacts (exclude current user — already shown above)
+            ForEach(otherMembers) { member in
                 Button { editingMember = member } label: {
                     HStack(spacing: 12) {
                         FamilyAvatar(
@@ -119,7 +127,7 @@ struct HouseholdView: View {
                 }
             }
 
-            if household.members.isEmpty {
+            if otherMembers.isEmpty {
                 VStack(spacing: 8) {
                     Image(systemName: "person.2.slash")
                         .font(.system(size: 28))
