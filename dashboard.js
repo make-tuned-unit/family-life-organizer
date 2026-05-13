@@ -2646,7 +2646,8 @@ app.post('/api/messages/:partnerId/read', requireAuth, async (req, res) => {
 app.get('/api/activity', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
-    const feed = await db.getActivityFeed(parseInt(req.query.limit) || 20);
+    const userId = req.session.user?.id;
+    const feed = await db.getActivityFeed(parseInt(req.query.limit) || 20, userId);
     res.json(feed);
   } catch (err) {
     res.status(500).json({ error: err.message });
