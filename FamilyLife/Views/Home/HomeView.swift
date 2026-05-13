@@ -178,7 +178,7 @@ struct HomeView: View {
         .task {
             await viewModel.loadAll(api: api, userName: auth.currentUser?.name, username: auth.currentUser?.username)
             checkFeedNotifications()
-            unreadCount = (try? await api.fetchUnreadMessageCount()) ?? 0
+            await checkMessageNotifications()
         }
     }
 
@@ -191,6 +191,17 @@ struct HomeView: View {
                 feed.map(\.item),
                 currentUser: auth.currentUser?.name ?? ""
             )
+        }
+    }
+
+    private func checkMessageNotifications() async {
+        do {
+            let convos = try await api.fetchConversations()
+            unreadCount = convos.reduce(0) { $0 + $1.unread_count }
+            guard await NotificationService.shared.isAuthorized() else { return }
+            NotificationService.shared.checkForNewMessages(convos)
+        } catch {
+            unreadCount = (try? await api.fetchUnreadMessageCount()) ?? 0
         }
     }
 
