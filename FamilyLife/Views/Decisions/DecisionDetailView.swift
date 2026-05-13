@@ -3,17 +3,21 @@ import SwiftUI
 struct DecisionDetailView: View {
     @Environment(APIService.self) private var api
     let decision: DecisionResponse
+    var onChanged: (() async -> Void)?
 
     @State private var reactions: [DecisionReactionResponse] = []
     @State private var comments: [DecisionCommentResponse] = []
     @State private var newComment = ""
     @State private var currentDecision: DecisionResponse
     @State private var error: String?
+    @State private var showingDeleteConfirm = false
 
     @Environment(AuthService.self) private var auth
+    @Environment(\.dismiss) private var dismiss
 
-    init(decision: DecisionResponse) {
+    init(decision: DecisionResponse, onChanged: (() async -> Void)? = nil) {
         self.decision = decision
+        self.onChanged = onChanged
         _currentDecision = State(initialValue: decision)
     }
 
@@ -26,9 +30,43 @@ struct DecisionDetailView: View {
         reactions.first { $0.member_name == (auth.currentUser?.username ?? "Me") && $0.reaction_type != "vote" }?.reaction_type
     }
 
+    private var statusBadge: some View {
+        Group {
+            if currentDecision.status == DecisionStatus.resolved.rawValue {
+                Label("Resolved", systemImage: "checkmark.circle.fill")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(WarmPalette.good)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .frame(maxWidth: .infinity)
+                    .background(WarmPalette.good.opacity(0.12), in: RoundedRectangle(cornerRadius: 10))
+            } else if let expiresStr = currentDecision.expires_at,
+                      let expiresDate = ISO8601DateFormatter.flexible.date(from: expiresStr) {
+                if expiresDate < Date() {
+                    Label("Expired", systemImage: "clock.badge.xmark")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(WarmPalette.ink3)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .frame(maxWidth: .infinity)
+                        .background(WarmPalette.ink1.opacity(0.06), in: RoundedRectangle(cornerRadius: 10))
+                } else {
+                    Label("Expires \(expiresDate, style: .relative)", systemImage: "clock")
+                        .font(.caption)
+                        .foregroundStyle(WarmPalette.ink3)
+                }
+            }
+        }
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
+                if currentDecision.status != DecisionStatus.active.rawValue || currentDecision.expires_at != nil {
+                    statusBadge
+                        .padding(.horizontal)
+                }
+
                 VStack(alignment: .leading, spacing: 8) {
                     HStack {
                         if isCurrentUserCreator {
@@ -168,13 +206,17 @@ struct DecisionDetailView: View {
                     if currentDecision.status == DecisionStatus.active.rawValue {
                         HStack {
                             TextField("Add a comment...", text: $newComment)
-                                
+                                .submitLabel(.send)
+                                .onSubmit {
+                                    guard !newComment.isEmpty else { return }
+                                    Task { await addComment() }
+                                }
                             Button {
                                 Task { await addComment() }
                             } label: {
                                 Image(systemName: "arrow.up.circle.fill")
                                     .font(.title2)
-                                    .foregroundStyle(TabAccent.home.color)
+                                    .foregroundStyle(newComment.isEmpty ? WarmPalette.ink4 : TabAccent.home.color)
                             }
                             .disabled(newComment.isEmpty)
                         }
@@ -188,13 +230,43 @@ struct DecisionDetailView: View {
         .navigationTitle(currentDecision.title)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            if currentDecision.status == DecisionStatus.active.rawValue && isCurrentUserCreator {
+            if isCurrentUserCreator {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("Resolve") {
-                        Task { await resolveDecision() }
+                    Menu {
+                        if currentDecision.status == DecisionStatus.active.rawValue {
+                            Button {
+                                Task { await resolveDecision() }
+                            } label: {
+                                Label("Mark Resolved", systemImage: "checkmark.circle")
+                            }
+                        }
+                        Button(role: .destructive) {
+                            showingDeleteConfirm = true
+                        } label: {
+                            Label("Delete", systemImage: "trash")
+                        }
+                    } label: {
+                        Image(systemName: "ellipsis.circle")
+                            .foregroundStyle(WarmPalette.ink2)
                     }
                 }
             }
+        }
+        .confirmationDialog("Delete this decision?", isPresented: $showingDeleteConfirm, titleVisibility: .visible) {
+            Button("Delete", role: .destructive) {
+                Task {
+                    do {
+                        try await api.deleteDecision(id: currentDecision.id)
+                        UINotificationFeedbackGenerator().notificationOccurred(.success)
+                        await onChanged?()
+                        dismiss()
+                    } catch {
+                        self.error = error.localizedDescription
+                    }
+                }
+            }
+        } message: {
+            Text("This will permanently remove the decision and all its reactions and comments.")
         }
         .alert("Couldn’t update decision", isPresented: errorAlertIsPresented) {
             Button("OK") { error = nil }
@@ -224,6 +296,7 @@ struct DecisionDetailView: View {
                 "member_name": auth.currentUser?.username ?? "Me",
                 "reaction_type": type
             ])
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
             await reload()
         } catch {
             guard !error.isCancellation else { return }
@@ -238,6 +311,7 @@ struct DecisionDetailView: View {
                 "reaction_type": "vote",
                 "poll_choice": option
             ])
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
             await reload()
         } catch {
             guard !error.isCancellation else { return }
@@ -251,6 +325,7 @@ struct DecisionDetailView: View {
                 "member_name": auth.currentUser?.username ?? "Me",
                 "text": newComment
             ])
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
             newComment = ""
             await reload()
         } catch {
@@ -264,6 +339,7 @@ struct DecisionDetailView: View {
             try await api.updateDecision(id: currentDecision.id, data: [
                 "status": DecisionStatus.resolved.rawValue
             ])
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
             currentDecision = DecisionResponse(
                 id: currentDecision.id,
                 title: currentDecision.title,
@@ -277,6 +353,7 @@ struct DecisionDetailView: View {
                 created_at: currentDecision.created_at,
                 expires_at: currentDecision.expires_at
             )
+            await onChanged?()
         } catch {
             guard !error.isCancellation else { return }
             self.error = error.localizedDescription
