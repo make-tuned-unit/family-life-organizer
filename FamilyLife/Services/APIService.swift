@@ -425,6 +425,7 @@ final class APIService {
         var user_name: String?
         var username: String?
         var user_avatar: String?
+        var profile_image: String?
         var contact_name: String?
         var relationship: String?
         var avatar_initial: String?
@@ -596,6 +597,7 @@ final class APIService {
         let title: String?
         let body: String?
         let author: String?
+        let author_id: Int?
         let status: String?
         let created_at: String?
         let reaction_count: Int?
@@ -605,12 +607,27 @@ final class APIService {
         var stableKey: String { "\(feed_type)-\(ref_id)-\(created_at ?? "")" }
 
         private enum CodingKeys: String, CodingKey {
-            case feed_type, ref_id, title, body, author, status, created_at, reaction_count, comment_count
+            case feed_type, ref_id, title, body, author, author_id, status, created_at, reaction_count, comment_count
         }
     }
 
     func fetchActivity(limit: Int = 50) async throws -> [ActivityItem] {
         try await get("/api/activity", queryParams: ["limit": String(limit)])
+    }
+
+    // MARK: - Profile Image
+
+    struct AvatarResponse: Codable {
+        let image: String
+    }
+
+    func uploadProfileImage(_ base64: String) async throws {
+        let _: SuccessResponse = try await put("/api/users/me/avatar", body: ["image": base64])
+    }
+
+    func fetchProfileImage(userId: Int) async throws -> String {
+        let response: AvatarResponse = try await get("/api/users/\(userId)/avatar")
+        return response.image
     }
 
     // MARK: - Lists
