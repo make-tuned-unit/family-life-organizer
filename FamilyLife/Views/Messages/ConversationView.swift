@@ -13,6 +13,7 @@ struct ConversationView: View {
     @State private var newMessage = ""
     @State private var isSending = false
     @State private var pendingQuote: QuotedItem?
+    @State private var pollTimer: Timer?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -82,6 +83,18 @@ struct ConversationView: View {
             pendingQuote = quotedItem
             await loadMessages()
             try? await api.markMessagesRead(partnerId: partnerId)
+        }
+        .onAppear {
+            pollTimer = Timer.scheduledTimer(withTimeInterval: 5, repeats: true) { _ in
+                Task { @MainActor in
+                    await loadMessages()
+                    try? await api.markMessagesRead(partnerId: partnerId)
+                }
+            }
+        }
+        .onDisappear {
+            pollTimer?.invalidate()
+            pollTimer = nil
         }
     }
 

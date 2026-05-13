@@ -26,7 +26,7 @@ struct ChatSheet: View {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 10) {
                         ForEach(otherMembers) { member in
-                            let partnerId = abs(member.id)
+                            let partnerId = household.userId(for: member.name) ?? abs(member.id)
                             let isSelected = selectedPartnerId == partnerId
                             let unread = conversations.first { $0.partner_id == partnerId }?.unread_count ?? 0
                             Button {
@@ -110,7 +110,7 @@ struct ChatSheet: View {
                         selectedPartnerId = unread.partner_id
                         selectedPartnerName = unread.partner_name
                     } else if let first = otherMembers.first {
-                        selectedPartnerId = abs(first.id)
+                        selectedPartnerId = household.userId(for: first.name) ?? abs(first.id)
                         selectedPartnerName = first.name
                     }
                 }
