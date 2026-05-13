@@ -5,6 +5,7 @@ struct GiftsView: View {
 
     @Environment(\.dismiss) private var dismiss
     @Environment(APIService.self) private var api
+    @Environment(HouseholdService.self) private var household
 
     @State private var people: [GiftPersonResponse] = []
     @State private var events: [SpecialEventResponse] = []
@@ -244,11 +245,32 @@ struct GiftsView: View {
             people = try await fetchedPeople
             events = try await fetchedEvents
             allIdeas = try await fetchedIdeas
+
+            // Auto-seed gift people from household/group members
+            await seedFromHousehold()
         } catch {
             guard !error.isCancellation else { return }
             self.error = error.localizedDescription
         }
         isLoading = false
+    }
+
+    private func seedFromHousehold() async {
+        let existingNames = Set(people.map { $0.name.lowercased() })
+        var added = false
+        for member in household.members {
+            guard !existingNames.contains(member.name.lowercased()) else { continue }
+            var data: [String: Any] = [
+                "name": member.name,
+                "relationship": member.relationship ?? "family"
+            ]
+            if let birthday = member.birthday, !birthday.isEmpty { data["birthday"] = birthday }
+            _ = try? await api.addGiftPerson(data)
+            added = true
+        }
+        if added {
+            people = (try? await api.fetchGiftPeople()) ?? people
+        }
     }
 
     private func deleteEvent(_ id: Int) async {
@@ -399,5 +421,6 @@ private extension SpecialEventResponse {
     NavigationStack {
         GiftsView()
             .environment(APIService())
+            .environment(HouseholdService())
     }
 }
