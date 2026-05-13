@@ -1841,6 +1841,23 @@ app.put('/api/decisions/:id', requireAuth, async (req, res) => {
   }
 });
 
+app.delete('/api/decisions/:id', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  const run = (sql, params) => new Promise((resolve, reject) => {
+    db.db.run(sql, params, (err) => err ? reject(err) : resolve());
+  });
+  try {
+    await run('DELETE FROM decision_reactions WHERE decision_id = ?', [req.params.id]);
+    await run('DELETE FROM decision_comments WHERE decision_id = ?', [req.params.id]);
+    await run('DELETE FROM decisions WHERE id = ?', [req.params.id]);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
 app.get('/api/decisions/:id/reactions', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {

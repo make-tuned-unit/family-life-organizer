@@ -17,6 +17,32 @@ struct NewDecisionView: View {
     @State private var error: String?
     @State private var selectedPhoto: PhotosPickerItem?
     @State private var selectedImageData: Data?
+    @State private var expiryChoice: ExpiryChoice = .day
+
+    enum ExpiryChoice: String, CaseIterable, Identifiable {
+        case tonight = "Tonight"
+        case day = "24 hours"
+        case threeDays = "3 days"
+        case week = "1 week"
+        case never = "No expiry"
+
+        var id: String { rawValue }
+
+        var date: Date? {
+            switch self {
+            case .tonight:
+                return Calendar.current.date(bySettingHour: 23, minute: 59, second: 59, of: Date())
+            case .day:
+                return Date().addingTimeInterval(24 * 3600)
+            case .threeDays:
+                return Date().addingTimeInterval(3 * 24 * 3600)
+            case .week:
+                return Date().addingTimeInterval(7 * 24 * 3600)
+            case .never:
+                return nil
+            }
+        }
+    }
 
     var body: some View {
         NavigationStack {
@@ -94,6 +120,17 @@ struct NewDecisionView: View {
                             .lineLimit(2)
                     }
                 }
+
+                Section("Expires") {
+                    Picker(selection: $expiryChoice) {
+                        ForEach(ExpiryChoice.allCases) { choice in
+                            Text(choice.rawValue).tag(choice)
+                        }
+                    } label: {
+                        Label("Time limit", systemImage: "clock")
+                    }
+                    .pickerStyle(.menu)
+                }
             }
             .scrollContentBackground(.hidden)
             .background { AmbientBackground(style: .decisions) }
@@ -127,7 +164,7 @@ struct NewDecisionView: View {
             return
         }
 
-        let expiresAt = Calendar.current.date(byAdding: .day, value: 7, to: Date()) ?? Date().addingTimeInterval(7 * 86_400)
+        let expiresAt = expiryChoice.date
         var photoBase64: Any = NSNull()
         if decisionType == .photo, let imageData = selectedImageData {
             // Compress to JPEG for smaller payload
@@ -145,7 +182,7 @@ struct NewDecisionView: View {
             "poll_options": filteredOptions,
             "creator_name": auth.currentUser?.name ?? "Me",
             "status": DecisionStatus.active.rawValue,
-            "expires_at": ISO8601DateFormatter().string(from: expiresAt)
+            "expires_at": expiresAt.map { ISO8601DateFormatter().string(from: $0) } ?? NSNull()
         ]
 
         do {

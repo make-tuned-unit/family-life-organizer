@@ -277,6 +277,10 @@ final class APIService {
         let _: SuccessResponse = try await put("/api/decisions/\(id)", body: data)
     }
 
+    func deleteDecision(id: Int) async throws {
+        let _: SuccessResponse = try await delete("/api/decisions/\(id)")
+    }
+
     func fetchDecisionReactions(id: Int) async throws -> [DecisionReactionResponse] {
         try await get("/api/decisions/\(id)/reactions")
     }
