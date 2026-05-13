@@ -81,27 +81,28 @@ struct FloatingTabBar: View {
                     selectedTab = tab
                 } label: {
                     Image(systemName: tab.icon)
-                        .font(.system(size: 20, weight: .medium))
+                        .font(.system(size: 18, weight: .medium))
                         .foregroundStyle(selectedTab == tab ? accentColor(for: tab) : WarmPalette.ink3)
-                        .frame(maxWidth: .infinity, minHeight: 52)
+                        .frame(maxWidth: .infinity, minHeight: 44)
                         .contentShape(Rectangle())
                         .background {
                             if selectedTab == tab {
                                 Circle()
                                     .fill(accentColor(for: tab).opacity(0.15))
-                                    .frame(width: 48, height: 48)
+                                    .frame(width: 40, height: 40)
                             }
                         }
                 }
                 .buttonStyle(.plain)
             }
         }
-        .padding(.horizontal, 6)
-        .padding(.vertical, 6)
-        .background(WarmPalette.cardSurface, in: Capsule())
-        .overlay(Capsule().stroke(WarmPalette.ink1.opacity(0.1), lineWidth: 0.5))
-        .padding(.horizontal, 16)
-        .padding(.bottom, 22)
+        .padding(.horizontal, 4)
+        .padding(.vertical, 4)
+        .background(.ultraThinMaterial, in: Capsule())
+        .overlay(Capsule().stroke(.white.opacity(0.2), lineWidth: 0.5))
+        .shadow(color: .black.opacity(0.1), radius: 12, y: 4)
+        .padding(.horizontal, 40)
+        .padding(.bottom, 20)
     }
 
     private func accentColor(for tab: MainTab) -> Color {
