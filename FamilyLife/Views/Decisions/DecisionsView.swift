@@ -170,7 +170,7 @@ struct DecisionsView: View {
         } else {
             ForEach(filteredActive) { decision in
                 NavigationLink {
-                    DecisionDetailView(decision: decision)
+                    DecisionDetailView(decision: decision) { await loadDecisions() }
                 } label: {
                     DecisionCard(decision: decision)
                 }
@@ -192,7 +192,7 @@ struct DecisionsView: View {
 
             ForEach(resolvedDecisions.prefix(5)) { decision in
                 NavigationLink {
-                    DecisionDetailView(decision: decision)
+                    DecisionDetailView(decision: decision) { await loadDecisions() }
                 } label: {
                     DecisionCard(decision: decision)
                 }
