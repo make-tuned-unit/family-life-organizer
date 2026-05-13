@@ -33,7 +33,7 @@ struct SendToSheet: View {
                     ForEach(otherMembers) { member in
                         NavigationLink {
                             ConversationView(
-                                partnerId: abs(member.id),
+                                partnerId: household.userId(for: member.name) ?? abs(member.id),
                                 partnerName: member.name,
                                 quotedItem: quotedItem
                             )
@@ -45,7 +45,7 @@ struct SendToSheet: View {
                             }
                         } label: {
                             HStack(spacing: 12) {
-                                if let img = profileCache.image(for: abs(member.id)) {
+                                if let img = profileCache.image(for: household.userId(for: member.name) ?? abs(member.id)) {
                                     Image(uiImage: img)
                                         .resizable()
                                         .scaledToFill()

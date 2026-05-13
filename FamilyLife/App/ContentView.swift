@@ -8,7 +8,7 @@ enum MainTab: Hashable, CaseIterable {
         case .calendar:  "calendar"
         case .lists:     "list.bullet.rectangle.fill"
         case .home:      "house.fill"
-        case .decisions: "bubble.left.and.bubble.right.fill"
+        case .decisions: "chart.bar.fill"
         case .more:      "ellipsis.circle.fill"
         }
     }
