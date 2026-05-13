@@ -2222,6 +2222,27 @@ app.post('/api/groups/join', requireAuth, async (req, res) => {
   }
 });
 
+app.post('/api/groups/:id/leave', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const userId = req.session.user?.id;
+    const members = await db.getGroupMembers(req.params.id);
+    const myMembership = members.find(m => m.user_id === userId);
+    if (!myMembership) return res.status(404).json({ error: 'Not a member' });
+    await db.removeGroupMember(req.params.id, myMembership.id);
+    // If no members left, delete the group
+    const remaining = members.filter(m => m.id !== myMembership.id);
+    if (remaining.length === 0) {
+      await db.deleteGroup(parseInt(req.params.id));
+    }
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
 app.get('/api/groups/:id/members', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {

@@ -463,6 +463,10 @@ final class APIService {
         let _: SuccessResponse = try await delete("/api/groups/\(id)")
     }
 
+    func leaveGroup(id: Int) async throws {
+        let _: SuccessResponse = try await post("/api/groups/\(id)/leave", body: [:] as [String: String])
+    }
+
     // MARK: - Contacts
 
     struct ContactResponse: Codable, Identifiable {
