@@ -2616,7 +2616,8 @@ app.post('/api/messages', requireAuth, async (req, res) => {
       text: req.body.text,
       reference_type: req.body.reference_type,
       reference_id: req.body.reference_id,
-      reference_title: req.body.reference_title
+      reference_title: req.body.reference_title,
+      image_data: req.body.image_data
     });
     res.json({ success: true, id: result.id });
   } catch (err) { res.status(500).json({ error: err.message }); }
