@@ -66,13 +66,16 @@ struct HouseholdView: View {
             }
         }
         .alert("Rename Household", isPresented: $showingRenameSheet) {
-            TextField("Household name", text: householdNameBinding)
+            TextField("Household name", text: $pendingName)
             Button("Save") {
                 Task { await renameHousehold() }
             }
-            Button("Cancel", role: .cancel) {}
+            Button("Cancel", role: .cancel) { pendingName = "" }
         } message: {
             Text("Choose a name for your household (e.g. The Fairbanks)")
+        }
+        .onChange(of: showingRenameSheet) { _, showing in
+            if showing { pendingName = household.householdGroup?.name ?? "" }
         }
         .alert("Something went wrong", isPresented: errorBinding) {
             Button("OK") { error = nil }
@@ -88,13 +91,6 @@ struct HouseholdView: View {
     // MARK: - Name
 
     @State private var pendingName = ""
-
-    private var householdNameBinding: Binding<String> {
-        Binding(
-            get: { pendingName.isEmpty ? (household.householdGroup?.name ?? "") : pendingName },
-            set: { pendingName = $0 }
-        )
-    }
 
     private func renameHousehold() async {
         guard let groupId = household.householdGroup?.id, !pendingName.isEmpty else { return }
@@ -200,79 +196,57 @@ struct HouseholdView: View {
     @ViewBuilder
     private var membersSection: some View {
         Section {
-            // Current user row — enriched with contact info if available
+            // Current user row — tap to edit your contact info
             if let user = auth.currentUser {
                 let myContact = household.member(named: user.name)
-                HStack(spacing: 12) {
-                    ProfileAvatar(size: 36)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(user.name)
-                            .font(.system(size: 15, weight: .semibold))
-                        Text("You")
-                            .font(.system(size: 12))
-                            .foregroundStyle(WarmPalette.ink3)
-                    }
-                    Spacer()
-                    VStack(alignment: .trailing, spacing: 2) {
-                        if let phone = myContact?.phone, !phone.isEmpty {
-                            Label(phone, systemImage: "phone")
-                                .font(.system(size: 11))
-                                .foregroundStyle(WarmPalette.ink3)
-                        }
-                        if let email = myContact?.email, !email.isEmpty {
-                            Label(email, systemImage: "envelope")
-                                .font(.system(size: 11))
-                                .foregroundStyle(WarmPalette.ink3)
-                                .lineLimit(1)
-                        }
-                    }
-                }
-                .padding(.vertical, 2)
-            }
-
-            // Family contacts (exclude current user — already shown above)
-            ForEach(otherMembers) { member in
-                Button { editingMember = member } label: {
-                    HStack(spacing: 12) {
-                        FamilyAvatar(
-                            initial: member.avatar_initial ?? String(member.name.prefix(1)).uppercased(),
-                            size: 36
+                Button {
+                    // Edit own contact info — use existing contact or create new
+                    if let contact = myContact {
+                        editingMember = contact
+                    } else {
+                        editingMember = APIService.ContactResponse(
+                            id: 0, name: user.name, relationship: nil,
+                            phone: nil, email: nil, birthday: nil,
+                            avatar_initial: nil, notes: nil, added_by: nil, created_at: nil
                         )
+                    }
+                } label: {
+                    HStack(spacing: 12) {
+                        ProfileAvatar(size: 36)
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(member.name)
+                            Text(user.name)
                                 .font(.system(size: 15, weight: .semibold))
                                 .foregroundStyle(WarmPalette.ink1)
-                            if let rel = member.relationship {
-                                Text(rel.capitalized)
+                            if let phone = myContact?.phone, !phone.isEmpty {
+                                Text(phone)
                                     .font(.system(size: 12))
                                     .foregroundStyle(WarmPalette.ink3)
+                            } else {
+                                Text("Tap to add your contact info")
+                                    .font(.system(size: 12))
+                                    .foregroundStyle(WarmPalette.ink4)
                             }
                         }
                         Spacer()
-                        VStack(alignment: .trailing, spacing: 2) {
-                            if let phone = member.phone, !phone.isEmpty {
-                                Label(phone, systemImage: "phone")
-                                    .font(.system(size: 11))
-                                    .foregroundStyle(WarmPalette.ink3)
-                            }
-                            if let email = member.email, !email.isEmpty {
-                                Label(email, systemImage: "envelope")
-                                    .font(.system(size: 11))
-                                    .foregroundStyle(WarmPalette.ink3)
-                                    .lineLimit(1)
-                            }
-                        }
+                        Image(systemName: "pencil")
+                            .font(.system(size: 12))
+                            .foregroundStyle(WarmPalette.ink4)
                     }
                     .padding(.vertical, 2)
                 }
                 .buttonStyle(.plain)
-                .swipeActions(edge: .trailing) {
-                    Button(role: .destructive) {
-                        Task { await deleteMember(member) }
-                    } label: {
-                        Label("Remove", systemImage: "trash")
+            }
+
+            // Family contacts (exclude current user — already shown above)
+            ForEach(otherMembers) { member in
+                MemberRow(member: member) { editingMember = member }
+                    .swipeActions(edge: .trailing) {
+                        Button(role: .destructive) {
+                            Task { await deleteMember(member) }
+                        } label: {
+                            Label("Remove", systemImage: "trash")
+                        }
                     }
-                }
             }
 
             if otherMembers.isEmpty {
@@ -532,7 +506,7 @@ struct EditMemberSheet: View {
         if !birthday.isEmpty { data["birthday"] = birthday }
 
         do {
-            if let existing = member {
+            if let existing = member, existing.id != 0 {
                 try await api.updateContact(id: existing.id, data: data)
             } else {
                 let _ = try await api.addContact(data)
@@ -543,6 +517,54 @@ struct EditMemberSheet: View {
             guard !error.isCancellation else { return }
             isSaving = false
         }
+    }
+}
+
+// MARK: - Member Row with hyperlinked contact info
+
+struct MemberRow: View {
+    let member: APIService.ContactResponse
+    var onEdit: () -> Void
+
+    var body: some View {
+        Button(action: onEdit) {
+            HStack(spacing: 12) {
+                FamilyAvatar(
+                    initial: member.avatar_initial ?? String(member.name.prefix(1)).uppercased(),
+                    size: 36
+                )
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(member.name)
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(WarmPalette.ink1)
+                    if let rel = member.relationship {
+                        Text(rel.capitalized)
+                            .font(.system(size: 12))
+                            .foregroundStyle(WarmPalette.ink3)
+                    }
+                }
+                Spacer()
+                VStack(alignment: .trailing, spacing: 4) {
+                    if let phone = member.phone, !phone.isEmpty {
+                        Link(destination: URL(string: "tel:\(phone.filter { $0.isNumber || $0 == "+" })")!) {
+                            Label(phone, systemImage: "phone.fill")
+                                .font(.system(size: 11))
+                                .foregroundStyle(TabAccent.home.color)
+                        }
+                    }
+                    if let email = member.email, !email.isEmpty {
+                        Link(destination: URL(string: "mailto:\(email)")!) {
+                            Label(email, systemImage: "envelope.fill")
+                                .font(.system(size: 11))
+                                .foregroundStyle(TabAccent.home.color)
+                                .lineLimit(1)
+                        }
+                    }
+                }
+            }
+            .padding(.vertical, 2)
+        }
+        .buttonStyle(.plain)
     }
 }
 
