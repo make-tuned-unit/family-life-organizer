@@ -2280,6 +2280,27 @@ app.delete('/api/groups/:groupId/members/:memberId', requireAuth, async (req, re
   }
 });
 
+app.put('/api/groups/:id', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const { name, description } = req.body;
+    const fields = [];
+    const params = [];
+    if (name) { fields.push('name = ?'); params.push(name); }
+    if (description !== undefined) { fields.push('description = ?'); params.push(description); }
+    if (fields.length === 0) return res.status(400).json({ error: 'Nothing to update' });
+    params.push(req.params.id);
+    await new Promise((resolve, reject) => {
+      db.db.run(`UPDATE groups SET ${fields.join(', ')} WHERE id = ?`, params, (err) => err ? reject(err) : resolve());
+    });
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
 app.delete('/api/groups/:id', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
