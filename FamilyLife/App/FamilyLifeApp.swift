@@ -39,6 +39,10 @@ struct FamilyLifeApp: App {
                         await authService.validateSession(api: apiService)
                     }
                 }
+                .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
+                    guard authService.isAuthenticated, let userId = authService.currentUser?.id else { return }
+                    messageCache.preload(api: apiService, userId: userId)
+                }
                 .preferredColorScheme(.light)
         }
     }
