@@ -169,7 +169,7 @@ struct NewConversationPicker: View {
                 Section("Send message to") {
                     ForEach(otherMembers) { member in
                         NavigationLink {
-                            ConversationView(partnerId: abs(member.id), partnerName: member.name)
+                            ConversationView(partnerId: household.userId(for: member.name) ?? abs(member.id), partnerName: member.name)
                         } label: {
                             HStack(spacing: 12) {
                                 FamilyAvatar(

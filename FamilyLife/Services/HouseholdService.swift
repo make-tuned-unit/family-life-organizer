@@ -5,6 +5,8 @@ import SwiftUI
 final class HouseholdService {
     private(set) var members: [APIService.ContactResponse] = []
     private(set) var householdGroup: APIService.GroupResponse?
+    /// Maps member names (lowercased) to their users table ID (for messaging)
+    private(set) var userIdsByName: [String: Int] = [:]
     private(set) var isLoaded = false
     private var isLoading = false
 
@@ -27,6 +29,7 @@ final class HouseholdService {
             let contactNames = Set(contacts.map { $0.name.lowercased() })
 
             // Add users from household/family groups who aren't already in contacts
+            var nameToUserId: [String: Int] = [:]
             for group in groups where group.group_type == "household" || group.group_type == "family" {
                 if let groupMembers = try? await api.fetchGroupMembers(groupId: group.id) {
                     // Load profile images into cache
@@ -34,6 +37,10 @@ final class HouseholdService {
 
                     for member in groupMembers {
                         let name = member.displayName
+                        // Track user_id for messaging
+                        if let uid = member.user_id {
+                            nameToUserId[name.lowercased()] = uid
+                        }
                         guard !contactNames.contains(name.lowercased()) else { continue }
                         // Create a ContactResponse-compatible entry for the user
                         combined.append(APIService.ContactResponse(
@@ -53,6 +60,7 @@ final class HouseholdService {
             }
 
             members = combined
+            userIdsByName = nameToUserId
         } catch {
             guard !error.isCancellation else { isLoading = false; return }
         }
@@ -67,6 +75,10 @@ final class HouseholdService {
 
     func member(named name: String) -> APIService.ContactResponse? {
         members.first { $0.name.localizedCaseInsensitiveCompare(name) == .orderedSame }
+    }
+
+    func userId(for name: String) -> Int? {
+        userIdsByName[name.lowercased()]
     }
 
     func initial(for name: String) -> String {
