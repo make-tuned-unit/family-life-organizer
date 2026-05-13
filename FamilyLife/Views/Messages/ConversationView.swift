@@ -9,8 +9,8 @@ struct ConversationView: View {
     @Environment(APIService.self) private var api
     @Environment(AuthService.self) private var auth
     @Environment(ProfileImageCache.self) private var profileCache
+    @Environment(MessageCache.self) private var messageCache
 
-    @State private var messages: [APIService.DirectMessageResponse] = []
     @State private var newMessage = ""
     @State private var isSending = false
     @State private var pendingQuote: QuotedItem?
@@ -20,6 +20,10 @@ struct ConversationView: View {
     @State private var showingNewDecision = false
     @State private var openDecisions: [DecisionResponse] = []
     @State private var fullscreenImage: UIImage?
+
+    private var messages: [APIService.DirectMessageResponse] {
+        messageCache.messages(for: partnerId)
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -58,6 +62,7 @@ struct ConversationView: View {
                         ForEach(messages.reversed()) { msg in
                             MessageBubble(
                                 message: msg,
+                                partnerId: partnerId,
                                 isOwn: msg.sender_id == auth.currentUser?.id,
                                 onImageTap: { image in fullscreenImage = image }
                             )
@@ -78,7 +83,6 @@ struct ConversationView: View {
 
             // Compose bar
             VStack(spacing: 0) {
-                // Quoted item preview
                 if let quote = pendingQuote {
                     HStack {
                         QuotedItemCard(type: quote.type, title: quote.title)
@@ -93,7 +97,6 @@ struct ConversationView: View {
                     .padding(.top, 8)
                 }
 
-                // Image preview
                 if let imageData = pendingImageData, let uiImage = UIImage(data: imageData) {
                     HStack {
                         Image(uiImage: uiImage)
@@ -113,7 +116,6 @@ struct ConversationView: View {
                 }
 
                 HStack(spacing: 8) {
-                    // Photo picker
                     PhotosPicker(selection: $selectedPhoto, matching: .images) {
                         Image(systemName: "photo")
                             .font(.system(size: 18))
@@ -127,7 +129,6 @@ struct ConversationView: View {
                         }
                     }
 
-                    // Decision button
                     Button { showingNewDecision = true } label: {
                         Image(systemName: "chart.bar.fill")
                             .font(.system(size: 16))
@@ -155,28 +156,25 @@ struct ConversationView: View {
         .navigationTitle(partnerName)
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $showingNewDecision) {
-            NewDecisionView {
-                await loadDecisions()
-            }
+            NewDecisionView { await loadDecisions() }
         }
         .fullScreenCover(item: Binding(
             get: { fullscreenImage.map { IdentifiableImage(image: $0) } },
             set: { fullscreenImage = $0?.image }
         )) { item in
-            ImagePreviewView(image: item.image) {
-                fullscreenImage = nil
-            }
+            ImagePreviewView(image: item.image) { fullscreenImage = nil }
         }
         .task {
             pendingQuote = quotedItem
-            await loadMessages()
+            // Show cached messages instantly, then refresh from server
+            await refreshMessages()
             await loadDecisions()
             try? await api.markMessagesRead(partnerId: partnerId)
         }
         .onAppear {
             pollTimer = Timer.scheduledTimer(withTimeInterval: 5, repeats: true) { _ in
                 Task { @MainActor in
-                    await loadMessages()
+                    await refreshMessages()
                     try? await api.markMessagesRead(partnerId: partnerId)
                 }
             }
@@ -191,9 +189,10 @@ struct ConversationView: View {
         !newMessage.trimmingCharacters(in: .whitespaces).isEmpty || pendingImageData != nil
     }
 
-    private func loadMessages() async {
+    private func refreshMessages() async {
         do {
-            messages = try await api.fetchMessages(partnerId: partnerId)
+            let fetched = try await api.fetchMessages(partnerId: partnerId)
+            messageCache.setMessages(fetched, for: partnerId)
         } catch {}
     }
 
@@ -210,22 +209,37 @@ struct ConversationView: View {
         isSending = true
         let quote = pendingQuote
         let imageBase64 = pendingImageData?.base64EncodedString()
+
+        // Optimistic insert — show message immediately
+        messageCache.insertOptimistic(
+            partnerId: partnerId,
+            text: text.isEmpty ? "Sent a photo" : text,
+            senderId: auth.currentUser?.id ?? 0,
+            senderName: auth.currentUser?.name ?? "Me",
+            referenceType: quote?.type,
+            referenceId: quote?.id,
+            referenceTitle: quote?.title,
+            imageData: imageBase64
+        )
+        let sentText = text.isEmpty ? "Sent a photo" : text
+        newMessage = ""
+        pendingQuote = nil
+        pendingImageData = nil
+        selectedPhoto = nil
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+
         Task {
             do {
                 _ = try await api.sendMessage(
                     recipientId: partnerId,
-                    text: text.isEmpty ? "Sent a photo" : text,
+                    text: sentText,
                     referenceType: quote?.type,
                     referenceId: quote?.id,
                     referenceTitle: quote?.title,
                     imageData: imageBase64
                 )
-                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                newMessage = ""
-                pendingQuote = nil
-                pendingImageData = nil
-                selectedPhoto = nil
-                await loadMessages()
+                // Replace optimistic with server data
+                await refreshMessages()
             } catch {}
             isSending = false
         }
@@ -236,33 +250,55 @@ struct ConversationView: View {
 
 struct MessageBubble: View {
     let message: APIService.DirectMessageResponse
+    let partnerId: Int
     let isOwn: Bool
     var onImageTap: ((UIImage) -> Void)?
+
+    @Environment(APIService.self) private var api
+    @Environment(MessageCache.self) private var messageCache
 
     var body: some View {
         HStack {
             if isOwn { Spacer(minLength: 60) }
 
             VStack(alignment: isOwn ? .trailing : .leading, spacing: 4) {
-                // Quoted reference
                 if let type = message.reference_type, let title = message.reference_title {
                     QuotedItemCard(type: type, title: title)
                 }
 
-                // Image
-                if let base64 = message.image_data,
-                   let data = Data(base64Encoded: base64),
-                   let uiImage = UIImage(data: data) {
-                    Button { onImageTap?(uiImage) } label: {
-                        Image(uiImage: uiImage)
+                // Image — from local cache or lazy-loaded
+                if let localImage = message.image_data.flatMap({ Data(base64Encoded: $0) }).flatMap({ UIImage(data: $0) }) {
+                    Button { onImageTap?(localImage) } label: {
+                        Image(uiImage: localImage)
                             .resizable()
                             .scaledToFit()
                             .frame(maxWidth: 200, maxHeight: 200)
                             .clipShape(RoundedRectangle(cornerRadius: 12))
                     }
+                } else if message.has_image == 1 {
+                    if let cached = messageCache.image(for: message.id) {
+                        Button { onImageTap?(cached) } label: {
+                            Image(uiImage: cached)
+                                .resizable()
+                                .scaledToFit()
+                                .frame(maxWidth: 200, maxHeight: 200)
+                                .clipShape(RoundedRectangle(cornerRadius: 12))
+                        }
+                    } else {
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(WarmPalette.ink1.opacity(0.06))
+                            .frame(width: 150, height: 100)
+                            .overlay {
+                                ProgressView()
+                                    .tint(WarmPalette.ink3)
+                            }
+                            .onAppear {
+                                messageCache.fetchImageIfNeeded(messageId: message.id, partnerId: partnerId, api: api)
+                            }
+                    }
                 }
 
-                if message.text != "Sent a photo" || message.image_data == nil {
+                if message.text != "Sent a photo" || (message.has_image != 1 && message.image_data == nil) {
                     Text(message.text)
                         .font(.system(size: 15))
                         .foregroundStyle(isOwn ? .white : WarmPalette.ink1)
@@ -303,7 +339,6 @@ struct ImagePreviewView: View {
     let onDismiss: () -> Void
 
     @State private var scale: CGFloat = 1
-    @State private var offset: CGSize = .zero
 
     var body: some View {
         ZStack(alignment: .topTrailing) {
@@ -313,7 +348,6 @@ struct ImagePreviewView: View {
                 .resizable()
                 .scaledToFit()
                 .scaleEffect(scale)
-                .offset(offset)
                 .gesture(
                     MagnifyGesture()
                         .onChanged { value in scale = value.magnification }

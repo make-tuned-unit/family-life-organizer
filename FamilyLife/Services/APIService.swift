@@ -651,7 +651,8 @@ final class APIService {
         var reference_type: String?
         var reference_id: Int?
         var reference_title: String?
-        var image_data: String?
+        var has_image: Int?
+        var image_data: String?  // only set for locally-inserted optimistic messages
         var read_at: String?
         var created_at: String?
     }
@@ -677,6 +678,11 @@ final class APIService {
         if let referenceTitle { body["reference_title"] = referenceTitle }
         if let imageData { body["image_data"] = imageData }
         return try await post("/api/messages", body: body)
+    }
+
+    func fetchMessageImage(partnerId: Int, messageId: Int) async throws -> String {
+        let response: AvatarResponse = try await get("/api/messages/\(partnerId)/\(messageId)/image")
+        return response.image
     }
 
     func markMessagesRead(partnerId: Int) async throws {
