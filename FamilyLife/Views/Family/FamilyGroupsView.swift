@@ -56,7 +56,10 @@ struct FamilyGroupsView: View {
         }
         .sheet(item: $selectedGroup) { group in
             NavigationStack {
-                GroupDetailView(group: group)
+                GroupDetailView(group: group) {
+                    await loadAll()
+                    await household.reload(api: api)
+                }
             }
         }
         .overlay {
@@ -100,54 +103,37 @@ struct FamilyGroupsView: View {
 
     @ViewBuilder
     private var householdSection: some View {
-        let household = groups.first { $0.group_type == "household" }
-        if let household {
-            VStack(alignment: .leading, spacing: 8) {
-                HStack(spacing: 12) {
-                    Image(systemName: "house.fill")
-                        .font(.system(size: 18))
-                        .foregroundStyle(AccentTheme.sage.color)
-                        .frame(width: 36, height: 36)
-                        .background(AccentTheme.sage.color.opacity(0.15))
-                        .clipShape(Circle())
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(household.name)
-                            .font(.system(size: 17, weight: .semibold))
-                            .foregroundStyle(WarmPalette.ink1)
-                        Text("\(household.member_count ?? 1) members")
-                            .font(.system(size: 13))
-                            .foregroundStyle(WarmPalette.ink3)
-                    }
-                    Spacer()
-                    if let code = household.invite_code {
-                        Button {
-                            UIPasteboard.general.string = code
-                        } label: {
-                            HStack(spacing: 4) {
-                                Image(systemName: "doc.on.doc")
-                                    .font(.system(size: 11))
-                                Text(code)
-                                    .font(.system(size: 12, weight: .semibold, design: .monospaced))
-                            }
-                            .foregroundStyle(WarmPalette.ink2)
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 6)
-                            .background(WarmPalette.cardSurface, in: Capsule())
+        let households = groups.filter { $0.group_type == "household" }
+        ForEach(households) { hh in
+            Button { selectedGroup = hh } label: {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 12) {
+                        Image(systemName: "house.fill")
+                            .font(.system(size: 18))
+                            .foregroundStyle(AccentTheme.sage.color)
+                            .frame(width: 36, height: 36)
+                            .background(AccentTheme.sage.color.opacity(0.15))
+                            .clipShape(Circle())
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(hh.name)
+                                .font(.system(size: 17, weight: .semibold))
+                                .foregroundStyle(WarmPalette.ink1)
+                            Text("\(hh.member_count ?? 1) members")
+                                .font(.system(size: 13))
+                                .foregroundStyle(WarmPalette.ink3)
                         }
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(WarmPalette.ink4)
                     }
                 }
-                Text("Share the invite code with your partner to join your household.")
-                    .font(.system(size: 13))
-                    .foregroundStyle(WarmPalette.ink3)
+                .padding(16)
+                .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
             }
-            .padding(16)
-            .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
-            .overlay(
-                RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card)
-                    .stroke(AccentTheme.sage.color.opacity(0.15), lineWidth: 1)
-            )
+            .buttonStyle(.plain)
             .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
-            .padding(.bottom, 14)
+            .padding(.bottom, 8)
         }
     }
 
@@ -276,15 +262,22 @@ struct ContactRow: View {
 
 struct GroupDetailView: View {
     let group: APIService.GroupResponse
+    var onLeft: (() async -> Void)?
     @Environment(APIService.self) private var api
+    @Environment(AuthService.self) private var auth
     @Environment(HouseholdService.self) private var household
     @Environment(\.dismiss) private var dismiss
     @State private var members: [APIService.GroupMemberResponse] = []
     @State private var feed: [APIService.FeedPostResponse] = []
     @State private var showingNewPost = false
     @State private var showingAddMember = false
+    @State private var showingLeaveConfirm = false
     @State private var selectedTab = 0
     @State private var copiedCode = false
+
+    private var isCreator: Bool {
+        group.created_by == auth.currentUser?.id
+    }
 
     var body: some View {
         ScrollView(showsIndicators: false) {
@@ -404,6 +397,30 @@ struct GroupDetailView: View {
         .sheet(isPresented: $showingAddMember) {
             AddGroupMemberSheet(groupId: group.id) { await loadMembers() }
         }
+        .confirmationDialog(
+            isCreator ? "Delete \(group.name)?" : "Leave \(group.name)?",
+            isPresented: $showingLeaveConfirm,
+            titleVisibility: .visible
+        ) {
+            Button(isCreator ? "Delete" : "Leave", role: .destructive) {
+                Task {
+                    do {
+                        if isCreator {
+                            try await api.deleteGroup(id: group.id)
+                        } else {
+                            try await api.leaveGroup(id: group.id)
+                        }
+                        UINotificationFeedbackGenerator().notificationOccurred(.success)
+                        await onLeft?()
+                        dismiss()
+                    } catch {}
+                }
+            }
+        } message: {
+            Text(isCreator
+                 ? "This will permanently remove the group and all its posts."
+                 : "You'll no longer see this group's feed or members.")
+        }
         .task {
             async let m: () = loadMembers()
             async let f: () = loadFeed()
@@ -476,6 +493,22 @@ struct GroupDetailView: View {
                 .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: 14))
             }
             .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
+
+            // Leave / Delete
+            Button(role: .destructive) { showingLeaveConfirm = true } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: isCreator ? "trash" : "rectangle.portrait.and.arrow.right")
+                        .font(.system(size: 14))
+                    Text(isCreator ? "Delete this group" : "Leave this group")
+                        .font(.system(size: 14, weight: .medium))
+                }
+                .foregroundStyle(WarmPalette.bad)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
+                .background(WarmPalette.bad.opacity(0.08), in: RoundedRectangle(cornerRadius: 14))
+            }
+            .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
+            .padding(.top, 16)
         }
     }
 
