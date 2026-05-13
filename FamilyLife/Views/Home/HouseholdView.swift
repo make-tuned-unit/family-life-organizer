@@ -8,8 +8,10 @@ struct HouseholdView: View {
 
     @State private var showingAddMember = false
     @State private var editingMember: APIService.ContactResponse?
-    @State private var showingAddresses = false
+    @State private var showingAddAddress = false
     @State private var showingJoinSheet = false
+    @State private var showingRenameSheet = false
+    @State private var addresses: [FamilyAddressResponse] = []
     @State private var error: String?
     @State private var copiedCode = false
 
@@ -23,18 +25,26 @@ struct HouseholdView: View {
 
     var body: some View {
         List {
+            nameSection
             inviteSection
             membersSection
             addressSection
         }
         .scrollContentBackground(.hidden)
         .background { AmbientBackground(style: .settings) }
-        .navigationTitle("My Household")
+        .navigationTitle(household.householdGroup?.name ?? "My Household")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                Button { showingAddMember = true } label: {
-                    Image(systemName: "person.badge.plus")
+                Menu {
+                    Button { showingAddMember = true } label: {
+                        Label("Add Member", systemImage: "person.badge.plus")
+                    }
+                    Button { showingRenameSheet = true } label: {
+                        Label("Rename Household", systemImage: "pencil")
+                    }
+                } label: {
+                    Image(systemName: "ellipsis.circle")
                         .foregroundStyle(TabAccent.home.color)
                 }
             }
@@ -50,23 +60,79 @@ struct HouseholdView: View {
                 await household.reload(api: api)
             }
         }
-        .sheet(isPresented: $showingAddresses) {
-            NavigationStack {
-                FamilyAddressesView()
-                    .toolbar {
-                        ToolbarItem(placement: .topBarLeading) {
-                            Button("Done") { showingAddresses = false }
-                                .foregroundStyle(WarmPalette.ink2)
-                        }
-                    }
+        .sheet(isPresented: $showingAddAddress) {
+            AddAddressView { address in
+                Task { await addAddress(address) }
             }
+        }
+        .alert("Rename Household", isPresented: $showingRenameSheet) {
+            TextField("Household name", text: householdNameBinding)
+            Button("Save") {
+                Task { await renameHousehold() }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Choose a name for your household (e.g. The Fairbanks)")
         }
         .alert("Something went wrong", isPresented: errorBinding) {
             Button("OK") { error = nil }
         } message: {
             Text(error ?? "")
         }
-        .task { await household.reload(api: api) }
+        .task {
+            await household.reload(api: api)
+            await loadAddresses()
+        }
+    }
+
+    // MARK: - Name
+
+    @State private var pendingName = ""
+
+    private var householdNameBinding: Binding<String> {
+        Binding(
+            get: { pendingName.isEmpty ? (household.householdGroup?.name ?? "") : pendingName },
+            set: { pendingName = $0 }
+        )
+    }
+
+    private func renameHousehold() async {
+        guard let groupId = household.householdGroup?.id, !pendingName.isEmpty else { return }
+        do {
+            try await api.updateGroup(id: groupId, data: ["name": pendingName])
+            await household.reload(api: api)
+            pendingName = ""
+        } catch {
+            self.error = error.localizedDescription
+        }
+    }
+
+    // MARK: - Name
+
+    @ViewBuilder
+    private var nameSection: some View {
+        Section {
+            Button { showingRenameSheet = true } label: {
+                HStack {
+                    Image(systemName: "house.fill")
+                        .foregroundStyle(TabAccent.home.color)
+                        .frame(width: 28)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(household.householdGroup?.name ?? "My Household")
+                            .font(.system(size: 17, weight: .semibold))
+                            .foregroundStyle(WarmPalette.ink1)
+                        Text("Tap to rename")
+                            .font(.system(size: 12))
+                            .foregroundStyle(WarmPalette.ink4)
+                    }
+                    Spacer()
+                    Image(systemName: "pencil")
+                        .font(.system(size: 14))
+                        .foregroundStyle(WarmPalette.ink4)
+                }
+            }
+            .buttonStyle(.plain)
+        }
     }
 
     // MARK: - Invite Code
@@ -234,16 +300,62 @@ struct HouseholdView: View {
 
     // MARK: - Address
 
+    @ViewBuilder
     private var addressSection: some View {
-        Section("Home Address") {
-            Button { showingAddresses = true } label: {
-                Label("Manage Addresses", systemImage: "mappin.and.ellipse")
+        Section {
+            ForEach(addresses) { addr in
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(addr.name)
+                        .font(.system(size: 15, weight: .medium))
+                    if let address = addr.address, !address.isEmpty {
+                        Text(address)
+                            .font(.system(size: 13))
+                            .foregroundStyle(WarmPalette.ink3)
+                    }
+                }
+                .swipeActions(edge: .trailing) {
+                    Button(role: .destructive) {
+                        Task { await deleteAddress(addr.id) }
+                    } label: {
+                        Label("Delete", systemImage: "trash")
+                    }
+                }
+            }
+
+            Button { showingAddAddress = true } label: {
+                Label("Add address", systemImage: "plus.circle")
                     .foregroundStyle(TabAccent.home.color)
             }
+        } header: {
+            Text("Addresses")
+        } footer: {
+            Text("Saved locations appear in Trips and Calendar for quick access.")
         }
     }
 
     // MARK: - Actions
+
+    private func loadAddresses() async {
+        do { addresses = try await api.fetchFamilyAddresses() } catch {}
+    }
+
+    private func addAddress(_ data: [String: Any]) async {
+        do {
+            try await api.addFamilyAddress(data)
+            await loadAddresses()
+        } catch {
+            self.error = error.localizedDescription
+        }
+    }
+
+    private func deleteAddress(_ id: Int) async {
+        do {
+            try await api.deleteFamilyAddress(id: id)
+            addresses.removeAll { $0.id == id }
+        } catch {
+            self.error = error.localizedDescription
+        }
+    }
 
     private func deleteMember(_ member: APIService.ContactResponse) async {
         do {
