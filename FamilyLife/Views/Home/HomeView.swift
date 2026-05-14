@@ -10,6 +10,7 @@ struct HomeView: View {
     @State private var showingNewEvent = false
     @State private var showingNewPost = false
     @State private var showingSettings = false
+    @State private var presenceMembers: [APIService.PresenceMember] = []
     @State private var selectedFeedEvent: AppointmentResponse?
     @State private var selectedFeedRivalry: RivalryResponse?
 
@@ -141,6 +142,7 @@ struct HomeView: View {
         }
         .task {
             await viewModel.loadAll(api: api, userName: auth.currentUser?.name, username: auth.currentUser?.username)
+            presenceMembers = (try? await api.fetchHouseholdPresence()) ?? []
             checkFeedNotifications()
             await checkMessageNotifications()
         }
@@ -205,9 +207,9 @@ struct HomeView: View {
             Spacer()
             HStack(spacing: 6) {
                 Circle()
-                    .fill(TabAccent.home.color)
+                    .fill(currentLocationColor)
                     .frame(width: 8, height: 8)
-                Text("Home")
+                Text(currentLocationLabel)
                     .font(.system(size: 13, weight: .medium))
                     .foregroundStyle(WarmPalette.ink2)
             }
@@ -240,6 +242,15 @@ struct HomeView: View {
         .padding(.bottom, 18)
     }
 
+    private var currentLocationLabel: String {
+        let me = presenceMembers.first { $0.id == auth.currentUser?.id }
+        return me?.last_location_name ?? "Home"
+    }
+
+    private var currentLocationColor: Color {
+        currentLocationLabel == "Home" ? TabAccent.home.color : AccentTheme.ocean.color
+    }
+
     @ViewBuilder
     private var familyStatusSubtitle: some View {
         if let trip = viewModel.activeTrips.first {
@@ -247,9 +258,21 @@ struct HomeView: View {
                 .font(.system(size: 15))
                 .foregroundStyle(WarmPalette.ink2)
         } else {
-            Text("Everyone's home. Quiet evening ahead.")
-                .font(.system(size: 15))
-                .foregroundStyle(WarmPalette.ink2)
+            let othersAway = presenceMembers.filter { member in
+                member.id != auth.currentUser?.id
+                && member.last_location_name != nil
+                && member.last_location_name != "Home"
+                && member.last_location_name != "Fairbanks"
+            }
+            if let away = othersAway.first {
+                Text("\(away.name) is at \(away.last_location_name ?? "away").")
+                    .font(.system(size: 15))
+                    .foregroundStyle(WarmPalette.ink2)
+            } else {
+                Text("Everyone's home. Quiet evening ahead.")
+                    .font(.system(size: 15))
+                    .foregroundStyle(WarmPalette.ink2)
+            }
         }
     }
 

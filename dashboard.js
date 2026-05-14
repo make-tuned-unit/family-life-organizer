@@ -9,6 +9,16 @@ const push = require('./push');
 const app = express();
 const PORT = process.env.PORT || 3456;
 
+// Haversine distance in meters between two lat/lng points
+function haversineDistance(lat1, lng1, lat2, lng2) {
+  const R = 6371000;
+  const toRad = d => d * Math.PI / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
 // Legacy hardcoded users — only used as fallback during migration
 const LEGACY_USERS = {
   'jesse': { password: '***REMOVED***', name: 'Jesse', avatar: '👨‍💼' },
@@ -148,6 +158,71 @@ app.post('/api/auth/device-token', requireAuth, async (req, res) => {
   } finally {
     db.close();
   }
+});
+
+// Update work address for a user
+app.put('/api/users/:id/work-address', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    await db.updateUserWorkAddress(parseInt(req.params.id), req.body);
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+  finally { db.close(); }
+});
+
+// Get work address for a user
+app.get('/api/users/:id/work-address', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const data = await db.getUserWorkAddress(parseInt(req.params.id));
+    res.json(data || {});
+  } catch (err) { res.status(500).json({ error: err.message }); }
+  finally { db.close(); }
+});
+
+// Report current location
+app.post('/api/location', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const userId = req.session.user.id;
+    const { lat, lng } = req.body;
+
+    // Check against saved addresses to determine location name
+    const addresses = await db.getFamilyAddresses();
+    const user = await db.getUserById(userId);
+    let locationName = null;
+
+    // Check home addresses
+    for (const addr of addresses) {
+      const dist = haversineDistance(lat, lng, addr.lat, addr.lng);
+      if (dist <= (addr.radius_meters || 500)) {
+        locationName = addr.name;
+        break;
+      }
+    }
+
+    // Check work address
+    if (!locationName && user?.work_lat && user?.work_lng) {
+      const dist = haversineDistance(lat, lng, user.work_lat, user.work_lng);
+      if (dist <= 500) {
+        locationName = 'Work';
+      }
+    }
+
+    await db.updateUserLocation(userId, { lat, lng, location_name: locationName });
+    res.json({ success: true, location_name: locationName });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+  finally { db.close(); }
+});
+
+// Get household presence (all members' locations)
+app.get('/api/household/presence', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const presence = await db.getHouseholdPresence(req.session.user.id);
+    res.json(presence);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+  finally { db.close(); }
 });
 
 // Get current user profile
