@@ -12,6 +12,7 @@ struct HomeView: View {
     @State private var showingSettings = false
     @State private var presenceMembers: [APIService.PresenceMember] = []
     @State private var feedFilterGroupId: Int? = nil // nil = All
+    @State private var userGroups: [APIService.GroupResponse] = []
     @State private var selectedFeedEvent: AppointmentResponse?
     @State private var selectedFeedRivalry: RivalryResponse?
 
@@ -143,6 +144,7 @@ struct HomeView: View {
         }
         .task {
             await viewModel.loadAll(api: api, userName: auth.currentUser?.name, username: auth.currentUser?.username)
+            userGroups = (try? await api.fetchGroups()) ?? []
             presenceMembers = (try? await api.fetchHouseholdPresence()) ?? []
             checkFeedNotifications()
             await checkMessageNotifications()
@@ -418,17 +420,9 @@ struct HomeView: View {
 
     // MARK: - Activity Feed
 
-    /// Unique groups found in the feed for the filter dropdown
+    /// All groups the user belongs to (for feed filter dropdown)
     private var feedGroups: [(id: Int, name: String)] {
-        var seen = Set<Int>()
-        var result: [(id: Int, name: String)] = []
-        for item in viewModel.activityFeed {
-            if let gid = item.item.group_id, let gname = item.item.group_name, !seen.contains(gid) {
-                seen.insert(gid)
-                result.append((id: gid, name: gname))
-            }
-        }
-        return result.sorted { $0.name < $1.name }
+        userGroups.map { (id: $0.id, name: $0.name) }.sorted { $0.name < $1.name }
     }
 
     private var filteredFeed: [PreparedFeedItem] {
@@ -466,7 +460,7 @@ struct HomeView: View {
                     }
                 } label: {
                     HStack(spacing: 4) {
-                        Text(feedFilterGroupId.flatMap { fid in feedGroups.first { $0.id == fid }?.name } ?? "All")
+                        Text(feedFilterGroupId.flatMap { fid in userGroups.first { $0.id == fid }?.name } ?? "All")
                             .font(.system(size: 13, weight: .medium))
                         Image(systemName: "chevron.down")
                             .font(.system(size: 10, weight: .semibold))

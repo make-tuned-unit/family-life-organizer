@@ -4,6 +4,11 @@ import SwiftData
 enum ChallengeType: String, Codable, CaseIterable, Identifiable {
     case steps
     case workout
+    case pushups
+    case squats
+    case situps
+    case plank
+    case running
     case habit
     case custom
 
@@ -13,6 +18,11 @@ enum ChallengeType: String, Codable, CaseIterable, Identifiable {
         switch self {
         case .steps: "Steps"
         case .workout: "Workouts"
+        case .pushups: "Push-ups"
+        case .squats: "Squats"
+        case .situps: "Sit-ups"
+        case .plank: "Plank"
+        case .running: "Running"
         case .habit: "Habit Streak"
         case .custom: "Custom"
         }
@@ -22,6 +32,11 @@ enum ChallengeType: String, Codable, CaseIterable, Identifiable {
         switch self {
         case .steps: "figure.walk"
         case .workout: "dumbbell.fill"
+        case .pushups: "figure.strengthtraining.traditional"
+        case .squats: "figure.cooldown"
+        case .situps: "figure.core.training"
+        case .plank: "figure.pilates"
+        case .running: "figure.run"
         case .habit: "checkmark.circle.fill"
         case .custom: "star.fill"
         }
@@ -29,8 +44,13 @@ enum ChallengeType: String, Codable, CaseIterable, Identifiable {
 
     var hint: String {
         switch self {
-        case .steps: "Who can log the most steps? Sync from Apple Health or log manually."
+        case .steps: "Who can log the most steps?"
         case .workout: "Track completed workouts. Each workout counts as 1."
+        case .pushups: "Daily push-up count — e.g. 20 per day for a month."
+        case .squats: "Daily squat count — set a target and go."
+        case .situps: "Daily sit-up count — track your core work."
+        case .plank: "Track total plank seconds or daily plank holds."
+        case .running: "Track distance (km) or minutes of running."
         case .habit: "Build a streak — log daily to keep your count going."
         case .custom: "Define your own challenge and track any metric."
         }
@@ -39,7 +59,8 @@ enum ChallengeType: String, Codable, CaseIterable, Identifiable {
     var color: String {
         switch self {
         case .steps: "blue"
-        case .workout: "orange"
+        case .workout, .pushups, .squats, .situps, .plank: "orange"
+        case .running: "teal"
         case .habit: "green"
         case .custom: "purple"
         }
