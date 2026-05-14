@@ -6,6 +6,8 @@ struct AddAppointmentView: View {
     @Environment(APIService.self) private var api
     @Environment(HouseholdService.self) private var household
 
+    var initialDate: Date?
+
     @State private var title = ""
     @State private var date = Date()
     @State private var time = Date()
@@ -149,6 +151,9 @@ struct AddAppointmentView: View {
             }
             .scrollContentBackground(.hidden)
             .background { AmbientBackground(style: .calendar) }
+            .onAppear {
+                if let d = initialDate { date = d }
+            }
             .navigationTitle("New Event")
             .navigationBarTitleDisplayMode(.inline)
             .alert("Couldn't save event", isPresented: errorAlertIsPresented) {

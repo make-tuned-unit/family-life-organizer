@@ -64,7 +64,7 @@ struct CalendarView: View {
             }
         }
         .sheet(isPresented: $showingAddAppointment) {
-            AddAppointmentView { appointment in
+            AddAppointmentView(initialDate: viewModel.selectedDate) { appointment in
                 Task { await viewModel.addAppointment(appointment, api: api) }
             }
         }
