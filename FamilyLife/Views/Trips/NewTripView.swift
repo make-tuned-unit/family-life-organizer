@@ -23,8 +23,15 @@ struct NewTripView: View {
     let onSave: ([String: Any]) -> Void
 
     private var travelerNames: [String] {
-        var names = [auth.currentUser?.name ?? "Me"]
-        names += household.members.map(\.name)
+        let me = auth.currentUser?.name ?? "Me"
+        let myUsername = auth.currentUser?.username ?? ""
+        var names = [me]
+        for member in household.members {
+            guard member.name.localizedCaseInsensitiveCompare(me) != .orderedSame,
+                  member.name.localizedCaseInsensitiveCompare(myUsername) != .orderedSame else { continue }
+            guard !names.contains(where: { $0.localizedCaseInsensitiveCompare(member.name) == .orderedSame }) else { continue }
+            names.append(member.name)
+        }
         return names
     }
 
@@ -165,8 +172,10 @@ struct NewTripView: View {
     private func loadAddresses() async {
         do {
             familyAddresses = try await api.fetchFamilyAddresses()
-        } catch let loadError {
-            error = loadError.localizedDescription
+        } catch {
+            // Silently handle auth errors — silent re-login will retry
+            guard !error.isCancellation, !(error is APIError) else { return }
+            self.error = error.localizedDescription
         }
     }
 
