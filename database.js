@@ -94,48 +94,57 @@ class FamilyDB {
   // Merge legacy separate households and backfill group_id on unscoped records
   runHouseholdMigrations() {
     return new Promise((resolve, reject) => {
-      // Step 1: Merge Jesse & Sophie into one household if they're in separate ones
+      // Step 1: Find all users and their household memberships
       this.db.all(`
         SELECT u.id as user_id, u.username, g.id as group_id, g.name as group_name
         FROM users u
         JOIN group_members gm ON gm.user_id = u.id
         JOIN groups g ON g.id = gm.group_id AND g.group_type = 'household'
-        WHERE u.username IN ('jesse', 'sophie')
         ORDER BY g.id ASC
       `, (err, rows) => {
-        if (err || !rows || rows.length < 2) return this._backfillGroupIds().then(resolve, reject);
+        if (err) {
+          console.error('Migration query error:', err.message);
+          return this._backfillGroupIds().then(resolve, reject);
+        }
+        console.log('Household migration: found', rows?.length || 0, 'user-household pairs:', JSON.stringify(rows));
+
+        if (!rows || rows.length === 0) {
+          console.log('No household memberships found — skipping merge');
+          return this._backfillGroupIds().then(resolve, reject);
+        }
 
         const households = [...new Set(rows.map(r => r.group_id))];
         if (households.length <= 1) {
-          // Already merged — just ensure it's named Fairbanks
-          this.db.run("UPDATE groups SET name = 'Fairbanks' WHERE id = ? AND (name LIKE '%''s Home' OR name = 'Fairbanks')",
-            [households[0]], () => {
-              this._backfillGroupIds().then(resolve, reject);
-            });
+          // All users already in one household — ensure it's named Fairbanks
+          const keepId = households[0];
+          console.log(`All users in household ${keepId} — ensuring name is Fairbanks`);
+          this.db.run("UPDATE groups SET name = 'Fairbanks' WHERE id = ?", [keepId], () => {
+            this._backfillGroupIds().then(resolve, reject);
+          });
           return;
         }
 
-        // They're in separate households — merge into the first one using serialize
+        // Multiple households exist — merge into the first one
         const keepId = households[0];
         const removeIds = households.slice(1);
-        const userIdsToMove = rows.filter(r => r.group_id !== keepId).map(r => r.user_id);
+        const allUserIds = [...new Set(rows.map(r => r.user_id))];
+        console.log(`Merging households ${JSON.stringify(households)} into ${keepId}, users: ${JSON.stringify(allUserIds)}`);
 
         this.db.serialize(() => {
-          // Add users to the kept household (skip if already there)
-          for (const uid of userIdsToMove) {
-            this.db.run(`INSERT OR IGNORE INTO group_members (group_id, user_id, role, added_by)
+          // Ensure ALL users are in the kept household
+          for (const uid of allUserIds) {
+            this.db.run(`INSERT INTO group_members (group_id, user_id, role, added_by)
               SELECT ?, ?, 'admin', ? WHERE NOT EXISTS (
                 SELECT 1 FROM group_members WHERE group_id = ? AND user_id = ?
               )`, [keepId, uid, uid, keepId, uid]);
           }
-          // Remove from old households
+          // Remove users from old households
           for (const oldId of removeIds) {
-            this.db.run('DELETE FROM group_members WHERE group_id = ? AND user_id IN (' +
-              userIdsToMove.map(() => '?').join(',') + ')', [oldId, ...userIdsToMove]);
+            this.db.run('DELETE FROM group_members WHERE group_id = ? AND user_id IS NOT NULL', [oldId]);
           }
           // Rename to Fairbanks
           this.db.run("UPDATE groups SET name = 'Fairbanks' WHERE id = ?", [keepId], () => {
-            console.log(`✅ Merged households into Fairbanks (group ${keepId})`);
+            console.log(`✅ Merged into Fairbanks (group ${keepId})`);
             this._backfillGroupIds().then(resolve, reject);
           });
         });
@@ -143,57 +152,39 @@ class FamilyDB {
     });
   }
 
-  // Backfill group_id — runs EVERY startup, reassigns based on current group membership
+  // Backfill group_id — runs EVERY startup, reassigns ALL records to correct household
   _backfillGroupIds() {
     return new Promise((resolve, reject) => {
-      this.db.serialize(() => {
-        // Appointments: always reassign based on person_tags → user's current household
-        this.db.run(`
-          UPDATE appointments SET group_id = (
-            SELECT gm.group_id FROM users u
-            JOIN group_members gm ON gm.user_id = u.id
-            JOIN groups g ON g.id = gm.group_id AND g.group_type = 'household'
-            WHERE appointments.person_tags LIKE '%' || u.name || '%'
-            LIMIT 1
-          ) WHERE person_tags IS NOT NULL
-        `);
-        // Appointments without person_tags: assign to first populated household
-        this.db.run(`
-          UPDATE appointments SET group_id = (
-            SELECT g.id FROM groups g
-            JOIN group_members gm ON gm.group_id = g.id AND gm.user_id IS NOT NULL
-            WHERE g.group_type = 'household'
-            ORDER BY g.id LIMIT 1
-          ) WHERE group_id IS NULL OR group_id NOT IN (
-            SELECT group_id FROM group_members WHERE user_id IS NOT NULL
-          )
-        `);
-        // Decisions: always reassign based on creator_name
-        this.db.run(`
-          UPDATE decisions SET group_id = (
-            SELECT gm.group_id FROM users u
-            JOIN group_members gm ON gm.user_id = u.id
-            JOIN groups g ON g.id = gm.group_id AND g.group_type = 'household'
-            WHERE u.name = decisions.creator_name
-            LIMIT 1
-          ) WHERE group_id IS NULL OR group_id NOT IN (
-            SELECT group_id FROM group_members WHERE user_id IS NOT NULL
-          )
-        `);
-        // Rivalries: always reassign based on initiator_name
-        this.db.run(`
-          UPDATE rivalries SET group_id = (
-            SELECT gm.group_id FROM users u
-            JOIN group_members gm ON gm.user_id = u.id
-            JOIN groups g ON g.id = gm.group_id AND g.group_type = 'household'
-            WHERE u.name = rivalries.initiator_name
-            LIMIT 1
-          ) WHERE group_id IS NULL OR group_id NOT IN (
-            SELECT group_id FROM group_members WHERE user_id IS NOT NULL
-          )
-        `, (err) => {
-          if (err) console.error('Backfill error:', err.message);
-          resolve();
+      // Find the primary household (first one with user members)
+      this.db.get(`
+        SELECT g.id FROM groups g
+        JOIN group_members gm ON gm.group_id = g.id AND gm.user_id IS NOT NULL
+        WHERE g.group_type = 'household'
+        ORDER BY g.id LIMIT 1
+      `, (err, hhRow) => {
+        const householdId = hhRow?.id;
+        console.log(`Backfill: primary household = ${householdId}`);
+        if (!householdId) return resolve();
+
+        this.db.serialize(() => {
+          // Assign ALL appointments to the primary household
+          // (This is safe because all appointments were created by household members)
+          this.db.run('UPDATE appointments SET group_id = ? WHERE group_id IS NULL OR group_id != ?',
+            [householdId, householdId], function() {
+              console.log(`Backfill: updated ${this.changes} appointments to household ${householdId}`);
+            });
+          // Assign ALL decisions to the primary household
+          this.db.run('UPDATE decisions SET group_id = ? WHERE group_id IS NULL OR group_id != ?',
+            [householdId, householdId], function() {
+              console.log(`Backfill: updated ${this.changes} decisions to household ${householdId}`);
+            });
+          // Assign ALL rivalries to the primary household
+          this.db.run('UPDATE rivalries SET group_id = ? WHERE group_id IS NULL OR group_id != ?',
+            [householdId, householdId], function(err) {
+              if (err) console.error('Backfill error:', err.message);
+              else console.log(`Backfill: updated ${this.changes} rivalries to household ${householdId}`);
+              resolve();
+            });
         });
       });
     });
@@ -367,12 +358,7 @@ class FamilyDB {
       if (userId) {
         const uid = parseInt(userId);
         sql += ` AND (group_id IN (SELECT group_id FROM group_members WHERE user_id = ${uid})
-          OR (group_id IS NULL AND EXISTS (
-            SELECT 1 FROM users u JOIN group_members gm ON gm.user_id = u.id
-            JOIN groups g ON g.id = gm.group_id AND g.group_type = 'household'
-            WHERE gm.group_id IN (SELECT group_id FROM group_members WHERE user_id = ${uid})
-            AND (appointments.person_tags LIKE '%' || u.name || '%' OR appointments.person_tags IS NULL)
-          )))`;
+          OR group_id IS NULL)`;
       }
 
       sql += ' ORDER BY appointment_date, appointment_time';
@@ -395,12 +381,7 @@ class FamilyDB {
       if (userId) {
         const uid = parseInt(userId);
         sql += ` AND (group_id IN (SELECT group_id FROM group_members WHERE user_id = ${uid})
-          OR (group_id IS NULL AND EXISTS (
-            SELECT 1 FROM users u JOIN group_members gm ON gm.user_id = u.id
-            JOIN groups g ON g.id = gm.group_id AND g.group_type = 'household'
-            WHERE gm.group_id IN (SELECT group_id FROM group_members WHERE user_id = ${uid})
-            AND (appointments.person_tags LIKE '%' || u.name || '%' OR appointments.person_tags IS NULL)
-          )))`;
+          OR group_id IS NULL)`;
       }
       sql += ' ORDER BY appointment_date, appointment_time';
 
@@ -417,12 +398,7 @@ class FamilyDB {
       if (userId) {
         const uid = parseInt(userId);
         sql += ` AND (group_id IN (SELECT group_id FROM group_members WHERE user_id = ${uid})
-          OR (group_id IS NULL AND EXISTS (
-            SELECT 1 FROM users u JOIN group_members gm ON gm.user_id = u.id
-            JOIN groups g ON g.id = gm.group_id AND g.group_type = 'household'
-            WHERE gm.group_id IN (SELECT group_id FROM group_members WHERE user_id = ${uid})
-            AND (appointments.person_tags LIKE '%' || u.name || '%' OR appointments.person_tags IS NULL)
-          )))`;
+          OR group_id IS NULL)`;
       }
       this.db.all(sql, (err, rows) => {
         if (err) reject(err);
@@ -1624,7 +1600,7 @@ class FamilyDB {
   getDailySummary(userId = null) {
     return new Promise((resolve, reject) => {
       const groupFilter = userId
-        ? `AND group_id IN (SELECT group_id FROM group_members WHERE user_id = ${parseInt(userId)})`
+        ? `AND (group_id IN (SELECT group_id FROM group_members WHERE user_id = ${parseInt(userId)}) OR group_id IS NULL)`
         : '';
       const sql = `
         SELECT
