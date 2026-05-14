@@ -52,7 +52,7 @@ struct HomeView: View {
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
                 Button { showingSettings = true } label: {
-                    ProfileAvatar(size: 30)
+                    ProfileAvatar(size: 40)
                 }
             }
             ToolbarItem(placement: .topBarTrailing) {

@@ -70,7 +70,9 @@ CREATE TABLE IF NOT EXISTS appointments (
     recurrence_rule TEXT,
     recurrence_end TEXT,
     reminder_sent BOOLEAN DEFAULT 0,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    group_id INTEGER,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (group_id) REFERENCES groups(id)
 );
 
 -- Automations
@@ -188,7 +190,9 @@ CREATE TABLE IF NOT EXISTS decisions (
     creator_name TEXT DEFAULT 'Jesse',
     status TEXT DEFAULT 'active',
     expires_at TEXT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    group_id INTEGER,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (group_id) REFERENCES groups(id)
 );
 
 CREATE TABLE IF NOT EXISTS decision_reactions (
@@ -226,7 +230,9 @@ CREATE TABLE IF NOT EXISTS rivalries (
     status TEXT DEFAULT 'active',
     point_value INTEGER DEFAULT 100,
     winner_name TEXT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    group_id INTEGER,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (group_id) REFERENCES groups(id)
 );
 
 CREATE TABLE IF NOT EXISTS rivalry_entries (

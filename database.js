@@ -76,10 +76,127 @@ class FamilyDB {
         this.db.run('ALTER TABLE users ADD COLUMN profile_image TEXT', () => {});
         // DM image support
         this.db.run('ALTER TABLE direct_messages ADD COLUMN image_data TEXT', () => {});
-        this.db.run('CREATE INDEX IF NOT EXISTS idx_feed_posts_group ON feed_posts(group_id, id DESC)', (err) => {
+        this.db.run('CREATE INDEX IF NOT EXISTS idx_feed_posts_group ON feed_posts(group_id, id DESC)', () => {});
+        // Data isolation: add group_id to household-scoped tables
+        this.db.run('ALTER TABLE appointments ADD COLUMN group_id INTEGER REFERENCES groups(id)', () => {});
+        this.db.run('ALTER TABLE decisions ADD COLUMN group_id INTEGER REFERENCES groups(id)', () => {});
+        this.db.run('ALTER TABLE rivalries ADD COLUMN group_id INTEGER REFERENCES groups(id)', () => {});
+        this.db.run('CREATE INDEX IF NOT EXISTS idx_appointments_group ON appointments(group_id)', () => {});
+        this.db.run('CREATE INDEX IF NOT EXISTS idx_decisions_group ON decisions(group_id)', () => {});
+        this.db.run('CREATE INDEX IF NOT EXISTS idx_rivalries_group ON rivalries(group_id)', (err) => {
           if (err) console.error('Index error:', err.message);
           resolve();
         });
+      });
+    });
+  }
+
+  // Merge legacy separate households and backfill group_id on unscoped records
+  runHouseholdMigrations() {
+    return new Promise((resolve, reject) => {
+      // Step 1: Merge Jesse & Sophie into one household if they're in separate ones
+      this.db.all(`
+        SELECT u.id as user_id, u.username, g.id as group_id, g.name as group_name
+        FROM users u
+        JOIN group_members gm ON gm.user_id = u.id
+        JOIN groups g ON g.id = gm.group_id AND g.group_type = 'household'
+        WHERE u.username IN ('jesse', 'sophie')
+        ORDER BY g.id ASC
+      `, (err, rows) => {
+        if (err || !rows || rows.length < 2) return this._backfillGroupIds().then(resolve, reject);
+
+        const households = [...new Set(rows.map(r => r.group_id))];
+        if (households.length <= 1) return this._backfillGroupIds().then(resolve, reject);
+
+        // They're in separate households — merge into the first one
+        const keepId = households[0];
+        const usersToMove = rows.filter(r => r.group_id !== keepId);
+
+        let pending = usersToMove.length;
+        if (pending === 0) return this._backfillGroupIds().then(resolve, reject);
+
+        for (const row of usersToMove) {
+          this.db.get('SELECT id FROM group_members WHERE group_id = ? AND user_id = ?',
+            [keepId, row.user_id], (err2, existing) => {
+              if (!err2 && !existing) {
+                this.db.run('INSERT INTO group_members (group_id, user_id, role, added_by) VALUES (?, ?, ?, ?)',
+                  [keepId, row.user_id, 'admin', row.user_id]);
+              }
+              // Remove from old household
+              this.db.run('DELETE FROM group_members WHERE group_id = ? AND user_id = ?',
+                [row.group_id, row.user_id]);
+              pending--;
+              if (pending === 0) {
+                // Rename to Fairbanks
+                this.db.run("UPDATE groups SET name = 'Fairbanks' WHERE id = ? AND name LIKE '%''s Home'",
+                  [keepId], () => {
+                    this._backfillGroupIds().then(resolve, reject);
+                  });
+              }
+            });
+        }
+      });
+    });
+  }
+
+  // Backfill group_id on records that don't have one
+  _backfillGroupIds() {
+    return new Promise((resolve, reject) => {
+      this.db.serialize(() => {
+        // Appointments: match person_tags to household members
+        this.db.run(`
+          UPDATE appointments SET group_id = (
+            SELECT gm.group_id FROM users u
+            JOIN group_members gm ON gm.user_id = u.id
+            JOIN groups g ON g.id = gm.group_id AND g.group_type = 'household'
+            WHERE appointments.person_tags LIKE '%' || u.name || '%'
+            LIMIT 1
+          ) WHERE group_id IS NULL AND person_tags IS NOT NULL
+        `);
+        // Appointments without person_tags: assign to first household
+        this.db.run(`
+          UPDATE appointments SET group_id = (
+            SELECT g.id FROM groups g WHERE g.group_type = 'household' ORDER BY g.id LIMIT 1
+          ) WHERE group_id IS NULL
+        `);
+        // Decisions: match creator_name
+        this.db.run(`
+          UPDATE decisions SET group_id = (
+            SELECT gm.group_id FROM users u
+            JOIN group_members gm ON gm.user_id = u.id
+            JOIN groups g ON g.id = gm.group_id AND g.group_type = 'household'
+            WHERE u.name = decisions.creator_name
+            LIMIT 1
+          ) WHERE group_id IS NULL
+        `);
+        // Rivalries: match initiator_name
+        this.db.run(`
+          UPDATE rivalries SET group_id = (
+            SELECT gm.group_id FROM users u
+            JOIN group_members gm ON gm.user_id = u.id
+            JOIN groups g ON g.id = gm.group_id AND g.group_type = 'household'
+            WHERE u.name = rivalries.initiator_name
+            LIMIT 1
+          ) WHERE group_id IS NULL
+        `, (err) => {
+          if (err) console.error('Backfill error:', err.message);
+          resolve();
+        });
+      });
+    });
+  }
+
+  // Get the user's household group ID
+  getUserHouseholdId(userId) {
+    return new Promise((resolve, reject) => {
+      this.db.get(`
+        SELECT g.id FROM groups g
+        JOIN group_members gm ON gm.group_id = g.id
+        WHERE gm.user_id = ? AND g.group_type = 'household'
+        LIMIT 1
+      `, [userId], (err, row) => {
+        if (err) reject(err);
+        else resolve(row?.id || null);
       });
     });
   }
@@ -194,7 +311,7 @@ class FamilyDB {
   addAppointment(appointment) {
     return new Promise((resolve, reject) => {
       this.db.run(
-        'INSERT INTO appointments (title, description, appointment_date, appointment_time, location, with_person, category, person_tags, recurrence_rule, recurrence_end) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        'INSERT INTO appointments (title, description, appointment_date, appointment_time, location, with_person, category, person_tags, recurrence_rule, recurrence_end, group_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
         [
           appointment.title,
           appointment.description || null,
@@ -205,7 +322,8 @@ class FamilyDB {
           appointment.category || 'appointments',
           appointment.person_tags ? appointment.person_tags.join(',') : null,
           appointment.recurrence_rule || null,
-          appointment.recurrence_end || null
+          appointment.recurrence_end || null,
+          appointment.group_id || null
         ],
         function(err) {
           if (err) reject(err);
@@ -215,7 +333,7 @@ class FamilyDB {
     });
   }
 
-  getAppointments(filters = {}) {
+  getAppointments(filters = {}, userId = null) {
     return new Promise((resolve, reject) => {
       let sql = 'SELECT * FROM appointments WHERE 1=1';
       const params = [];
@@ -233,6 +351,17 @@ class FamilyDB {
         params.push('%' + filters.person + '%');
       }
 
+      if (userId) {
+        const uid = parseInt(userId);
+        sql += ` AND (group_id IN (SELECT group_id FROM group_members WHERE user_id = ${uid})
+          OR (group_id IS NULL AND EXISTS (
+            SELECT 1 FROM users u JOIN group_members gm ON gm.user_id = u.id
+            JOIN groups g ON g.id = gm.group_id AND g.group_type = 'household'
+            WHERE gm.group_id IN (SELECT group_id FROM group_members WHERE user_id = ${uid})
+            AND (appointments.person_tags LIKE '%' || u.name || '%' OR appointments.person_tags IS NULL)
+          )))`;
+      }
+
       sql += ' ORDER BY appointment_date, appointment_time';
 
       this.db.all(sql, params, (err, rows) => {
@@ -242,33 +371,50 @@ class FamilyDB {
     });
   }
 
-  getAppointmentsByMonth(year, month) {
+  getAppointmentsByMonth(year, month, userId = null) {
     return new Promise((resolve, reject) => {
       const startDate = `${year}-${String(month).padStart(2, '0')}-01`;
-      const endDate = month === 12 
-        ? `${year + 1}-01-01` 
+      const endDate = month === 12
+        ? `${year + 1}-01-01`
         : `${year}-${String(month + 1).padStart(2, '0')}-01`;
-      
-      this.db.all(
-        'SELECT * FROM appointments WHERE appointment_date >= ? AND appointment_date < ? ORDER BY appointment_date, appointment_time',
-        [startDate, endDate],
-        (err, rows) => {
-          if (err) reject(err);
-          else resolve(rows);
-        }
-      );
+
+      let sql = 'SELECT * FROM appointments WHERE appointment_date >= ? AND appointment_date < ?';
+      if (userId) {
+        const uid = parseInt(userId);
+        sql += ` AND (group_id IN (SELECT group_id FROM group_members WHERE user_id = ${uid})
+          OR (group_id IS NULL AND EXISTS (
+            SELECT 1 FROM users u JOIN group_members gm ON gm.user_id = u.id
+            JOIN groups g ON g.id = gm.group_id AND g.group_type = 'household'
+            WHERE gm.group_id IN (SELECT group_id FROM group_members WHERE user_id = ${uid})
+            AND (appointments.person_tags LIKE '%' || u.name || '%' OR appointments.person_tags IS NULL)
+          )))`;
+      }
+      sql += ' ORDER BY appointment_date, appointment_time';
+
+      this.db.all(sql, [startDate, endDate], (err, rows) => {
+        if (err) reject(err);
+        else resolve(rows);
+      });
     });
   }
 
-  getRecurringAppointments() {
+  getRecurringAppointments(userId = null) {
     return new Promise((resolve, reject) => {
-      this.db.all(
-        'SELECT * FROM appointments WHERE recurrence_rule IS NOT NULL AND recurrence_rule != ""',
-        (err, rows) => {
-          if (err) reject(err);
-          else resolve(rows || []);
-        }
-      );
+      let sql = 'SELECT * FROM appointments WHERE recurrence_rule IS NOT NULL AND recurrence_rule != ""';
+      if (userId) {
+        const uid = parseInt(userId);
+        sql += ` AND (group_id IN (SELECT group_id FROM group_members WHERE user_id = ${uid})
+          OR (group_id IS NULL AND EXISTS (
+            SELECT 1 FROM users u JOIN group_members gm ON gm.user_id = u.id
+            JOIN groups g ON g.id = gm.group_id AND g.group_type = 'household'
+            WHERE gm.group_id IN (SELECT group_id FROM group_members WHERE user_id = ${uid})
+            AND (appointments.person_tags LIKE '%' || u.name || '%' OR appointments.person_tags IS NULL)
+          )))`;
+      }
+      this.db.all(sql, (err, rows) => {
+        if (err) reject(err);
+        else resolve(rows || []);
+      });
     });
   }
 
@@ -589,8 +735,8 @@ class FamilyDB {
   addDecision(decision) {
     return new Promise((resolve, reject) => {
       this.db.run(
-        `INSERT INTO decisions (title, decision_type, body, link_url, photo_data, poll_options, creator_name, status, expires_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO decisions (title, decision_type, body, link_url, photo_data, poll_options, creator_name, status, expires_at, group_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           decision.title,
           decision.decision_type,
@@ -600,7 +746,8 @@ class FamilyDB {
           JSON.stringify(decision.poll_options || []),
           decision.creator_name || 'Jesse',
           decision.status || 'active',
-          decision.expires_at || null
+          decision.expires_at || null,
+          decision.group_id || null
         ],
         function(err) {
           if (err) reject(err);
@@ -610,11 +757,20 @@ class FamilyDB {
     });
   }
 
-  getDecisions(filters = {}) {
+  getDecisions(filters = {}, userId = null) {
     return new Promise((resolve, reject) => {
       let sql = 'SELECT * FROM decisions WHERE 1=1';
       const params = [];
       if (filters.status) { sql += ' AND status = ?'; params.push(filters.status); }
+      if (userId) {
+        const uid = parseInt(userId);
+        sql += ` AND (group_id IN (SELECT group_id FROM group_members WHERE user_id = ${uid})
+          OR (group_id IS NULL AND creator_name IN (
+            SELECT u.name FROM users u JOIN group_members gm ON gm.user_id = u.id
+            JOIN groups g ON g.id = gm.group_id AND g.group_type = 'household'
+            WHERE gm.group_id IN (SELECT group_id FROM group_members WHERE user_id = ${uid})
+          )))`;
+      }
       sql += ' ORDER BY datetime(created_at) DESC';
       this.db.all(sql, params, (err, rows) => {
         if (err) reject(err);
@@ -699,8 +855,8 @@ class FamilyDB {
   addRivalry(rivalry) {
     return new Promise((resolve, reject) => {
       this.db.run(
-        `INSERT INTO rivalries (title, challenge_type, initiator_name, opponent_name, start_date, end_date, status, point_value, winner_name)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO rivalries (title, challenge_type, initiator_name, opponent_name, start_date, end_date, status, point_value, winner_name, group_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           rivalry.title,
           rivalry.challenge_type,
@@ -710,7 +866,8 @@ class FamilyDB {
           rivalry.end_date,
           rivalry.status || 'active',
           rivalry.point_value || 100,
-          rivalry.winner_name || null
+          rivalry.winner_name || null,
+          rivalry.group_id || null
         ],
         function(err) {
           if (err) reject(err);
@@ -720,11 +877,26 @@ class FamilyDB {
     });
   }
 
-  getRivalries(filters = {}) {
+  getRivalries(filters = {}, userId = null) {
     return new Promise((resolve, reject) => {
       let sql = 'SELECT * FROM rivalries WHERE 1=1';
       const params = [];
       if (filters.status) { sql += ' AND status = ?'; params.push(filters.status); }
+      if (userId) {
+        const uid = parseInt(userId);
+        sql += ` AND (group_id IN (SELECT group_id FROM group_members WHERE user_id = ${uid})
+          OR (group_id IS NULL AND (
+            initiator_name IN (
+              SELECT u.name FROM users u JOIN group_members gm ON gm.user_id = u.id
+              JOIN groups g ON g.id = gm.group_id AND g.group_type = 'household'
+              WHERE gm.group_id IN (SELECT group_id FROM group_members WHERE user_id = ${uid})
+            ) OR opponent_name IN (
+              SELECT u.name FROM users u JOIN group_members gm ON gm.user_id = u.id
+              JOIN groups g ON g.id = gm.group_id AND g.group_type = 'household'
+              WHERE gm.group_id IN (SELECT group_id FROM group_members WHERE user_id = ${uid})
+            )
+          )))`;
+      }
       sql += ' ORDER BY datetime(created_at) DESC';
       this.db.all(sql, params, (err, rows) => err ? reject(err) : resolve(rows));
     });
@@ -770,21 +942,36 @@ class FamilyDB {
     });
   }
 
-  getRivalryLeaderboard() {
+  getRivalryLeaderboard(userId = null) {
     return new Promise((resolve, reject) => {
+      const groupFilter = userId
+        ? `WHERE (group_id IN (SELECT group_id FROM group_members WHERE user_id = ${parseInt(userId)})
+            OR (group_id IS NULL AND (initiator_name IN (
+              SELECT u.name FROM users u JOIN group_members gm ON gm.user_id = u.id
+              JOIN groups g ON g.id = gm.group_id AND g.group_type = 'household'
+              WHERE gm.group_id IN (SELECT group_id FROM group_members WHERE user_id = ${parseInt(userId)})
+            ) OR opponent_name IN (
+              SELECT u.name FROM users u JOIN group_members gm ON gm.user_id = u.id
+              JOIN groups g ON g.id = gm.group_id AND g.group_type = 'household'
+              WHERE gm.group_id IN (SELECT group_id FROM group_members WHERE user_id = ${parseInt(userId)})
+            ))))`
+        : '';
       const sql = `
-        WITH participants AS (
+        WITH scoped_rivalries AS (
+          SELECT * FROM rivalries ${groupFilter}
+        ),
+        participants AS (
           SELECT DISTINCT member_name FROM (
-            SELECT initiator_name AS member_name FROM rivalries
+            SELECT initiator_name AS member_name FROM scoped_rivalries
             UNION
-            SELECT opponent_name AS member_name FROM rivalries
+            SELECT opponent_name AS member_name FROM scoped_rivalries
           )
         )
         SELECT
           p.member_name,
-          (SELECT COUNT(*) FROM rivalries WHERE status = 'completed' AND (initiator_name = p.member_name OR opponent_name = p.member_name)) AS rivalries_completed,
-          (SELECT COUNT(*) FROM rivalries WHERE status = 'completed' AND winner_name = p.member_name) AS rivalries_won,
-          COALESCE((SELECT SUM(point_value) FROM rivalries WHERE status = 'completed' AND winner_name = p.member_name), 0) AS total_points
+          (SELECT COUNT(*) FROM scoped_rivalries WHERE status = 'completed' AND (initiator_name = p.member_name OR opponent_name = p.member_name)) AS rivalries_completed,
+          (SELECT COUNT(*) FROM scoped_rivalries WHERE status = 'completed' AND winner_name = p.member_name) AS rivalries_won,
+          COALESCE((SELECT SUM(point_value) FROM scoped_rivalries WHERE status = 'completed' AND winner_name = p.member_name), 0) AS total_points
         FROM participants p
         ORDER BY total_points DESC, rivalries_won DESC, p.member_name ASC
       `;
@@ -1355,13 +1542,23 @@ class FamilyDB {
           0 as reaction_count, 0 as comment_count, cr.requester_id as author_id, NULL as group_id, NULL as group_name
         FROM coverage_requests cr
         LEFT JOIN users u ON u.id = cr.requester_id
-        WHERE cr.status IN ('pending', 'approved')
+        WHERE cr.status IN ('pending', 'approved')${uid ? `
+          AND cr.requester_id IN (
+            SELECT gm2.user_id FROM group_members gm2
+            JOIN groups g2 ON g2.id = gm2.group_id AND g2.group_type = 'household'
+            WHERE gm2.group_id IN (SELECT group_id FROM group_members WHERE user_id = ${uid})
+          )` : ''}
         UNION ALL
         SELECT 'rivalry' as feed_type, id as ref_id, title, challenge_type as body,
           initiator_name as author, status,
           created_at,
           0 as reaction_count, 0 as comment_count, NULL as author_id, NULL as group_id, NULL as group_name
-        FROM rivalries WHERE status = 'active' AND created_at >= datetime('now', '-14 days')
+        FROM rivalries WHERE status = 'active' AND created_at >= datetime('now', '-14 days')${uid ? `
+          AND (group_id IN (${myGroups})
+            OR (group_id IS NULL AND (
+              initiator_name IN (${myHouseholdMembers})
+              OR opponent_name IN (${myHouseholdMembers})
+            )))` : ''}
         UNION ALL
         SELECT 'post' as feed_type, fp.id as ref_id, fp.title, fp.body,
           COALESCE(u.name, u.username, 'Family') as author, fp.post_type as status,
@@ -1411,12 +1608,15 @@ class FamilyDB {
     });
   }
 
-  getDailySummary() {
+  getDailySummary(userId = null) {
     return new Promise((resolve, reject) => {
+      const groupFilter = userId
+        ? `AND group_id IN (SELECT group_id FROM group_members WHERE user_id = ${parseInt(userId)})`
+        : '';
       const sql = `
-        SELECT 
+        SELECT
           (SELECT COUNT(*) FROM tasks WHERE status = 'active' AND date(due_date) = date('now')) as tasks_today,
-          (SELECT COUNT(*) FROM appointments WHERE date(appointment_date) = date('now')) as appointments_today,
+          (SELECT COUNT(*) FROM appointments WHERE date(appointment_date) = date('now') ${groupFilter}) as appointments_today,
           (SELECT COUNT(*) FROM groceries WHERE status = 'needed') as groceries_needed,
           (SELECT COUNT(*) FROM tasks WHERE status = 'active' AND due_date < date('now')) as overdue_tasks
       `;
