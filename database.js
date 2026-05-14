@@ -1373,6 +1373,7 @@ class FamilyDB {
         LEFT JOIN users u ON u.id = fp.author_id
         LEFT JOIN groups g ON g.id = fp.group_id
         WHERE fp.group_id IN (${myGroups})
+          AND fp.post_type != 'text'
         UNION ALL
         SELECT 'comment' as feed_type, fc.post_id as ref_id,
           (SELECT title FROM feed_posts WHERE id = fc.post_id) as title,
@@ -1387,6 +1388,7 @@ class FamilyDB {
         LEFT JOIN groups g2 ON g2.id = fp2.group_id
         WHERE fc.created_at >= datetime('now', '-7 days')
           AND fp2.group_id IN (${myGroups})
+          AND fp2.post_type != 'text'
         UNION ALL
         SELECT 'reaction' as feed_type, fr.post_id as ref_id,
           (SELECT title FROM feed_posts WHERE id = fr.post_id) as title,
@@ -1400,6 +1402,7 @@ class FamilyDB {
         LEFT JOIN feed_posts fp3 ON fp3.id = fr.post_id
         LEFT JOIN groups g3 ON g3.id = fp3.group_id
         WHERE fr.created_at >= datetime('now', '-7 days')
+          AND fp3.post_type != 'text'
           AND fp3.group_id IN (${myGroups})
         ORDER BY created_at DESC
         LIMIT ?
