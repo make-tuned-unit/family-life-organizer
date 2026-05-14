@@ -4,6 +4,7 @@ const bodyParser = require('body-parser');
 const bcrypt = require('bcryptjs');
 const path = require('path');
 const FamilyDB = require('./database');
+const push = require('./push');
 
 const app = express();
 const PORT = process.env.PORT || 3456;
@@ -127,6 +128,21 @@ app.post('/api/auth/login', async (req, res) => {
     }
 
     res.status(401).json({ error: 'Invalid credentials' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+// Register device token for push notifications
+app.post('/api/auth/device-token', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const { token } = req.body;
+    if (!token) return res.status(400).json({ error: 'Token required' });
+    await db.saveDeviceToken(req.session.user.id, token);
+    res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
   } finally {
@@ -1927,11 +1943,17 @@ app.post('/api/decisions', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
     const data = { ...req.body };
+    const userId = req.session.user.id;
+    const senderName = req.session.user.name;
     if (!data.group_id) {
-      data.group_id = await db.getUserHouseholdId(req.session.user.id);
+      data.group_id = await db.getUserHouseholdId(userId);
     }
     const result = await db.addDecision(data);
     res.json({ success: true, id: result.id });
+    // Push to household members
+    if (data.group_id) {
+      push.pushToGroup(db, data.group_id, userId, `${senderName} needs your input`, data.title || 'New decision', { type: 'decision' });
+    }
   } catch (err) {
     res.status(500).json({ error: err.message });
   } finally {
@@ -2428,8 +2450,13 @@ app.post('/api/groups/:id/feed', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
     const userId = req.session.user?.id;
-    const result = await db.addFeedPost({ ...req.body, group_id: req.params.id, author_id: userId });
+    const senderName = req.session.user?.name;
+    const groupId = parseInt(req.params.id);
+    const result = await db.addFeedPost({ ...req.body, group_id: groupId, author_id: userId });
     res.json({ success: true, id: result.id });
+    // Push to group members (fire-and-forget)
+    const preview = req.body.title || req.body.body || 'New post';
+    push.pushToGroup(db, groupId, userId, senderName, preview, { type: 'feed', group_id: groupId });
   } catch (err) {
     res.status(500).json({ error: err.message });
   } finally {
@@ -2633,8 +2660,10 @@ app.get('/api/messages/:partnerId/:messageId/image', requireAuth, async (req, re
 app.post('/api/messages', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
+    const senderId = req.session.user.id;
+    const senderName = req.session.user.name;
     const result = await db.sendMessage({
-      sender_id: req.session.user.id,
+      sender_id: senderId,
       recipient_id: req.body.recipient_id,
       text: req.body.text,
       reference_type: req.body.reference_type,
@@ -2643,6 +2672,9 @@ app.post('/api/messages', requireAuth, async (req, res) => {
       image_data: req.body.image_data
     });
     res.json({ success: true, id: result.id });
+    // Push notification to recipient (fire-and-forget)
+    const text = req.body.image_data ? 'Sent a photo' : (req.body.text || '');
+    push.pushToUser(db, req.body.recipient_id, senderName, text, { type: 'message', sender_id: senderId });
   } catch (err) { res.status(500).json({ error: err.message }); }
   finally { db.close(); }
 });
