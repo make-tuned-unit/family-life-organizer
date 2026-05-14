@@ -51,8 +51,10 @@ struct ProfileAvatar: View {
                 .resizable()
                 .scaledToFill()
                 .frame(width: size, height: size)
+                .contentShape(Circle())
                 .clipShape(Circle())
                 .overlay { Circle().stroke(AccentTheme.sage.color, lineWidth: 3) }
+                .aspectRatio(1, contentMode: .fit)
         } else {
             FamilyAvatar(
                 initial: String(auth.currentUser?.name.prefix(1) ?? "?").uppercased(),
