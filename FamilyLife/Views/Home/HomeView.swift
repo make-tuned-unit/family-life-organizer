@@ -11,6 +11,7 @@ struct HomeView: View {
     @State private var showingNewPost = false
     @State private var showingSettings = false
     @State private var presenceMembers: [APIService.PresenceMember] = []
+    @State private var feedFilterGroupId: Int? = nil // nil = All
     @State private var selectedFeedEvent: AppointmentResponse?
     @State private var selectedFeedRivalry: RivalryResponse?
 
@@ -417,13 +418,69 @@ struct HomeView: View {
 
     // MARK: - Activity Feed
 
+    /// Unique groups found in the feed for the filter dropdown
+    private var feedGroups: [(id: Int, name: String)] {
+        var seen = Set<Int>()
+        var result: [(id: Int, name: String)] = []
+        for item in viewModel.activityFeed {
+            if let gid = item.item.group_id, let gname = item.item.group_name, !seen.contains(gid) {
+                seen.insert(gid)
+                result.append((id: gid, name: gname))
+            }
+        }
+        return result.sorted { $0.name < $1.name }
+    }
+
+    private var filteredFeed: [PreparedFeedItem] {
+        guard let filterId = feedFilterGroupId else { return viewModel.activityFeed }
+        return viewModel.activityFeed.filter { $0.item.group_id == filterId || $0.item.group_id == nil }
+    }
+
     @ViewBuilder
     private var activityFeedSection: some View {
         if !viewModel.activityFeed.isEmpty {
-            WarmSectionHeader(title: "Feed")
-                .padding(.bottom, 8)
+            // Feed header with group filter
+            HStack {
+                Text("Feed")
+                    .font(.system(size: 17, weight: .bold))
+                    .foregroundStyle(WarmPalette.ink1)
+                Spacer()
+                Menu {
+                    Button {
+                        feedFilterGroupId = nil
+                    } label: {
+                        HStack {
+                            Text("All")
+                            if feedFilterGroupId == nil { Image(systemName: "checkmark") }
+                        }
+                    }
+                    ForEach(feedGroups, id: \.id) { group in
+                        Button {
+                            feedFilterGroupId = group.id
+                        } label: {
+                            HStack {
+                                Text(group.name)
+                                if feedFilterGroupId == group.id { Image(systemName: "checkmark") }
+                            }
+                        }
+                    }
+                } label: {
+                    HStack(spacing: 4) {
+                        Text(feedFilterGroupId.flatMap { fid in feedGroups.first { $0.id == fid }?.name } ?? "All")
+                            .font(.system(size: 13, weight: .medium))
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 10, weight: .semibold))
+                    }
+                    .foregroundStyle(TabAccent.home.color)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(WarmPalette.cardSurface, in: Capsule())
+                }
+            }
+            .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
+            .padding(.bottom, 8)
 
-            let visible = viewModel.activityFeed.prefix(viewModel.visibleFeedCount)
+            let visible = filteredFeed.prefix(viewModel.visibleFeedCount)
             ForEach(visible) { prepared in
                 FeedCard(
                     prepared: prepared,
@@ -436,7 +493,7 @@ struct HomeView: View {
                 .padding(.bottom, 10)
             }
 
-            if viewModel.activityFeed.count > viewModel.visibleFeedCount {
+            if filteredFeed.count > viewModel.visibleFeedCount {
                 Button {
                     withAnimation(.spring(response: 0.3)) {
                         viewModel.visibleFeedCount += 15
