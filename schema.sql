@@ -324,6 +324,13 @@ CREATE TABLE IF NOT EXISTS users (
     phone TEXT,
     avatar TEXT,
     profile_image TEXT,
+    work_address TEXT,
+    work_lat REAL,
+    work_lng REAL,
+    last_lat REAL,
+    last_lng REAL,
+    last_location_name TEXT,
+    last_location_at DATETIME,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 

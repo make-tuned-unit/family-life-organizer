@@ -40,6 +40,7 @@ struct MainTabView: View {
     @State private var showingChat = false
     @State private var chatInitialThread: ChatSheet.ChatThread?
     @State private var unreadCount = 0
+    @State private var locationService = LocationService()
 
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -101,6 +102,7 @@ struct MainTabView: View {
     }
 
     private func pollUnread() async {
+        var locationReportCounter = 0
         while !Task.isCancelled {
             // Update badge count
             unreadCount = (try? await api.fetchUnreadMessageCount()) ?? 0
@@ -116,6 +118,15 @@ struct MainTabView: View {
                         feed,
                         currentUser: currentUser
                     )
+                }
+            }
+
+            // Report location every ~5 minutes (every 20th poll cycle)
+            locationReportCounter += 1
+            if locationReportCounter >= 20 {
+                locationReportCounter = 0
+                if let coord = await locationService.getCurrentLocation() {
+                    _ = try? await api.reportLocation(lat: coord.latitude, lng: coord.longitude)
                 }
             }
 
