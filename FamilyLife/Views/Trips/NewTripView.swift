@@ -8,50 +8,41 @@ struct NewTripView: View {
     @Environment(HouseholdService.self) private var household
     @State private var locationService = LocationService()
 
-    @State private var traveler = ""
     @State private var destination = ""
     @State private var purpose = ""
     @State private var selectedAddress: FamilyAddressResponse?
     @State private var familyAddresses: [FamilyAddressResponse] = []
-    @State private var etaMinutes = 30
+    @State private var etaMinutes: Int?
+    @State private var isCalculatingETA = false
     @State private var notifyPercent = 10
     @State private var error: String?
     @State private var locationCompleter = LocationCompleter()
     @State private var showingLocationSuggestions = false
     @State private var isSelectingSavedAddress = false
+    @State private var shareGroupId: Int?
 
     let onSave: ([String: Any]) -> Void
-
-    private var travelerNames: [String] {
-        let me = auth.currentUser?.name ?? "Me"
-        let myUsername = auth.currentUser?.username ?? ""
-        var names = [me]
-        for member in household.members {
-            guard member.name.localizedCaseInsensitiveCompare(me) != .orderedSame,
-                  member.name.localizedCaseInsensitiveCompare(myUsername) != .orderedSame else { continue }
-            guard !names.contains(where: { $0.localizedCaseInsensitiveCompare(member.name) == .orderedSame }) else { continue }
-            names.append(member.name)
-        }
-        return names
-    }
 
     var body: some View {
         NavigationStack {
             Form {
-                Section("Who's traveling?") {
-                    Picker("Traveler", selection: $traveler) {
-                        ForEach(travelerNames, id: \.self) { Text($0) }
+                Section {
+                    HStack(spacing: 12) {
+                        ProfileAvatar(size: 36)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(auth.currentUser?.name ?? "Me")
+                                .font(.system(size: 15, weight: .semibold))
+                            Text("Starting a trip")
+                                .font(.system(size: 12))
+                                .foregroundStyle(WarmPalette.ink3)
+                        }
                     }
-                    .pickerStyle(.segmented)
                 }
 
-                Section("Destination") {
-                    // Saved addresses — single tap selects
+                Section("Where to?") {
                     if !familyAddresses.isEmpty {
                         ForEach(familyAddresses) { addr in
-                            Button {
-                                selectSavedAddress(addr)
-                            } label: {
+                            Button { selectSavedAddress(addr) } label: {
                                 HStack {
                                     VStack(alignment: .leading) {
                                         Text(addr.name)
@@ -73,9 +64,8 @@ struct NewTripView: View {
                         }
                     }
 
-                    // Search field — only shows when no saved address is selected
                     if selectedAddress == nil {
-                        TextField("Or search for a place...", text: $destination)
+                        TextField("Search for a place...", text: $destination)
                             .onChange(of: destination) {
                                 guard !isSelectingSavedAddress else { return }
                                 locationCompleter.search(query: destination)
@@ -85,8 +75,10 @@ struct NewTripView: View {
                         if showingLocationSuggestions && !locationCompleter.results.isEmpty {
                             ForEach(locationCompleter.results, id: \.self) { result in
                                 Button {
-                                    destination = [result.title, result.subtitle].filter { !$0.isEmpty }.joined(separator: ", ")
+                                    let full = [result.title, result.subtitle].filter { !$0.isEmpty }.joined(separator: ", ")
+                                    destination = full
                                     showingLocationSuggestions = false
+                                    resolveAndCalculateETA(for: result)
                                 } label: {
                                     VStack(alignment: .leading, spacing: 2) {
                                         Text(result.title)
@@ -105,6 +97,7 @@ struct NewTripView: View {
                         Button {
                             selectedAddress = nil
                             destination = ""
+                            etaMinutes = nil
                         } label: {
                             Label("Change destination", systemImage: "arrow.triangle.2.circlepath")
                                 .font(.caption)
@@ -113,10 +106,31 @@ struct NewTripView: View {
                     }
                 }
 
-                Section("Details") {
-                    TextField("Purpose (optional)", text: $purpose)
-
-                    Stepper("ETA: \(etaMinutes) min", value: $etaMinutes, in: 5...480, step: 5)
+                Section("ETA") {
+                    if isCalculatingETA {
+                        HStack {
+                            ProgressView()
+                                .scaleEffect(0.8)
+                            Text("Calculating route...")
+                                .font(.system(size: 14))
+                                .foregroundStyle(WarmPalette.ink3)
+                        }
+                    } else if let eta = etaMinutes {
+                        HStack {
+                            Image(systemName: "car.fill")
+                                .foregroundStyle(TabAccent.home.color)
+                            Text("\(eta) min drive")
+                                .font(.system(size: 15, weight: .semibold))
+                            Spacer()
+                            Text("via Apple Maps")
+                                .font(.system(size: 11))
+                                .foregroundStyle(WarmPalette.ink4)
+                        }
+                    } else {
+                        Text("Select a destination to calculate ETA")
+                            .font(.system(size: 13))
+                            .foregroundStyle(WarmPalette.ink4)
+                    }
 
                     Picker("Notify when", selection: $notifyPercent) {
                         Text("10% away").tag(10)
@@ -126,15 +140,21 @@ struct NewTripView: View {
                         Text("15 min away").tag(-15)
                     }
                 }
+
+                Section("Details") {
+                    TextField("Purpose (optional)", text: $purpose)
+                }
+
+                ShareWithSection(selectedGroupId: $shareGroupId)
             }
             .scrollContentBackground(.hidden)
             .background { AmbientBackground(style: .trips) }
             .navigationTitle("Start Trip")
             .navigationBarTitleDisplayMode(.inline)
-            .alert("Couldn't load trip setup", isPresented: errorAlertIsPresented) {
+            .alert("Something went wrong", isPresented: errorAlertIsPresented) {
                 Button("OK") { error = nil }
             } message: {
-                Text(error ?? "An unexpected error occurred.")
+                Text(error ?? "")
             }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -151,9 +171,6 @@ struct NewTripView: View {
             .task {
                 await loadAddresses()
                 locationService.requestPermission()
-                if traveler.isEmpty {
-                    traveler = auth.currentUser?.name ?? "Me"
-                }
             }
         }
     }
@@ -163,9 +180,40 @@ struct NewTripView: View {
         selectedAddress = addr
         destination = addr.name
         showingLocationSuggestions = false
-        // Reset flag after onChange fires
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
             isSelectingSavedAddress = false
+        }
+        calculateETA(to: CLLocationCoordinate2D(latitude: addr.lat, longitude: addr.lng))
+    }
+
+    private func resolveAndCalculateETA(for completion: MKLocalSearchCompletion) {
+        let request = MKLocalSearch.Request(completion: completion)
+        let search = MKLocalSearch(request: request)
+        search.start { response, _ in
+            guard let item = response?.mapItems.first else { return }
+            calculateETA(to: item.placemark.coordinate)
+        }
+    }
+
+    private func calculateETA(to destCoord: CLLocationCoordinate2D) {
+        isCalculatingETA = true
+        let request = MKDirections.Request()
+
+        if let loc = locationService.currentLocation {
+            request.source = MKMapItem(placemark: MKPlacemark(coordinate: loc))
+        } else {
+            request.source = MKMapItem.forCurrentLocation()
+        }
+
+        request.destination = MKMapItem(placemark: MKPlacemark(coordinate: destCoord))
+        request.transportType = .automobile
+
+        let directions = MKDirections(request: request)
+        directions.calculateETA { response, _ in
+            isCalculatingETA = false
+            if let eta = response {
+                etaMinutes = max(1, Int(eta.expectedTravelTime / 60))
+            }
         }
     }
 
@@ -173,7 +221,6 @@ struct NewTripView: View {
         do {
             familyAddresses = try await api.fetchFamilyAddresses()
         } catch {
-            // Silently handle auth errors — silent re-login will retry
             guard !error.isCancellation, !(error is APIError) else { return }
             self.error = error.localizedDescription
         }
@@ -181,9 +228,9 @@ struct NewTripView: View {
 
     private func startTrip() {
         var data: [String: Any] = [
-            "traveler": traveler.lowercased(),
+            "traveler": (auth.currentUser?.name ?? "Me").lowercased(),
             "destination": selectedAddress?.name ?? destination,
-            "eta_minutes": etaMinutes,
+            "eta_minutes": etaMinutes ?? 30,
             "notify_percent": notifyPercent
         ]
         if !purpose.isEmpty { data["purpose"] = purpose }
@@ -196,13 +243,23 @@ struct NewTripView: View {
             data["origin_lng"] = loc.longitude
         }
         onSave(data)
+
+        // Cross-post to group if selected
+        if let groupId = shareGroupId {
+            let dest = selectedAddress?.name ?? destination
+            let etaStr = etaMinutes.map { "\($0) min" } ?? ""
+            Task {
+                _ = try? await api.addFeedPost(groupId: groupId, data: [
+                    "post_type": "event",
+                    "title": "On my way to \(dest)",
+                    "body": "\(auth.currentUser?.name ?? "Someone") is heading to \(dest)\(!etaStr.isEmpty ? " — ETA \(etaStr)" : "")"
+                ])
+            }
+        }
     }
 
     private var errorAlertIsPresented: Binding<Bool> {
-        Binding(
-            get: { error != nil },
-            set: { if !$0 { error = nil } }
-        )
+        Binding(get: { error != nil }, set: { if !$0 { error = nil } })
     }
 }
 
