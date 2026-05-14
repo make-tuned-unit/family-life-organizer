@@ -520,6 +520,19 @@ CREATE INDEX IF NOT EXISTS idx_appointments_date ON appointments(appointment_dat
 CREATE INDEX IF NOT EXISTS idx_receipts_date ON receipts(date);
 CREATE INDEX IF NOT EXISTS idx_receipts_category ON receipts(category);
 
+-- Device tokens for APNs push notifications
+CREATE TABLE IF NOT EXISTS device_tokens (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    token TEXT NOT NULL UNIQUE,
+    platform TEXT DEFAULT 'ios',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_device_tokens_user ON device_tokens(user_id);
+
 -- Direct messages
 CREATE TABLE IF NOT EXISTS direct_messages (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

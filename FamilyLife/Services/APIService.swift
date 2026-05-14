@@ -452,6 +452,10 @@ final class APIService {
         try await post("/api/groups/join", body: ["invite_code": inviteCode])
     }
 
+    func registerDeviceToken(_ token: String) async throws {
+        let _: SuccessResponse = try await post("/api/auth/device-token", body: ["token": token])
+    }
+
     func fetchGroupMembers(groupId: Int) async throws -> [GroupMemberResponse] {
         try await get("/api/groups/\(groupId)/members")
     }
