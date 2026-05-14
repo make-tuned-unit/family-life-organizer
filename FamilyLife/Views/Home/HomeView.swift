@@ -12,9 +12,6 @@ struct HomeView: View {
     @State private var showingSettings = false
     @State private var selectedFeedEvent: AppointmentResponse?
     @State private var selectedFeedRivalry: RivalryResponse?
-    @State private var showingChat = false
-    @State private var chatInitialThread: ChatSheet.ChatThread?
-    @State private var unreadCount = 0
 
     private var greeting: String {
         let hour = Calendar.current.component(.hour, from: Date())
@@ -127,39 +124,10 @@ struct HomeView: View {
                     }
             }
         }
-        .overlay(alignment: .bottomTrailing) {
+        .overlay(alignment: .center) {
             if viewModel.isLoading && viewModel.summary == nil {
                 ProgressView()
-            } else {
-                // Floating chat button
-                Button { showingChat = true } label: {
-                    ZStack(alignment: .topTrailing) {
-                        Image(systemName: "bubble.left.and.text.bubble.right.fill")
-                            .font(.system(size: 20))
-                            .foregroundStyle(.white)
-                            .frame(width: 52, height: 52)
-                            .background(TabAccent.home.color, in: Circle())
-                            .shadow(color: .black.opacity(0.15), radius: 8, y: 4)
-
-                        if unreadCount > 0 {
-                            Text("\(unreadCount)")
-                                .font(.system(size: 10, weight: .bold))
-                                .foregroundStyle(.white)
-                                .frame(minWidth: 18, minHeight: 18)
-                                .background(AccentTheme.rose.color, in: Circle())
-                                .offset(x: 4, y: -4)
-                        }
-                    }
-                }
-                .padding(.trailing, 20)
-                .padding(.bottom, 80)
             }
-        }
-        .sheet(isPresented: $showingChat) {
-            ChatSheet(initialThread: chatInitialThread)
-        }
-        .onChange(of: showingChat) { _, showing in
-            if !showing { chatInitialThread = nil }
         }
         .alert("Something went wrong", isPresented: errorAlertIsPresented) {
             Button("OK") {
@@ -193,12 +161,9 @@ struct HomeView: View {
     private func checkMessageNotifications() async {
         do {
             let convos = try await api.fetchConversations()
-            unreadCount = convos.reduce(0) { $0 + $1.unread_count }
             guard await NotificationService.shared.isAuthorized() else { return }
             NotificationService.shared.checkForNewMessages(convos)
-        } catch {
-            unreadCount = (try? await api.fetchUnreadMessageCount()) ?? 0
-        }
+        } catch {}
     }
 
     private func openFeedEvent(id: Int) async {
@@ -442,11 +407,7 @@ struct HomeView: View {
                     selectedTab: $selectedTab,
                     onEventTap: { eventId in Task { await openFeedEvent(id: eventId) } },
                     onRivalryTap: { rivalryId in Task { await openFeedRivalry(id: rivalryId) } },
-                    onCoverageTap: { selectedTab = .calendar },
-                    onGroupTap: { group in
-                        chatInitialThread = .group(groupId: group.id, name: group.name)
-                        showingChat = true
-                    }
+                    onCoverageTap: { selectedTab = .calendar }
                 )
                 .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
                 .padding(.bottom, 10)
