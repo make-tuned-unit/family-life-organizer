@@ -395,10 +395,11 @@ app.get('/logout', (req, res) => {
 app.get('/', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
-    const summary = await db.getDailySummary();
+    const userId = req.session.user?.id;
+    const summary = await db.getDailySummary(userId);
     const groceries = await db.getGroceries('needed');
     const tasks = await db.getTasks({ status: 'active' });
-    const appointments = await db.getAppointments();
+    const appointments = await db.getAppointments({}, userId);
     const tasksByCategory = {};
     tasks.forEach(task => {
       if (!tasksByCategory[task.category]) tasksByCategory[task.category] = [];
@@ -1219,7 +1220,8 @@ app.post('/api/complete', requireAuth, async (req, res) => {
 app.get('/api/data', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
-    const summary = await db.getDailySummary();
+    const userId = req.session.user?.id;
+    const summary = await db.getDailySummary(userId);
     const groceries = await db.getGroceries('needed');
     res.json({ summary, groceries });
   } catch (err) {
@@ -1234,6 +1236,9 @@ app.post('/api/appointments', requireAuth, async (req, res) => {
   try {
     const data = { ...req.body };
     if (data.appointment_date) data.appointment_date = normalizeDate(data.appointment_date);
+    if (!data.group_id) {
+      data.group_id = await db.getUserHouseholdId(req.session.user.id);
+    }
     await db.addAppointment(data);
     res.json({ success: true });
   } catch (err) {
@@ -1270,7 +1275,7 @@ app.get('/api/appointments', requireAuth, async (req, res) => {
     if (req.query.date_from) filters.date_from = req.query.date_from;
     if (req.query.date_to) filters.date_to = req.query.date_to;
     if (req.query.person) filters.person = req.query.person;
-    const appointments = await db.getAppointments(filters);
+    const appointments = await db.getAppointments(filters, req.session.user.id);
     res.json(appointments);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -1285,12 +1290,13 @@ app.get('/api/appointments/:year/:month', requireAuth, async (req, res) => {
   try {
     const year = parseInt(req.params.year);
     const month = parseInt(req.params.month);
-    const appointments = await db.getAppointmentsByMonth(year, month);
+    const userId = req.session.user.id;
+    const appointments = await db.getAppointmentsByMonth(year, month, userId);
 
     // Expand recurring events into the queried month
     const rangeStart = new Date(year, month - 1, 1);
     const rangeEnd = new Date(month === 12 ? year + 1 : year, month === 12 ? 0 : month, 1);
-    const recurring = await db.getRecurringAppointments();
+    const recurring = await db.getRecurringAppointments(userId);
     for (const appt of recurring) {
       const originDate = new Date(appt.appointment_date + 'T00:00:00');
       if (originDate >= rangeStart && originDate < rangeEnd) continue; // already in results
@@ -1908,7 +1914,7 @@ app.delete('/api/addresses/:id', requireAuth, async (req, res) => {
 app.get('/api/decisions', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
-    const decisions = await db.getDecisions({ status: req.query.status });
+    const decisions = await db.getDecisions({ status: req.query.status }, req.session.user.id);
     res.json(decisions);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -1920,7 +1926,11 @@ app.get('/api/decisions', requireAuth, async (req, res) => {
 app.post('/api/decisions', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
-    const result = await db.addDecision(req.body);
+    const data = { ...req.body };
+    if (!data.group_id) {
+      data.group_id = await db.getUserHouseholdId(req.session.user.id);
+    }
+    const result = await db.addDecision(data);
     res.json({ success: true, id: result.id });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -2011,7 +2021,7 @@ app.post('/api/decisions/:id/comments', requireAuth, async (req, res) => {
 app.get('/api/rivalries', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
-    const rivalries = await db.getRivalries({ status: req.query.status });
+    const rivalries = await db.getRivalries({ status: req.query.status }, req.session.user.id);
     res.json(rivalries);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -2026,6 +2036,9 @@ app.post('/api/rivalries', requireAuth, async (req, res) => {
     const data = { ...req.body };
     if (data.start_date) data.start_date = normalizeDate(data.start_date);
     if (data.end_date) data.end_date = normalizeDate(data.end_date);
+    if (!data.group_id) {
+      data.group_id = await db.getUserHouseholdId(req.session.user.id);
+    }
     const result = await db.addRivalry(data);
     res.json({ success: true, id: result.id });
   } catch (err) {
@@ -2078,7 +2091,7 @@ app.post('/api/rivalries/:id/entries', requireAuth, async (req, res) => {
 app.get('/api/rivalries/leaderboard', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
-    const rows = await db.getRivalryLeaderboard();
+    const rows = await db.getRivalryLeaderboard(req.session.user.id);
     res.json(rows);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -2896,7 +2909,8 @@ async function initializeDatabase() {
   const db = new FamilyDB();
   try {
     await db.initSchema();
-    console.log('✅ Database initialized with full schema');
+    await db.runHouseholdMigrations();
+    console.log('✅ Database initialized with full schema + household isolation');
   } catch (err) {
     console.error('❌ Database init error:', err.message);
   } finally {
