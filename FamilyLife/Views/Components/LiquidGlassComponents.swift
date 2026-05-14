@@ -42,74 +42,29 @@ struct FamilyAvatar: View {
 
 // MARK: - Profile Avatar (current user only)
 
-struct ProfileAvatar: UIViewRepresentable {
+struct ProfileAvatar: View {
     @Environment(AuthService.self) private var auth
     var size: CGFloat = 32
 
-    func makeUIView(context: Context) -> UIImageView {
-        let iv = UIImageView()
-        iv.contentMode = .scaleAspectFit
-        iv.translatesAutoresizingMaskIntoConstraints = false
-        NSLayoutConstraint.activate([
-            iv.widthAnchor.constraint(equalToConstant: size),
-            iv.heightAnchor.constraint(equalToConstant: size)
-        ])
-        return iv
-    }
-
-    func updateUIView(_ iv: UIImageView, context: Context) {
-        if let source = auth.profileUIImage {
-            iv.image = Self.circularCrop(source, size: size, border: AccentTheme.sage.color)
-        } else {
-            iv.image = Self.initialImage(auth.currentUser?.name.prefix(1).uppercased() ?? "?", size: size)
+    var body: some View {
+        Group {
+            if let source = auth.profileUIImage {
+                Image(uiImage: source)
+                    .resizable()
+                    .scaledToFill()
+            } else {
+                Circle()
+                    .fill(Color.green.opacity(0.6))
+                    .overlay {
+                        Text(auth.currentUser?.name.prefix(1).uppercased() ?? "?")
+                            .font(.system(size: size * 0.42, weight: .bold))
+                            .foregroundStyle(.white)
+                    }
+            }
         }
-    }
-
-    private static func circularCrop(_ source: UIImage, size: CGFloat, border: Color) -> UIImage {
-        let s = UIScreen.main.scale
-        let total = size * s
-        let bw: CGFloat = 3 * s
-        let imgDiameter = total - bw * 2
-        let renderer = UIGraphicsImageRenderer(size: CGSize(width: total, height: total))
-        return renderer.image { ctx in
-            // Border circle
-            UIColor(border).setFill()
-            UIBezierPath(ovalIn: CGRect(x: 0, y: 0, width: total, height: total)).fill()
-
-            // Clip inner circle for photo
-            let inner = CGRect(x: bw, y: bw, width: imgDiameter, height: imgDiameter)
-            let clip = UIBezierPath(ovalIn: inner)
-            clip.addClip()
-
-            // Draw photo filling the inner circle
-            let aspect = source.size
-            let scale = max(imgDiameter / aspect.width, imgDiameter / aspect.height)
-            let drawW = aspect.width * scale
-            let drawH = aspect.height * scale
-            let drawRect = CGRect(
-                x: bw + (imgDiameter - drawW) / 2,
-                y: bw + (imgDiameter - drawH) / 2,
-                width: drawW, height: drawH
-            )
-            source.draw(in: drawRect)
-        }
-    }
-
-    private static func initialImage(_ letter: String, size: CGFloat) -> UIImage {
-        let s = UIScreen.main.scale
-        let total = size * s
-        let renderer = UIGraphicsImageRenderer(size: CGSize(width: total, height: total))
-        return renderer.image { ctx in
-            UIColor.systemGreen.withAlphaComponent(0.6).setFill()
-            UIBezierPath(ovalIn: CGRect(x: 0, y: 0, width: total, height: total)).fill()
-            let attrs: [NSAttributedString.Key: Any] = [
-                .font: UIFont.boldSystemFont(ofSize: total * 0.42),
-                .foregroundColor: UIColor.white
-            ]
-            let str = NSString(string: letter)
-            let sz = str.size(withAttributes: attrs)
-            str.draw(at: CGPoint(x: (total - sz.width) / 2, y: (total - sz.height) / 2), withAttributes: attrs)
-        }
+        .frame(width: size, height: size)
+        .clipShape(Circle())
+        .overlay(Circle().stroke(AccentTheme.sage.color, lineWidth: 2))
     }
 }
 
