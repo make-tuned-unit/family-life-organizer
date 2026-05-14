@@ -91,79 +91,127 @@ class FamilyDB {
     });
   }
 
-  // Merge legacy separate households and backfill group_id on unscoped records
+  // Ensure Jesse + Sophie share a "Fairbanks" household, fix any bad state
   runHouseholdMigrations() {
     return new Promise((resolve, reject) => {
-      // Step 1: Find all users and their household memberships
-      this.db.all(`
-        SELECT u.id as user_id, u.username, g.id as group_id, g.name as group_name
-        FROM users u
-        JOIN group_members gm ON gm.user_id = u.id
-        JOIN groups g ON g.id = gm.group_id AND g.group_type = 'household'
-        ORDER BY g.id ASC
-      `, (err, rows) => {
-        if (err) {
-          console.error('Migration query error:', err.message);
+      // Find jesse and sophie specifically
+      this.db.all("SELECT id, username, name FROM users WHERE username IN ('jesse', 'sophie')", (err, users) => {
+        if (err || !users || users.length === 0) {
+          console.log('Household migration: no jesse/sophie users found');
           return this._backfillGroupIds().then(resolve, reject);
         }
-        console.log('Household migration: found', rows?.length || 0, 'user-household pairs:', JSON.stringify(rows));
+        const jesse = users.find(u => u.username === 'jesse');
+        const sophie = users.find(u => u.username === 'sophie');
+        console.log('Found users:', JSON.stringify({ jesse, sophie }));
 
-        if (!rows || rows.length === 0) {
-          console.log('No household memberships found — skipping merge');
-          return this._backfillGroupIds().then(resolve, reject);
-        }
+        // Find their current household memberships
+        const userIds = [jesse?.id, sophie?.id].filter(Boolean);
+        this.db.all(`
+          SELECT gm.user_id, g.id as group_id, g.name as group_name
+          FROM group_members gm
+          JOIN groups g ON g.id = gm.group_id AND g.group_type = 'household'
+          WHERE gm.user_id IN (${userIds.join(',')})
+        `, (err2, memberships) => {
+          console.log('Current household memberships:', JSON.stringify(memberships));
 
-        const households = [...new Set(rows.map(r => r.group_id))];
-        if (households.length <= 1) {
-          // All users already in one household — ensure it's named Fairbanks
-          const keepId = households[0];
-          console.log(`All users in household ${keepId} — ensuring name is Fairbanks`);
-          this.db.run("UPDATE groups SET name = 'Fairbanks' WHERE id = ?", [keepId], () => {
-            this._backfillGroupIds().then(resolve, reject);
-          });
-          return;
-        }
+          this.db.serialize(() => {
+            let householdId = null;
 
-        // Multiple households exist — merge into the first one
-        const keepId = households[0];
-        const removeIds = households.slice(1);
-        const allUserIds = [...new Set(rows.map(r => r.user_id))];
-        console.log(`Merging households ${JSON.stringify(households)} into ${keepId}, users: ${JSON.stringify(allUserIds)}`);
+            // Find or determine the household to use
+            const jesseHH = memberships?.find(m => m.user_id === jesse?.id);
+            const sophieHH = memberships?.find(m => m.user_id === sophie?.id);
 
-        this.db.serialize(() => {
-          // Ensure ALL users are in the kept household
-          for (const uid of allUserIds) {
-            this.db.run(`INSERT INTO group_members (group_id, user_id, role, added_by)
-              SELECT ?, ?, 'admin', ? WHERE NOT EXISTS (
-                SELECT 1 FROM group_members WHERE group_id = ? AND user_id = ?
-              )`, [keepId, uid, uid, keepId, uid]);
-          }
-          // Remove users from old households
-          for (const oldId of removeIds) {
-            this.db.run('DELETE FROM group_members WHERE group_id = ? AND user_id IS NOT NULL', [oldId]);
-          }
-          // Rename to Fairbanks
-          this.db.run("UPDATE groups SET name = 'Fairbanks' WHERE id = ?", [keepId], () => {
-            console.log(`✅ Merged into Fairbanks (group ${keepId})`);
-            this._backfillGroupIds().then(resolve, reject);
+            if (jesseHH) {
+              householdId = jesseHH.group_id;
+            } else if (sophieHH) {
+              householdId = sophieHH.group_id;
+            }
+
+            if (householdId) {
+              console.log(`Using existing household ${householdId}`);
+              // Ensure both jesse and sophie are in this household
+              for (const uid of userIds) {
+                this.db.run(`INSERT INTO group_members (group_id, user_id, role, added_by)
+                  SELECT ?, ?, 'admin', ? WHERE NOT EXISTS (
+                    SELECT 1 FROM group_members WHERE group_id = ? AND user_id = ?
+                  )`, [householdId, uid, uid, householdId, uid]);
+              }
+              // Remove jesse/sophie from any OTHER household groups
+              this.db.run(`DELETE FROM group_members WHERE user_id IN (${userIds.join(',')})
+                AND group_id != ? AND group_id IN (SELECT id FROM groups WHERE group_type = 'household')`,
+                [householdId]);
+              // Rename to Fairbanks
+              this.db.run("UPDATE groups SET name = 'Fairbanks' WHERE id = ?", [householdId], () => {
+                console.log(`✅ Fairbanks household = group ${householdId} with users ${userIds}`);
+                // Restore any non-jesse/sophie users removed from wrong merges back to their households
+                this._restoreOtherHouseholds().then(() => {
+                  this._backfillGroupIds().then(resolve, reject);
+                });
+              });
+            } else {
+              // Neither has a household — create one
+              console.log('Creating new Fairbanks household');
+              this.db.run("INSERT INTO groups (name, group_type, invite_code, created_by) VALUES ('Fairbanks', 'household', ?, ?)",
+                [Math.random().toString(36).substring(2, 8).toUpperCase(), jesse?.id || userIds[0]], function() {
+                  const newId = this.lastID;
+                  for (const uid of userIds) {
+                    this.db.run(`INSERT INTO group_members (group_id, user_id, role, added_by) VALUES (?, ?, 'admin', ?)`,
+                      [newId, uid, uid]);
+                  }
+                  console.log(`✅ Created Fairbanks household = group ${newId}`);
+                  this._backfillGroupIds().then(resolve, reject);
+                }.bind(this));
+            }
           });
         });
       });
     });
   }
 
-  // Backfill group_id — runs EVERY startup, reassigns ALL records to correct household
+  // Ensure non-jesse/sophie users are back in their own households
+  _restoreOtherHouseholds() {
+    return new Promise((resolve) => {
+      // Find users not in any household and restore them
+      this.db.all(`
+        SELECT u.id, u.username, g.id as old_group_id, g.name as old_group_name
+        FROM users u
+        JOIN groups g ON g.created_by = u.id AND g.group_type = 'household'
+        WHERE u.username NOT IN ('jesse', 'sophie')
+        AND NOT EXISTS (
+          SELECT 1 FROM group_members gm
+          JOIN groups g2 ON g2.id = gm.group_id AND g2.group_type = 'household'
+          WHERE gm.user_id = u.id
+        )
+      `, (err, orphans) => {
+        if (!orphans || orphans.length === 0) return resolve();
+        console.log('Restoring orphaned users to their households:', JSON.stringify(orphans));
+        let pending = orphans.length;
+        for (const orphan of orphans) {
+          this.db.run(`INSERT INTO group_members (group_id, user_id, role, added_by)
+            SELECT ?, ?, 'admin', ? WHERE NOT EXISTS (
+              SELECT 1 FROM group_members WHERE group_id = ? AND user_id = ?
+            )`, [orphan.old_group_id, orphan.id, orphan.id, orphan.old_group_id, orphan.id], () => {
+              pending--;
+              if (pending === 0) resolve();
+            });
+        }
+      });
+    });
+  }
+
+  // Backfill group_id — runs EVERY startup, reassigns ALL records to jesse+sophie's household
   _backfillGroupIds() {
     return new Promise((resolve, reject) => {
-      // Find the primary household (first one with user members)
+      // Find the Fairbanks household (jesse+sophie's household)
       this.db.get(`
         SELECT g.id FROM groups g
-        JOIN group_members gm ON gm.group_id = g.id AND gm.user_id IS NOT NULL
+        JOIN group_members gm ON gm.group_id = g.id
+        JOIN users u ON u.id = gm.user_id AND u.username = 'jesse'
         WHERE g.group_type = 'household'
-        ORDER BY g.id LIMIT 1
+        LIMIT 1
       `, (err, hhRow) => {
         const householdId = hhRow?.id;
-        console.log(`Backfill: primary household = ${householdId}`);
+        console.log(`Backfill: jesse's household = ${householdId}`);
         if (!householdId) return resolve();
 
         this.db.serialize(() => {
