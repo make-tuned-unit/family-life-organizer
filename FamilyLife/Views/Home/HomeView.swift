@@ -309,46 +309,54 @@ struct HomeView: View {
     @ViewBuilder
     private var heroFocusCard: some View {
         if let appt = viewModel.todayAppointments.first {
-            VStack(alignment: .leading, spacing: 14) {
-                HStack {
-                    Text("TODAY'S FOCUS")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(TabAccent.home.color)
-                    Spacer()
-                    if let time = appt.appointment_time {
-                        Text(time)
-                            .font(.system(size: 13))
-                            .foregroundStyle(WarmPalette.ink3)
-                    }
+            heroCard(appt, label: "TODAY'S FOCUS", subtitle: appt.appointment_time, showDismiss: true)
+        } else if let appt = viewModel.nextAppointment {
+            heroCard(appt, label: "NEXT EVENT", subtitle: Self.friendlyDate(appt.appointment_date, time: appt.appointment_time), showDismiss: false)
+        }
+    }
+
+    private func heroCard(_ appt: AppointmentResponse, label: String, subtitle: String?, showDismiss: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack {
+                Text(label)
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(TabAccent.home.color)
+                Spacer()
+                if let subtitle {
+                    Text(subtitle)
+                        .font(.system(size: 13))
+                        .foregroundStyle(WarmPalette.ink3)
                 }
+            }
 
-                Text(appt.title)
-                    .font(.system(size: 28, weight: .bold))
-                    .foregroundStyle(WarmPalette.ink1)
+            Text(appt.title)
+                .font(.system(size: 28, weight: .bold))
+                .foregroundStyle(WarmPalette.ink1)
 
+            if let location = appt.location, !location.isEmpty {
+                Text(location)
+                    .font(.system(size: 15))
+                    .foregroundStyle(WarmPalette.ink2)
+                    .padding(.bottom, 2)
+            }
+
+            HStack(spacing: 8) {
                 if let location = appt.location, !location.isEmpty {
-                    Text(location)
-                        .font(.system(size: 15))
-                        .foregroundStyle(WarmPalette.ink2)
-                        .padding(.bottom, 2)
-                }
-
-                HStack(spacing: 8) {
-                    if let location = appt.location, !location.isEmpty {
-                        Button {
-                            let query = location.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? location
-                            if let url = URL(string: "maps://?q=\(query)") {
-                                UIApplication.shared.open(url)
-                            }
-                        } label: {
-                            Text("Get directions")
-                                .font(.system(size: 14, weight: .semibold))
-                                .foregroundStyle(WarmPalette.cream1)
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 10)
-                                .background(WarmPalette.ink1, in: Capsule())
+                    Button {
+                        let query = location.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? location
+                        if let url = URL(string: "maps://?q=\(query)") {
+                            UIApplication.shared.open(url)
                         }
+                    } label: {
+                        Text("Get directions")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(WarmPalette.cream1)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 10)
+                            .background(WarmPalette.ink1, in: Capsule())
                     }
+                }
+                if showDismiss {
                     Button {
                         viewModel.dismissHeroCard()
                     } label: {
@@ -361,12 +369,25 @@ struct HomeView: View {
                     }
                 }
             }
-            .padding(.vertical, 20)
-            .padding(.horizontal, 22)
-            .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.cardLarge))
-            .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
-            .padding(.bottom, 14)
         }
+        .padding(.vertical, 20)
+        .padding(.horizontal, 22)
+        .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.cardLarge))
+        .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
+        .padding(.bottom, 14)
+    }
+
+    private static let friendlyDateFmt: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "EEEE, MMM d"
+        return f
+    }()
+
+    private static func friendlyDate(_ dateStr: String, time: String?) -> String {
+        guard let date = DateFormatter.isoDate.date(from: dateStr) else { return dateStr }
+        let day = friendlyDateFmt.string(from: date)
+        if let time, !time.isEmpty { return "\(day) · \(time)" }
+        return day
     }
 
     // MARK: - Stats Grid
@@ -516,6 +537,7 @@ struct HomeView: View {
                             .font(.system(size: 10, weight: .semibold))
                     }
                     .foregroundStyle(TabAccent.home.color)
+                    .fixedSize()
                 }
             }
             .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)

@@ -18,6 +18,7 @@ struct PreparedFeedItem: Identifiable {
 final class HomeViewModel {
     var summary: APIService.DailySummary?
     var todayAppointments: [AppointmentResponse] = []
+    var nextAppointment: AppointmentResponse?
     var weekEventCount: Int = 0
     var monthEventCount: Int = 0
     var activeTasks: [TaskResponse] = []
@@ -78,6 +79,17 @@ final class HomeViewModel {
 
         weekEventCount = weekAppts.value?.count ?? 0
         monthEventCount = monthAppts.value?.count ?? 0
+
+        // When no events today, surface the next upcoming event from the week
+        if todayAppointments.isEmpty, let upcoming = weekAppts.value {
+            let today = Self.todayString()
+            nextAppointment = upcoming
+                .filter { $0.appointment_date > today }
+                .sorted { ($0.appointment_date, $0.appointment_time ?? "") < ($1.appointment_date, $1.appointment_time ?? "") }
+                .first
+        } else {
+            nextAppointment = nil
+        }
 
         if let feed = feed.value { activityFeed = Self.prepareFeed(feed, currentUserName: currentUserName, currentUsername: currentUsername) }
         else if let e = feed.error { firstError = firstError ?? e }
