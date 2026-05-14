@@ -33,8 +33,12 @@ struct ContentView: View {
 }
 
 struct MainTabView: View {
+    @Environment(APIService.self) private var api
     @State private var selectedTab: MainTab = .home
     @State private var loadedTabs: Set<MainTab> = [.home]
+    @State private var showingChat = false
+    @State private var chatInitialThread: ChatSheet.ChatThread?
+    @State private var unreadCount = 0
 
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -50,10 +54,55 @@ struct MainTabView: View {
                 Spacer()
                 FloatingTabBar(selectedTab: $selectedTab)
             }
+
+            // Floating chat button — visible on all tabs
+            VStack {
+                Spacer()
+                HStack {
+                    Spacer()
+                    Button { showingChat = true } label: {
+                        ZStack(alignment: .topTrailing) {
+                            Image(systemName: "bubble.left.and.text.bubble.right.fill")
+                                .font(.system(size: 20))
+                                .foregroundStyle(.white)
+                                .frame(width: 52, height: 52)
+                                .background(TabAccent.home.color, in: Circle())
+                                .shadow(color: .black.opacity(0.15), radius: 8, y: 4)
+
+                            if unreadCount > 0 {
+                                Text("\(unreadCount)")
+                                    .font(.system(size: 10, weight: .bold))
+                                    .foregroundStyle(.white)
+                                    .frame(minWidth: 18, minHeight: 18)
+                                    .background(AccentTheme.rose.color, in: Circle())
+                                    .offset(x: 4, y: -4)
+                            }
+                        }
+                    }
+                    .padding(.trailing, 20)
+                    .padding(.bottom, 80)
+                }
+            }
         }
         .ignoresSafeArea(.keyboard)
         .onChange(of: selectedTab) {
             loadedTabs.insert(selectedTab)
+        }
+        .sheet(isPresented: $showingChat) {
+            ChatSheet(initialThread: chatInitialThread)
+        }
+        .onChange(of: showingChat) { _, showing in
+            if !showing { chatInitialThread = nil }
+        }
+        .task {
+            await pollUnread()
+        }
+    }
+
+    private func pollUnread() async {
+        while !Task.isCancelled {
+            unreadCount = (try? await api.fetchUnreadMessageCount()) ?? 0
+            try? await Task.sleep(for: .seconds(15))
         }
     }
 
