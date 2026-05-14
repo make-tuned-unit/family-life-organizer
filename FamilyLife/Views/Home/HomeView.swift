@@ -516,10 +516,6 @@ struct HomeView: View {
                             .font(.system(size: 10, weight: .semibold))
                     }
                     .foregroundStyle(TabAccent.home.color)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .background(WarmPalette.cardSurface, in: Capsule())
-                    .fixedSize()
                 }
             }
             .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
