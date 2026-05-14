@@ -371,7 +371,7 @@ struct HomeView: View {
         HStack(spacing: 8) {
             WarmStatTile(label: "Tasks", value: "\(viewModel.summary?.tasks_today ?? 0)", sub: "today")
             WarmStatTile(label: "Events", value: "\(viewModel.summary?.appointments_today ?? 0)", sub: "today")
-            WarmStatTile(label: "Grocery", value: "\(viewModel.summary?.groceries_needed ?? 0)", sub: "needed")
+            WarmStatTile(label: viewModel.summary?.pinned_list_name ?? "List", value: "\(viewModel.summary?.groceries_needed ?? 0)", sub: "items")
             WarmStatTile(label: "Overdue", value: "\(viewModel.summary?.overdue_tasks ?? 0)", sub: "tasks")
         }
         .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)

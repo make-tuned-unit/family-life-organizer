@@ -57,6 +57,7 @@ final class APIService {
         let appointments_today: Int
         let groceries_needed: Int
         let overdue_tasks: Int
+        let pinned_list_name: String?
     }
 
     func fetchDashboard() async throws -> DashboardData {
@@ -767,9 +768,12 @@ final class APIService {
         var name: String
         var icon: String?
         var color: String?
+        var pinned: Int?
         var active_count: Int?
         var total_count: Int?
         var created_at: String?
+
+        var isPinned: Bool { (pinned ?? 0) != 0 }
     }
 
     struct ListItemResponse: Codable, Identifiable {
@@ -799,6 +803,14 @@ final class APIService {
 
     func deleteList(id: Int) async throws {
         let _: SuccessResponse = try await delete("/api/lists/\(id)")
+    }
+
+    func pinList(id: Int) async throws {
+        let _: SuccessResponse = try await post("/api/lists/\(id)/pin", body: [:] as [String: String])
+    }
+
+    func unpinList(id: Int) async throws {
+        let _: SuccessResponse = try await post("/api/lists/\(id)/unpin", body: [:] as [String: String])
     }
 
     func fetchListItems(listId: Int) async throws -> [ListItemResponse] {

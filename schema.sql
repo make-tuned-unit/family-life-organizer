@@ -435,6 +435,7 @@ CREATE TABLE IF NOT EXISTS lists (
     name TEXT NOT NULL,
     icon TEXT DEFAULT 'list.bullet',
     color TEXT,
+    pinned BOOLEAN DEFAULT 0,
     created_by INTEGER,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (created_by) REFERENCES users(id)
