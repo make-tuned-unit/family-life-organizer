@@ -51,14 +51,14 @@ struct HouseholdView: View {
             }
         }
         .sheet(isPresented: $showingAddMember) {
-            EditMemberSheet(member: nil) { await household.reload(api: api) }
+            EditMemberSheet(member: nil) { await household.reload(api: api, currentUserId: auth.currentUser?.id) }
         }
         .sheet(item: $editingMember) { member in
-            EditMemberSheet(member: member) { await household.reload(api: api) }
+            EditMemberSheet(member: member) { await household.reload(api: api, currentUserId: auth.currentUser?.id) }
         }
         .sheet(isPresented: $showingJoinSheet) {
             JoinHouseholdSheet {
-                await household.reload(api: api)
+                await household.reload(api: api, currentUserId: auth.currentUser?.id)
             }
         }
         .sheet(isPresented: $showingAddAddress) {
@@ -89,7 +89,7 @@ struct HouseholdView: View {
             Text(error ?? "")
         }
         .task {
-            await household.reload(api: api)
+            await household.reload(api: api, currentUserId: auth.currentUser?.id)
             await loadAddresses()
         }
     }
@@ -102,7 +102,7 @@ struct HouseholdView: View {
         guard let groupId = household.householdGroup?.id, !pendingName.isEmpty else { return }
         do {
             try await api.updateGroup(id: groupId, data: ["name": pendingName])
-            await household.reload(api: api)
+            await household.reload(api: api, currentUserId: auth.currentUser?.id)
             pendingName = ""
         } catch {
             self.error = error.localizedDescription
@@ -352,7 +352,7 @@ struct HouseholdView: View {
     private func deleteMember(_ member: APIService.ContactResponse) async {
         do {
             try await api.deleteContact(id: member.id)
-            await household.reload(api: api)
+            await household.reload(api: api, currentUserId: auth.currentUser?.id)
         } catch {
             guard !error.isCancellation else { return }
             self.error = error.localizedDescription

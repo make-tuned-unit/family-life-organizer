@@ -353,7 +353,10 @@ struct GroupChatView: View {
     private func loadDecisions() async {
         do {
             let all = try await api.fetchDecisions()
-            openDecisions = all.filter { $0.status == DecisionStatus.active.rawValue }
+            openDecisions = all.filter {
+                $0.status == DecisionStatus.active.rawValue
+                && $0.group_id == groupId
+            }
         } catch {}
     }
 

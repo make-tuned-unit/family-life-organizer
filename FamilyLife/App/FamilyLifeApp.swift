@@ -21,7 +21,7 @@ struct FamilyLifeApp: App {
                         await authService.validateSession(api: apiService)
                     }
                     if authService.isAuthenticated {
-                        await householdService.reload(api: apiService, profileCache: profileImageCache)
+                        await householdService.reload(api: apiService, profileCache: profileImageCache, currentUserId: authService.currentUser?.id)
                         if let userId = authService.currentUser?.id {
                             messageCache.preload(api: apiService, userId: userId)
                         }
@@ -30,7 +30,7 @@ struct FamilyLifeApp: App {
                 .onChange(of: authService.isAuthenticated) { _, isAuthenticated in
                     if isAuthenticated {
                         Task {
-                            await householdService.reload(api: apiService, profileCache: profileImageCache)
+                            await householdService.reload(api: apiService, profileCache: profileImageCache, currentUserId: authService.currentUser?.id)
                         }
                     }
                 }
