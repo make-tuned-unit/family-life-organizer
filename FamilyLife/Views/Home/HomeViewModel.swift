@@ -170,7 +170,8 @@ final class HomeViewModel {
                     tasks_today: max(0, s.tasks_today - 1),
                     appointments_today: s.appointments_today,
                     groceries_needed: s.groceries_needed,
-                    overdue_tasks: s.overdue_tasks
+                    overdue_tasks: s.overdue_tasks,
+                    pinned_list_name: s.pinned_list_name
                 )
             }
         } catch {
@@ -221,7 +222,8 @@ final class HomeViewModel {
                     tasks_today: s.tasks_today,
                     appointments_today: s.appointments_today,
                     groceries_needed: max(0, s.groceries_needed - 1),
-                    overdue_tasks: s.overdue_tasks
+                    overdue_tasks: s.overdue_tasks,
+                    pinned_list_name: s.pinned_list_name
                 )
             }
         } catch {

@@ -91,6 +91,7 @@ class FamilyDB {
         this.db.run('ALTER TABLE users ADD COLUMN last_lat REAL', () => {});
         this.db.run('ALTER TABLE users ADD COLUMN last_lng REAL', () => {});
         this.db.run('ALTER TABLE users ADD COLUMN last_location_name TEXT', () => {});
+        this.db.run('ALTER TABLE lists ADD COLUMN pinned BOOLEAN DEFAULT 0', () => {});
         this.db.run('ALTER TABLE users ADD COLUMN last_location_at DATETIME', (err) => {
           if (err) console.error('Migration error:', err.message);
           resolve();
@@ -1671,9 +1672,10 @@ class FamilyDB {
           (SELECT COUNT(*) FROM tasks WHERE status = 'active' AND date(due_date) = date('now')) as tasks_today,
           (SELECT COUNT(*) FROM appointments WHERE date(appointment_date) = date('now') ${groupFilter}) as appointments_today,
           (SELECT COUNT(*) FROM list_items WHERE is_done = 0 AND list_id IN (
-            SELECT id FROM lists WHERE LOWER(name) = 'grocery' LIMIT 1
+            SELECT id FROM lists WHERE pinned = 1 LIMIT 1
           )) as groceries_needed,
-          (SELECT COUNT(*) FROM tasks WHERE status = 'active' AND due_date < date('now')) as overdue_tasks
+          (SELECT COUNT(*) FROM tasks WHERE status = 'active' AND due_date < date('now')) as overdue_tasks,
+          (SELECT name FROM lists WHERE pinned = 1 LIMIT 1) as pinned_list_name
       `;
       this.db.get(sql, [], (err, row) => {
         if (err) reject(err);
