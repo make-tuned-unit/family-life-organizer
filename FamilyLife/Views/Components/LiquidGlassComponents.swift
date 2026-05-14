@@ -46,21 +46,23 @@ struct ProfileAvatar: View {
     var size: CGFloat = 32
 
     var body: some View {
-        if let uiImage = auth.profileUIImage {
-            Image(uiImage: uiImage)
-                .resizable()
-                .scaledToFill()
-                .frame(width: size, height: size)
-                .contentShape(Circle())
-                .clipShape(Circle())
-                .overlay { Circle().stroke(AccentTheme.sage.color, lineWidth: 3) }
-                .aspectRatio(1, contentMode: .fit)
-        } else {
-            FamilyAvatar(
-                initial: String(auth.currentUser?.name.prefix(1) ?? "?").uppercased(),
-                size: size
-            )
+        Group {
+            if let uiImage = auth.profileUIImage {
+                Image(uiImage: uiImage)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: size, height: size)
+                    .clipShape(Circle())
+                    .overlay { Circle().stroke(AccentTheme.sage.color, lineWidth: 3) }
+            } else {
+                FamilyAvatar(
+                    initial: String(auth.currentUser?.name.prefix(1) ?? "?").uppercased(),
+                    size: size
+                )
+            }
         }
+        .frame(width: size, height: size)
+        .fixedSize()
     }
 }
 
