@@ -18,6 +18,8 @@ struct PreparedFeedItem: Identifiable {
 final class HomeViewModel {
     var summary: APIService.DailySummary?
     var todayAppointments: [AppointmentResponse] = []
+    var weekEventCount: Int = 0
+    var monthEventCount: Int = 0
     var activeTasks: [TaskResponse] = []
     var groceries: [GroceryResponse] = []
     var activityFeed: [PreparedFeedItem] = []
@@ -46,10 +48,12 @@ final class HomeViewModel {
         async let d = Self.safeFetch { try await api.fetchDashboard() }
         async let t = Self.safeFetch { try await api.fetchTasks(status: "active") }
         async let a = Self.safeFetch { try await api.fetchAppointments(dateFrom: Self.todayString(), dateTo: Self.todayString()) }
+        async let aWeek = Self.safeFetch { try await api.fetchAppointments(dateFrom: Self.todayString(), dateTo: Self.dateString(daysFromNow: 7)) }
+        async let aMonth = Self.safeFetch { try await api.fetchAppointments(dateFrom: Self.todayString(), dateTo: Self.dateString(daysFromNow: 30)) }
         async let f = Self.safeFetch { try await api.fetchActivity() }
         async let tr = Self.safeFetch { try await api.fetchTrips(status: "active") }
 
-        let (dashboard, tasks, appointments, feed, trips) = await (d, t, a, f, tr)
+        let (dashboard, tasks, appointments, weekAppts, monthAppts, feed, trips) = await (d, t, a, aWeek, aMonth, f, tr)
 
         // Batch apply — single re-render
         if let data = dashboard.value {
@@ -71,6 +75,9 @@ final class HomeViewModel {
                 .filter { !dismissed.contains($0.id) }
                 .sorted { ($0.appointment_time ?? "") < ($1.appointment_time ?? "") }
         } else if let e = appointments.error { firstError = firstError ?? e }
+
+        weekEventCount = weekAppts.value?.count ?? 0
+        monthEventCount = monthAppts.value?.count ?? 0
 
         if let feed = feed.value { activityFeed = Self.prepareFeed(feed, currentUserName: currentUserName, currentUsername: currentUsername) }
         else if let e = feed.error { firstError = firstError ?? e }
@@ -243,5 +250,9 @@ final class HomeViewModel {
 
     private static func todayString() -> String {
         DateFormatter.isoDate.string(from: Date())
+    }
+
+    static func dateString(daysFromNow days: Int) -> String {
+        DateFormatter.isoDate.string(from: Calendar.current.date(byAdding: .day, value: days, to: Date())!)
     }
 }
