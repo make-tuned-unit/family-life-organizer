@@ -276,11 +276,7 @@ struct DecisionCard: View {
         VStack(alignment: .leading, spacing: 10) {
             // Meta row
             HStack(spacing: 8) {
-                if isCurrentUserCreator {
-                    ProfileAvatar(size: 22)
-                } else {
-                    FamilyAvatar(initial: String(decision.creator_name.prefix(1)).uppercased(), size: 22)
-                }
+                UserAvatar(name: decision.creator_name, size: 22)
                 Text(decision.creator_name)
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(WarmPalette.ink1)

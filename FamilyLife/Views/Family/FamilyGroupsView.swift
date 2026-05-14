@@ -253,10 +253,11 @@ struct GroupRow: View {
 struct ContactRow: View {
     let contact: APIService.ContactResponse
     var groups: [APIService.GroupResponse] = []
+    @Environment(HouseholdService.self) private var household
 
     var body: some View {
         HStack(spacing: 12) {
-            FamilyAvatar(initial: contact.avatar_initial ?? String(contact.name.prefix(1)).uppercased(), size: 36)
+            UserAvatar(name: contact.name, userId: household.userId(for: contact.name), size: 36)
             VStack(alignment: .leading, spacing: 2) {
                 Text(contact.name)
                     .font(.system(size: 15, weight: .semibold))
@@ -661,7 +662,7 @@ struct FeedPostCard: View {
         VStack(alignment: .leading, spacing: 10) {
             // Author + time
             HStack(spacing: 10) {
-                FamilyAvatar(initial: String(post.author_name?.prefix(1) ?? "?").uppercased(), size: 32)
+                UserAvatar(name: post.author_name ?? "?", userId: post.author_id, size: 32)
                 VStack(alignment: .leading, spacing: 1) {
                     Text(post.author_name ?? "Unknown")
                         .font(.system(size: 14, weight: .semibold))

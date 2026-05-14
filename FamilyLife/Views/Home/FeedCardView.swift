@@ -77,26 +77,12 @@ struct FeedCard: View {
 
     private var header: some View {
         HStack(spacing: 10) {
-            if prepared.isOwnPost {
-                ProfileAvatar(size: 32)
-            } else if let authorId = item.author_id, let img = profileCache.image(for: authorId) {
-                Image(uiImage: img)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(width: 32, height: 32)
-                    .clipShape(Circle())
-                    .onAppear { profileCache.fetchIfNeeded(userId: authorId, api: api) }
-            } else {
-                FamilyAvatar(
-                    initial: String(item.author?.prefix(1) ?? "?").uppercased(),
-                    size: 32
-                )
+            UserAvatar(name: item.author ?? "?", userId: item.author_id, size: 32)
                 .onAppear {
                     if let authorId = item.author_id {
                         profileCache.fetchIfNeeded(userId: authorId, api: api)
                     }
                 }
-            }
 
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
@@ -265,7 +251,7 @@ struct FeedCard: View {
             }
 
             HStack(spacing: 10) {
-                ProfileAvatar(size: 24)
+                UserAvatar(name: auth.currentUser?.name ?? "?", userId: auth.currentUser?.id, size: 24)
 
                 TextField("Add a comment...", text: $newComment)
                     .font(.system(size: 14))
@@ -290,14 +276,7 @@ struct FeedCard: View {
 
     private func commentRow(_ comment: APIService.FeedCommentResponse) -> some View {
         HStack(alignment: .top, spacing: 10) {
-            if isCommentByCurrentUser(comment) {
-                ProfileAvatar(size: 22)
-            } else {
-                FamilyAvatar(
-                    initial: String(comment.user_name?.prefix(1) ?? "?").uppercased(),
-                    size: 22
-                )
-            }
+            UserAvatar(name: comment.user_name ?? "?", userId: comment.user_id, size: 22)
 
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 6) {

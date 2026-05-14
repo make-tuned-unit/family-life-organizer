@@ -529,6 +529,7 @@ final class APIService {
 
     struct FeedCommentResponse: Codable, Identifiable {
         let id: Int
+        var user_id: Int?
         var user_name: String?
         var user_avatar: String?
         var text: String
