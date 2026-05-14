@@ -83,8 +83,16 @@ class FamilyDB {
         this.db.run('ALTER TABLE rivalries ADD COLUMN group_id INTEGER REFERENCES groups(id)', () => {});
         this.db.run('CREATE INDEX IF NOT EXISTS idx_appointments_group ON appointments(group_id)', () => {});
         this.db.run('CREATE INDEX IF NOT EXISTS idx_decisions_group ON decisions(group_id)', () => {});
-        this.db.run('CREATE INDEX IF NOT EXISTS idx_rivalries_group ON rivalries(group_id)', (err) => {
-          if (err) console.error('Index error:', err.message);
+        this.db.run('CREATE INDEX IF NOT EXISTS idx_rivalries_group ON rivalries(group_id)', () => {});
+        // User location/work fields
+        this.db.run('ALTER TABLE users ADD COLUMN work_address TEXT', () => {});
+        this.db.run('ALTER TABLE users ADD COLUMN work_lat REAL', () => {});
+        this.db.run('ALTER TABLE users ADD COLUMN work_lng REAL', () => {});
+        this.db.run('ALTER TABLE users ADD COLUMN last_lat REAL', () => {});
+        this.db.run('ALTER TABLE users ADD COLUMN last_lng REAL', () => {});
+        this.db.run('ALTER TABLE users ADD COLUMN last_location_name TEXT', () => {});
+        this.db.run('ALTER TABLE users ADD COLUMN last_location_at DATETIME', (err) => {
+          if (err) console.error('Migration error:', err.message);
           resolve();
         });
       });
@@ -1213,7 +1221,7 @@ class FamilyDB {
 
   getUserById(id) {
     return new Promise((resolve, reject) => {
-      this.db.get('SELECT id, username, name, email, phone, avatar, created_at FROM users WHERE id = ?', [id], (err, row) => {
+      this.db.get('SELECT id, username, name, email, phone, avatar, work_address, work_lat, work_lng, created_at FROM users WHERE id = ?', [id], (err, row) => {
         if (err) reject(err);
         else resolve(row || null);
       });
@@ -1982,6 +1990,50 @@ class FamilyDB {
     return new Promise((resolve, reject) => {
       this.db.get('SELECT COUNT(*) as count FROM direct_messages WHERE recipient_id = ? AND read_at IS NULL', [userId],
         (err, row) => err ? reject(err) : resolve(row?.count || 0));
+    });
+  }
+
+  // ============================================
+  // User Location & Work Address
+  // ============================================
+
+  updateUserWorkAddress(userId, { work_address, work_lat, work_lng }) {
+    return new Promise((resolve, reject) => {
+      this.db.run(
+        'UPDATE users SET work_address = ?, work_lat = ?, work_lng = ? WHERE id = ?',
+        [work_address || null, work_lat || null, work_lng || null, userId],
+        (err) => err ? reject(err) : resolve()
+      );
+    });
+  }
+
+  updateUserLocation(userId, { lat, lng, location_name }) {
+    return new Promise((resolve, reject) => {
+      this.db.run(
+        'UPDATE users SET last_lat = ?, last_lng = ?, last_location_name = ?, last_location_at = CURRENT_TIMESTAMP WHERE id = ?',
+        [lat, lng, location_name || null, userId],
+        (err) => err ? reject(err) : resolve()
+      );
+    });
+  }
+
+  getHouseholdPresence(userId) {
+    return new Promise((resolve, reject) => {
+      this.db.all(`
+        SELECT u.id, u.name, u.last_lat, u.last_lng, u.last_location_name, u.last_location_at,
+          u.work_address, u.work_lat, u.work_lng
+        FROM users u
+        JOIN group_members gm ON gm.user_id = u.id
+        JOIN groups g ON g.id = gm.group_id AND g.group_type = 'household'
+        WHERE gm.group_id IN (SELECT group_id FROM group_members WHERE user_id = ?)
+      `, [userId], (err, rows) => err ? reject(err) : resolve(rows || []));
+    });
+  }
+
+  getUserWorkAddress(userId) {
+    return new Promise((resolve, reject) => {
+      this.db.get('SELECT work_address, work_lat, work_lng FROM users WHERE id = ?', [userId],
+        (err, row) => err ? reject(err) : resolve(row));
     });
   }
 

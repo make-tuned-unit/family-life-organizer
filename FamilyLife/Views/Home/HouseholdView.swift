@@ -9,6 +9,7 @@ struct HouseholdView: View {
 
     @State private var showingAddMember = false
     @State private var editingMember: APIService.ContactResponse?
+    @State private var editingUserId: Int?
     @State private var showingAddAddress = false
     @State private var showingJoinSheet = false
     @State private var showingRenameSheet = false
@@ -53,7 +54,7 @@ struct HouseholdView: View {
             EditMemberSheet(member: nil) { await household.reload(api: api, currentUserId: auth.currentUser?.id) }
         }
         .sheet(item: $editingMember) { member in
-            EditMemberSheet(member: member) { await household.reload(api: api, currentUserId: auth.currentUser?.id) }
+            EditMemberSheet(member: member, userId: editingUserId) { await household.reload(api: api, currentUserId: auth.currentUser?.id) }
         }
         .sheet(isPresented: $showingJoinSheet) {
             JoinHouseholdSheet {
@@ -208,7 +209,7 @@ struct HouseholdView: View {
             if let user = auth.currentUser {
                 let myContact = household.member(named: user.name)
                 Button {
-                    // Edit own contact info — use existing contact or create new
+                    editingUserId = user.id
                     if let contact = myContact {
                         editingMember = contact
                     } else {
@@ -248,6 +249,7 @@ struct HouseholdView: View {
             // Household members (exclude current user — already shown above)
             ForEach(otherHouseholdMembers) { member in
                 HouseholdMemberRow(member: member) {
+                    editingUserId = member.user_id
                     if let contact = household.member(named: member.displayName) {
                         editingMember = contact
                     }
@@ -440,6 +442,7 @@ struct JoinHouseholdSheet: View {
 
 struct EditMemberSheet: View {
     let member: APIService.ContactResponse?
+    var userId: Int?  // non-nil if editing a registered app user
     let onComplete: () async -> Void
 
     @Environment(APIService.self) private var api
@@ -450,6 +453,11 @@ struct EditMemberSheet: View {
     @State private var phone: String
     @State private var email: String
     @State private var birthday: String
+    @State private var workAddress: String = ""
+    @State private var workLat: Double = 0
+    @State private var workLng: Double = 0
+    @State private var locationCompleter = LocationCompleter()
+    @State private var showingWorkSuggestions = false
     @State private var isSaving = false
 
     private let relationships = [
@@ -463,8 +471,9 @@ struct EditMemberSheet: View {
         "friend", "babysitter", "nanny", "other"
     ]
 
-    init(member: APIService.ContactResponse?, onComplete: @escaping () async -> Void) {
+    init(member: APIService.ContactResponse?, userId: Int? = nil, onComplete: @escaping () async -> Void) {
         self.member = member
+        self.userId = userId
         self.onComplete = onComplete
         _name = State(initialValue: member?.name ?? "")
         _relationship = State(initialValue: member?.relationship ?? "partner")
@@ -493,6 +502,54 @@ struct EditMemberSheet: View {
                         .textContentType(.emailAddress)
                         .textInputAutocapitalization(.never)
                 }
+
+                if userId != nil {
+                    Section {
+                        TextField("Search for office address...", text: $workAddress)
+                            .onChange(of: workAddress) {
+                                locationCompleter.search(query: workAddress)
+                                showingWorkSuggestions = !workAddress.isEmpty
+                            }
+
+                        if showingWorkSuggestions && !locationCompleter.results.isEmpty {
+                            ForEach(locationCompleter.results, id: \.self) { result in
+                                Button {
+                                    let full = [result.title, result.subtitle].filter { !$0.isEmpty }.joined(separator: ", ")
+                                    workAddress = full
+                                    showingWorkSuggestions = false
+                                    resolveCoordinates(for: result)
+                                } label: {
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(result.title)
+                                            .font(.subheadline.weight(.medium))
+                                            .foregroundStyle(.primary)
+                                        if !result.subtitle.isEmpty {
+                                            Text(result.subtitle)
+                                                .font(.caption)
+                                                .foregroundStyle(WarmPalette.ink3)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        if !workAddress.isEmpty {
+                            Button(role: .destructive) {
+                                workAddress = ""
+                                workLat = 0
+                                workLng = 0
+                            } label: {
+                                Label("Remove office address", systemImage: "trash")
+                                    .font(.system(size: 14))
+                            }
+                        }
+                    } header: {
+                        Text("Office / Work")
+                    } footer: {
+                        Text("Used for presence status — shows \"At Office\" on the home screen when nearby.")
+                    }
+                }
+
                 Section("Details") {
                     TextField("Birthday (YYYY-MM-DD)", text: $birthday)
                         .keyboardType(.numbersAndPunctuation)
@@ -514,6 +571,15 @@ struct EditMemberSheet: View {
                     .disabled(name.isEmpty || isSaving)
                 }
             }
+            .task {
+                if let uid = userId {
+                    if let wa = try? await api.fetchWorkAddress(userId: uid) {
+                        workAddress = wa.work_address ?? ""
+                        workLat = wa.work_lat ?? 0
+                        workLng = wa.work_lng ?? 0
+                    }
+                }
+            }
         }
     }
 
@@ -533,11 +599,31 @@ struct EditMemberSheet: View {
             } else {
                 let _ = try await api.addContact(data)
             }
+
+            // Save work address for app users
+            if let uid = userId {
+                if workAddress.isEmpty {
+                    try? await api.clearWorkAddress(userId: uid)
+                } else {
+                    try? await api.updateWorkAddress(userId: uid, address: workAddress, lat: workLat, lng: workLng)
+                }
+            }
+
             await onComplete()
             dismiss()
         } catch {
             guard !error.isCancellation else { return }
             isSaving = false
+        }
+    }
+
+    private func resolveCoordinates(for completion: MKLocalSearchCompletion) {
+        let request = MKLocalSearch.Request(completion: completion)
+        let search = MKLocalSearch(request: request)
+        search.start { response, _ in
+            guard let item = response?.mapItems.first else { return }
+            workLat = item.placemark.coordinate.latitude
+            workLng = item.placemark.coordinate.longitude
         }
     }
 }

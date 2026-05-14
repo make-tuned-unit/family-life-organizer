@@ -456,6 +456,52 @@ final class APIService {
         let _: SuccessResponse = try await post("/api/auth/device-token", body: ["token": token])
     }
 
+    // Location & Presence
+    func updateWorkAddress(userId: Int, address: String, lat: Double, lng: Double) async throws {
+        let _: SuccessResponse = try await put("/api/users/\(userId)/work-address", body: [
+            "work_address": address, "work_lat": lat, "work_lng": lng
+        ])
+    }
+
+    func clearWorkAddress(userId: Int) async throws {
+        let _: SuccessResponse = try await put("/api/users/\(userId)/work-address", body: [
+            "work_address": NSNull(), "work_lat": NSNull(), "work_lng": NSNull()
+        ])
+    }
+
+    struct WorkAddressResponse: Codable {
+        let work_address: String?
+        let work_lat: Double?
+        let work_lng: Double?
+    }
+
+    func fetchWorkAddress(userId: Int) async throws -> WorkAddressResponse {
+        try await get("/api/users/\(userId)/work-address")
+    }
+
+    func reportLocation(lat: Double, lng: Double) async throws -> LocationReportResponse {
+        try await post("/api/location", body: ["lat": lat, "lng": lng])
+    }
+
+    struct LocationReportResponse: Codable {
+        let success: Bool
+        let location_name: String?
+    }
+
+    struct PresenceMember: Codable, Identifiable {
+        let id: Int
+        let name: String
+        let last_lat: Double?
+        let last_lng: Double?
+        let last_location_name: String?
+        let last_location_at: String?
+        let work_address: String?
+    }
+
+    func fetchHouseholdPresence() async throws -> [PresenceMember] {
+        try await get("/api/household/presence")
+    }
+
     func fetchGroupMembers(groupId: Int) async throws -> [GroupMemberResponse] {
         try await get("/api/groups/\(groupId)/members")
     }
