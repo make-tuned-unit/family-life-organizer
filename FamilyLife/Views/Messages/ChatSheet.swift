@@ -120,8 +120,10 @@ struct ChatSheet: View {
                 switch selectedThread {
                 case .dm(let partnerId, let name):
                     ConversationView(partnerId: partnerId, partnerName: name)
+                        .id(partnerId)
                 case .group(let groupId, _):
                     GroupChatView(groupId: groupId)
+                        .id(groupId)
                 case nil:
                     Spacer()
                     VStack(spacing: 8) {
