@@ -12,10 +12,8 @@ struct HomeView: View {
     @State private var showingSettings = false
     @State private var selectedFeedEvent: AppointmentResponse?
     @State private var selectedFeedRivalry: RivalryResponse?
-    @State private var selectedFeedGroup: APIService.GroupResponse?
     @State private var showingChat = false
-    @State private var chatPartnerId: Int?
-    @State private var chatPartnerName: String?
+    @State private var chatInitialThread: ChatSheet.ChatThread?
     @State private var unreadCount = 0
 
     private var greeting: String {
@@ -129,11 +127,6 @@ struct HomeView: View {
                     }
             }
         }
-        .sheet(item: $selectedFeedGroup) { group in
-            NavigationStack {
-                GroupDetailView(group: group)
-            }
-        }
         .overlay(alignment: .bottomTrailing) {
             if viewModel.isLoading && viewModel.summary == nil {
                 ProgressView()
@@ -163,7 +156,10 @@ struct HomeView: View {
             }
         }
         .sheet(isPresented: $showingChat) {
-            ChatSheet()
+            ChatSheet(initialThread: chatInitialThread)
+        }
+        .onChange(of: showingChat) { _, showing in
+            if !showing { chatInitialThread = nil }
         }
         .alert("Something went wrong", isPresented: errorAlertIsPresented) {
             Button("OK") {
@@ -447,7 +443,10 @@ struct HomeView: View {
                     onEventTap: { eventId in Task { await openFeedEvent(id: eventId) } },
                     onRivalryTap: { rivalryId in Task { await openFeedRivalry(id: rivalryId) } },
                     onCoverageTap: { selectedTab = .calendar },
-                    onGroupTap: { group in selectedFeedGroup = group }
+                    onGroupTap: { group in
+                        chatInitialThread = .group(groupId: group.id, name: group.name)
+                        showingChat = true
+                    }
                 )
                 .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
                 .padding(.bottom, 10)
