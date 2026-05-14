@@ -11,7 +11,10 @@ struct HomeView: View {
     @State private var showingNewPost = false
     @State private var showingSettings = false
     @State private var presenceMembers: [APIService.PresenceMember] = []
-    @State private var feedFilterGroupId: Int? = nil // nil = All
+    enum FeedFilter: Equatable {
+        case all, forYou, group(Int)
+    }
+    @State private var feedFilter: FeedFilter = .all
     @State private var userGroups: [APIService.GroupResponse] = []
     @State private var selectedFeedEvent: AppointmentResponse?
     @State private var selectedFeedRivalry: RivalryResponse?
@@ -420,14 +423,39 @@ struct HomeView: View {
 
     // MARK: - Activity Feed
 
+    private var feedFilterLabel: String {
+        switch feedFilter {
+        case .all: "All"
+        case .forYou: "For You"
+        case .group(let id): userGroups.first { $0.id == id }?.name ?? "Group"
+        }
+    }
+
     /// All groups the user belongs to (for feed filter dropdown)
     private var feedGroups: [(id: Int, name: String)] {
         userGroups.map { (id: $0.id, name: $0.name) }.sorted { $0.name < $1.name }
     }
 
     private var filteredFeed: [PreparedFeedItem] {
-        guard let filterId = feedFilterGroupId else { return viewModel.activityFeed }
-        return viewModel.activityFeed.filter { $0.item.group_id == filterId || $0.item.group_id == nil }
+        let myName = auth.currentUser?.name ?? ""
+        switch feedFilter {
+        case .all:
+            return viewModel.activityFeed
+        case .forYou:
+            return viewModel.activityFeed.filter { item in
+                let author = item.item.author ?? ""
+                let body = item.item.body ?? ""
+                let title = item.item.title ?? ""
+                // Show items that mention me or are directed at me (but not my own)
+                let involvesMe = body.localizedCaseInsensitiveContains(myName)
+                    || title.localizedCaseInsensitiveContains(myName)
+                let isDirectedAtMe = ["rivalry", "decision"].contains(item.item.feed_type)
+                    && author.localizedCaseInsensitiveCompare(myName) != .orderedSame
+                return involvesMe || isDirectedAtMe
+            }
+        case .group(let groupId):
+            return viewModel.activityFeed.filter { $0.item.group_id == groupId || $0.item.group_id == nil }
+        }
     }
 
     @ViewBuilder
@@ -440,27 +468,30 @@ struct HomeView: View {
                     .foregroundStyle(WarmPalette.ink1)
                 Spacer()
                 Menu {
-                    Button {
-                        feedFilterGroupId = nil
-                    } label: {
+                    Button { feedFilter = .all } label: {
                         HStack {
                             Text("All")
-                            if feedFilterGroupId == nil { Image(systemName: "checkmark") }
+                            if feedFilter == .all { Image(systemName: "checkmark") }
                         }
                     }
+                    Button { feedFilter = .forYou } label: {
+                        HStack {
+                            Text("For You")
+                            if feedFilter == .forYou { Image(systemName: "checkmark") }
+                        }
+                    }
+                    Divider()
                     ForEach(feedGroups, id: \.id) { group in
-                        Button {
-                            feedFilterGroupId = group.id
-                        } label: {
+                        Button { feedFilter = .group(group.id) } label: {
                             HStack {
                                 Text(group.name)
-                                if feedFilterGroupId == group.id { Image(systemName: "checkmark") }
+                                if feedFilter == .group(group.id) { Image(systemName: "checkmark") }
                             }
                         }
                     }
                 } label: {
                     HStack(spacing: 4) {
-                        Text(feedFilterGroupId.flatMap { fid in userGroups.first { $0.id == fid }?.name } ?? "All")
+                        Text(feedFilterLabel)
                             .font(.system(size: 13, weight: .medium))
                             .lineLimit(1)
                         Image(systemName: "chevron.down")
