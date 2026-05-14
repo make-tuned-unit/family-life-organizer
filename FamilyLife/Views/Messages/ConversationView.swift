@@ -199,7 +199,12 @@ struct ConversationView: View {
     private func loadDecisions() async {
         do {
             let all = try await api.fetchDecisions()
-            openDecisions = all.filter { $0.status == DecisionStatus.active.rawValue }
+            let myName = auth.currentUser?.name ?? ""
+            openDecisions = all.filter {
+                $0.status == DecisionStatus.active.rawValue
+                && ($0.creator_name.localizedCaseInsensitiveCompare(myName) == .orderedSame
+                    || $0.creator_name.localizedCaseInsensitiveCompare(partnerName) == .orderedSame)
+            }
         } catch {}
     }
 

@@ -10,7 +10,7 @@ final class HouseholdService {
     private(set) var isLoaded = false
     private var isLoading = false
 
-    func load(api: APIService, profileCache: ProfileImageCache? = nil) async {
+    func load(api: APIService, profileCache: ProfileImageCache? = nil, currentUserId: Int? = nil) async {
         guard !isLoading else { return }
         isLoading = true
         do {
@@ -26,25 +26,46 @@ final class HouseholdService {
 
             // Start with contacts
             var combined = contacts
-            let contactNames = Set(contacts.map { $0.name.lowercased() })
+            let contactFirstNames = Set(contacts.map { $0.name.lowercased().split(separator: " ").first.map(String.init) ?? $0.name.lowercased() })
 
             // Add users from ALL groups who aren't already in contacts
             var nameToUserId: [String: Int] = [:]
-            var addedNames = contactNames
+            var addedNames = Set(contacts.map { $0.name.lowercased() })
+            var addedUserIds = Set<Int>()
             for group in groups {
                 if let groupMembers = try? await api.fetchGroupMembers(groupId: group.id) {
-                    // Load profile images into cache
                     profileCache?.loadFromHousehold(groupMembers)
 
                     for member in groupMembers {
                         let name = member.displayName
+                        let nameLC = name.lowercased()
                         // Track user_id for messaging
                         if let uid = member.user_id {
-                            nameToUserId[name.lowercased()] = uid
+                            nameToUserId[nameLC] = uid
+                            // Also map matching contacts to this user_id
+                            for contact in contacts {
+                                let contactFirst = contact.name.lowercased().split(separator: " ").first.map(String.init) ?? ""
+                                let memberFirst = nameLC.split(separator: " ").first.map(String.init) ?? nameLC
+                                if contactFirst == memberFirst || contact.name.lowercased() == nameLC {
+                                    nameToUserId[contact.name.lowercased()] = uid
+                                    addedUserIds.insert(uid)
+                                }
+                            }
                         }
-                        guard !addedNames.contains(name.lowercased()) else { continue }
-                        addedNames.insert(name.lowercased())
-                        // Create a ContactResponse-compatible entry for the user
+                        // Skip current user
+                        if let uid = member.user_id, uid == currentUserId { continue }
+                        // Skip if this user_id is already represented by a contact
+                        if let uid = member.user_id, addedUserIds.contains(uid) { continue }
+                        // Skip exact name match
+                        guard !addedNames.contains(nameLC) else { continue }
+                        // Skip first-name match (e.g. "Jesse" matches contact "Jesse Sharratt")
+                        let firstName = nameLC.split(separator: " ").first.map(String.init) ?? nameLC
+                        guard !contactFirstNames.contains(firstName) else {
+                            if let uid = member.user_id { addedUserIds.insert(uid) }
+                            continue
+                        }
+                        addedNames.insert(nameLC)
+                        if let uid = member.user_id { addedUserIds.insert(uid) }
                         combined.append(APIService.ContactResponse(
                             id: -(member.user_id ?? member.id),
                             name: name,
@@ -70,9 +91,9 @@ final class HouseholdService {
         isLoading = false
     }
 
-    func reload(api: APIService, profileCache: ProfileImageCache? = nil) async {
+    func reload(api: APIService, profileCache: ProfileImageCache? = nil, currentUserId: Int? = nil) async {
         isLoading = false
-        await load(api: api, profileCache: profileCache)
+        await load(api: api, profileCache: profileCache, currentUserId: currentUserId)
     }
 
     func member(named name: String) -> APIService.ContactResponse? {
