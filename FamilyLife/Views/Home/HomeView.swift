@@ -11,6 +11,7 @@ struct HomeView: View {
     @State private var showingNewPost = false
     @State private var showingSettings = false
     @State private var presenceMembers: [APIService.PresenceMember] = []
+    @State private var eventRange = 0 // 0=today, 1=week, 2=month
     enum FeedFilter: Equatable {
         case all, forYou, group(Int)
     }
@@ -370,10 +371,27 @@ struct HomeView: View {
 
     // MARK: - Stats Grid
 
+    private var eventCount: Int {
+        switch eventRange {
+        case 1: viewModel.weekEventCount
+        case 2: viewModel.monthEventCount
+        default: viewModel.summary?.appointments_today ?? 0
+        }
+    }
+
+    private var eventSub: String {
+        switch eventRange {
+        case 1: "this week"
+        case 2: "this month"
+        default: "today"
+        }
+    }
+
     private var statsGrid: some View {
         HStack(spacing: 8) {
             WarmStatTile(label: "Tasks", value: "\(viewModel.summary?.tasks_today ?? 0)", sub: "today")
-            WarmStatTile(label: "Events", value: "\(viewModel.summary?.appointments_today ?? 0)", sub: "today")
+            WarmStatTile(label: "Events", value: "\(eventCount)", sub: eventSub)
+                .onTapGesture { withAnimation { eventRange = (eventRange + 1) % 3 } }
             WarmStatTile(label: viewModel.summary?.pinned_list_name ?? "List", value: "\(viewModel.summary?.groceries_needed ?? 0)", sub: "items")
             WarmStatTile(label: "Overdue", value: "\(viewModel.summary?.overdue_tasks ?? 0)", sub: "tasks")
         }
