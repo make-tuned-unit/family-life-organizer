@@ -1985,6 +1985,49 @@ class FamilyDB {
     });
   }
 
+  // ============================================
+  // Device Tokens (APNs)
+  // ============================================
+
+  saveDeviceToken(userId, token) {
+    return new Promise((resolve, reject) => {
+      this.db.run(`
+        INSERT INTO device_tokens (user_id, token, updated_at)
+        VALUES (?, ?, CURRENT_TIMESTAMP)
+        ON CONFLICT(token) DO UPDATE SET user_id = ?, updated_at = CURRENT_TIMESTAMP
+      `, [userId, token, userId], function(err) {
+        if (err) reject(err);
+        else resolve({ id: this.lastID });
+      });
+    });
+  }
+
+  getDeviceTokens(userId) {
+    return new Promise((resolve, reject) => {
+      this.db.all('SELECT token FROM device_tokens WHERE user_id = ?', [userId],
+        (err, rows) => err ? reject(err) : resolve(rows?.map(r => r.token) || []));
+    });
+  }
+
+  getDeviceTokensForUsers(userIds) {
+    if (!userIds || userIds.length === 0) return Promise.resolve([]);
+    const placeholders = userIds.map(() => '?').join(',');
+    return new Promise((resolve, reject) => {
+      this.db.all(
+        `SELECT user_id, token FROM device_tokens WHERE user_id IN (${placeholders})`,
+        userIds,
+        (err, rows) => err ? reject(err) : resolve(rows || [])
+      );
+    });
+  }
+
+  removeDeviceToken(token) {
+    return new Promise((resolve, reject) => {
+      this.db.run('DELETE FROM device_tokens WHERE token = ?', [token],
+        (err) => err ? reject(err) : resolve());
+    });
+  }
+
   close() {
     // No-op: using shared connection for WAL mode concurrency
   }
