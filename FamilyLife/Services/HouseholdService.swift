@@ -28,9 +28,10 @@ final class HouseholdService {
             var combined = contacts
             let contactNames = Set(contacts.map { $0.name.lowercased() })
 
-            // Add users from household/family groups who aren't already in contacts
+            // Add users from ALL groups who aren't already in contacts
             var nameToUserId: [String: Int] = [:]
-            for group in groups where group.group_type == "household" || group.group_type == "family" {
+            var addedNames = contactNames
+            for group in groups {
                 if let groupMembers = try? await api.fetchGroupMembers(groupId: group.id) {
                     // Load profile images into cache
                     profileCache?.loadFromHousehold(groupMembers)
@@ -41,7 +42,8 @@ final class HouseholdService {
                         if let uid = member.user_id {
                             nameToUserId[name.lowercased()] = uid
                         }
-                        guard !contactNames.contains(name.lowercased()) else { continue }
+                        guard !addedNames.contains(name.lowercased()) else { continue }
+                        addedNames.insert(name.lowercased())
                         // Create a ContactResponse-compatible entry for the user
                         combined.append(APIService.ContactResponse(
                             id: -(member.user_id ?? member.id),
