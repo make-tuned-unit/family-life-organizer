@@ -393,18 +393,24 @@ struct GroupMessageBubble: View {
                         .foregroundStyle(WarmPalette.ink3)
                 }
 
-                // Decision/poll badge
+                // Inline decision/poll card
                 if post.post_type == "decision" || post.post_type == "poll" {
-                    HStack(spacing: 4) {
-                        Image(systemName: "chart.bar.fill")
-                            .font(.system(size: 10))
-                        Text("Decision")
-                            .font(.system(size: 10, weight: .semibold))
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "chart.bar.fill")
+                                .font(.system(size: 12))
+                                .foregroundStyle(TabAccent.decisions.color)
+                            Text(post.title ?? "Decision")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundStyle(WarmPalette.ink1)
+                        }
+                        Text("Tap to vote")
+                            .font(.system(size: 11))
+                            .foregroundStyle(TabAccent.decisions.color)
                     }
-                    .foregroundStyle(TabAccent.decisions.color)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 3)
-                    .background(TabAccent.decisions.color.opacity(0.1), in: Capsule())
+                    .padding(10)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(TabAccent.decisions.color.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
                 }
 
                 // Photo
