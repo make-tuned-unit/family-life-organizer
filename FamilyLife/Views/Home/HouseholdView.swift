@@ -13,15 +13,14 @@ struct HouseholdView: View {
     @State private var showingJoinSheet = false
     @State private var showingRenameSheet = false
     @State private var addresses: [FamilyAddressResponse] = []
+    @State private var householdMembers: [APIService.GroupMemberResponse] = []
     @State private var error: String?
     @State private var copiedCode = false
 
-    private var otherMembers: [APIService.ContactResponse] {
-        guard let user = auth.currentUser else { return household.members }
-        return household.members.filter {
-            $0.name.localizedCaseInsensitiveCompare(user.name) != .orderedSame
-            && $0.name.localizedCaseInsensitiveCompare(user.username) != .orderedSame
-        }
+    /// Members of the household group only (not wider family groups)
+    private var otherHouseholdMembers: [APIService.GroupMemberResponse] {
+        guard let user = auth.currentUser else { return householdMembers }
+        return householdMembers.filter { $0.user_id != user.id }
     }
 
     var body: some View {
@@ -90,6 +89,7 @@ struct HouseholdView: View {
         }
         .task {
             await household.reload(api: api, currentUserId: auth.currentUser?.id)
+            await loadHouseholdMembers()
             await loadAddresses()
         }
     }
@@ -102,11 +102,13 @@ struct HouseholdView: View {
         guard let groupId = household.householdGroup?.id, !pendingName.isEmpty else { return }
         do {
             try await api.updateGroup(id: groupId, data: ["name": pendingName])
+            // Reload to pick up new name
             await household.reload(api: api, currentUserId: auth.currentUser?.id)
-            pendingName = ""
+            await loadHouseholdMembers()
         } catch {
             self.error = error.localizedDescription
         }
+        pendingName = ""
     }
 
     // MARK: - Name
@@ -243,19 +245,16 @@ struct HouseholdView: View {
                 .buttonStyle(.plain)
             }
 
-            // Family contacts (exclude current user — already shown above)
-            ForEach(otherMembers) { member in
-                MemberRow(member: member) { editingMember = member }
-                    .swipeActions(edge: .trailing) {
-                        Button(role: .destructive) {
-                            Task { await deleteMember(member) }
-                        } label: {
-                            Label("Remove", systemImage: "trash")
-                        }
+            // Household members (exclude current user — already shown above)
+            ForEach(otherHouseholdMembers) { member in
+                HouseholdMemberRow(member: member) {
+                    if let contact = household.member(named: member.displayName) {
+                        editingMember = contact
                     }
+                }
             }
 
-            if otherMembers.isEmpty {
+            if otherHouseholdMembers.isEmpty {
                 VStack(spacing: 8) {
                     Image(systemName: "person.2.slash")
                         .font(.system(size: 28))
@@ -326,6 +325,11 @@ struct HouseholdView: View {
     }
 
     // MARK: - Actions
+
+    private func loadHouseholdMembers() async {
+        guard let groupId = household.householdGroup?.id else { return }
+        householdMembers = (try? await api.fetchGroupMembers(groupId: groupId)) ?? []
+    }
 
     private func loadAddresses() async {
         do { addresses = try await api.fetchFamilyAddresses() } catch {}
@@ -657,7 +661,66 @@ struct EditAddressSheet: View {
     }
 }
 
-// MARK: - Member Row with hyperlinked contact info
+// MARK: - Household Member Row (from group membership)
+
+struct HouseholdMemberRow: View {
+    let member: APIService.GroupMemberResponse
+    var onEdit: () -> Void
+    @Environment(ProfileImageCache.self) private var profileCache
+    @Environment(HouseholdService.self) private var household
+
+    private var contact: APIService.ContactResponse? {
+        household.member(named: member.displayName)
+    }
+
+    var body: some View {
+        Button(action: onEdit) {
+            HStack(spacing: 12) {
+                if let uid = member.user_id, let img = profileCache.image(for: uid) {
+                    Image(uiImage: img)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: 36, height: 36)
+                        .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+                } else {
+                    FamilyAvatar(initial: member.initial, size: 36)
+                }
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(member.displayName)
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(WarmPalette.ink1)
+                    if let rel = contact?.relationship ?? member.relationship {
+                        Text(rel.capitalized)
+                            .font(.system(size: 12))
+                            .foregroundStyle(WarmPalette.ink3)
+                    }
+                }
+                Spacer()
+                VStack(alignment: .trailing, spacing: 4) {
+                    if let phone = contact?.phone, !phone.isEmpty {
+                        Link(destination: URL(string: "tel:\(phone.filter { $0.isNumber || $0 == "+" })")!) {
+                            Label(phone, systemImage: "phone.fill")
+                                .font(.system(size: 11))
+                                .foregroundStyle(TabAccent.home.color)
+                        }
+                    }
+                    if let email = contact?.email, !email.isEmpty {
+                        Link(destination: URL(string: "mailto:\(email)")!) {
+                            Label(email, systemImage: "envelope.fill")
+                                .font(.system(size: 11))
+                                .foregroundStyle(TabAccent.home.color)
+                                .lineLimit(1)
+                        }
+                    }
+                }
+            }
+            .padding(.vertical, 2)
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+// MARK: - Member Row (contact-based, for backwards compat)
 
 struct MemberRow: View {
     let member: APIService.ContactResponse

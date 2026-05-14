@@ -5,6 +5,7 @@ struct FamilyGroupsView: View {
     @Environment(AuthService.self) private var auth
     @Environment(HouseholdService.self) private var household
     @State private var groups: [APIService.GroupResponse] = []
+    @State private var householdMemberNames: Set<String> = []
     @State private var isLoading = false
     @State private var showingNewGroup = false
     @State private var showingAddContact = false
@@ -73,6 +74,11 @@ struct FamilyGroupsView: View {
         isLoading = true
         do {
             groups = try await api.fetchGroups()
+            // Load household members to separate them from wider family
+            if let hhGroup = groups.first(where: { $0.group_type == "household" }) {
+                let members = (try? await api.fetchGroupMembers(groupId: hhGroup.id)) ?? []
+                householdMemberNames = Set(members.map { $0.displayName.lowercased() })
+            }
         } catch {
             guard !error.isCancellation else { return }
         }
@@ -160,22 +166,28 @@ struct FamilyGroupsView: View {
 
     // MARK: - Contacts
 
-    private var visibleMembers: [APIService.ContactResponse] {
+    /// Contacts from wider groups only (household members show in Household settings)
+    private var widerFamilyContacts: [APIService.ContactResponse] {
         guard let user = auth.currentUser else { return household.members }
-        return household.members.filter {
-            $0.name.localizedCaseInsensitiveCompare(user.name) != .orderedSame
-            && $0.name.localizedCaseInsensitiveCompare(user.username) != .orderedSame
+        return household.members.filter { contact in
+            // Exclude self
+            guard contact.name.localizedCaseInsensitiveCompare(user.name) != .orderedSame
+                && contact.name.localizedCaseInsensitiveCompare(user.username) != .orderedSame else { return false }
+            // Exclude household members (they show in Household settings)
+            let firstName = contact.name.lowercased().split(separator: " ").first.map(String.init) ?? contact.name.lowercased()
+            return !householdMemberNames.contains(contact.name.lowercased())
+                && !householdMemberNames.contains(firstName)
         }
     }
 
     private var contactsSection: some View {
         VStack(spacing: 0) {
-            if !visibleMembers.isEmpty {
-                WarmSectionHeader(title: "Family Members", trailing: "\(visibleMembers.count)")
+            if !widerFamilyContacts.isEmpty {
+                WarmSectionHeader(title: "Family Members", trailing: "\(widerFamilyContacts.count)")
                     .padding(.bottom, 8)
                     .padding(.top, 4)
 
-                ForEach(visibleMembers) { contact in
+                ForEach(widerFamilyContacts) { contact in
                     ContactRow(contact: contact, groups: groups)
                         .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
                         .padding(.bottom, 6)
