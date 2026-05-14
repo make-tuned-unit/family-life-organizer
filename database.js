@@ -1703,13 +1703,22 @@ class FamilyDB {
 
   getLists(userId) {
     return new Promise((resolve, reject) => {
-      this.db.all(`
-        SELECT l.*,
-          (SELECT COUNT(*) FROM list_items WHERE list_id = l.id AND is_done = 0) as active_count,
-          (SELECT COUNT(*) FROM list_items WHERE list_id = l.id) as total_count
-        FROM lists l
-        ORDER BY l.created_at ASC
-      `, [], (err, rows) => err ? reject(err) : resolve(rows));
+      const sql = userId
+        ? `SELECT l.*,
+            (SELECT COUNT(*) FROM list_items WHERE list_id = l.id AND is_done = 0) as active_count,
+            (SELECT COUNT(*) FROM list_items WHERE list_id = l.id) as total_count
+          FROM lists l
+          WHERE l.created_by = ? OR l.created_by IN (
+            SELECT gm2.user_id FROM group_members gm2
+            JOIN groups g ON g.id = gm2.group_id AND g.group_type = 'household'
+            WHERE gm2.group_id IN (SELECT group_id FROM group_members WHERE user_id = ?)
+          )
+          ORDER BY l.pinned DESC, l.created_at ASC`
+        : `SELECT l.*,
+            (SELECT COUNT(*) FROM list_items WHERE list_id = l.id AND is_done = 0) as active_count,
+            (SELECT COUNT(*) FROM list_items WHERE list_id = l.id) as total_count
+          FROM lists l ORDER BY l.created_at ASC`;
+      this.db.all(sql, userId ? [userId, userId] : [], (err, rows) => err ? reject(err) : resolve(rows));
     });
   }
 
