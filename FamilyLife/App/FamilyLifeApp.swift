@@ -25,6 +25,8 @@ struct FamilyLifeApp: App {
                         if let userId = authService.currentUser?.id {
                             messageCache.preload(api: apiService, userId: userId)
                         }
+                        // Request notification permission on first authenticated launch
+                        _ = await NotificationService.shared.ensurePermissionIfNeeded()
                     }
                 }
                 .onChange(of: authService.isAuthenticated) { _, isAuthenticated in

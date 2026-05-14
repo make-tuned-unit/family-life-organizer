@@ -34,6 +34,7 @@ struct ContentView: View {
 
 struct MainTabView: View {
     @Environment(APIService.self) private var api
+    @Environment(AuthService.self) private var auth
     @State private var selectedTab: MainTab = .home
     @State private var loadedTabs: Set<MainTab> = [.home]
     @State private var showingChat = false
@@ -101,7 +102,23 @@ struct MainTabView: View {
 
     private func pollUnread() async {
         while !Task.isCancelled {
+            // Update badge count
             unreadCount = (try? await api.fetchUnreadMessageCount()) ?? 0
+
+            // Fire local notifications for new messages
+            if await NotificationService.shared.isAuthorized() {
+                if let convos = try? await api.fetchConversations() {
+                    NotificationService.shared.checkForNewMessages(convos)
+                }
+                let currentUser = auth.currentUser?.name ?? ""
+                if let feed = try? await api.fetchActivity() {
+                    NotificationService.shared.checkForNewFeedItems(
+                        feed,
+                        currentUser: currentUser
+                    )
+                }
+            }
+
             try? await Task.sleep(for: .seconds(15))
         }
     }
