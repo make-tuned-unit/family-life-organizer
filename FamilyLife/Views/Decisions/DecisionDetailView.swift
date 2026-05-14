@@ -70,11 +70,7 @@ struct DecisionDetailView: View {
 
                 VStack(alignment: .leading, spacing: 8) {
                     HStack {
-                        if isCurrentUserCreator {
-                            ProfileAvatar(size: 24)
-                        } else {
-                            FamilyAvatar(initial: String(currentDecision.creator_name.prefix(1)).uppercased(), size: 24)
-                        }
+                        UserAvatar(name: currentDecision.creator_name, size: 24)
                         Text(currentDecision.creator_name)
                             .font(.subheadline.weight(.semibold))
                         Spacer()
