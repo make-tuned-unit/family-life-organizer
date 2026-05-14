@@ -61,6 +61,11 @@ struct LogProgressView: View {
         switch rivalry.challengeType {
         case .steps: "Steps"
         case .workout: "Workouts completed"
+        case .pushups: "Push-ups"
+        case .squats: "Squats"
+        case .situps: "Sit-ups"
+        case .plank: "Seconds held"
+        case .running: "Distance or minutes"
         case .habit: "Days completed"
         case .custom: "Value"
         }
@@ -70,6 +75,11 @@ struct LogProgressView: View {
         switch rivalry.challengeType {
         case .steps: "steps"
         case .workout: "workouts"
+        case .pushups: "push-ups"
+        case .squats: "squats"
+        case .situps: "sit-ups"
+        case .plank: "seconds"
+        case .running: "km"
         case .habit: "days"
         case .custom: "pts"
         }
