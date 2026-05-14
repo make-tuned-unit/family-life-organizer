@@ -148,6 +148,10 @@ class FamilyDB {
               this.db.run(`DELETE FROM group_members WHERE user_id IN (${userIds.join(',')})
                 AND group_id != ? AND group_id IN (SELECT id FROM groups WHERE group_type = 'household')`,
                 [householdId]);
+              // Remove non-jesse/sophie users from this household (e.g. Ariel wrongly merged in)
+              this.db.run(`DELETE FROM group_members WHERE group_id = ?
+                AND user_id IS NOT NULL AND user_id NOT IN (${userIds.join(',')})`,
+                [householdId]);
               // Rename to Fairbanks
               this.db.run("UPDATE groups SET name = 'Fairbanks' WHERE id = ?", [householdId], () => {
                 console.log(`✅ Fairbanks household = group ${householdId} with users ${userIds}`);

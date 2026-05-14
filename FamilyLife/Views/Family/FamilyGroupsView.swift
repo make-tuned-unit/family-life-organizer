@@ -301,6 +301,10 @@ struct GroupDetailView: View {
         group.created_by == auth.currentUser?.id
     }
 
+    private var isHousehold: Bool {
+        group.group_type == "household"
+    }
+
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(spacing: 0) {
@@ -365,29 +369,34 @@ struct GroupDetailView: View {
                     .padding(.bottom, 14)
                 }
 
-                // Tab selector
-                HStack(spacing: 0) {
-                    ForEach(["Feed", "Members"], id: \.self) { tab in
-                        let index = tab == "Feed" ? 0 : 1
-                        Text(tab)
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundStyle(selectedTab == index ? WarmPalette.cream1 : WarmPalette.ink2)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 8)
-                            .background(selectedTab == index ? WarmPalette.ink1 : .clear)
-                            .clipShape(Capsule())
-                            .onTapGesture { withAnimation { selectedTab = index } }
-                    }
-                }
-                .padding(4)
-                .background(WarmPalette.cardSurface, in: Capsule())
-                .padding(.horizontal, 22)
-                .padding(.bottom, 14)
-
-                if selectedTab == 0 {
-                    feedSection
-                } else {
+                if isHousehold {
+                    // Households: just show members, no feed tab
                     membersSection
+                } else {
+                    // Non-household groups: show Feed/Members tabs
+                    HStack(spacing: 0) {
+                        ForEach(["Feed", "Members"], id: \.self) { tab in
+                            let index = tab == "Feed" ? 0 : 1
+                            Text(tab)
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundStyle(selectedTab == index ? WarmPalette.cream1 : WarmPalette.ink2)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 8)
+                                .background(selectedTab == index ? WarmPalette.ink1 : .clear)
+                                .clipShape(Capsule())
+                                .onTapGesture { withAnimation { selectedTab = index } }
+                        }
+                    }
+                    .padding(4)
+                    .background(WarmPalette.cardSurface, in: Capsule())
+                    .padding(.horizontal, 22)
+                    .padding(.bottom, 14)
+
+                    if selectedTab == 0 {
+                        feedSection
+                    } else {
+                        membersSection
+                    }
                 }
             }
             .padding(.bottom, DesignTokens.Spacing.bottomBuffer)
@@ -401,8 +410,10 @@ struct GroupDetailView: View {
             }
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
-                    Button { showingNewPost = true } label: {
-                        Label("New Post", systemImage: "text.bubble")
+                    if !isHousehold {
+                        Button { showingNewPost = true } label: {
+                            Label("New Post", systemImage: "text.bubble")
+                        }
                     }
                     Button { showingAddMember = true } label: {
                         Label("Add Member", systemImage: "person.badge.plus")
