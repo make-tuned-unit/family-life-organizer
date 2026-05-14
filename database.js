@@ -106,44 +106,48 @@ class FamilyDB {
         if (err || !rows || rows.length < 2) return this._backfillGroupIds().then(resolve, reject);
 
         const households = [...new Set(rows.map(r => r.group_id))];
-        if (households.length <= 1) return this._backfillGroupIds().then(resolve, reject);
-
-        // They're in separate households — merge into the first one
-        const keepId = households[0];
-        const usersToMove = rows.filter(r => r.group_id !== keepId);
-
-        let pending = usersToMove.length;
-        if (pending === 0) return this._backfillGroupIds().then(resolve, reject);
-
-        for (const row of usersToMove) {
-          this.db.get('SELECT id FROM group_members WHERE group_id = ? AND user_id = ?',
-            [keepId, row.user_id], (err2, existing) => {
-              if (!err2 && !existing) {
-                this.db.run('INSERT INTO group_members (group_id, user_id, role, added_by) VALUES (?, ?, ?, ?)',
-                  [keepId, row.user_id, 'admin', row.user_id]);
-              }
-              // Remove from old household
-              this.db.run('DELETE FROM group_members WHERE group_id = ? AND user_id = ?',
-                [row.group_id, row.user_id]);
-              pending--;
-              if (pending === 0) {
-                // Rename to Fairbanks
-                this.db.run("UPDATE groups SET name = 'Fairbanks' WHERE id = ? AND name LIKE '%''s Home'",
-                  [keepId], () => {
-                    this._backfillGroupIds().then(resolve, reject);
-                  });
-              }
+        if (households.length <= 1) {
+          // Already merged — just ensure it's named Fairbanks
+          this.db.run("UPDATE groups SET name = 'Fairbanks' WHERE id = ? AND (name LIKE '%''s Home' OR name = 'Fairbanks')",
+            [households[0]], () => {
+              this._backfillGroupIds().then(resolve, reject);
             });
+          return;
         }
+
+        // They're in separate households — merge into the first one using serialize
+        const keepId = households[0];
+        const removeIds = households.slice(1);
+        const userIdsToMove = rows.filter(r => r.group_id !== keepId).map(r => r.user_id);
+
+        this.db.serialize(() => {
+          // Add users to the kept household (skip if already there)
+          for (const uid of userIdsToMove) {
+            this.db.run(`INSERT OR IGNORE INTO group_members (group_id, user_id, role, added_by)
+              SELECT ?, ?, 'admin', ? WHERE NOT EXISTS (
+                SELECT 1 FROM group_members WHERE group_id = ? AND user_id = ?
+              )`, [keepId, uid, uid, keepId, uid]);
+          }
+          // Remove from old households
+          for (const oldId of removeIds) {
+            this.db.run('DELETE FROM group_members WHERE group_id = ? AND user_id IN (' +
+              userIdsToMove.map(() => '?').join(',') + ')', [oldId, ...userIdsToMove]);
+          }
+          // Rename to Fairbanks
+          this.db.run("UPDATE groups SET name = 'Fairbanks' WHERE id = ?", [keepId], () => {
+            console.log(`✅ Merged households into Fairbanks (group ${keepId})`);
+            this._backfillGroupIds().then(resolve, reject);
+          });
+        });
       });
     });
   }
 
-  // Backfill group_id on records that don't have one
+  // Backfill group_id — runs EVERY startup, reassigns based on current group membership
   _backfillGroupIds() {
     return new Promise((resolve, reject) => {
       this.db.serialize(() => {
-        // Appointments: match person_tags to household members
+        // Appointments: always reassign based on person_tags → user's current household
         this.db.run(`
           UPDATE appointments SET group_id = (
             SELECT gm.group_id FROM users u
@@ -151,15 +155,20 @@ class FamilyDB {
             JOIN groups g ON g.id = gm.group_id AND g.group_type = 'household'
             WHERE appointments.person_tags LIKE '%' || u.name || '%'
             LIMIT 1
-          ) WHERE group_id IS NULL AND person_tags IS NOT NULL
+          ) WHERE person_tags IS NOT NULL
         `);
-        // Appointments without person_tags: assign to first household
+        // Appointments without person_tags: assign to first populated household
         this.db.run(`
           UPDATE appointments SET group_id = (
-            SELECT g.id FROM groups g WHERE g.group_type = 'household' ORDER BY g.id LIMIT 1
-          ) WHERE group_id IS NULL
+            SELECT g.id FROM groups g
+            JOIN group_members gm ON gm.group_id = g.id AND gm.user_id IS NOT NULL
+            WHERE g.group_type = 'household'
+            ORDER BY g.id LIMIT 1
+          ) WHERE group_id IS NULL OR group_id NOT IN (
+            SELECT group_id FROM group_members WHERE user_id IS NOT NULL
+          )
         `);
-        // Decisions: match creator_name
+        // Decisions: always reassign based on creator_name
         this.db.run(`
           UPDATE decisions SET group_id = (
             SELECT gm.group_id FROM users u
@@ -167,9 +176,11 @@ class FamilyDB {
             JOIN groups g ON g.id = gm.group_id AND g.group_type = 'household'
             WHERE u.name = decisions.creator_name
             LIMIT 1
-          ) WHERE group_id IS NULL
+          ) WHERE group_id IS NULL OR group_id NOT IN (
+            SELECT group_id FROM group_members WHERE user_id IS NOT NULL
+          )
         `);
-        // Rivalries: match initiator_name
+        // Rivalries: always reassign based on initiator_name
         this.db.run(`
           UPDATE rivalries SET group_id = (
             SELECT gm.group_id FROM users u
@@ -177,7 +188,9 @@ class FamilyDB {
             JOIN groups g ON g.id = gm.group_id AND g.group_type = 'household'
             WHERE u.name = rivalries.initiator_name
             LIMIT 1
-          ) WHERE group_id IS NULL
+          ) WHERE group_id IS NULL OR group_id NOT IN (
+            SELECT group_id FROM group_members WHERE user_id IS NOT NULL
+          )
         `, (err) => {
           if (err) console.error('Backfill error:', err.message);
           resolve();
