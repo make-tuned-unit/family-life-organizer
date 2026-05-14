@@ -1,4 +1,5 @@
 import SwiftUI
+import AVFoundation
 
 // MARK: - Family Avatar
 // Uses Circle fill + overlay — NO .clipShape, NO offscreen render pass.
@@ -46,23 +47,42 @@ struct ProfileAvatar: View {
     var size: CGFloat = 32
 
     var body: some View {
-        Group {
-            if let uiImage = auth.profileUIImage {
-                Image(uiImage: uiImage)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(width: size, height: size)
-                    .clipShape(Circle())
-                    .overlay { Circle().stroke(AccentTheme.sage.color, lineWidth: 3) }
-            } else {
-                FamilyAvatar(
-                    initial: String(auth.currentUser?.name.prefix(1) ?? "?").uppercased(),
-                    size: size
-                )
-            }
+        if let uiImage = auth.profileUIImage {
+            Image(uiImage: Self.circularCrop(uiImage, size: size))
+                .resizable()
+                .frame(width: size, height: size)
+        } else {
+            FamilyAvatar(
+                initial: String(auth.currentUser?.name.prefix(1) ?? "?").uppercased(),
+                size: size
+            )
         }
-        .frame(width: size, height: size)
-        .fixedSize()
+    }
+
+    /// Pre-render a circular crop with sage border into a new UIImage.
+    /// This guarantees a perfect circle regardless of SwiftUI layout.
+    private static func circularCrop(_ source: UIImage, size: CGFloat) -> UIImage {
+        let scale = UIScreen.main.scale
+        let px = size * scale
+        let borderWidth: CGFloat = 3 * scale
+        let renderer = UIGraphicsImageRenderer(size: CGSize(width: px, height: px))
+        return renderer.image { ctx in
+            let rect = CGRect(x: 0, y: 0, width: px, height: px)
+            let inset = rect.insetBy(dx: borderWidth / 2, dy: borderWidth / 2)
+
+            // Draw image clipped to circle
+            let clipPath = UIBezierPath(ovalIn: rect.insetBy(dx: borderWidth, dy: borderWidth))
+            ctx.cgContext.addPath(clipPath.cgPath)
+            ctx.cgContext.clip()
+            source.draw(in: AVMakeRect(aspectRatio: source.size, insideRect: rect.insetBy(dx: borderWidth, dy: borderWidth)).insetBy(dx: -(px * 0.15), dy: -(px * 0.15)))
+
+            // Draw border
+            ctx.cgContext.resetClip()
+            UIColor(AccentTheme.sage.color).setStroke()
+            let borderPath = UIBezierPath(ovalIn: inset)
+            borderPath.lineWidth = borderWidth
+            borderPath.stroke()
+        }
     }
 }
 
