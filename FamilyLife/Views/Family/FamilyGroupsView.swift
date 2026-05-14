@@ -47,7 +47,7 @@ struct FamilyGroupsView: View {
         }
         .sheet(isPresented: $showingAddContact) {
             AddContactSheet {
-                await household.reload(api: api)
+                await household.reload(api: api, currentUserId: auth.currentUser?.id)
                 await loadAll()
             }
         }
@@ -58,7 +58,7 @@ struct FamilyGroupsView: View {
             NavigationStack {
                 GroupDetailView(group: group) {
                     await loadAll()
-                    await household.reload(api: api)
+                    await household.reload(api: api, currentUserId: auth.currentUser?.id)
                 }
             }
         }
@@ -160,15 +160,23 @@ struct FamilyGroupsView: View {
 
     // MARK: - Contacts
 
+    private var visibleMembers: [APIService.ContactResponse] {
+        guard let user = auth.currentUser else { return household.members }
+        return household.members.filter {
+            $0.name.localizedCaseInsensitiveCompare(user.name) != .orderedSame
+            && $0.name.localizedCaseInsensitiveCompare(user.username) != .orderedSame
+        }
+    }
+
     private var contactsSection: some View {
         VStack(spacing: 0) {
-            if !household.members.isEmpty {
-                WarmSectionHeader(title: "Family Members", trailing: "\(household.members.count)")
+            if !visibleMembers.isEmpty {
+                WarmSectionHeader(title: "Family Members", trailing: "\(visibleMembers.count)")
                     .padding(.bottom, 8)
                     .padding(.top, 4)
 
-                ForEach(household.members) { contact in
-                    ContactRow(contact: contact)
+                ForEach(visibleMembers) { contact in
+                    ContactRow(contact: contact, groups: groups)
                         .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
                         .padding(.bottom, 6)
                 }
@@ -232,6 +240,7 @@ struct GroupRow: View {
 
 struct ContactRow: View {
     let contact: APIService.ContactResponse
+    var groups: [APIService.GroupResponse] = []
 
     var body: some View {
         HStack(spacing: 12) {

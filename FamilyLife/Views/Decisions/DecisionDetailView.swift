@@ -362,7 +362,8 @@ struct DecisionDetailView: View {
                 creator_name: currentDecision.creator_name,
                 status: DecisionStatus.resolved.rawValue,
                 created_at: currentDecision.created_at,
-                expires_at: currentDecision.expires_at
+                expires_at: currentDecision.expires_at,
+                group_id: currentDecision.group_id
             )
             await onChanged?()
         } catch {
@@ -393,7 +394,8 @@ struct DecisionDetailView: View {
                 creator_name: "Jesse",
                 status: "active",
                 created_at: "2026-04-08T00:00:00Z",
-                expires_at: "2026-04-15T00:00:00Z"
+                expires_at: "2026-04-15T00:00:00Z",
+                group_id: nil
             )
         )
         .environment(APIService())

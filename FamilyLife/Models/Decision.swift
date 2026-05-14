@@ -126,6 +126,7 @@ struct DecisionResponse: Codable, Identifiable {
     let status: String
     let created_at: String?
     let expires_at: String?
+    let group_id: Int?
 }
 
 struct DecisionReactionResponse: Codable, Identifiable {
