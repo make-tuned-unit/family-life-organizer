@@ -39,8 +39,7 @@ struct FamilyAvatar: View {
     }
 }
 
-// MARK: - Profile Avatar
-// Uses pre-rendered circular thumbnail — NO .clipShape.
+// MARK: - Profile Avatar (current user only)
 
 struct ProfileAvatar: View {
     @Environment(AuthService.self) private var auth
@@ -60,6 +59,40 @@ struct ProfileAvatar: View {
                 size: size
             )
         }
+    }
+}
+
+// MARK: - User Avatar (any user — checks profile image cache, falls back to initials)
+
+struct UserAvatar: View {
+    let name: String
+    var userId: Int? = nil
+    var size: CGFloat = 32
+    @Environment(AuthService.self) private var auth
+    @Environment(ProfileImageCache.self) private var profileCache
+
+    var body: some View {
+        if isCurrentUser, let uiImage = auth.profileUIImage {
+            profileImage(uiImage)
+        } else if let uid = userId, let img = profileCache.image(for: uid) {
+            profileImage(img)
+        } else {
+            FamilyAvatar(initial: String(name.prefix(1)).uppercased(), size: size)
+        }
+    }
+
+    private var isCurrentUser: Bool {
+        guard let user = auth.currentUser else { return false }
+        return name.localizedCaseInsensitiveCompare(user.name) == .orderedSame
+            || name.localizedCaseInsensitiveCompare(user.username) == .orderedSame
+    }
+
+    private func profileImage(_ img: UIImage) -> some View {
+        Image(uiImage: img)
+            .resizable()
+            .scaledToFill()
+            .frame(width: size, height: size)
+            .clipShape(Circle())
     }
 }
 
