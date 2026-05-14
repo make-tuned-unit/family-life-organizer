@@ -462,6 +462,7 @@ struct HomeView: View {
                     HStack(spacing: 4) {
                         Text(feedFilterGroupId.flatMap { fid in userGroups.first { $0.id == fid }?.name } ?? "All")
                             .font(.system(size: 13, weight: .medium))
+                            .lineLimit(1)
                         Image(systemName: "chevron.down")
                             .font(.system(size: 10, weight: .semibold))
                     }
@@ -469,6 +470,7 @@ struct HomeView: View {
                     .padding(.horizontal, 10)
                     .padding(.vertical, 6)
                     .background(WarmPalette.cardSurface, in: Capsule())
+                    .fixedSize()
                 }
             }
             .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
