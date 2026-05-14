@@ -2849,6 +2849,36 @@ app.put('/api/lists/:id', requireAuth, async (req, res) => {
   }
 });
 
+// Pin a list to the home screen KPI card (unpins any other)
+app.post('/api/lists/:id/pin', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    // Unpin all lists first
+    await new Promise((resolve, reject) => {
+      db.db.run('UPDATE lists SET pinned = 0 WHERE pinned = 1', (err) => err ? reject(err) : resolve());
+    });
+    // Pin the selected one
+    await db.updateList(req.params.id, { pinned: 1 });
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+app.post('/api/lists/:id/unpin', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    await db.updateList(req.params.id, { pinned: 0 });
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
 app.delete('/api/lists/:id', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {

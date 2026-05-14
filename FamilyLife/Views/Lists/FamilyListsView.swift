@@ -99,7 +99,7 @@ struct FamilyListsView: View {
                         withAnimation(.easeInOut(duration: 0.2)) { selectedList = list }
                     } label: {
                         HStack(spacing: 6) {
-                            Image(systemName: list.icon ?? "list.bullet")
+                            Image(systemName: list.isPinned ? "pin.fill" : (list.icon ?? "list.bullet"))
                                 .font(.system(size: 12))
                             Text(list.name)
                                 .font(.system(size: 13, weight: .semibold))
@@ -117,6 +117,31 @@ struct FamilyListsView: View {
                         .background(WarmPalette.cardSurface, in: Capsule())
                     }
                     .buttonStyle(.plain)
+                    .contextMenu {
+                        Button {
+                            Task {
+                                if list.isPinned {
+                                    try? await api.unpinList(id: list.id)
+                                } else {
+                                    try? await api.pinList(id: list.id)
+                                }
+                                await loadLists()
+                            }
+                        } label: {
+                            Label(
+                                list.isPinned ? "Remove from Home" : "Show on Home",
+                                systemImage: list.isPinned ? "pin.slash" : "pin.fill"
+                            )
+                        }
+                        Button(role: .destructive) {
+                            Task {
+                                try? await api.deleteList(id: list.id)
+                                await loadLists()
+                            }
+                        } label: {
+                            Label("Delete List", systemImage: "trash")
+                        }
+                    }
                 }
 
                 // Quick add list button
