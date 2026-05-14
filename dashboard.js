@@ -2670,6 +2670,37 @@ app.get('/api/activity', requireAuth, async (req, res) => {
 });
 
 // ============================================
+// Admin diagnostic + manual fix
+// ============================================
+
+app.get('/api/admin/diagnostic', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const query = (sql, params = []) => new Promise((resolve, reject) => {
+      db.db.all(sql, params, (err, rows) => err ? reject(err) : resolve(rows));
+    });
+    const users = await query('SELECT id, username, name FROM users');
+    const groups = await query('SELECT * FROM groups');
+    const members = await query(`SELECT gm.*, u.name as user_name, u.username
+      FROM group_members gm LEFT JOIN users u ON u.id = gm.user_id`);
+    const apptStats = await query(`SELECT group_id, COUNT(*) as count FROM appointments GROUP BY group_id`);
+    const decisionStats = await query(`SELECT group_id, COUNT(*) as count FROM decisions GROUP BY group_id`);
+    const totalAppts = await query('SELECT COUNT(*) as count FROM appointments');
+    res.json({ users, groups, members, apptStats, decisionStats, totalAppts: totalAppts[0]?.count });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+  finally { db.close(); }
+});
+
+app.post('/api/admin/fix-household', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    await db.runHouseholdMigrations();
+    res.json({ success: true, message: 'Household migration completed' });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+  finally { db.close(); }
+});
+
+// ============================================
 // Lists
 // ============================================
 
