@@ -1608,6 +1608,10 @@ class FamilyDB {
         LEFT JOIN groups g ON g.id = fp.group_id
         WHERE fp.group_id IN (${myGroups})
           AND fp.post_type != 'text'
+          AND (
+            (fp.post_type NOT IN ('decision', 'poll') AND (fp.reference_type IS NULL OR fp.reference_type != 'decision'))
+            OR EXISTS (SELECT 1 FROM decisions d WHERE d.id = fp.reference_id AND d.status = 'active')
+          )
         UNION ALL
         SELECT 'comment' as feed_type, fc.post_id as ref_id,
           (SELECT title FROM feed_posts WHERE id = fc.post_id) as title,
