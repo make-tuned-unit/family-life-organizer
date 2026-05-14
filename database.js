@@ -1317,21 +1317,37 @@ class FamilyDB {
   // Posts/comments/reactions are filtered to groups the user belongs to
   getActivityFeed(limit = 20, userId = null) {
     return new Promise((resolve, reject) => {
+      const uid = userId ? parseInt(userId) : null;
       // Subquery for user's group IDs
-      const myGroups = userId
-        ? `SELECT group_id FROM group_members WHERE user_id = ${parseInt(userId)}`
+      const myGroups = uid
+        ? `SELECT group_id FROM group_members WHERE user_id = ${uid}`
         : `SELECT id FROM groups`;
+      // Subquery for household members (to scope events/decisions)
+      const myHouseholdMembers = uid
+        ? `SELECT u.name FROM users u JOIN group_members gm ON gm.user_id = u.id
+           JOIN groups g ON g.id = gm.group_id WHERE g.group_type = 'household'
+           AND gm.group_id IN (SELECT group_id FROM group_members WHERE user_id = ${uid})`
+        : `SELECT name FROM users`;
       const sql = `
         SELECT 'decision' as feed_type, id as ref_id, title, NULL as body,
           creator_name as author, status, created_at,
           0 as reaction_count, 0 as comment_count, NULL as author_id, NULL as group_id, NULL as group_name
         FROM decisions WHERE status = 'active'
+          AND creator_name IN (${myHouseholdMembers})
         UNION ALL
         SELECT 'event' as feed_type, a.id as ref_id, a.title, a.location as body,
           COALESCE(a.person_tags, 'Family') as author, 'upcoming' as status,
           a.created_at,
           0 as reaction_count, 0 as comment_count, NULL as author_id, NULL as group_id, NULL as group_name
-        FROM appointments a WHERE a.appointment_date >= date('now') AND a.appointment_date <= date('now', '+7 days')
+        FROM appointments a WHERE a.appointment_date >= date('now') AND a.appointment_date <= date('now', '+7 days')${uid ? `
+          AND EXISTS (
+            SELECT 1 FROM users hu
+            JOIN group_members hgm ON hgm.user_id = hu.id
+            JOIN groups hg ON hg.id = hgm.group_id AND hg.group_type = 'household'
+            WHERE hgm.group_id IN (SELECT group_id FROM group_members WHERE user_id = ${uid})
+              AND hg.group_type = 'household'
+              AND (a.person_tags LIKE '%' || hu.name || '%' OR a.person_tags IS NULL)
+          )` : ''}
         UNION ALL
         SELECT 'coverage' as feed_type, cr.id as ref_id, cr.reason as title, cr.note as body,
           COALESCE(u.name, u.username, 'Family') as author, cr.status,
