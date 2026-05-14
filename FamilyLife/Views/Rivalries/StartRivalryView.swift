@@ -112,7 +112,8 @@ struct StartRivalryView: View {
     private func typeColor(_ type: ChallengeType) -> Color {
         switch type {
         case .steps: AccentTheme.ocean.color
-        case .workout: AccentTheme.saffron.color
+        case .workout, .pushups, .squats, .situps, .plank: AccentTheme.saffron.color
+        case .running: AccentTheme.ocean.color
         case .habit: WarmPalette.good
         case .custom: AccentTheme.mauve.color
         }

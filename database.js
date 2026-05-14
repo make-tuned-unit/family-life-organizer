@@ -1670,7 +1670,9 @@ class FamilyDB {
         SELECT
           (SELECT COUNT(*) FROM tasks WHERE status = 'active' AND date(due_date) = date('now')) as tasks_today,
           (SELECT COUNT(*) FROM appointments WHERE date(appointment_date) = date('now') ${groupFilter}) as appointments_today,
-          (SELECT COUNT(*) FROM groceries WHERE status = 'needed') as groceries_needed,
+          (SELECT COUNT(*) FROM list_items WHERE is_done = 0 AND list_id IN (
+            SELECT id FROM lists WHERE LOWER(name) = 'grocery' LIMIT 1
+          )) as groceries_needed,
           (SELECT COUNT(*) FROM tasks WHERE status = 'active' AND due_date < date('now')) as overdue_tasks
       `;
       this.db.get(sql, [], (err, row) => {
