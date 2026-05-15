@@ -164,9 +164,9 @@ struct StartRivalryView: View {
             try await api.addRivalry(body)
             await onSaved()
             dismiss()
-        } catch {
-            guard !error.isCancellation else { return }
-            self.error = error.localizedDescription
+        } catch let err {
+            guard !err.isCancellation else { return }
+            self.error = err.localizedDescription
             isSaving = false
         }
     }
