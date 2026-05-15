@@ -5,6 +5,7 @@ struct RivalriesView: View {
 
     @Environment(\.dismiss) private var dismiss
     @Environment(APIService.self) private var api
+    @Environment(AuthService.self) private var auth
 
     @State private var rivalries: [RivalryResponse] = []
     @State private var leaderboard: [RivalryLeaderboardResponse] = []
@@ -136,6 +137,11 @@ struct RivalriesView: View {
             let fetchedRivalries = try await api.fetchRivalries()
             rivalries = fetchedRivalries
             leaderboard = try await api.fetchRivalryLeaderboard()
+            // Cache current user's XP for level-up detection
+            if let myName = auth.currentUser?.name,
+               let myEntry = leaderboard.first(where: { $0.member_name.localizedCaseInsensitiveCompare(myName) == .orderedSame }) {
+                UserDefaults.standard.set(myEntry.total_points, forKey: "rivalry_xp")
+            }
             var nextEntries: [Int: [RivalryEntryResponse]] = [:]
             for rivalry in fetchedRivalries {
                 nextEntries[rivalry.id] = try await api.fetchRivalryEntries(id: rivalry.id)
@@ -246,10 +252,15 @@ struct LeaderboardCardRemote: View {
                 .padding(.horizontal)
 
             VStack(spacing: 10) {
-                ForEach(points.prefix(5)) { member in
-                    HStack {
+                ForEach(Array(points.prefix(5).enumerated()), id: \.element.id) { index, member in
+                    HStack(spacing: 10) {
+                        Text("\(index + 1)")
+                            .font(.subheadline.bold())
+                            .foregroundStyle(index == 0 ? AccentTheme.saffron.color : WarmPalette.ink3)
+                            .frame(width: 20)
                         Text(member.member_name)
                             .font(.subheadline.weight(.medium))
+                        LevelBadge(xp: member.total_points, compact: true)
                         Spacer()
                         Text("\(member.total_points) pts")
                             .font(.subheadline.bold())

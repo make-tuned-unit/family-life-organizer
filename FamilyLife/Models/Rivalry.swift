@@ -191,6 +191,15 @@ struct RivalryEntryResponse: Codable, Identifiable {
     let logged_at: String?
 }
 
+struct RivalryCompleteResponse: Codable {
+    let success: Bool
+    let winner_name: String?
+    let initiator_total: Double
+    let opponent_total: Double
+    let message: String?
+    let is_tie: Bool?
+}
+
 struct RivalryLeaderboardResponse: Codable, Identifiable {
     var id: String { member_name }
     let member_name: String

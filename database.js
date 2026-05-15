@@ -999,6 +999,49 @@ class FamilyDB {
     });
   }
 
+  getUserIdByName(name) {
+    return new Promise((resolve, reject) => {
+      this.db.get('SELECT id FROM users WHERE name = ? COLLATE NOCASE', [name], (err, row) => {
+        if (err) reject(err);
+        else resolve(row?.id || null);
+      });
+    });
+  }
+
+  completeRivalryWithTotals(id) {
+    return new Promise((resolve, reject) => {
+      this.db.get('SELECT * FROM rivalries WHERE id = ?', [id], (err, rivalry) => {
+        if (err) return reject(err);
+        if (!rivalry) return reject(new Error('Rivalry not found'));
+        if (rivalry.status === 'completed') {
+          // Already completed — return existing result
+          this.db.all('SELECT member_name, SUM(value) as total FROM rivalry_entries WHERE rivalry_id = ? GROUP BY member_name', [id], (err2, totals) => {
+            if (err2) return reject(err2);
+            const iTotal = totals.find(t => t.member_name.toLowerCase() === rivalry.initiator_name.toLowerCase())?.total || 0;
+            const oTotal = totals.find(t => t.member_name.toLowerCase() === rivalry.opponent_name.toLowerCase())?.total || 0;
+            return resolve({ rivalry, initiator_total: iTotal, opponent_total: oTotal, winner_name: rivalry.winner_name, already_completed: true });
+          });
+          return;
+        }
+        // Compute totals
+        this.db.all('SELECT member_name, SUM(value) as total FROM rivalry_entries WHERE rivalry_id = ? GROUP BY member_name', [id], (err2, totals) => {
+          if (err2) return reject(err2);
+          const iTotal = totals.find(t => t.member_name.toLowerCase() === rivalry.initiator_name.toLowerCase())?.total || 0;
+          const oTotal = totals.find(t => t.member_name.toLowerCase() === rivalry.opponent_name.toLowerCase())?.total || 0;
+          let winnerName = null;
+          if (iTotal > oTotal) winnerName = rivalry.initiator_name;
+          else if (oTotal > iTotal) winnerName = rivalry.opponent_name;
+          // Update rivalry
+          this.db.run('UPDATE rivalries SET status = ?, winner_name = ? WHERE id = ?',
+            ['completed', winnerName, id], (err3) => {
+              if (err3) return reject(err3);
+              resolve({ rivalry: { ...rivalry, status: 'completed', winner_name: winnerName }, initiator_total: iTotal, opponent_total: oTotal, winner_name: winnerName, already_completed: false });
+            });
+        });
+      });
+    });
+  }
+
   getRivalryLeaderboard(userId = null) {
     return new Promise((resolve, reject) => {
       const groupFilter = userId
