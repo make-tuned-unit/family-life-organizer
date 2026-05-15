@@ -389,6 +389,7 @@ struct GroupChatView: View {
 struct InlinePollCard: View {
     let decisionId: Int
     let title: String
+    var isOwn: Bool = false
     @Environment(APIService.self) private var api
     @Environment(AuthService.self) private var auth
     @State private var decision: DecisionResponse?
@@ -454,7 +455,10 @@ struct InlinePollCard: View {
         }
         .padding(10)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(TabAccent.decisions.color.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
+        .background(
+            isOwn ? AnyShapeStyle(Color.white.opacity(0.95)) : AnyShapeStyle(TabAccent.decisions.color.opacity(0.08)),
+            in: RoundedRectangle(cornerRadius: 12)
+        )
         .task { await load() }
     }
 
@@ -501,7 +505,7 @@ struct GroupMessageBubble: View {
 
                 // Inline decision/poll card
                 if (post.post_type == "decision" || post.post_type == "poll"), let refId = post.reference_id {
-                    InlinePollCard(decisionId: refId, title: post.title ?? "Decision")
+                    InlinePollCard(decisionId: refId, title: post.title ?? "Decision", isOwn: isOwn)
                 }
 
                 // Photo
