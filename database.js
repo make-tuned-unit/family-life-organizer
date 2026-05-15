@@ -92,6 +92,9 @@ class FamilyDB {
         this.db.run('ALTER TABLE users ADD COLUMN last_lng REAL', () => {});
         this.db.run('ALTER TABLE users ADD COLUMN last_location_name TEXT', () => {});
         this.db.run('ALTER TABLE lists ADD COLUMN pinned BOOLEAN DEFAULT 0', () => {});
+        // Grocery household isolation
+        this.db.run('ALTER TABLE groceries ADD COLUMN group_id INTEGER REFERENCES groups(id)', () => {});
+        this.db.run('CREATE INDEX IF NOT EXISTS idx_groceries_group ON groceries(group_id)', () => {});
         this.db.run('ALTER TABLE users ADD COLUMN last_location_at DATETIME', (err) => {
           if (err) console.error('Migration error:', err.message);
           resolve();
@@ -241,9 +244,19 @@ class FamilyDB {
             });
           // Assign ALL rivalries to the primary household
           this.db.run('UPDATE rivalries SET group_id = ? WHERE group_id IS NULL OR group_id != ?',
-            [householdId, householdId], function(err) {
-              if (err) console.error('Backfill error:', err.message);
-              else console.log(`Backfill: updated ${this.changes} rivalries to household ${householdId}`);
+            [householdId, householdId], function() {
+              console.log(`Backfill: updated ${this.changes} rivalries to household ${householdId}`);
+            });
+          // Assign groceries to household based on who added them; default to primary household for jesse/sophie
+          this.db.run(`UPDATE groceries SET group_id = (
+            SELECT gm.group_id FROM users u
+            JOIN group_members gm ON gm.user_id = u.id
+            JOIN groups g ON g.id = gm.group_id AND g.group_type = 'household'
+            WHERE u.username = groceries.added_by
+            LIMIT 1
+          ) WHERE group_id IS NULL`, function(err) {
+              if (err) console.error('Backfill groceries error:', err.message);
+              else console.log(`Backfill: updated ${this.changes} groceries with household group_id`);
               resolve();
             });
         });
@@ -333,11 +346,11 @@ class FamilyDB {
   }
 
   // Grocery operations
-  addGrocery(item, category = null, quantity = '1') {
+  addGrocery(item, category = null, quantity = '1', addedBy = 'jesse', groupId = null) {
     return new Promise((resolve, reject) => {
       this.db.run(
-        'INSERT INTO groceries (item, category, quantity) VALUES (?, ?, ?)',
-        [item, category, quantity],
+        'INSERT INTO groceries (item, category, quantity, added_by, group_id) VALUES (?, ?, ?, ?, ?)',
+        [item, category, quantity, addedBy, groupId],
         function(err) {
           if (err) reject(err);
           else resolve({ id: this.lastID, item, category, quantity });
@@ -346,16 +359,18 @@ class FamilyDB {
     });
   }
 
-  getGroceries(status = 'needed') {
+  getGroceries(status = 'needed', userId = null) {
     return new Promise((resolve, reject) => {
-      this.db.all(
-        'SELECT * FROM groceries WHERE status = ? ORDER BY category, item',
-        [status],
-        (err, rows) => {
-          if (err) reject(err);
-          else resolve(rows);
-        }
-      );
+      let sql = 'SELECT * FROM groceries WHERE status = ?';
+      if (userId) {
+        const uid = parseInt(userId);
+        sql += ` AND (group_id IN (SELECT group_id FROM group_members WHERE user_id = ${uid}) OR group_id IS NULL)`;
+      }
+      sql += ' ORDER BY category, item';
+      this.db.all(sql, [status], (err, rows) => {
+        if (err) reject(err);
+        else resolve(rows);
+      });
     });
   }
 
