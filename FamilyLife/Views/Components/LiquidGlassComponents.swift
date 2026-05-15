@@ -47,24 +47,25 @@ struct ProfileAvatar: View {
     var size: CGFloat = 32
 
     var body: some View {
-        Group {
-            if let source = auth.profileUIImage {
-                Image(uiImage: source)
-                    .resizable()
-                    .scaledToFill()
-            } else {
-                Circle()
-                    .fill(Color.green.opacity(0.6))
-                    .overlay {
-                        Text(auth.currentUser?.name.prefix(1).uppercased() ?? "?")
-                            .font(.system(size: size * 0.42, weight: .bold))
-                            .foregroundStyle(.white)
-                    }
+        Color.clear
+            .frame(width: size, height: size)
+            .overlay {
+                if let source = auth.profileUIImage {
+                    Image(uiImage: source)
+                        .resizable()
+                        .scaledToFill()
+                } else {
+                    Circle()
+                        .fill(Color.green.opacity(0.6))
+                        .overlay {
+                            Text(auth.currentUser?.name.prefix(1).uppercased() ?? "?")
+                                .font(.system(size: size * 0.42, weight: .bold))
+                                .foregroundStyle(.white)
+                        }
+                }
             }
-        }
-        .frame(width: size, height: size)
-        .clipShape(Circle())
-        .overlay(Circle().stroke(AccentTheme.sage.color, lineWidth: 2))
+            .clipShape(Circle())
+            .overlay(Circle().stroke(AccentTheme.sage.color, lineWidth: 2))
     }
 }
 
