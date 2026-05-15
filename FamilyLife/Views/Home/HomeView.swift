@@ -51,6 +51,10 @@ struct HomeView: View {
             }
             .padding(.bottom, DesignTokens.Spacing.bottomBuffer)
         }
+        .refreshable {
+            await viewModel.loadAll(api: api, userName: auth.currentUser?.name, username: auth.currentUser?.username)
+            checkFeedNotifications()
+        }
         .background { AmbientBackground(style: .home) }
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackgroundVisibility(.hidden, for: .navigationBar)
@@ -61,18 +65,7 @@ struct HomeView: View {
                 }
             }
             ToolbarItem(placement: .topBarTrailing) {
-                HStack(spacing: 14) {
-                    Button {
-                        Task {
-                            await viewModel.loadAll(api: api, userName: auth.currentUser?.name, username: auth.currentUser?.username)
-                            checkFeedNotifications()
-                        }
-                    } label: {
-                        Image(systemName: "arrow.clockwise")
-                            .font(.system(size: 14, weight: .medium))
-                            .foregroundStyle(WarmPalette.ink2)
-                    }
-                    Menu {
+                Menu {
                         Button { showingNewPost = true } label: {
                             Label("New Post", systemImage: "text.bubble")
                         }
@@ -437,10 +430,13 @@ struct HomeView: View {
     private var statsGrid: some View {
         HStack(spacing: 8) {
             WarmStatTile(label: "Tasks", value: "\(viewModel.summary?.tasks_today ?? 0)", sub: "today")
+                .onTapGesture { selectedTab = .lists }
             WarmStatTile(label: "Events", value: "\(eventCount)", sub: eventSub)
                 .onTapGesture { withAnimation { eventRange = (eventRange + 1) % 3 } }
             WarmStatTile(label: viewModel.summary?.pinned_list_name ?? "List", value: "\(viewModel.summary?.groceries_needed ?? 0)", sub: "items")
+                .onTapGesture { selectedTab = .lists }
             WarmStatTile(label: "Overdue", value: "\(viewModel.summary?.overdue_tasks ?? 0)", sub: "tasks")
+                .onTapGesture { selectedTab = .lists }
         }
         .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
         .padding(.bottom, 14)
@@ -465,7 +461,7 @@ struct HomeView: View {
                             tagInitial: appt.person_tags.flatMap { $0.first.map(String.init) }
                         )
                         .contentShape(Rectangle())
-                        .onTapGesture { selectedFeedEvent = appt }
+                        .onTapGesture { selectedTab = .calendar }
                     }
                     if viewModel.todayAppointments.count < 3 {
                         ForEach(Array(viewModel.activeTasks.prefix(3 - viewModel.todayAppointments.count).enumerated()), id: \.element.id) { _, task in

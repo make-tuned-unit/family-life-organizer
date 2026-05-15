@@ -838,6 +838,15 @@ class FamilyDB {
     });
   }
 
+  getDecisionById(id) {
+    return new Promise((resolve, reject) => {
+      this.db.get('SELECT * FROM decisions WHERE id = ?', [id], (err, row) => {
+        if (err) reject(err);
+        else resolve(row ? { ...row, poll_options: this.parseJSONList(row.poll_options) } : null);
+      });
+    });
+  }
+
   updateDecision(id, updates) {
     return new Promise((resolve, reject) => {
       const fields = [];
