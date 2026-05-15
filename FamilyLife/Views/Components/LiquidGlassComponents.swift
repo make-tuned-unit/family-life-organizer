@@ -55,8 +55,6 @@ struct ProfileAvatar: View {
                 borderColor: UIColor(borderColor),
                 borderWidth: borderWidth
             ))
-            .resizable()
-            .frame(width: size, height: size)
         } else {
             Circle()
                 .fill(Color.green.opacity(0.6))
