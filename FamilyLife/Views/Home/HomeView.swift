@@ -258,29 +258,47 @@ struct HomeView: View {
         currentLocationLabel == "Home" ? TabAccent.home.color : AccentTheme.ocean.color
     }
 
-    @ViewBuilder
     private var familyStatusSubtitle: some View {
+        Text(familyStatusText)
+            .font(.system(size: 15))
+            .foregroundStyle(WarmPalette.ink2)
+    }
+
+    private var familyStatusText: String {
         if let trip = viewModel.activeTrips.first {
-            Text("\(trip.traveler.capitalized) is on the way home.")
-                .font(.system(size: 15))
-                .foregroundStyle(WarmPalette.ink2)
-        } else {
-            let othersAway = presenceMembers.filter { member in
-                member.id != auth.currentUser?.id
-                && member.last_location_name != nil
-                && member.last_location_name != "Home"
-                && member.last_location_name != "Fairbanks"
-            }
-            if let away = othersAway.first {
-                Text("\(away.name) is at \(away.last_location_name ?? "away").")
-                    .font(.system(size: 15))
-                    .foregroundStyle(WarmPalette.ink2)
-            } else {
-                Text("Everyone's home. Quiet evening ahead.")
-                    .font(.system(size: 15))
-                    .foregroundStyle(WarmPalette.ink2)
-            }
+            return "\(trip.traveler.capitalized) is on the way home."
         }
+
+        let othersAway = presenceMembers.filter { member in
+            member.id != auth.currentUser?.id
+            && member.last_location_name != nil
+            && member.last_location_name != "Home"
+            && member.last_location_name != "Fairbanks"
+        }
+
+        if othersAway.count > 1 {
+            let names = ListFormatter.localizedString(byJoining: othersAway.map(\.name))
+            return "\(names) are out."
+        } else if let away = othersAway.first {
+            return "\(away.name) is at \(away.last_location_name ?? "away")."
+        }
+
+        // Everyone's home — reflect time + what's actually on the schedule
+        let hour = Calendar.current.component(.hour, from: Date())
+        let events = viewModel.todayAppointments.count
+        let tasks = viewModel.summary?.tasks_today ?? 0
+
+        if events > 0 {
+            let when = hour < 12 ? "today" : hour < 17 ? "this afternoon" : "tonight"
+            return "\(events) event\(events == 1 ? "" : "s") \(when)."
+        }
+
+        if tasks > 0 {
+            return "\(tasks) task\(tasks == 1 ? "" : "s") on the list."
+        }
+
+        let quiet = hour < 12 ? "Easy morning ahead." : hour < 17 ? "Quiet afternoon." : "Quiet night ahead."
+        return "Everyone's home. \(quiet)"
     }
 
     // MARK: - Presence Row
