@@ -95,10 +95,13 @@ struct UserAvatar: View {
     }
 
     private func profileImage(_ img: UIImage) -> some View {
-        Image(uiImage: img)
-            .resizable()
-            .scaledToFill()
+        Color.clear
             .frame(width: size, height: size)
+            .overlay {
+                Image(uiImage: img)
+                    .resizable()
+                    .scaledToFill()
+            }
             .clipShape(Circle())
     }
 }
