@@ -10,6 +10,8 @@ struct RivalryDetailView: View {
     @State private var error: String?
     @State private var healthSteps: Double?
     @State private var isSyncingSteps = false
+    @State private var completionMessage: String?
+    @State private var showingLevelUp: FamilyTier?
     private let healthKit = HealthKitManager()
 
     @Environment(AuthService.self) private var auth
@@ -35,6 +37,35 @@ struct RivalryDetailView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 20) {
+                // Winner banner
+                if currentRivalry.status == RivalryStatus.completed.rawValue {
+                    VStack(spacing: 8) {
+                        Image(systemName: "trophy.fill")
+                            .font(.system(size: 36))
+                            .foregroundStyle(AccentTheme.saffron.color)
+                        if let winner = currentRivalry.winner_name {
+                            Text("\(winner) Wins!")
+                                .font(.title2.bold())
+                                .foregroundStyle(WarmPalette.ink1)
+                        } else {
+                            Text("It's a Tie!")
+                                .font(.title2.bold())
+                                .foregroundStyle(WarmPalette.ink1)
+                        }
+                        if let msg = completionMessage {
+                            Text(msg)
+                                .font(.system(size: 13))
+                                .foregroundStyle(WarmPalette.ink2)
+                                .multilineTextAlignment(.center)
+                                .padding(.horizontal, 8)
+                        }
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .flCard(tint: AccentTheme.saffron.color)
+                    .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
+                }
+
                 VStack(spacing: 16) {
                     HStack {
                         Image(systemName: currentRivalry.challengeType.icon)
@@ -171,6 +202,13 @@ struct RivalryDetailView: View {
             if currentRivalry.challengeType == .steps {
                 await fetchHealthSteps()
             }
+            // Auto-complete expired rivalries
+            if currentRivalry.status == RivalryStatus.active.rawValue && isExpired {
+                await autoCompleteRivalry()
+            }
+        }
+        .fullScreenCover(item: $showingLevelUp) { tier in
+            LevelUpCelebration(tier: tier)
         }
     }
 
@@ -229,22 +267,21 @@ struct RivalryDetailView: View {
         }
     }
 
-    private func completeRivalry() async {
-        let winnerName: String?
-        if initiatorTotal > opponentTotal {
-            winnerName = currentRivalry.initiator_name
-        } else if opponentTotal > initiatorTotal {
-            winnerName = currentRivalry.opponent_name
-        } else {
-            winnerName = nil
+    private func autoCompleteRivalry() async {
+        // Auto-sync steps first if applicable
+        if currentRivalry.challengeType == .steps, let hkSteps = healthSteps {
+            let delta = hkSteps - myLoggedTotal
+            if delta > 0 {
+                await syncStepsFromHealth(delta: delta)
+            }
         }
+        await completeRivalry()
+    }
 
+    private func completeRivalry() async {
         do {
-            let winnerValue: Any = winnerName ?? NSNull()
-            try await api.updateRivalry(id: currentRivalry.id, data: [
-                "status": RivalryStatus.completed.rawValue,
-                "winner_name": winnerValue
-            ])
+            let result = try await api.completeRivalry(id: currentRivalry.id)
+            completionMessage = result.message
             currentRivalry = RivalryResponse(
                 id: currentRivalry.id,
                 title: currentRivalry.title,
@@ -255,9 +292,21 @@ struct RivalryDetailView: View {
                 end_date: currentRivalry.end_date,
                 status: RivalryStatus.completed.rawValue,
                 point_value: currentRivalry.point_value,
-                winner_name: winnerName,
+                winner_name: result.winner_name,
                 created_at: currentRivalry.created_at
             )
+            // Level-up check
+            let myName = auth.currentUser?.name ?? ""
+            if result.winner_name?.localizedCaseInsensitiveCompare(myName) == .orderedSame {
+                let oldXP = UserDefaults.standard.integer(forKey: "rivalry_xp")
+                let newXP = oldXP + currentRivalry.point_value
+                let oldTier = FamilyTier.tier(for: oldXP)
+                let newTier = FamilyTier.tier(for: newXP)
+                UserDefaults.standard.set(newXP, forKey: "rivalry_xp")
+                if newTier.rawValue > oldTier.rawValue {
+                    showingLevelUp = newTier
+                }
+            }
         } catch {
             guard !error.isCancellation else { return }
             self.error = error.localizedDescription
