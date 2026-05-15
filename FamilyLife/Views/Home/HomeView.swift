@@ -56,7 +56,7 @@ struct HomeView: View {
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
                 Button { showingSettings = true } label: {
-                    ProfileAvatar(size: 40)
+                    ProfileAvatar(size: 34)
                 }
             }
             ToolbarItem(placement: .topBarTrailing) {
@@ -518,12 +518,14 @@ struct HomeView: View {
     @ViewBuilder
     private var activityFeedSection: some View {
         if !viewModel.activityFeed.isEmpty {
-            // Feed header with group filter
+            // Feed header with group filter — Menu in overlay to bypass HStack width negotiation
             HStack {
                 Text("Feed")
                     .font(.system(size: 17, weight: .bold))
                     .foregroundStyle(WarmPalette.ink1)
-                Spacer(minLength: 8)
+                Spacer()
+            }
+            .overlay(alignment: .trailing) {
                 Menu {
                     Button { feedFilter = .all } label: {
                         HStack {
@@ -555,8 +557,6 @@ struct HomeView: View {
                     }
                     .foregroundStyle(TabAccent.home.color)
                 }
-                .fixedSize()
-                .layoutPriority(1)
             }
             .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
             .padding(.bottom, 8)
