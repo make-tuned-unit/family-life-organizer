@@ -312,7 +312,8 @@ struct RivalryDetailView: View {
                 status: RivalryStatus.completed.rawValue,
                 point_value: currentRivalry.point_value,
                 winner_name: result.winner_name,
-                created_at: currentRivalry.created_at
+                created_at: currentRivalry.created_at,
+                participants: currentRivalry.participants
             )
             // Level-up check
             let myName = auth.currentUser?.name ?? ""
@@ -370,7 +371,7 @@ struct EntryRowRemote: View {
 #Preview {
     NavigationStack {
         RivalryDetailView(
-            rivalry: RivalryResponse(id: 1, title: "Step Challenge", challenge_type: "steps", initiator_name: "Jesse", opponent_name: "Sophie", start_date: "2026-04-01", end_date: "2026-04-10", status: "active", point_value: 100, winner_name: nil, created_at: nil)
+            rivalry: RivalryResponse(id: 1, title: "Step Challenge", challenge_type: "steps", initiator_name: "Jesse", opponent_name: "Sophie", start_date: "2026-04-01", end_date: "2026-04-10", status: "active", point_value: 100, winner_name: nil, created_at: nil, participants: nil)
         )
         .environment(APIService())
     }
