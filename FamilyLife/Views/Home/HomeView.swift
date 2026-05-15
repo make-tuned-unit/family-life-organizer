@@ -2,6 +2,7 @@ import SwiftUI
 
 struct HomeView: View {
     @Binding var selectedTab: MainTab
+    @Binding var pendingListName: String?
     @Environment(APIService.self) private var api
     @Environment(AuthService.self) private var auth
     @State private var viewModel = HomeViewModel()
@@ -394,6 +395,8 @@ struct HomeView: View {
         .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.cardLarge))
         .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
         .padding(.bottom, 14)
+        .contentShape(Rectangle())
+        .onTapGesture { selectedTab = .calendar }
     }
 
     private static let friendlyDateFmt: DateFormatter = {
@@ -430,13 +433,13 @@ struct HomeView: View {
     private var statsGrid: some View {
         HStack(spacing: 8) {
             WarmStatTile(label: "Tasks", value: "\(viewModel.summary?.tasks_today ?? 0)", sub: "today")
-                .onTapGesture { selectedTab = .lists }
+                .onTapGesture { pendingListName = "Tasks"; selectedTab = .lists }
             WarmStatTile(label: "Events", value: "\(eventCount)", sub: eventSub)
                 .onTapGesture { withAnimation { eventRange = (eventRange + 1) % 3 } }
             WarmStatTile(label: viewModel.summary?.pinned_list_name ?? "List", value: "\(viewModel.summary?.groceries_needed ?? 0)", sub: "items")
-                .onTapGesture { selectedTab = .lists }
+                .onTapGesture { pendingListName = viewModel.summary?.pinned_list_name; selectedTab = .lists }
             WarmStatTile(label: "Overdue", value: "\(viewModel.summary?.overdue_tasks ?? 0)", sub: "tasks")
-                .onTapGesture { selectedTab = .lists }
+                .onTapGesture { pendingListName = "Tasks"; selectedTab = .lists }
         }
         .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
         .padding(.bottom, 14)
@@ -461,7 +464,7 @@ struct HomeView: View {
                             tagInitial: appt.person_tags.flatMap { $0.first.map(String.init) }
                         )
                         .contentShape(Rectangle())
-                        .onTapGesture { selectedTab = .calendar }
+                        .onTapGesture { selectedFeedEvent = appt }
                     }
                     if viewModel.todayAppointments.count < 3 {
                         ForEach(Array(viewModel.activeTasks.prefix(3 - viewModel.todayAppointments.count).enumerated()), id: \.element.id) { _, task in
@@ -584,7 +587,7 @@ struct HomeView: View {
 
 #Preview {
     NavigationStack {
-        HomeView(selectedTab: .constant(.home))
+        HomeView(selectedTab: .constant(.home), pendingListName: .constant(nil))
     }
     .environment(APIService())
     .environment(AuthService())
