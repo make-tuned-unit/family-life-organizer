@@ -556,6 +556,7 @@ struct HomeView: View {
                     .foregroundStyle(TabAccent.home.color)
                 }
                 .fixedSize()
+                .layoutPriority(1)
             }
             .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
             .padding(.bottom, 8)
