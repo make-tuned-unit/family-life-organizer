@@ -19,6 +19,8 @@ struct ReceiptScannerView: View {
     @State private var error: String?
     @State private var showingCamera = false
     @State private var cameraPermissionDenied = false
+    @State private var showingScanAnother = false
+    @State private var savedCount = 0
 
     private var isProjectMode: Bool { projectId != nil }
 
@@ -97,6 +99,12 @@ struct ReceiptScannerView: View {
                     scanImage(data)
                 }
                 .ignoresSafeArea()
+            }
+            .alert("Receipt Saved", isPresented: $showingScanAnother) {
+                Button("Scan Another") { resetForNextScan() }
+                Button("Done") { dismiss() }
+            } message: {
+                Text("\(savedCount) receipt\(savedCount == 1 ? "" : "s") saved. Scan another?")
             }
         }
     }
@@ -263,6 +271,13 @@ struct ReceiptScannerView: View {
         }
     }
 
+    private func resetForNextScan() {
+        scanResult = nil
+        imageData = nil
+        selectedPhoto = nil
+        error = nil
+    }
+
     private func loadAndScan() {
         guard let selectedPhoto else { return }
         Task {
@@ -319,8 +334,11 @@ struct ReceiptScannerView: View {
                         return item.name
                     }.joined(separator: "\n")
                     try await api.saveScannedReceipt(result: result, notes: itemDetail)
+                    savedCount += 1
+                    isSaving = false
+                    showingScanAnother = true
+                    return
                 }
-                dismiss()
             } catch {
                 self.error = "Failed to save: \(error.localizedDescription)"
                 isSaving = false
