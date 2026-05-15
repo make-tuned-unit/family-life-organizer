@@ -2022,6 +2022,19 @@ app.get('/api/decisions', requireAuth, async (req, res) => {
   }
 });
 
+app.get('/api/decisions/:id(\\d+)', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const decision = await db.getDecisionById(req.params.id);
+    if (!decision) return res.status(404).json({ error: 'Not found' });
+    res.json(decision);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
 app.post('/api/decisions', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {

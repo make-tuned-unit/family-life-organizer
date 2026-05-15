@@ -464,11 +464,8 @@ struct InlinePollCard: View {
 
     private func load() async {
         do {
-            let all = try await api.fetchDecisions()
-            decision = all.first { $0.id == decisionId }
-            if decision != nil {
-                reactions = try await api.fetchDecisionReactions(id: decisionId)
-            }
+            decision = try await api.fetchDecision(id: decisionId)
+            reactions = try await api.fetchDecisionReactions(id: decisionId)
             loaded = true
         } catch {
             loaded = true
