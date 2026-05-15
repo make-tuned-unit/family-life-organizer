@@ -45,27 +45,59 @@ struct FamilyAvatar: View {
 struct ProfileAvatar: View {
     @Environment(AuthService.self) private var auth
     var size: CGFloat = 32
+    var borderColor: Color = AccentTheme.sage.color
+    var borderWidth: CGFloat = 2
 
     var body: some View {
-        Color.clear
+        if let source = auth.profileUIImage {
+            Image(uiImage: Self.preRenderedCircle(
+                source, diameter: size,
+                borderColor: UIColor(borderColor),
+                borderWidth: borderWidth
+            ))
+            .resizable()
             .frame(width: size, height: size)
-            .overlay {
-                if let source = auth.profileUIImage {
-                    Image(uiImage: source)
-                        .resizable()
-                        .scaledToFill()
-                } else {
-                    Circle()
-                        .fill(Color.green.opacity(0.6))
-                        .overlay {
-                            Text(auth.currentUser?.name.prefix(1).uppercased() ?? "?")
-                                .font(.system(size: size * 0.42, weight: .bold))
-                                .foregroundStyle(.white)
-                        }
+        } else {
+            Circle()
+                .fill(Color.green.opacity(0.6))
+                .frame(width: size, height: size)
+                .overlay {
+                    Text(auth.currentUser?.name.prefix(1).uppercased() ?? "?")
+                        .font(.system(size: size * 0.42, weight: .bold))
+                        .foregroundStyle(.white)
                 }
-            }
-            .clipShape(Circle())
-            .overlay(Circle().stroke(AccentTheme.sage.color, lineWidth: 2))
+                .overlay(Circle().stroke(borderColor, lineWidth: borderWidth))
+        }
+    }
+
+    /// Pre-renders a UIImage as a perfect circle with border baked in.
+    /// The toolbar cannot distort a pre-rendered bitmap.
+    static func preRenderedCircle(
+        _ source: UIImage,
+        diameter: CGFloat,
+        borderColor: UIColor,
+        borderWidth: CGFloat
+    ) -> UIImage {
+        let totalSize = CGSize(width: diameter, height: diameter)
+        let renderer = UIGraphicsImageRenderer(size: totalSize)
+        return renderer.image { _ in
+            let borderRect = CGRect(origin: .zero, size: totalSize)
+            borderColor.setFill()
+            UIBezierPath(ovalIn: borderRect).fill()
+
+            let imageRect = borderRect.insetBy(dx: borderWidth, dy: borderWidth)
+            UIBezierPath(ovalIn: imageRect).addClip()
+
+            let imgSize = source.size
+            let scale = max(imageRect.width / imgSize.width, imageRect.height / imgSize.height)
+            let drawW = imgSize.width * scale
+            let drawH = imgSize.height * scale
+            source.draw(in: CGRect(
+                x: imageRect.midX - drawW / 2,
+                y: imageRect.midY - drawH / 2,
+                width: drawW, height: drawH
+            ))
+        }
     }
 }
 
@@ -95,14 +127,13 @@ struct UserAvatar: View {
     }
 
     private func profileImage(_ img: UIImage) -> some View {
-        Color.clear
-            .frame(width: size, height: size)
-            .overlay {
-                Image(uiImage: img)
-                    .resizable()
-                    .scaledToFill()
-            }
-            .clipShape(Circle())
+        Image(uiImage: ProfileAvatar.preRenderedCircle(
+            img, diameter: size,
+            borderColor: .clear,
+            borderWidth: 0
+        ))
+        .resizable()
+        .frame(width: size, height: size)
     }
 }
 
