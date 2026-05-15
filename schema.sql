@@ -575,4 +575,6 @@ INSERT OR IGNORE INTO budget_categories (name, monthly_limit, color)
 INSERT OR IGNORE INTO budget_categories (name, monthly_limit, color)
   SELECT 'Kids', 200.00, '#30cfd0' WHERE NOT EXISTS (SELECT 1 FROM budget_categories WHERE name='Kids');
 INSERT OR IGNORE INTO budget_categories (name, monthly_limit, color)
+  SELECT 'Pets', 150.00, '#fccb90' WHERE NOT EXISTS (SELECT 1 FROM budget_categories WHERE name='Pets');
+INSERT OR IGNORE INTO budget_categories (name, monthly_limit, color)
   SELECT 'Other', 100.00, '#a8edea' WHERE NOT EXISTS (SELECT 1 FROM budget_categories WHERE name='Other');

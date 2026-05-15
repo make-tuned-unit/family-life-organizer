@@ -1593,7 +1593,7 @@ app.post('/api/receipts/scan', requireAuth, async (req, res) => {
           role: 'user',
           content: [
             { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: image } },
-            { type: 'text', text: 'Extract receipt data. Return ONLY valid JSON: {"merchant":"store name","date":"YYYY-MM-DD","total":0.00,"category":"Groceries|Dining Out|Gas/Transport|Household|Health|Entertainment|Kids|Other","items":[{"name":"item","price":0.00,"quantity":"1"}]}' }
+            { type: 'text', text: 'Extract receipt data. Return ONLY valid JSON: {"merchant":"store name","date":"YYYY-MM-DD","total":0.00,"category":"Groceries|Dining Out|Gas/Transport|Household|Health|Pets|Entertainment|Kids|Other","items":[{"name":"item","price":0.00,"quantity":"1"}]}' }
           ]
         }]
       })
