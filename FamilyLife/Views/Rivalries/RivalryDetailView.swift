@@ -8,6 +8,9 @@ struct RivalryDetailView: View {
     @State private var entries: [RivalryEntryResponse] = []
     @State private var showingLogProgress = false
     @State private var error: String?
+    @State private var healthSteps: Double?
+    @State private var isSyncingSteps = false
+    private let healthKit = HealthKitManager()
 
     @Environment(AuthService.self) private var auth
 
@@ -74,6 +77,43 @@ struct RivalryDetailView: View {
                 .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
 
                 if currentRivalry.status == RivalryStatus.active.rawValue {
+                    // HealthKit auto-sync for steps challenges
+                    if currentRivalry.challengeType == .steps, let hkSteps = healthSteps {
+                        let myTotal = myLoggedTotal
+                        let delta = hkSteps - myTotal
+                        VStack(spacing: 8) {
+                            HStack {
+                                Image(systemName: "heart.fill")
+                                    .foregroundStyle(.red)
+                                Text("Apple Health: \(Int(hkSteps)) steps")
+                                    .font(.system(size: 14, weight: .semibold))
+                                Spacer()
+                                if delta > 0 {
+                                    Text("+\(Int(delta)) to sync")
+                                        .font(.system(size: 12, weight: .medium))
+                                        .foregroundStyle(WarmPalette.good)
+                                }
+                            }
+                            if delta > 0 {
+                                Button {
+                                    Task { await syncStepsFromHealth(delta: delta) }
+                                } label: {
+                                    Label(isSyncingSteps ? "Syncing..." : "Sync Steps from Health", systemImage: "arrow.triangle.2.circlepath")
+                                        .frame(maxWidth: .infinity)
+                                }
+                                .buttonStyle(.flPrimary(tint: AccentTheme.ocean.color))
+                                .disabled(isSyncingSteps)
+                            } else {
+                                Text("Steps are up to date")
+                                    .font(.system(size: 12))
+                                    .foregroundStyle(WarmPalette.ink3)
+                            }
+                        }
+                        .padding(DesignTokens.Spacing.cardPadding)
+                        .flCard(tint: AccentTheme.ocean.color)
+                        .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
+                    }
+
                     HStack(spacing: 12) {
                         Button {
                             showingLogProgress = true
@@ -128,7 +168,46 @@ struct RivalryDetailView: View {
         }
         .task {
             await loadEntries()
+            if currentRivalry.challengeType == .steps {
+                await fetchHealthSteps()
+            }
         }
+    }
+
+    private var myLoggedTotal: Double {
+        let myName = auth.currentUser?.username ?? auth.currentUser?.name ?? ""
+        return entries.filter { $0.member_name.localizedCaseInsensitiveCompare(myName) == .orderedSame }.reduce(0) { $0 + $1.value }
+    }
+
+    private func fetchHealthSteps() async {
+        let authorized = await healthKit.requestStepAuthorization()
+        guard authorized else { return }
+
+        let startDate = ISO8601DateFormatter.flexible.date(from: currentRivalry.start_date)
+            ?? DateFormatter.isoDate.date(from: currentRivalry.start_date)
+            ?? Date()
+        let endDate = currentRivalry.endDate ?? Date()
+
+        let steps = await healthKit.fetchSteps(from: startDate, to: min(endDate, Date()))
+        healthSteps = steps
+    }
+
+    private func syncStepsFromHealth(delta: Double) async {
+        isSyncingSteps = true
+        do {
+            try await api.addRivalryEntry(id: currentRivalry.id, data: [
+                "member_name": auth.currentUser?.username ?? "Me",
+                "value": delta,
+                "note": "Synced from Apple Health",
+                "is_verified": true
+            ])
+            await loadEntries()
+            await fetchHealthSteps()
+        } catch {
+            guard !error.isCancellation else { return }
+            self.error = error.localizedDescription
+        }
+        isSyncingSteps = false
     }
 
     private var challengeColor: Color {
