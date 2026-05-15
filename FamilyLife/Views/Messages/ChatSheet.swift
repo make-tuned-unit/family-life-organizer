@@ -381,6 +381,106 @@ struct GroupChatView: View {
     }
 }
 
+// MARK: - Inline Poll Card (self-contained: loads decision + reactions, handles voting)
+
+struct InlinePollCard: View {
+    let decisionId: Int
+    let title: String
+    @Environment(APIService.self) private var api
+    @Environment(AuthService.self) private var auth
+    @State private var decision: DecisionResponse?
+    @State private var reactions: [DecisionReactionResponse] = []
+    @State private var loaded = false
+
+    private var myVote: Int? {
+        reactions.first {
+            $0.member_name == (auth.currentUser?.username ?? "") && $0.reaction_type == "vote"
+        }?.poll_choice
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 6) {
+                Image(systemName: "chart.bar.fill")
+                    .font(.system(size: 12))
+                    .foregroundStyle(TabAccent.decisions.color)
+                Text(title)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(WarmPalette.ink1)
+            }
+
+            if let decision, !decision.poll_options.isEmpty {
+                let totalVotes = reactions.filter { $0.reaction_type == "vote" }.count
+                ForEach(Array(decision.poll_options.enumerated()), id: \.offset) { idx, option in
+                    let count = reactions.filter { $0.poll_choice == idx }.count
+                    Button {
+                        Task { await vote(for: idx) }
+                    } label: {
+                        HStack {
+                            Text(option)
+                                .font(.system(size: 13))
+                                .foregroundStyle(WarmPalette.ink1)
+                            Spacer()
+                            Text("\(count)")
+                                .font(.system(size: 13, weight: .bold))
+                                .foregroundStyle(TabAccent.home.color)
+                            if myVote == idx {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .font(.system(size: 12))
+                                    .foregroundStyle(TabAccent.home.color)
+                            }
+                        }
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 6)
+                        .background {
+                            GeometryReader { geo in
+                                RoundedRectangle(cornerRadius: 6)
+                                    .fill(TabAccent.decisions.color.opacity(0.12))
+                                    .frame(width: totalVotes > 0 ? geo.size.width * CGFloat(count) / CGFloat(totalVotes) : 0)
+                            }
+                        }
+                        .background(WarmPalette.ink1.opacity(0.04))
+                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                    }
+                }
+            } else if !loaded {
+                ProgressView()
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 4)
+            }
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(TabAccent.decisions.color.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
+        .task { await load() }
+    }
+
+    private func load() async {
+        do {
+            let all = try await api.fetchDecisions()
+            decision = all.first { $0.id == decisionId }
+            if decision != nil {
+                reactions = try await api.fetchDecisionReactions(id: decisionId)
+            }
+            loaded = true
+        } catch {
+            loaded = true
+        }
+    }
+
+    private func vote(for option: Int) async {
+        do {
+            try await api.setDecisionReaction(id: decisionId, data: [
+                "member_name": auth.currentUser?.username ?? "Me",
+                "reaction_type": "vote",
+                "poll_choice": option
+            ])
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            reactions = (try? await api.fetchDecisionReactions(id: decisionId)) ?? reactions
+        } catch {}
+    }
+}
+
 struct GroupMessageBubble: View {
     let post: APIService.FeedPostResponse
     let isOwn: Bool
@@ -397,23 +497,8 @@ struct GroupMessageBubble: View {
                 }
 
                 // Inline decision/poll card
-                if post.post_type == "decision" || post.post_type == "poll" {
-                    VStack(alignment: .leading, spacing: 6) {
-                        HStack(spacing: 6) {
-                            Image(systemName: "chart.bar.fill")
-                                .font(.system(size: 12))
-                                .foregroundStyle(TabAccent.decisions.color)
-                            Text(post.title ?? "Decision")
-                                .font(.system(size: 14, weight: .semibold))
-                                .foregroundStyle(WarmPalette.ink1)
-                        }
-                        Text("Tap to vote")
-                            .font(.system(size: 11))
-                            .foregroundStyle(TabAccent.decisions.color)
-                    }
-                    .padding(10)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(TabAccent.decisions.color.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
+                if (post.post_type == "decision" || post.post_type == "poll"), let refId = post.reference_id {
+                    InlinePollCard(decisionId: refId, title: post.title ?? "Decision")
                 }
 
                 // Photo
