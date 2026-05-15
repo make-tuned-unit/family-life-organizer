@@ -170,6 +170,7 @@ struct ListDetailSection: View {
     @State private var newItem = ""
     @State private var isLoading = false
     @State private var showingDeleteConfirm = false
+    @State private var showCompleted = false
 
     private var activeItems: [APIService.ListItemResponse] {
         items.filter { !$0.isDone }
@@ -233,25 +234,45 @@ struct ListDetailSection: View {
                         .padding(.bottom, 14)
                     }
 
-                    // Completed items
+                    // Completed items — collapsed by default
                     if !doneItems.isEmpty {
-                        WarmSectionHeader(title: "Completed", trailing: "\(doneItems.count)")
+                        Button {
+                            withAnimation(.easeInOut(duration: 0.2)) { showCompleted.toggle() }
+                        } label: {
+                            HStack {
+                                Text("Completed")
+                                    .font(.system(size: 13, weight: .semibold))
+                                    .foregroundStyle(WarmPalette.ink3)
+                                Text("\(doneItems.count)")
+                                    .font(.system(size: 12, weight: .bold))
+                                    .foregroundStyle(WarmPalette.ink4)
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundStyle(WarmPalette.ink4)
+                                    .rotationEffect(.degrees(showCompleted ? 90 : 0))
+                            }
+                            .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
                             .padding(.bottom, 6)
+                        }
+                        .buttonStyle(.plain)
 
-                        VStack(spacing: 0) {
-                            ForEach(Array(doneItems.enumerated()), id: \.element.id) { index, item in
-                                if index > 0 { GlassDivider() }
-                                ListItemRow(item: item) {
-                                    Task { await toggleItem(item.id) }
-                                } onDelete: {
-                                    Task { await deleteItem(item.id) }
+                        if showCompleted {
+                            VStack(spacing: 0) {
+                                ForEach(Array(doneItems.enumerated()), id: \.element.id) { index, item in
+                                    if index > 0 { GlassDivider() }
+                                    ListItemRow(item: item) {
+                                        Task { await toggleItem(item.id) }
+                                    } onDelete: {
+                                        Task { await deleteItem(item.id) }
+                                    }
                                 }
                             }
+                            .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
+                            .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
+                            .padding(.bottom, 14)
+                            .opacity(0.6)
                         }
-                        .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
-                        .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
-                        .padding(.bottom, 14)
-                        .opacity(0.6)
                     }
                 }
                 .padding(.bottom, DesignTokens.Spacing.bottomBuffer)
