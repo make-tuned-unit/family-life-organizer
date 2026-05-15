@@ -154,6 +154,13 @@ struct HomeView: View {
             checkFeedNotifications()
             await checkMessageNotifications()
         }
+        .onChange(of: selectedTab) {
+            if selectedTab == .home {
+                Task {
+                    await viewModel.loadAll(api: api, userName: auth.currentUser?.name, username: auth.currentUser?.username)
+                }
+            }
+        }
     }
 
     private func checkFeedNotifications() {
