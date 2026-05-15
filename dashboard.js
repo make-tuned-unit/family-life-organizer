@@ -2022,7 +2022,7 @@ app.get('/api/decisions', requireAuth, async (req, res) => {
   }
 });
 
-app.get('/api/decisions/:id(\\d+)', requireAuth, async (req, res) => {
+app.get('/api/decisions/:id', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
     const decision = await db.getDecisionById(req.params.id);
