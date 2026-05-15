@@ -1279,7 +1279,14 @@ app.post('/api/add', requireAuth, async (req, res) => {
   try {
     const { type, data } = req.body;
     if (type === 'grocery') {
-      await db.addGrocery(data.item, data.category || null, data.quantity || '1');
+      // Resolve user's household group_id
+      const username = req.session.user?.username || 'jesse';
+      const userGroupId = await new Promise((resolve) => {
+        db.db.get(`SELECT gm.group_id FROM group_members gm
+          JOIN groups g ON g.id = gm.group_id AND g.group_type = 'household'
+          WHERE gm.user_id = ?`, [req.session.user?.id], (err, row) => resolve(row?.group_id || null));
+      });
+      await db.addGrocery(data.item, data.category || null, data.quantity || '1', username, userGroupId);
     } else if (type === 'task') {
       await db.addTask({...data, status: 'active'});
     }
@@ -1313,7 +1320,7 @@ app.get('/api/data', requireAuth, async (req, res) => {
   try {
     const userId = req.session.user?.id;
     const summary = await db.getDailySummary(userId);
-    const groceries = await db.getGroceries('needed');
+    const groceries = await db.getGroceries('needed', userId);
     res.json({ summary, groceries });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -1440,7 +1447,8 @@ app.get('/api/groceries', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
     const status = req.query.status || 'needed';
-    const groceries = await db.getGroceries(status);
+    const userId = req.session.user?.id;
+    const groceries = await db.getGroceries(status, userId);
     res.json(groceries);
   } catch (err) {
     res.status(500).json({ error: err.message });
