@@ -128,15 +128,14 @@ struct StartRivalryView: View {
 
     private func updateDefaultTitle() {
         let opponents = selectedOpponents.sorted()
-        let oldTitles = ChallengeType.allCases.flatMap { type in
-            household.members.map { "\(currentUser) vs \($0.name): \(type.displayName)" }
-        } + ChallengeType.allCases.map { "\(challengeType.displayName) Challenge" }
-        if title.isEmpty || oldTitles.contains(title) || title.hasSuffix(": \(challengeType.displayName)") || title.hasSuffix("Challenge") {
-            if opponents.count == 1 {
-                title = "\(currentUser) vs \(opponents[0]): \(challengeType.displayName)"
-            } else if opponents.count > 1 {
-                title = "\(challengeType.displayName) Challenge"
-            }
+        let isAutoTitle = title.isEmpty
+            || title.contains(" vs ")
+            || title.hasSuffix("Challenge")
+        guard isAutoTitle else { return }
+        if opponents.count == 1 {
+            title = "\(currentUser) vs \(opponents[0]): \(challengeType.displayName)"
+        } else if opponents.count > 1 {
+            title = "\(challengeType.displayName) Challenge"
         }
     }
 
