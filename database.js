@@ -247,18 +247,10 @@ class FamilyDB {
             [householdId, householdId], function() {
               console.log(`Backfill: updated ${this.changes} rivalries to household ${householdId}`);
             });
-          // Assign groceries to household based on who added them; default to primary household for jesse/sophie
-          this.db.run(`UPDATE groceries SET group_id = (
-            SELECT gm.group_id FROM users u
-            JOIN group_members gm ON gm.user_id = u.id
-            JOIN groups g ON g.id = gm.group_id AND g.group_type = 'household'
-            WHERE u.username = groceries.added_by
-            LIMIT 1
-          ) WHERE group_id IS NULL`, function(err) {
-              if (err) console.error('Backfill groceries error:', err.message);
-              else console.log(`Backfill: updated ${this.changes} groceries with household group_id`);
-              resolve();
-            });
+          // No groceries backfill — added_by defaults to 'jesse' for all users,
+          // making it impossible to tell whose items are whose. Users re-add items;
+          // new items get proper group_id from the session.
+          resolve();
         });
       });
     });
@@ -364,7 +356,7 @@ class FamilyDB {
       let sql = 'SELECT * FROM groceries WHERE status = ?';
       if (userId) {
         const uid = parseInt(userId);
-        sql += ` AND (group_id IN (SELECT group_id FROM group_members WHERE user_id = ${uid}) OR group_id IS NULL)`;
+        sql += ` AND group_id IN (SELECT group_id FROM group_members WHERE user_id = ${uid})`;
       }
       sql += ' ORDER BY category, item';
       this.db.all(sql, [status], (err, rows) => {
