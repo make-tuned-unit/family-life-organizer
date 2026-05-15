@@ -17,6 +17,7 @@ struct HomeView: View {
     }
     @State private var feedFilter: FeedFilter = .all
     @State private var userGroups: [APIService.GroupResponse] = []
+    @State private var showingFeedFilter = false
     @State private var selectedFeedEvent: AppointmentResponse?
     @State private var selectedFeedRivalry: RivalryResponse?
 
@@ -56,7 +57,7 @@ struct HomeView: View {
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
                 Button { showingSettings = true } label: {
-                    ProfileAvatar(size: 34)
+                    ProfileAvatar(size: 36)
                 }
             }
             ToolbarItem(placement: .topBarTrailing) {
@@ -503,12 +504,13 @@ struct HomeView: View {
                 let author = item.item.author ?? ""
                 let body = item.item.body ?? ""
                 let title = item.item.title ?? ""
-                // Show items that mention me or are directed at me (but not my own)
                 let involvesMe = body.localizedCaseInsensitiveContains(myName)
                     || title.localizedCaseInsensitiveContains(myName)
-                let isDirectedAtMe = ["rivalry", "decision"].contains(item.item.feed_type)
+                // Rivalries always show — user is a participant whether they created it or not
+                let isRivalry = item.item.feed_type == "rivalry"
+                let isDirectedAtMe = item.item.feed_type == "decision"
                     && author.localizedCaseInsensitiveCompare(myName) != .orderedSame
-                return involvesMe || isDirectedAtMe
+                return involvesMe || isRivalry || isDirectedAtMe
             }
         case .group(let groupId):
             return viewModel.activityFeed.filter { $0.item.group_id == groupId || $0.item.group_id == nil }
@@ -518,37 +520,13 @@ struct HomeView: View {
     @ViewBuilder
     private var activityFeedSection: some View {
         if !viewModel.activityFeed.isEmpty {
-            // Feed header with group filter — Menu in overlay to bypass HStack width negotiation
+            // Feed header with group filter
             HStack {
                 Text("Feed")
                     .font(.system(size: 17, weight: .bold))
                     .foregroundStyle(WarmPalette.ink1)
                 Spacer()
-            }
-            .overlay(alignment: .trailing) {
-                Menu {
-                    Button { feedFilter = .all } label: {
-                        HStack {
-                            Text("All")
-                            if feedFilter == .all { Image(systemName: "checkmark") }
-                        }
-                    }
-                    Button { feedFilter = .forYou } label: {
-                        HStack {
-                            Text("For You")
-                            if feedFilter == .forYou { Image(systemName: "checkmark") }
-                        }
-                    }
-                    Divider()
-                    ForEach(feedGroups, id: \.id) { group in
-                        Button { feedFilter = .group(group.id) } label: {
-                            HStack {
-                                Text(group.name)
-                                if feedFilter == .group(group.id) { Image(systemName: "checkmark") }
-                            }
-                        }
-                    }
-                } label: {
+                Button { showingFeedFilter = true } label: {
                     HStack(spacing: 4) {
                         Text(feedFilterLabel)
                             .font(.system(size: 13, weight: .medium))
@@ -556,6 +534,13 @@ struct HomeView: View {
                             .font(.system(size: 10, weight: .semibold))
                     }
                     .foregroundStyle(TabAccent.home.color)
+                }
+                .confirmationDialog("Filter Feed", isPresented: $showingFeedFilter) {
+                    Button("All") { feedFilter = .all }
+                    Button("For You") { feedFilter = .forYou }
+                    ForEach(feedGroups, id: \.id) { group in
+                        Button(group.name) { feedFilter = .group(group.id) }
+                    }
                 }
             }
             .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
