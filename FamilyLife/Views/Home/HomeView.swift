@@ -505,7 +505,7 @@ struct HomeView: View {
                 Text("Feed")
                     .font(.system(size: 17, weight: .bold))
                     .foregroundStyle(WarmPalette.ink1)
-                Spacer()
+                Spacer(minLength: 8)
                 Menu {
                     Button { feedFilter = .all } label: {
                         HStack {
@@ -529,12 +529,15 @@ struct HomeView: View {
                         }
                     }
                 } label: {
-                    (Text(feedFilterLabel)
-                        .font(.system(size: 13, weight: .medium))
-                    + Text(" \(Image(systemName: "chevron.down"))")
-                        .font(.system(size: 10, weight: .semibold)))
+                    HStack(spacing: 4) {
+                        Text(feedFilterLabel)
+                            .font(.system(size: 13, weight: .medium))
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 10, weight: .semibold))
+                    }
                     .foregroundStyle(TabAccent.home.color)
                 }
+                .fixedSize()
             }
             .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
             .padding(.bottom, 8)
