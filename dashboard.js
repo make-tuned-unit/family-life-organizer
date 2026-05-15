@@ -2278,7 +2278,8 @@ app.post('/api/rivalries/:id/complete', requireAuth, async (req, res) => {
       } catch (e) { console.error('Push error:', e.message); }
     }
 
-    res.json({ success: true, winner_name, initiator_total, opponent_total, message, is_tie: !winner_name });
+    const scores = result.scores || [];
+    res.json({ success: true, winner_name, initiator_total, opponent_total, scores, message, is_tie: !winner_name });
   } catch (err) {
     res.status(500).json({ error: err.message });
   } finally {

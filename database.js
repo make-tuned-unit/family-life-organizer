@@ -94,6 +94,8 @@ class FamilyDB {
         this.db.run('ALTER TABLE lists ADD COLUMN pinned BOOLEAN DEFAULT 0', () => {});
         // Grocery household isolation
         this.db.run('ALTER TABLE groceries ADD COLUMN group_id INTEGER REFERENCES groups(id)', () => {});
+        // Multi-player rivalries
+        this.db.run('ALTER TABLE rivalries ADD COLUMN participants TEXT', () => {});
         this.db.run('CREATE INDEX IF NOT EXISTS idx_groceries_group ON groceries(group_id)', () => {});
         this.db.run('ALTER TABLE users ADD COLUMN last_location_at DATETIME', (err) => {
           if (err) console.error('Migration error:', err.message);
@@ -1013,29 +1015,43 @@ class FamilyDB {
       this.db.get('SELECT * FROM rivalries WHERE id = ?', [id], (err, rivalry) => {
         if (err) return reject(err);
         if (!rivalry) return reject(new Error('Rivalry not found'));
-        if (rivalry.status === 'completed') {
-          // Already completed — return existing result
-          this.db.all('SELECT member_name, SUM(value) as total FROM rivalry_entries WHERE rivalry_id = ? GROUP BY member_name', [id], (err2, totals) => {
-            if (err2) return reject(err2);
-            const iTotal = totals.find(t => t.member_name.toLowerCase() === rivalry.initiator_name.toLowerCase())?.total || 0;
-            const oTotal = totals.find(t => t.member_name.toLowerCase() === rivalry.opponent_name.toLowerCase())?.total || 0;
-            return resolve({ rivalry, initiator_total: iTotal, opponent_total: oTotal, winner_name: rivalry.winner_name, already_completed: true });
-          });
-          return;
-        }
-        // Compute totals
+
         this.db.all('SELECT member_name, SUM(value) as total FROM rivalry_entries WHERE rivalry_id = ? GROUP BY member_name', [id], (err2, totals) => {
           if (err2) return reject(err2);
+
+          // Build participant list — from participants JSON or 1v1 fields
+          let participants;
+          try { participants = JSON.parse(rivalry.participants || '[]'); } catch { participants = []; }
+          if (!participants.length) participants = [rivalry.initiator_name, rivalry.opponent_name];
+
+          const scores = participants.map(name => ({
+            name,
+            total: totals.find(t => t.member_name.toLowerCase() === name.toLowerCase())?.total || 0
+          })).sort((a, b) => b.total - a.total);
+
           const iTotal = totals.find(t => t.member_name.toLowerCase() === rivalry.initiator_name.toLowerCase())?.total || 0;
           const oTotal = totals.find(t => t.member_name.toLowerCase() === rivalry.opponent_name.toLowerCase())?.total || 0;
+
+          if (rivalry.status === 'completed') {
+            return resolve({ rivalry, initiator_total: iTotal, opponent_total: oTotal, scores, winner_name: rivalry.winner_name, already_completed: true });
+          }
+
+          // Determine winner (highest score, null if tie for first)
           let winnerName = null;
-          if (iTotal > oTotal) winnerName = rivalry.initiator_name;
-          else if (oTotal > iTotal) winnerName = rivalry.opponent_name;
-          // Update rivalry
+          if (scores.length > 0 && scores[0].total > 0) {
+            if (scores.length === 1 || scores[0].total > scores[1].total) {
+              winnerName = scores[0].name;
+            }
+          }
+
           this.db.run('UPDATE rivalries SET status = ?, winner_name = ? WHERE id = ?',
             ['completed', winnerName, id], (err3) => {
               if (err3) return reject(err3);
-              resolve({ rivalry: { ...rivalry, status: 'completed', winner_name: winnerName }, initiator_total: iTotal, opponent_total: oTotal, winner_name: winnerName, already_completed: false });
+              resolve({
+                rivalry: { ...rivalry, status: 'completed', winner_name: winnerName },
+                initiator_total: iTotal, opponent_total: oTotal,
+                scores, winner_name: winnerName, already_completed: false
+              });
             });
         });
       });
