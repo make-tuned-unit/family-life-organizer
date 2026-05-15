@@ -7,6 +7,7 @@ struct NewDecisionView: View {
     @Environment(\.dismiss) private var dismiss
 
     let onSaved: () async -> Void
+    var preselectedGroupId: Int?
 
     @State private var title = ""
     @State private var decisionType: DecisionType = .text
@@ -19,6 +20,12 @@ struct NewDecisionView: View {
     @State private var selectedImageData: Data?
     @State private var expiryChoice: ExpiryChoice = .day
     @State private var shareGroupId: Int?
+
+    init(preselectedGroupId: Int? = nil, onSaved: @escaping () async -> Void) {
+        self.onSaved = onSaved
+        self.preselectedGroupId = preselectedGroupId
+        _shareGroupId = State(initialValue: preselectedGroupId)
+    }
 
     enum ExpiryChoice: String, CaseIterable, Identifiable {
         case tonight = "Tonight"
@@ -189,12 +196,14 @@ struct NewDecisionView: View {
         ]
 
         do {
-            try await api.addDecision(body)
+            let result = try await api.addDecision(body)
             if let groupId = shareGroupId {
                 _ = try? await api.addFeedPost(groupId: groupId, data: [
-                    "post_type": "decision",
+                    "post_type": decisionType == .poll ? "poll" : "decision",
                     "title": title,
-                    "body": "\(auth.currentUser?.name ?? "Someone") wants input: \(title)"
+                    "body": "\(auth.currentUser?.name ?? "Someone") wants input: \(title)",
+                    "reference_type": "decision",
+                    "reference_id": result.id
                 ])
             }
             await onSaved()
