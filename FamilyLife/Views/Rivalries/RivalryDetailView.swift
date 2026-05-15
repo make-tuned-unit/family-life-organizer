@@ -128,6 +128,20 @@ struct RivalryDetailView: View {
 
                 if currentRivalry.status == RivalryStatus.active.rawValue {
                     // HealthKit auto-sync for steps challenges
+                    if currentRivalry.challengeType == .steps && healthSteps == nil {
+                        HStack {
+                            ProgressView()
+                                .controlSize(.small)
+                            Text("Loading steps from Apple Health...")
+                                .font(.system(size: 13))
+                                .foregroundStyle(WarmPalette.ink3)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(DesignTokens.Spacing.cardPadding)
+                        .flCard(tint: AccentTheme.ocean.color)
+                        .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
+                    }
+
                     if currentRivalry.challengeType == .steps, let hkSteps = healthSteps {
                         let myTotal = myLoggedTotal
                         let delta = hkSteps - myTotal
@@ -164,16 +178,19 @@ struct RivalryDetailView: View {
                         .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
                     }
 
-                    HStack(spacing: 12) {
-                        Button {
-                            showingLogProgress = true
-                        } label: {
-                            Label("Log Progress", systemImage: "plus.circle.fill")
-                                .frame(maxWidth: .infinity)
+                    // For steps challenges, HealthKit sync replaces manual logging
+                    if currentRivalry.challengeType != .steps {
+                        HStack(spacing: 12) {
+                            Button {
+                                showingLogProgress = true
+                            } label: {
+                                Label("Log Progress", systemImage: "plus.circle.fill")
+                                    .frame(maxWidth: .infinity)
+                            }
+                            .buttonStyle(.flPrimary(tint: TabAccent.rivalries.color))
                         }
-                        .buttonStyle(.flPrimary(tint: TabAccent.rivalries.color))
+                        .padding(.horizontal)
                     }
-                    .padding(.horizontal)
 
                     if isExpired {
                         Button {
