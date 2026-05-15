@@ -179,6 +179,17 @@ struct RivalryResponse: Codable, Identifiable {
     let point_value: Int
     let winner_name: String?
     let created_at: String?
+    let participants: String? // JSON array of all participant names
+
+    var participantNames: [String] {
+        guard let participants, let data = participants.data(using: .utf8),
+              let names = try? JSONDecoder().decode([String].self, from: data) else {
+            return [initiator_name, opponent_name]
+        }
+        return names
+    }
+
+    var isMultiPlayer: Bool { participantNames.count > 2 }
 }
 
 struct RivalryEntryResponse: Codable, Identifiable {
@@ -196,8 +207,15 @@ struct RivalryCompleteResponse: Codable {
     let winner_name: String?
     let initiator_total: Double
     let opponent_total: Double
+    let scores: [ParticipantScore]?
     let message: String?
     let is_tie: Bool?
+}
+
+struct ParticipantScore: Codable, Identifiable {
+    let name: String
+    let total: Double
+    var id: String { name }
 }
 
 struct RivalryLeaderboardResponse: Codable, Identifiable {

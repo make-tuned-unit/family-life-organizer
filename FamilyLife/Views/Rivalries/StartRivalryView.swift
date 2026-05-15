@@ -10,7 +10,7 @@ struct StartRivalryView: View {
 
     @State private var title = ""
     @State private var challengeType: ChallengeType = .steps
-    @State private var opponentName = ""
+    @State private var selectedOpponents: Set<String> = []
     @State private var endDate = Calendar.current.date(byAdding: .day, value: 7, to: Date()) ?? Date().addingTimeInterval(7 * 86400)
     @State private var pointValue = 100
     @State private var error: String?
@@ -56,10 +56,14 @@ struct StartRivalryView: View {
                     }
                 }
 
-                Section("Opponent") {
+                Section(selectedOpponents.count <= 1 ? "Opponent" : "Opponents (\(selectedOpponents.count))") {
                     ForEach(household.members) { member in
                         Button {
-                            opponentName = member.name
+                            if selectedOpponents.contains(member.name) {
+                                selectedOpponents.remove(member.name)
+                            } else {
+                                selectedOpponents.insert(member.name)
+                            }
                             updateDefaultTitle()
                         } label: {
                             HStack {
@@ -67,9 +71,12 @@ struct StartRivalryView: View {
                                 Text(member.name)
                                     .foregroundStyle(.primary)
                                 Spacer()
-                                if opponentName == member.name {
-                                    Image(systemName: "checkmark")
+                                if selectedOpponents.contains(member.name) {
+                                    Image(systemName: "checkmark.circle.fill")
                                         .foregroundStyle(TabAccent.home.color)
+                                } else {
+                                    Image(systemName: "circle")
+                                        .foregroundStyle(WarmPalette.ink4)
                                 }
                             }
                         }
@@ -103,7 +110,7 @@ struct StartRivalryView: View {
                     Button("Challenge!") {
                         Task { await createRivalry() }
                     }
-                    .disabled(title.isEmpty || opponentName.isEmpty || isSaving)
+                    .disabled(title.isEmpty || selectedOpponents.isEmpty || isSaving)
                 }
             }
         }
@@ -120,24 +127,39 @@ struct StartRivalryView: View {
     }
 
     private func updateDefaultTitle() {
-        if title.isEmpty || ChallengeType.allCases.map({ "\(currentUser) vs \(opponentName): \($0.displayName)" }).contains(title) {
-            title = "\(currentUser) vs \(opponentName): \(challengeType.displayName)"
+        let opponents = selectedOpponents.sorted()
+        let oldTitles = ChallengeType.allCases.flatMap { type in
+            household.members.map { "\(currentUser) vs \($0.name): \(type.displayName)" }
+        } + ChallengeType.allCases.map { "\(challengeType.displayName) Challenge" }
+        if title.isEmpty || oldTitles.contains(title) || title.hasSuffix(": \(challengeType.displayName)") || title.hasSuffix("Challenge") {
+            if opponents.count == 1 {
+                title = "\(currentUser) vs \(opponents[0]): \(challengeType.displayName)"
+            } else if opponents.count > 1 {
+                title = "\(challengeType.displayName) Challenge"
+            }
         }
     }
 
     private func createRivalry() async {
         isSaving = true
+        let opponents = selectedOpponents.sorted()
+        let allParticipants = [currentUser] + opponents
         do {
-            try await api.addRivalry([
+            var body: [String: Any] = [
                 "title": title,
                 "challenge_type": challengeType.rawValue,
                 "initiator_name": currentUser,
-                "opponent_name": opponentName,
+                "opponent_name": opponents.first ?? "",
                 "start_date": ISO8601DateFormatter().string(from: Date()),
                 "end_date": ISO8601DateFormatter().string(from: endDate),
                 "status": RivalryStatus.active.rawValue,
                 "point_value": pointValue
-            ])
+            ]
+            if allParticipants.count > 2 {
+                let jsonData = try JSONEncoder().encode(allParticipants)
+                body["participants"] = String(data: jsonData, encoding: .utf8) ?? "[]"
+            }
+            try await api.addRivalry(body)
             await onSaved()
             dismiss()
         } catch {
