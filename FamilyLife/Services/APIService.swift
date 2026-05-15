@@ -274,8 +274,9 @@ final class APIService {
         return try await get("/api/decisions", queryParams: params)
     }
 
-    func addDecision(_ decision: [String: Any]) async throws {
-        let _: SuccessResponse = try await post("/api/decisions", body: decision)
+    @discardableResult
+    func addDecision(_ decision: [String: Any]) async throws -> IDResponse {
+        try await post("/api/decisions", body: decision)
     }
 
     func updateDecision(id: Int, data: [String: Any]) async throws {
