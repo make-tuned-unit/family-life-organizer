@@ -323,7 +323,10 @@ struct GroupChatView: View {
             .background(.ultraThinMaterial)
         }
         .sheet(isPresented: $showingNewDecision) {
-            NewDecisionView { await loadDecisions() }
+            NewDecisionView(preselectedGroupId: groupId) {
+                await loadDecisions()
+                await loadPosts()
+            }
         }
         .fullScreenCover(item: Binding(
             get: { fullscreenImage.map { IdentifiableImage(image: $0) } },
