@@ -29,6 +29,13 @@ struct RivalryDetailView: View {
         entries.filter { $0.member_name.localizedCaseInsensitiveCompare(currentRivalry.opponent_name) == .orderedSame }.reduce(0) { $0 + $1.value }
     }
 
+    private var participantScores: [(name: String, total: Double)] {
+        currentRivalry.participantNames.map { name in
+            let total = entries.filter { $0.member_name.localizedCaseInsensitiveCompare(name) == .orderedSame }.reduce(0) { $0 + $1.value }
+            return (name: name, total: total)
+        }.sorted { $0.total > $1.total }
+    }
+
     private var isExpired: Bool {
         guard let endDate = currentRivalry.endDate else { return false }
         return Date() > endDate
@@ -77,17 +84,29 @@ struct RivalryDetailView: View {
                         StatusBadge(status: currentRivalry.statusValue)
                     }
 
-                    HStack(spacing: 20) {
-                        PlayerColumn(name: currentRivalry.initiator_name, value: initiatorTotal, color: TabAccent.home.color, isLeading: initiatorTotal > opponentTotal)
-                        Text("vs")
-                            .font(.title3.bold())
-                            .foregroundStyle(WarmPalette.ink3)
-                        PlayerColumn(name: currentRivalry.opponent_name, value: opponentTotal, color: AccentTheme.saffron.color, isLeading: opponentTotal > initiatorTotal)
-                    }
+                    if currentRivalry.isMultiPlayer {
+                        // Multi-player scoreboard
+                        let maxVal = participantScores.first?.total ?? 0
+                        VStack(spacing: 6) {
+                            ForEach(Array(participantScores.enumerated()), id: \.element.name) { index, ps in
+                                let color = index == 0 ? TabAccent.home.color : (index == 1 ? AccentTheme.saffron.color : AccentTheme.ocean.color)
+                                ProgressRow(name: ps.name, value: ps.total, maxValue: maxVal, color: color)
+                            }
+                        }
+                    } else {
+                        // Classic 1v1
+                        HStack(spacing: 20) {
+                            PlayerColumn(name: currentRivalry.initiator_name, value: initiatorTotal, color: TabAccent.home.color, isLeading: initiatorTotal > opponentTotal)
+                            Text("vs")
+                                .font(.title3.bold())
+                                .foregroundStyle(WarmPalette.ink3)
+                            PlayerColumn(name: currentRivalry.opponent_name, value: opponentTotal, color: AccentTheme.saffron.color, isLeading: opponentTotal > initiatorTotal)
+                        }
 
-                    VStack(spacing: 4) {
-                        ProgressRow(name: currentRivalry.initiator_name, value: initiatorTotal, maxValue: max(initiatorTotal, opponentTotal), color: TabAccent.home.color)
-                        ProgressRow(name: currentRivalry.opponent_name, value: opponentTotal, maxValue: max(initiatorTotal, opponentTotal), color: AccentTheme.saffron.color)
+                        VStack(spacing: 4) {
+                            ProgressRow(name: currentRivalry.initiator_name, value: initiatorTotal, maxValue: max(initiatorTotal, opponentTotal), color: TabAccent.home.color)
+                            ProgressRow(name: currentRivalry.opponent_name, value: opponentTotal, maxValue: max(initiatorTotal, opponentTotal), color: AccentTheme.saffron.color)
+                        }
                     }
 
                     HStack {
