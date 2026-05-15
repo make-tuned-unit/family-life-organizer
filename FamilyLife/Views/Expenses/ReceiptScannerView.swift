@@ -89,6 +89,7 @@ struct ReceiptScannerView: View {
                         .foregroundStyle(WarmPalette.ink2)
                 }
             }
+            .interactiveDismissDisabled(isSaving)
             .onChange(of: selectedPhoto) { loadAndScan() }
             .sheet(isPresented: $showingCamera) {
                 CameraView { data in
