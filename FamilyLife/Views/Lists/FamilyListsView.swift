@@ -3,6 +3,7 @@ import SwiftUI
 // MARK: - Family Lists — each list is its own entity with its own items
 
 struct FamilyListsView: View {
+    @Binding var pendingListName: String?
     @Environment(APIService.self) private var api
     @State private var lists: [APIService.ListResponse] = []
     @State private var selectedList: APIService.ListResponse?
@@ -48,14 +49,34 @@ struct FamilyListsView: View {
         }
         .refreshable { await loadLists() }
         .task { await loadLists() }
+        .onChange(of: pendingListName) {
+            if let name = pendingListName {
+                Task { await navigateToList(named: name) }
+            }
+        }
+    }
+
+    private func navigateToList(named name: String) async {
+        if let match = lists.first(where: { $0.name.localizedCaseInsensitiveCompare(name) == .orderedSame }) {
+            selectedList = match
+        } else {
+            let icon = name == "Tasks" ? "checkmark.circle.fill" : "list.bullet"
+            if let result = try? await api.createList(["name": name, "icon": icon]) {
+                await loadLists()
+                selectedList = lists.first { $0.id == result.id }
+            }
+        }
+        pendingListName = nil
     }
 
     private func loadLists() async {
         isLoading = true
         do {
             lists = try await api.fetchLists()
-            // Auto-select first list if none selected
-            if selectedList == nil, let first = lists.first {
+            // Deep-link takes priority
+            if let name = pendingListName {
+                await navigateToList(named: name)
+            } else if selectedList == nil, let first = lists.first {
                 selectedList = first
             }
             // Update selected list data if it still exists
@@ -439,7 +460,7 @@ struct NewListSheet: View {
 
 #Preview {
     NavigationStack {
-        FamilyListsView()
+        FamilyListsView(pendingListName: .constant(nil))
     }
     .environment(APIService())
 }

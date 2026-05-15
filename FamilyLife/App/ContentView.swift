@@ -36,6 +36,7 @@ struct MainTabView: View {
     @Environment(APIService.self) private var api
     @Environment(AuthService.self) private var auth
     @State private var selectedTab: MainTab = .home
+    @State private var pendingListName: String?
     @State private var loadedTabs: Set<MainTab> = [.home]
     @State private var showingChat = false
     @State private var chatInitialThread: ChatSheet.ChatThread?
@@ -138,8 +139,8 @@ struct MainTabView: View {
     private func tabView(for tab: MainTab) -> some View {
         switch tab {
         case .calendar:  NavigationStack { CalendarView() }
-        case .lists:     NavigationStack { FamilyListsView() }
-        case .home:      NavigationStack { HomeView(selectedTab: $selectedTab) }
+        case .lists:     NavigationStack { FamilyListsView(pendingListName: $pendingListName) }
+        case .home:      NavigationStack { HomeView(selectedTab: $selectedTab, pendingListName: $pendingListName) }
         case .budget:    NavigationStack { ExpensesView() }
         case .more:      NavigationStack { MoreView() }
         }
