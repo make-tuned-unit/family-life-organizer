@@ -331,6 +331,10 @@ final class APIService {
         try await get("/api/rivalries/leaderboard")
     }
 
+    func completeRivalry(id: Int) async throws -> RivalryCompleteResponse {
+        try await post("/api/rivalries/\(id)/complete", body: [:] as [String: String])
+    }
+
     // MARK: - Gifts
 
     func fetchGiftPeople() async throws -> [GiftPersonResponse] {

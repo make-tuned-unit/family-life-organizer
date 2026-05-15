@@ -93,6 +93,7 @@
 		AA000075 /* ChatSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000075 /* ChatSheet.swift */; };
 		AA000076 /* SendToSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000076 /* SendToSheet.swift */; };
 		AA000077 /* MessageCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000077 /* MessageCache.swift */; };
+		AA000078 /* XPLevelSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000078 /* XPLevelSystem.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -182,6 +183,7 @@
 		BB000075 /* ChatSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatSheet.swift; sourceTree = "<group>"; };
 		BB000076 /* SendToSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SendToSheet.swift; sourceTree = "<group>"; };
 		BB000077 /* MessageCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessageCache.swift; sourceTree = "<group>"; };
+		BB000078 /* XPLevelSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = XPLevelSystem.swift; sourceTree = "<group>"; };
 		CC000001 /* FamilyLife.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = FamilyLife.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -380,6 +382,7 @@
 				BB000029 /* RivalryDetailView.swift */,
 				BB00002A /* LogProgressView.swift */,
 				BB00002B /* LeaderboardCard.swift */,
+				BB000078 /* XPLevelSystem.swift */,
 			);
 			path = Rivalries;
 			sourceTree = "<group>";
@@ -569,6 +572,7 @@
 				AA000029 /* RivalryDetailView.swift in Sources */,
 				AA00002A /* LogProgressView.swift in Sources */,
 				AA00002B /* LeaderboardCard.swift in Sources */,
+				AA000078 /* XPLevelSystem.swift in Sources */,
 				AA00002C /* Decision.swift in Sources */,
 				AA00002D /* WeekView.swift in Sources */,
 				AA00002E /* DecisionsView.swift in Sources */,
@@ -624,7 +628,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 67;
+				CURRENT_PROJECT_VERSION = 68;
 				DEVELOPMENT_ASSET_PATHS = "";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -659,7 +663,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 67;
+				CURRENT_PROJECT_VERSION = 68;
 				DEVELOPMENT_ASSET_PATHS = "";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
