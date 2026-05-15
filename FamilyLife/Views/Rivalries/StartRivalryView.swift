@@ -156,8 +156,10 @@ struct StartRivalryView: View {
                 "point_value": pointValue
             ]
             if allParticipants.count > 2 {
-                let jsonData = try JSONEncoder().encode(allParticipants)
-                body["participants"] = String(data: jsonData, encoding: .utf8) ?? "[]"
+                // JSON-encode participant list
+                if let jsonData = try? JSONEncoder().encode(allParticipants) {
+                    body["participants"] = String(data: jsonData, encoding: .utf8) ?? "[]"
+                }
             }
             try await api.addRivalry(body)
             await onSaved()
