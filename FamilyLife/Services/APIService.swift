@@ -274,6 +274,10 @@ final class APIService {
         return try await get("/api/decisions", queryParams: params)
     }
 
+    func fetchDecision(id: Int) async throws -> DecisionResponse {
+        try await get("/api/decisions/\(id)")
+    }
+
     @discardableResult
     func addDecision(_ decision: [String: Any]) async throws -> IDResponse {
         try await post("/api/decisions", body: decision)

@@ -183,7 +183,7 @@ struct NewDecisionView: View {
             }
         }
 
-        let body: [String: Any] = [
+        var body: [String: Any] = [
             "title": title,
             "decision_type": decisionType.rawValue,
             "body": bodyText.isEmpty ? NSNull() : bodyText,
@@ -194,6 +194,7 @@ struct NewDecisionView: View {
             "status": DecisionStatus.active.rawValue,
             "expires_at": expiresAt.map { ISO8601DateFormatter().string(from: $0) } ?? NSNull()
         ]
+        if let shareGroupId { body["group_id"] = shareGroupId }
 
         do {
             let result = try await api.addDecision(body)
