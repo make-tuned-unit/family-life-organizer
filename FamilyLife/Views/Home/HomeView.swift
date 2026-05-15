@@ -529,15 +529,11 @@ struct HomeView: View {
                         }
                     }
                 } label: {
-                    HStack(spacing: 4) {
-                        Text(feedFilterLabel)
-                            .font(.system(size: 13, weight: .medium))
-                            .lineLimit(1)
-                        Image(systemName: "chevron.down")
-                            .font(.system(size: 10, weight: .semibold))
-                    }
+                    (Text(feedFilterLabel)
+                        .font(.system(size: 13, weight: .medium))
+                    + Text(" \(Image(systemName: "chevron.down"))")
+                        .font(.system(size: 10, weight: .semibold)))
                     .foregroundStyle(TabAccent.home.color)
-                    .fixedSize()
                 }
             }
             .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
