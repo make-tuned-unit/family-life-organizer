@@ -2155,7 +2155,13 @@ app.post('/api/rivalries', requireAuth, async (req, res) => {
     if (data.start_date) data.start_date = normalizeDate(data.start_date);
     if (data.end_date) data.end_date = normalizeDate(data.end_date);
     if (!data.group_id) {
-      data.group_id = await db.getUserHouseholdId(req.session.user.id);
+      // For 1v1 rivalries, find the shared group between participants
+      if (data.initiator_name && data.opponent_name) {
+        data.group_id = await db.getSharedGroupByNames(data.initiator_name, data.opponent_name);
+      }
+      if (!data.group_id) {
+        data.group_id = await db.getUserHouseholdId(req.session.user.id);
+      }
     }
     const result = await db.addRivalry(data);
     res.json({ success: true, id: result.id });

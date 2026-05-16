@@ -104,21 +104,33 @@ struct MainTabView: View {
 
     private func pollUnread() async {
         var locationReportCounter = 0
+        var isFirstPoll = true
         while !Task.isCancelled {
             // Update badge count
             unreadCount = (try? await api.fetchUnreadMessageCount()) ?? 0
 
-            // Fire local notifications for new messages
+            // Fire local notifications for new messages (skip first poll to avoid flood on relaunch)
             if await NotificationService.shared.isAuthorized() {
-                if let convos = try? await api.fetchConversations() {
-                    NotificationService.shared.checkForNewMessages(convos)
-                }
-                let currentUser = auth.currentUser?.name ?? ""
-                if let feed = try? await api.fetchActivity() {
-                    NotificationService.shared.checkForNewFeedItems(
-                        feed,
-                        currentUser: currentUser
-                    )
+                if isFirstPoll {
+                    // Catch up watermarks without firing notifications
+                    if let convos = try? await api.fetchConversations() {
+                        NotificationService.shared.syncWatermark(convos)
+                    }
+                    if let feed = try? await api.fetchActivity() {
+                        NotificationService.shared.syncFeedWatermark(feed)
+                    }
+                    isFirstPoll = false
+                } else {
+                    if let convos = try? await api.fetchConversations() {
+                        NotificationService.shared.checkForNewMessages(convos)
+                    }
+                    let currentUser = auth.currentUser?.name ?? ""
+                    if let feed = try? await api.fetchActivity() {
+                        NotificationService.shared.checkForNewFeedItems(
+                            feed,
+                            currentUser: currentUser
+                        )
+                    }
                 }
             }
 

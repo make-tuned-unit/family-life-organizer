@@ -263,6 +263,20 @@ final class NotificationService {
         UNUserNotificationCenter.current().add(request)
     }
 
+    /// Update DM watermark without firing notifications (used on app launch)
+    func syncWatermark(_ conversations: [APIService.ConversationResponse]) {
+        if let maxId = conversations.map(\.id).max() {
+            UserDefaults.standard.set(maxId, forKey: "last_seen_dm_id")
+        }
+    }
+
+    /// Update feed watermark without firing notifications (used on app launch)
+    func syncFeedWatermark(_ items: [APIService.ActivityItem]) {
+        if let first = items.first {
+            UserDefaults.standard.set(first.stableKey, forKey: "last_seen_feed_id")
+        }
+    }
+
     /// Check for new DMs since last check and fire notifications
     func checkForNewMessages(_ conversations: [APIService.ConversationResponse]) {
         let lastSeenKey = "last_seen_dm_id"
