@@ -122,6 +122,8 @@ struct MainTabView: View {
     private func pollUnread() async {
         var locationReportCounter = 0
         var isFirstPoll = true
+        // Clear stale local notifications on launch to prevent flood
+        UNUserNotificationCenter.current().removeAllDeliveredNotifications()
         while !Task.isCancelled {
             // Update badge count
             unreadCount = (try? await api.fetchUnreadMessageCount()) ?? 0
