@@ -511,14 +511,15 @@ struct HomeView: View {
                 let title = item.item.title ?? ""
                 let involvesMe = body.localizedCaseInsensitiveContains(myName)
                     || title.localizedCaseInsensitiveContains(myName)
-                // Rivalries always show — user is a participant whether they created it or not
                 let isRivalry = item.item.feed_type == "rivalry"
+                    && (title.localizedCaseInsensitiveContains(myName)
+                        || author.localizedCaseInsensitiveCompare(myName) == .orderedSame)
                 let isDirectedAtMe = item.item.feed_type == "decision"
                     && author.localizedCaseInsensitiveCompare(myName) != .orderedSame
                 return involvesMe || isRivalry || isDirectedAtMe
             }
         case .group(let groupId):
-            return viewModel.activityFeed.filter { $0.item.group_id == groupId || $0.item.group_id == nil }
+            return viewModel.activityFeed.filter { $0.item.group_id == groupId }
         }
     }
 
