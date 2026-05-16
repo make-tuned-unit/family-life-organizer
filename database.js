@@ -1674,15 +1674,17 @@ class FamilyDB {
             WHERE gm2.group_id IN (SELECT group_id FROM group_members WHERE user_id = ${uid})
           )` : ''}
         UNION ALL
-        SELECT 'rivalry' as feed_type, id as ref_id, title, challenge_type as body,
-          initiator_name as author, status,
-          created_at,
-          0 as reaction_count, 0 as comment_count, NULL as author_id, NULL as group_id, NULL as group_name
-        FROM rivalries WHERE status = 'active' AND created_at >= datetime('now', '-14 days')${uid ? `
-          AND (group_id IN (${myGroups})
-            OR (group_id IS NULL AND (
-              initiator_name IN (${myHouseholdMembers})
-              OR opponent_name IN (${myHouseholdMembers})
+        SELECT 'rivalry' as feed_type, r.id as ref_id, r.title, r.challenge_type as body,
+          r.initiator_name as author, r.status,
+          r.created_at,
+          0 as reaction_count, 0 as comment_count, NULL as author_id, r.group_id, g.name as group_name
+        FROM rivalries r
+        LEFT JOIN groups g ON g.id = r.group_id
+        WHERE r.status = 'active' AND r.created_at >= datetime('now', '-14 days')${uid ? `
+          AND (r.group_id IN (${myGroups})
+            OR (r.group_id IS NULL AND (
+              r.initiator_name IN (${myHouseholdMembers})
+              OR r.opponent_name IN (${myHouseholdMembers})
             )))` : ''}
         UNION ALL
         SELECT 'post' as feed_type, fp.id as ref_id, fp.title, fp.body,
