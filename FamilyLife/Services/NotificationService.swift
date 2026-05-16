@@ -273,61 +273,56 @@ final class NotificationService {
 
     /// Update feed watermark without firing notifications (used on app launch)
     func syncFeedWatermark(_ items: [APIService.ActivityItem]) {
-        if let first = items.first {
-            UserDefaults.standard.set(first.stableKey, forKey: "last_seen_feed_id")
-        }
+        var seen = notifiedFeedKeys
+        for item in items { seen.insert(item.stableKey) }
+        saveNotifiedFeedKeys(seen)
     }
 
     /// Check for new DMs since last check and fire notifications
     func checkForNewMessages(_ conversations: [APIService.ConversationResponse]) {
-        let lastSeenKey = "last_seen_dm_id"
-        let lastSeenId = UserDefaults.standard.integer(forKey: lastSeenKey)
-
-        // First launch — mark current state
-        if lastSeenId == 0 {
-            if let maxId = conversations.map(\.id).max() {
-                UserDefaults.standard.set(maxId, forKey: lastSeenKey)
-            }
+        var seen = Set(UserDefaults.standard.stringArray(forKey: "notified_dm_ids") ?? [])
+        // First launch — mark all current
+        if seen.isEmpty {
+            seen = Set(conversations.map { String($0.id) })
+            UserDefaults.standard.set(Array(seen), forKey: "notified_dm_ids")
             return
         }
 
         var notified = 0
         for convo in conversations {
-            guard convo.id > lastSeenId else { continue }
+            let key = String(convo.id)
+            guard !seen.contains(key) else { continue }
             guard convo.unread_count > 0 else { continue }
             guard notified < 3 else { break }
             notifyNewMessage(
                 from: convo.partner_name, text: convo.text,
                 userInfo: ["type": "message", "ref_id": convo.partner_id, "name": convo.partner_name]
             )
+            seen.insert(key)
             notified += 1
         }
 
-        if let maxId = conversations.map(\.id).max(), maxId > lastSeenId {
-            UserDefaults.standard.set(maxId, forKey: lastSeenKey)
-        }
+        UserDefaults.standard.set(Array(seen), forKey: "notified_dm_ids")
     }
 
     /// Check feed for new items since last check and fire notifications
     func checkForNewFeedItems(_ items: [APIService.ActivityItem], currentUser: String) {
-        let lastSeenKey = "last_seen_feed_id"
-        let lastSeenId = UserDefaults.standard.string(forKey: lastSeenKey) ?? ""
-
-        // First launch — just mark current state, don't spam notifications
-        if lastSeenId.isEmpty {
-            if let first = items.first {
-                UserDefaults.standard.set(first.stableKey, forKey: lastSeenKey)
-            }
+        var seen = notifiedFeedKeys
+        // First launch — mark all current, don't spam
+        if seen.isEmpty {
+            for item in items { seen.insert(item.stableKey) }
+            saveNotifiedFeedKeys(seen)
             return
         }
 
-        // Max 3 notifications per refresh to avoid overwhelming the user
         var notified = 0
         for item in items {
-            guard item.stableKey != lastSeenId else { break }
+            guard !seen.contains(item.stableKey) else { continue }
             guard notified < 3 else { break }
-            // Skip own actions
-            guard item.author?.localizedCaseInsensitiveCompare(currentUser) != .orderedSame else { continue }
+            guard item.author?.localizedCaseInsensitiveCompare(currentUser) != .orderedSame else {
+                seen.insert(item.stableKey)
+                continue
+            }
 
             let author = item.author ?? "Someone"
             let info: [String: Any] = ["type": item.feed_type, "ref_id": item.ref_id]
@@ -335,13 +330,8 @@ final class NotificationService {
             switch item.feed_type {
             case "post":
                 postLocal(title: "\(author) shared a post", body: String((item.body ?? item.title ?? "").prefix(80)), category: "SOCIAL", userInfo: info)
-                if let body = item.body, body.localizedStandardContains("@\(currentUser)") {
-                    postLocal(title: "\(author) mentioned you", body: String(body.prefix(80)), category: "SOCIAL", userInfo: info)
-                }
             case "comment":
                 postLocal(title: "\(author) commented", body: item.body ?? "on a post", category: "FEED", userInfo: info)
-            case "reaction":
-                postLocal(title: "\(author) liked a post", body: item.title ?? "", category: "FEED", userInfo: info)
             case "decision":
                 postLocal(title: "\(author) needs your input", body: item.title ?? "New decision", category: "SOCIAL", userInfo: info)
             case "rivalry":
@@ -351,14 +341,24 @@ final class NotificationService {
             case "coverage":
                 postLocal(title: "\(author) needs coverage", body: item.title ?? "Coverage needed", category: "COVERAGE", userInfo: info)
             default:
+                seen.insert(item.stableKey)
                 continue
             }
+            seen.insert(item.stableKey)
             notified += 1
         }
 
-        if let first = items.first {
-            UserDefaults.standard.set(first.stableKey, forKey: lastSeenKey)
-        }
+        saveNotifiedFeedKeys(seen)
+    }
+
+    private var notifiedFeedKeys: Set<String> {
+        Set(UserDefaults.standard.stringArray(forKey: "notified_feed_keys") ?? [])
+    }
+
+    private func saveNotifiedFeedKeys(_ keys: Set<String>) {
+        // Keep last 200 to prevent unbounded growth
+        let trimmed = keys.count > 200 ? Set(keys.suffix(200)) : keys
+        UserDefaults.standard.set(Array(trimmed), forKey: "notified_feed_keys")
     }
 
     // MARK: - Helpers
