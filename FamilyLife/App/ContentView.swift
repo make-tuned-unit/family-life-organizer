@@ -35,6 +35,7 @@ struct ContentView: View {
 struct MainTabView: View {
     @Environment(APIService.self) private var api
     @Environment(AuthService.self) private var auth
+    @Environment(DeepLinkRouter.self) private var deepLinkRouter
     @State private var selectedTab: MainTab = .home
     @State private var pendingListName: String?
     @State private var loadedTabs: Set<MainTab> = [.home]
@@ -42,6 +43,9 @@ struct MainTabView: View {
     @State private var chatInitialThread: ChatSheet.ChatThread?
     @State private var unreadCount = 0
     @State private var locationService = LocationService()
+    @State private var deepRivalry: RivalryResponse?
+    @State private var deepDecision: DecisionResponse?
+    @State private var deepEvent: AppointmentResponse?
 
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -97,6 +101,19 @@ struct MainTabView: View {
         .onChange(of: showingChat) { _, showing in
             if !showing { chatInitialThread = nil }
         }
+        .sheet(item: $deepRivalry) { rivalry in
+            NavigationStack { RivalryDetailView(rivalry: rivalry) }
+        }
+        .sheet(item: $deepDecision) { decision in
+            NavigationStack { DecisionDetailView(decision: decision) }
+        }
+        .sheet(item: $deepEvent) { event in
+            NavigationStack { EventDetailView(appointment: event) }
+        }
+        .onChange(of: deepLinkRouter.pendingType) {
+            guard let type = deepLinkRouter.pendingType else { return }
+            Task { await handleDeepLink(type: type) }
+        }
         .task {
             await pollUnread()
         }
@@ -144,6 +161,44 @@ struct MainTabView: View {
             }
 
             try? await Task.sleep(for: .seconds(15))
+        }
+    }
+
+    private func handleDeepLink(type: String) async {
+        let refId = deepLinkRouter.pendingRefId
+        let name = deepLinkRouter.pendingName
+        deepLinkRouter.consume()
+
+        switch type {
+        case "rivalry":
+            if let refId {
+                let rivalries = (try? await api.fetchRivalries()) ?? []
+                if let rivalry = rivalries.first(where: { $0.id == refId }) {
+                    deepRivalry = rivalry
+                }
+            }
+            selectedTab = .home
+        case "decision":
+            if let refId {
+                deepDecision = try? await api.fetchDecision(id: refId)
+            }
+            selectedTab = .home
+        case "event", "appointment":
+            selectedTab = .calendar
+        case "message":
+            if let refId, let name {
+                chatInitialThread = .dm(partnerId: refId, name: name)
+            }
+            showingChat = true
+        case "group_message":
+            if let refId, let name {
+                chatInitialThread = .group(groupId: refId, name: name)
+            }
+            showingChat = true
+        case "coverage":
+            selectedTab = .home
+        default:
+            selectedTab = .home
         }
     }
 
@@ -212,5 +267,6 @@ struct FloatingTabBar: View {
         .environment(APIService())
         .environment(HouseholdService())
         .environment(ProfileImageCache())
+        .environment(DeepLinkRouter())
         .environment(MessageCache())
 }

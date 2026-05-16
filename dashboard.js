@@ -2048,7 +2048,7 @@ app.post('/api/decisions', requireAuth, async (req, res) => {
     res.json({ success: true, id: result.id });
     // Push to household members
     if (data.group_id) {
-      push.pushToGroup(db, data.group_id, userId, `${senderName} needs your input`, data.title || 'New decision', { type: 'decision' });
+      push.pushToGroup(db, data.group_id, userId, `${senderName} needs your input`, data.title || 'New decision', { type: 'decision', ref_id: result.id });
     }
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -2284,15 +2284,15 @@ app.post('/api/rivalries/:id/complete', requireAuth, async (req, res) => {
           const loser = winner_name === rivalry.initiator_name ? rivalry.opponent_name : rivalry.initiator_name;
           const winnerId = await db.getUserIdByName(winner_name);
           const loserId = await db.getUserIdByName(loser);
-          if (winnerId) push.pushToUser(db, winnerId, 'You Won!', pick(RIVALRY_WINNER_PUSH)(loser), { type: 'rivalry', rivalry_id: rivalry.id });
-          if (loserId) push.pushToUser(db, loserId, 'Better Luck Next Time', pick(RIVALRY_LOSER_PUSH)(winner_name), { type: 'rivalry', rivalry_id: rivalry.id });
+          if (winnerId) push.pushToUser(db, winnerId, 'You Won!', pick(RIVALRY_WINNER_PUSH)(loser), { type: 'rivalry', ref_id: rivalry.id });
+          if (loserId) push.pushToUser(db, loserId, 'Better Luck Next Time', pick(RIVALRY_LOSER_PUSH)(winner_name), { type: 'rivalry', ref_id: rivalry.id });
         } else {
           // Tie — notify both
           const id1 = await db.getUserIdByName(rivalry.initiator_name);
           const id2 = await db.getUserIdByName(rivalry.opponent_name);
           const tieMsg = `It's a tie in "${rivalry.title}"! Run it back?`;
-          if (id1) push.pushToUser(db, id1, 'Rivalry Tied!', tieMsg, { type: 'rivalry', rivalry_id: rivalry.id });
-          if (id2) push.pushToUser(db, id2, 'Rivalry Tied!', tieMsg, { type: 'rivalry', rivalry_id: rivalry.id });
+          if (id1) push.pushToUser(db, id1, 'Rivalry Tied!', tieMsg, { type: 'rivalry', ref_id: rivalry.id });
+          if (id2) push.pushToUser(db, id2, 'Rivalry Tied!', tieMsg, { type: 'rivalry', ref_id: rivalry.id });
         }
       } catch (e) { console.error('Push error:', e.message); }
     }
@@ -2652,7 +2652,7 @@ app.post('/api/groups/:id/feed', requireAuth, async (req, res) => {
     res.json({ success: true, id: result.id });
     // Push to group members (fire-and-forget)
     const preview = req.body.title || req.body.body || 'New post';
-    push.pushToGroup(db, groupId, userId, senderName, preview, { type: 'feed', group_id: groupId });
+    push.pushToGroup(db, groupId, userId, senderName, preview, { type: 'group_message', ref_id: groupId });
   } catch (err) {
     res.status(500).json({ error: err.message });
   } finally {
@@ -2870,7 +2870,7 @@ app.post('/api/messages', requireAuth, async (req, res) => {
     res.json({ success: true, id: result.id });
     // Push notification to recipient (fire-and-forget)
     const text = req.body.image_data ? 'Sent a photo' : (req.body.text || '');
-    push.pushToUser(db, req.body.recipient_id, senderName, text, { type: 'message', sender_id: senderId });
+    push.pushToUser(db, req.body.recipient_id, senderName, text, { type: 'message', ref_id: senderId, name: senderName });
   } catch (err) { res.status(500).json({ error: err.message }); }
   finally { db.close(); }
 });

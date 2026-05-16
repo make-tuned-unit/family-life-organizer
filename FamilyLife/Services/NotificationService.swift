@@ -251,12 +251,13 @@ final class NotificationService {
         UNUserNotificationCenter.current().add(request)
     }
 
-    func notifyNewMessage(from sender: String, text: String, hasImage: Bool = false) {
+    func notifyNewMessage(from sender: String, text: String, hasImage: Bool = false, userInfo: [String: Any] = [:]) {
         let content = UNMutableNotificationContent()
         content.title = sender
         content.body = hasImage ? "Sent a photo" : String(text.prefix(100))
         content.sound = .default
         content.categoryIdentifier = "MESSAGE"
+        if !userInfo.isEmpty { content.userInfo = userInfo }
 
         let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 1, repeats: false)
         let request = UNNotificationRequest(identifier: "dm-\(UUID().uuidString)", content: content, trigger: trigger)
@@ -295,7 +296,10 @@ final class NotificationService {
             guard convo.id > lastSeenId else { continue }
             guard convo.unread_count > 0 else { continue }
             guard notified < 3 else { break }
-            notifyNewMessage(from: convo.partner_name, text: convo.text)
+            notifyNewMessage(
+                from: convo.partner_name, text: convo.text,
+                userInfo: ["type": "message", "ref_id": convo.partner_id, "name": convo.partner_name]
+            )
             notified += 1
         }
 
@@ -326,33 +330,26 @@ final class NotificationService {
             guard item.author?.localizedCaseInsensitiveCompare(currentUser) != .orderedSame else { continue }
 
             let author = item.author ?? "Someone"
+            let info: [String: Any] = ["type": item.feed_type, "ref_id": item.ref_id]
 
             switch item.feed_type {
             case "post":
-                notifyNewPost(author: author, preview: item.body ?? item.title ?? "")
+                postLocal(title: "\(author) shared a post", body: String((item.body ?? item.title ?? "").prefix(80)), category: "SOCIAL", userInfo: info)
                 if let body = item.body, body.localizedStandardContains("@\(currentUser)") {
-                    notifyMention(author: author, inPost: body)
+                    postLocal(title: "\(author) mentioned you", body: String(body.prefix(80)), category: "SOCIAL", userInfo: info)
                 }
             case "comment":
-                notifyLocal(
-                    title: "\(author) commented",
-                    body: item.body ?? "on a post",
-                    category: "FEED"
-                )
+                postLocal(title: "\(author) commented", body: item.body ?? "on a post", category: "FEED", userInfo: info)
             case "reaction":
-                notifyLocal(
-                    title: "\(author) liked a post",
-                    body: item.title ?? "",
-                    category: "FEED"
-                )
+                postLocal(title: "\(author) liked a post", body: item.title ?? "", category: "FEED", userInfo: info)
             case "decision":
-                notifyNewDecision(author: author, title: item.title ?? "New decision")
+                postLocal(title: "\(author) needs your input", body: item.title ?? "New decision", category: "SOCIAL", userInfo: info)
             case "rivalry":
-                notifyNewRivalry(author: author, title: item.title ?? "New challenge")
+                postLocal(title: "\(author) challenged you", body: item.title ?? "New challenge", category: "SOCIAL", userInfo: info)
             case "event":
-                notifyNewEvent(author: author, title: item.title ?? "New event")
+                postLocal(title: "New event", body: item.title ?? "", category: "CALENDAR", userInfo: info)
             case "coverage":
-                notifyCoverageRequest(author: author, reason: item.title ?? "Coverage needed")
+                postLocal(title: "\(author) needs coverage", body: item.title ?? "Coverage needed", category: "COVERAGE", userInfo: info)
             default:
                 continue
             }
@@ -365,6 +362,19 @@ final class NotificationService {
     }
 
     // MARK: - Helpers
+
+    private func postLocal(title: String, body: String, category: String, userInfo: [String: Any] = [:]) {
+        let content = UNMutableNotificationContent()
+        content.title = title
+        content.body = String(body.prefix(100))
+        content.sound = .default
+        content.categoryIdentifier = category
+        if !userInfo.isEmpty { content.userInfo = userInfo }
+
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 1, repeats: false)
+        let request = UNNotificationRequest(identifier: "\(category.lowercased())-\(UUID().uuidString)", content: content, trigger: trigger)
+        UNUserNotificationCenter.current().add(request)
+    }
 
     private func parseDateTime(date: String, time: String?, minutesBefore: Int) -> Date? {
         let formatter = time != nil ? DateFormatter.dateTimeMinute : DateFormatter.isoDate
