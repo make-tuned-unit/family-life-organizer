@@ -1,8 +1,28 @@
 import SwiftUI
 import UIKit
 
+@Observable
+class DeepLinkRouter {
+    var pendingType: String?
+    var pendingRefId: Int?
+    var pendingName: String?
+
+    func route(type: String, refId: Int?, name: String? = nil) {
+        pendingType = type
+        pendingRefId = refId
+        pendingName = name
+    }
+
+    func consume() {
+        pendingType = nil
+        pendingRefId = nil
+        pendingName = nil
+    }
+}
+
 class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
     var apiService: APIService?
+    var deepLinkRouter: DeepLinkRouter?
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         UNUserNotificationCenter.current().delegate = self
@@ -26,6 +46,17 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
     func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification) async -> UNNotificationPresentationOptions {
         [.banner, .sound, .badge]
     }
+
+    // Handle notification tap
+    func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse) async {
+        let userInfo = response.notification.request.content.userInfo
+        guard let type = userInfo["type"] as? String else { return }
+        let refId = userInfo["ref_id"] as? Int
+        let name = userInfo["name"] as? String
+        await MainActor.run {
+            deepLinkRouter?.route(type: type, refId: refId, name: name)
+        }
+    }
 }
 
 @main
@@ -36,6 +67,7 @@ struct FamilyLifeApp: App {
     @State private var householdService = HouseholdService()
     @State private var profileImageCache = ProfileImageCache()
     @State private var messageCache = MessageCache()
+    @State private var deepLinkRouter = DeepLinkRouter()
 
     var body: some Scene {
         WindowGroup {
@@ -45,9 +77,11 @@ struct FamilyLifeApp: App {
                 .environment(householdService)
                 .environment(profileImageCache)
                 .environment(messageCache)
+                .environment(deepLinkRouter)
                 .task {
-                    // Wire up API service to app delegate for token registration
+                    // Wire up API service and deep link router to app delegate
                     appDelegate.apiService = apiService
+                    appDelegate.deepLinkRouter = deepLinkRouter
 
                     if authService.isAuthenticated {
                         await authService.validateSession(api: apiService)
