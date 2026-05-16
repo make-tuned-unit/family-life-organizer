@@ -45,8 +45,8 @@ struct HomeView: View {
                 headerSection
                 greetingSection
                 presenceRow
-                heroFocusCard
                 statsGrid
+                heroFocusCard
                 upNextSection
                 activityFeedSection
             }
@@ -331,31 +331,7 @@ struct HomeView: View {
             heroCard(appt, label: "TODAY'S FOCUS", subtitle: appt.appointment_time, showDismiss: true)
         } else if let appt = viewModel.nextAppointment {
             heroCard(appt, label: "NEXT EVENT", subtitle: Self.friendlyDate(appt.appointment_date, time: appt.appointment_time), showDismiss: false)
-        } else {
-            emptyHeroCard
         }
-    }
-
-    private var emptyHeroCard: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("CALENDAR")
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(TabAccent.home.color)
-            Text("No upcoming events")
-                .font(.system(size: 22, weight: .bold))
-                .foregroundStyle(WarmPalette.ink1)
-            Text("Tap to view your calendar")
-                .font(.system(size: 14))
-                .foregroundStyle(WarmPalette.ink3)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.vertical, 20)
-        .padding(.horizontal, 22)
-        .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.cardLarge))
-        .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
-        .padding(.bottom, 14)
-        .contentShape(Rectangle())
-        .onTapGesture { selectedTab = .calendar }
     }
 
     private func heroCard(_ appt: AppointmentResponse, label: String, subtitle: String?, showDismiss: Bool) -> some View {

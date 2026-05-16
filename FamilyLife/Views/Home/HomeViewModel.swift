@@ -80,13 +80,13 @@ final class HomeViewModel {
         weekEventCount = weekAppts.value?.count ?? 0
         monthEventCount = monthAppts.value?.count ?? 0
 
-        // When no events today, surface the next upcoming event from the week
-        if todayAppointments.isEmpty, let upcoming = weekAppts.value {
+        // When no events today, surface the next upcoming event from the month
+        if todayAppointments.isEmpty {
             let today = Self.todayString()
-            nextAppointment = upcoming
+            let allUpcoming = (monthAppts.value ?? weekAppts.value ?? [])
                 .filter { $0.appointment_date > today }
                 .sorted { ($0.appointment_date, $0.appointment_time ?? "") < ($1.appointment_date, $1.appointment_time ?? "") }
-                .first
+            nextAppointment = allUpcoming.first
         } else {
             nextAppointment = nil
         }
