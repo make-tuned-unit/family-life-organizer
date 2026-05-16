@@ -42,7 +42,6 @@ struct HomeView: View {
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(spacing: 0) {
-                headerSection
                 greetingSection
                 presenceRow
                 statsGrid
@@ -63,6 +62,21 @@ struct HomeView: View {
             ToolbarItem(placement: .topBarLeading) {
                 Button { showingSettings = true } label: {
                     ProfileAvatar(size: 36)
+                }
+            }
+            ToolbarItem(placement: .principal) {
+                VStack(spacing: 2) {
+                    Text(dateString)
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(WarmPalette.ink3)
+                    HStack(spacing: 5) {
+                        Circle()
+                            .fill(currentLocationColor)
+                            .frame(width: 6, height: 6)
+                        Text(currentLocationLabel)
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(WarmPalette.ink2)
+                    }
                 }
             }
             ToolbarItem(placement: .topBarTrailing) {
@@ -207,41 +221,18 @@ struct HomeView: View {
 
     // MARK: - Header
 
-    private var headerSection: some View {
-        HStack {
-            Text(dateString)
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(WarmPalette.ink3)
-            Spacer()
-            HStack(spacing: 6) {
-                Circle()
-                    .fill(currentLocationColor)
-                    .frame(width: 8, height: 8)
-                Text(currentLocationLabel)
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(WarmPalette.ink2)
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
-            .background(WarmPalette.cardSurface, in: Capsule())
-        }
-        .padding(.horizontal, 22)
-        .padding(.top, 14)
-        .padding(.bottom, 8)
-    }
-
     // MARK: - Greeting
+
+    private var firstName: String {
+        let name = auth.currentUser?.name ?? "there"
+        return name.components(separatedBy: " ").first ?? name
+    }
 
     private var greetingSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            VStack(alignment: .leading, spacing: 0) {
-                Text("\(greeting),")
-                    .font(.system(size: 34, weight: .bold))
-                    .foregroundStyle(WarmPalette.ink1)
-                Text("\(auth.currentUser?.name ?? "there").")
-                    .font(.system(size: 34, weight: .bold))
-                    .foregroundStyle(TabAccent.home.color)
-            }
+            Text("\(greeting), \(firstName).")
+                .font(.system(size: 28, weight: .bold))
+                .foregroundStyle(WarmPalette.ink1)
             familyStatusSubtitle
         }
         .frame(maxWidth: .infinity, alignment: .leading)
