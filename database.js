@@ -259,6 +259,23 @@ class FamilyDB {
   }
 
   // Get the user's household group ID
+  getSharedGroupByNames(name1, name2) {
+    return new Promise((resolve, reject) => {
+      this.db.get(`
+        SELECT g.id FROM groups g
+        JOIN group_members gm1 ON gm1.group_id = g.id
+        JOIN users u1 ON u1.id = gm1.user_id AND u1.name = ?
+        JOIN group_members gm2 ON gm2.group_id = g.id
+        JOIN users u2 ON u2.id = gm2.user_id AND u2.name = ?
+        ORDER BY CASE WHEN g.group_type = 'household' THEN 1 ELSE 0 END, g.id
+        LIMIT 1
+      `, [name1, name2], (err, row) => {
+        if (err) reject(err);
+        else resolve(row?.id || null);
+      });
+    });
+  }
+
   getUserHouseholdId(userId) {
     return new Promise((resolve, reject) => {
       this.db.get(`
