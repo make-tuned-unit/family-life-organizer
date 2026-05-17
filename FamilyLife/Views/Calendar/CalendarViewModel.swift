@@ -6,6 +6,7 @@ final class CalendarViewModel {
     var displayedMonth: Date = Date()
     var selectedDate: Date?
     var monthAppointments: [AppointmentResponse] = []
+    var coverageBlocks: [APIService.CoverageBlockResponse] = []
     var isLoading = false
     var error: String?
 
@@ -83,6 +84,19 @@ final class CalendarViewModel {
             .sorted { ($0.appointment_time ?? "") < ($1.appointment_time ?? "") }
     }
 
+    func hasCoverage(for date: Date?) -> Bool {
+        guard let date else { return false }
+        let dateStr = Self.dateString(from: date)
+        return coverageBlocks.contains { $0.approved_date == dateStr }
+    }
+
+    func coverageBlocks(for date: Date) -> [APIService.CoverageBlockResponse] {
+        let dateStr = Self.dateString(from: date)
+        return coverageBlocks
+            .filter { $0.approved_date == dateStr }
+            .sorted { $0.approved_start < $1.approved_start }
+    }
+
     // MARK: - Navigation
 
     func previousMonth() {
@@ -100,8 +114,15 @@ final class CalendarViewModel {
         error = nil
         let year = calendar.component(.year, from: displayedMonth)
         let month = calendar.component(.month, from: displayedMonth)
+
+        let firstDay = String(format: "%04d-%02d-01", year, month)
+        let lastDay = String(format: "%04d-%02d-%02d", year, month, calendar.range(of: .day, in: .month, for: displayedMonth)?.count ?? 28)
+
         do {
-            monthAppointments = try await api.fetchAppointmentsByMonth(year: year, month: month)
+            async let appts = api.fetchAppointmentsByMonth(year: year, month: month)
+            async let blocks = api.fetchCoverageBlocks(dateFrom: firstDay, dateTo: lastDay)
+            monthAppointments = try await appts
+            coverageBlocks = (try? await blocks) ?? []
         } catch {
             guard !error.isCancellation else { return }
             self.error = error.localizedDescription

@@ -3111,6 +3111,21 @@ app.get('/api/coverage', requireAuth, async (req, res) => {
   }
 });
 
+// Approved coverage blocks for calendar display
+app.get('/api/coverage/blocks', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const userId = req.session.user?.id;
+    const { date_from, date_to } = req.query;
+    const blocks = await db.getCoverageBlocks(userId, date_from, date_to);
+    res.json(blocks);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
 // Get full details of a coverage request
 app.get('/api/coverage/:id', requireAuth, async (req, res) => {
   const db = new FamilyDB();
@@ -3184,6 +3199,16 @@ app.post('/api/coverage/approve/:token', async (req, res) => {
       approved_end,
       helper_note
     });
+
+    // Push notification to requester
+    const request = await db.getCoverageRequestById(recipient.request_id);
+    if (request) {
+      const helperName = recipient.contact_name || 'Your care team';
+      const timeDesc = approved_start && approved_end ? `${approved_start}–${approved_end}` : 'a time block';
+      push.pushToUser(db, request.requester_id, 'Coverage Confirmed', `${helperName} approved ${timeDesc}`, {
+        type: 'coverage', ref_id: recipient.request_id
+      });
+    }
 
     res.json({ success: true, message: 'Coverage confirmed' });
   } catch (err) {
