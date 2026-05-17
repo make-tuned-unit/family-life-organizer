@@ -72,6 +72,7 @@
 		AA000045 /* CareCascadeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000045 /* CareCascadeView.swift */; };
 		AA000046 /* AIDisclosureView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000046 /* AIDisclosureView.swift */; };
 		AA000080 /* IncomingCoverageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000080 /* IncomingCoverageView.swift */; };
+		AA000081 /* MyCoverageRequestsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000081 /* MyCoverageRequestsView.swift */; };
 		AA000047 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = BB000047 /* PrivacyInfo.xcprivacy */; };
 		AA000048 /* AppConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000048 /* AppConfig.swift */; };
 		AA00004A /* FamilyListsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00004A /* FamilyListsView.swift */; };
@@ -163,6 +164,7 @@
 		BB000045 /* CareCascadeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CareCascadeView.swift; sourceTree = "<group>"; };
 		BB000046 /* AIDisclosureView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIDisclosureView.swift; sourceTree = "<group>"; };
 		BB000080 /* IncomingCoverageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IncomingCoverageView.swift; sourceTree = "<group>"; };
+		BB000081 /* MyCoverageRequestsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MyCoverageRequestsView.swift; sourceTree = "<group>"; };
 		BB000047 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		BB000048 /* AppConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppConfig.swift; sourceTree = "<group>"; };
 		BB00004A /* FamilyListsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FamilyListsView.swift; sourceTree = "<group>"; };
@@ -443,6 +445,7 @@
 			children = (
 				BB000045 /* CareCascadeView.swift */,
 				BB000080 /* IncomingCoverageView.swift */,
+				BB000081 /* MyCoverageRequestsView.swift */,
 			);
 			path = Care;
 			sourceTree = "<group>";
@@ -604,6 +607,7 @@
 				AA000077 /* MessageCache.swift in Sources */,
 				AA000045 /* CareCascadeView.swift in Sources */,
 				AA000080 /* IncomingCoverageView.swift in Sources */,
+				AA000081 /* MyCoverageRequestsView.swift in Sources */,
 				AA000046 /* AIDisclosureView.swift in Sources */,
 				AA000048 /* AppConfig.swift in Sources */,
 				AA00004A /* FamilyListsView.swift in Sources */,
