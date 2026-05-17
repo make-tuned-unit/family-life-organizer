@@ -227,8 +227,8 @@ struct CoverageDetailSheet: View {
                 VStack(spacing: 6) {
                     ForEach(detail.recipients) { recipient in
                         HStack(spacing: 12) {
-                            FamilyAvatar(initial: recipient.avatar_initial ?? String(recipient.contact_name.prefix(1)).uppercased(), size: 32)
-                            Text(recipient.contact_name)
+                            FamilyAvatar(initial: recipient.avatar_initial ?? String((recipient.contact_name ?? "?").prefix(1)).uppercased(), size: 32)
+                            Text(recipient.contact_name ?? "Helper")
                                 .font(.system(size: 14, weight: .semibold))
                                 .foregroundStyle(WarmPalette.ink1)
                             Spacer()
