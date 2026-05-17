@@ -1,61 +1,89 @@
 import SwiftUI
 
-// MARK: - My Coverage Requests (requester's view)
-// Shows coverage requests the current user has sent, with status tracking.
+// MARK: - Combined Coverage View (sent + incoming)
+// Shows both requests the user has sent AND requests from others needing help.
 
 struct MyCoverageRequestsView: View {
     @Environment(APIService.self) private var api
-    @State private var requests: [APIService.CoverageRequestResponse] = []
+    @State private var myRequests: [APIService.CoverageRequestResponse] = []
+    @State private var incoming: [APIService.IncomingCoverageRequest] = []
     @State private var isLoading = false
     @State private var selectedDetail: APIService.CoverageDetailResponse?
     @State private var showingCareCascade = false
+    @State private var selectedIncoming: APIService.IncomingCoverageRequest?
 
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(spacing: 0) {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("MY REQUESTS")
+                    Text("COVERAGE")
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundStyle(TabAccent.care.color).tracking(0.4)
-                    Text("Coverage requests")
+                    Text("Care Cascade")
                         .font(.system(size: 28, weight: .bold))
                         .foregroundStyle(WarmPalette.ink1)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 22).padding(.top, 14).padding(.bottom, 18)
 
-                if isLoading && requests.isEmpty {
+                if isLoading && myRequests.isEmpty && incoming.isEmpty {
                     ProgressView().padding(.top, 40)
-                } else if requests.isEmpty {
-                    VStack(spacing: 12) {
-                        Image(systemName: "arrow.triangle.swap")
-                            .font(.system(size: 32))
-                            .foregroundStyle(WarmPalette.ink4)
-                        Text("No requests yet")
-                            .font(.system(size: 15))
-                            .foregroundStyle(WarmPalette.ink3)
-                        Button { showingCareCascade = true } label: {
-                            Text("Send a coverage request")
-                                .font(.system(size: 14, weight: .semibold))
-                                .foregroundStyle(TabAccent.care.color)
-                                .padding(.horizontal, 16).padding(.vertical, 10)
-                                .background(TabAccent.care.color.opacity(0.12), in: Capsule())
-                        }
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 40)
                 } else {
-                    VStack(spacing: 10) {
-                        ForEach(requests) { request in
-                            Button {
-                                Task { await loadDetail(id: request.id) }
-                            } label: {
-                                MyCoverageRequestCard(request: request)
+                    // Incoming help requests
+                    if !incoming.isEmpty {
+                        sectionHeader("Needs your help")
+                        VStack(spacing: 8) {
+                            ForEach(incoming) { request in
+                                IncomingRequestCard(request: request) {
+                                    selectedIncoming = request
+                                }
                             }
-                            .buttonStyle(.plain)
                         }
+                        .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
+                        .padding(.bottom, 18)
                     }
-                    .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
+
+                    // My sent requests
+                    sectionHeader("Your requests")
+                    if myRequests.isEmpty {
+                        VStack(spacing: 12) {
+                            Image(systemName: "arrow.triangle.swap")
+                                .font(.system(size: 32))
+                                .foregroundStyle(WarmPalette.ink4)
+                            Text("No requests yet")
+                                .font(.system(size: 15))
+                                .foregroundStyle(WarmPalette.ink3)
+                            Button { showingCareCascade = true } label: {
+                                Text("Send a coverage request")
+                                    .font(.system(size: 14, weight: .semibold))
+                                    .foregroundStyle(TabAccent.care.color)
+                                    .padding(.horizontal, 16).padding(.vertical, 10)
+                                    .background(TabAccent.care.color.opacity(0.12), in: Capsule())
+                            }
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 30)
+                    } else {
+                        VStack(spacing: 8) {
+                            ForEach(myRequests) { request in
+                                MyCoverageRequestCard(request: request)
+                                    .contentShape(Rectangle())
+                                    .onTapGesture {
+                                        Task { await loadDetail(id: request.id) }
+                                    }
+                                    .swipeActions(edge: .trailing) {
+                                        if request.status == "pending" {
+                                            Button(role: .destructive) {
+                                                Task { await cancelRequest(id: request.id) }
+                                            } label: {
+                                                Label("Cancel", systemImage: "xmark.circle")
+                                            }
+                                        }
+                                    }
+                            }
+                        }
+                        .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
+                    }
                 }
             }
             .padding(.bottom, DesignTokens.Spacing.bottomBuffer)
@@ -70,26 +98,51 @@ struct MyCoverageRequestsView: View {
                 }
             }
         }
-        .refreshable { await loadRequests() }
-        .task { await loadRequests() }
+        .refreshable { await loadAll() }
+        .task { await loadAll() }
         .sheet(item: $selectedDetail) { detail in
-            NavigationStack { CoverageDetailSheet(detail: detail) }
+            NavigationStack {
+                CoverageDetailSheet(detail: detail) {
+                    await loadAll()
+                }
+            }
         }
         .sheet(isPresented: $showingCareCascade) {
+            NavigationStack { CareCascadeView() }
+        }
+        .sheet(item: $selectedIncoming) { request in
             NavigationStack {
-                CareCascadeView()
+                ApproveRequestSheet(request: request) {
+                    await loadAll()
+                }
             }
         }
     }
 
-    private func loadRequests() async {
+    private func loadAll() async {
         isLoading = true
-        requests = (try? await api.fetchCoverageRequests()) ?? []
+        async let r = api.fetchCoverageRequests()
+        async let i = api.fetchIncomingCoverage()
+        myRequests = (try? await r) ?? []
+        incoming = ((try? await i) ?? []).filter { $0.recipient_status == "pending" }
         isLoading = false
     }
 
     private func loadDetail(id: Int) async {
         selectedDetail = try? await api.fetchCoverageDetail(id: id)
+    }
+
+    private func cancelRequest(id: Int) async {
+        try? await api.cancelCoverageRequest(id: id)
+        myRequests.removeAll { $0.id == id }
+    }
+
+    private func sectionHeader(_ title: String) -> some View {
+        Text(title.uppercased())
+            .font(.system(size: 10, weight: .semibold))
+            .foregroundStyle(WarmPalette.ink3).tracking(0.4)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 22).padding(.bottom, 8)
     }
 }
 
@@ -116,16 +169,7 @@ struct MyCoverageRequestCard: View {
     }
 
     private var reasonIcon: String {
-        switch request.reason {
-        case "Watch the kids": "figure.and.child.holdinghands"
-        case "Watch the dog": "dog.fill"
-        case "Cat care": "cat.fill"
-        case "House sitting": "house.fill"
-        case "Plant care": "leaf.fill"
-        case "Pet sitting": "pawprint.fill"
-        case "Eldercare": "heart.fill"
-        default: "hand.raised.fill"
-        }
+        coverageReasonIcon(request.reason)
     }
 
     var body: some View {
@@ -175,6 +219,7 @@ struct MyCoverageRequestCard: View {
 
 struct CoverageDetailSheet: View {
     let detail: APIService.CoverageDetailResponse
+    var onChanged: (() async -> Void)?
     @Environment(APIService.self) private var api
     @Environment(\.dismiss) private var dismiss
 
@@ -270,6 +315,24 @@ struct CoverageDetailSheet: View {
                     }
                     .padding(.horizontal, 22).padding(.bottom, 18)
                 }
+
+                // Cancel button
+                if detail.status == "pending" {
+                    Button {
+                        Task {
+                            try? await api.cancelCoverageRequest(id: detail.id)
+                            await onChanged?()
+                            dismiss()
+                        }
+                    } label: {
+                        Text("Cancel request")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(AccentTheme.rose.color)
+                            .frame(maxWidth: .infinity).padding(.vertical, 14)
+                            .background(AccentTheme.rose.color.opacity(0.1), in: RoundedRectangle(cornerRadius: 18))
+                    }
+                    .padding(.horizontal, 22)
+                }
             }
             .padding(.bottom, 40)
         }
@@ -316,6 +379,20 @@ struct CoverageDetailSheet: View {
 
 // Make CoverageDetailResponse Identifiable for sheet presentation
 extension APIService.CoverageDetailResponse: @retroactive Identifiable { }
+
+// Shared reason icon helper
+func coverageReasonIcon(_ reason: String) -> String {
+    switch reason {
+    case "Watch the kids": "figure.and.child.holdinghands"
+    case "Watch the dog": "dog.fill"
+    case "Cat care": "cat.fill"
+    case "House sitting": "house.fill"
+    case "Plant care": "leaf.fill"
+    case "Pet sitting": "pawprint.fill"
+    case "Eldercare": "heart.fill"
+    default: "hand.raised.fill"
+    }
+}
 
 #Preview("My Coverage Requests") {
     NavigationStack { MyCoverageRequestsView() }

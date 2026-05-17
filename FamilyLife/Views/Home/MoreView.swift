@@ -30,11 +30,7 @@ struct MoreView: View {
                     }
 
                     NavigationLink { MyCoverageRequestsView() } label: {
-                        moreRow(icon: "arrow.triangle.swap", title: "My Coverage", subtitle: "Requests you've sent for help", color: TabAccent.care.color)
-                    }
-
-                    NavigationLink { IncomingCoverageView() } label: {
-                        moreRow(icon: "hand.raised.fill", title: "Help Requests", subtitle: "Coverage requests from your family", color: AccentTheme.sage.color)
+                        moreRow(icon: "arrow.triangle.swap", title: "Coverage", subtitle: "Your requests and incoming help", color: TabAccent.care.color)
                     }
 
                     NavigationLink { TripsView() } label: {
