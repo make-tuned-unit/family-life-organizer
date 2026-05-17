@@ -29,6 +29,10 @@ struct MoreView: View {
                         moreRow(icon: "gift.fill", title: "Gifts", subtitle: "Track people, occasions, and gift ideas", color: AccentTheme.rose.color)
                     }
 
+                    NavigationLink { IncomingCoverageView() } label: {
+                        moreRow(icon: "hand.raised.fill", title: "Help Requests", subtitle: "Coverage requests from your family", color: TabAccent.care.color)
+                    }
+
                     NavigationLink { TripsView() } label: {
                         moreRow(icon: "car.fill", title: "Trips", subtitle: "Share departures and ETA updates", color: AccentTheme.ocean.color)
                     }

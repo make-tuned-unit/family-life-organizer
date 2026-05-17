@@ -3239,7 +3239,7 @@ app.post('/api/coverage/approve/:token', async (req, res) => {
       const helperId = await db.getUserIdByContactId(recipient.contact_id);
       if (helperId && approved_date) {
         await db.addAppointment({
-          title: `Helping ${requesterName} · Childcare`,
+          title: `Helping ${requesterName} · ${request.reason || 'Coverage'}`,
           appointment_date: approved_date ? normalizeDate(approved_date) : null,
           appointment_time: approved_start || null,
           location: null,
@@ -3293,7 +3293,7 @@ app.post('/api/coverage/incoming/:id/approve', requireAuth, async (req, res) => 
       // Add to helper's calendar
       if (approved_date) {
         await db.addAppointment({
-          title: `Helping ${request.requester_name || 'Family'} · Childcare`,
+          title: `Helping ${request.requester_name || 'Family'} · ${request.reason || 'Coverage'}`,
           appointment_date: normalizeDate(approved_date),
           appointment_time: approved_start || null,
           location: null,
