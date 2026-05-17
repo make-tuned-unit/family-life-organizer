@@ -65,19 +65,20 @@ struct HomeView: View {
                 }
             }
             ToolbarItem(placement: .principal) {
-                VStack(spacing: 2) {
+                VStack(spacing: 3) {
                     Text(dateString)
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(WarmPalette.ink3)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(WarmPalette.ink2)
                     HStack(spacing: 5) {
                         Circle()
                             .fill(currentLocationColor)
                             .frame(width: 6, height: 6)
                         Text(currentLocationLabel)
                             .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(WarmPalette.ink2)
+                            .foregroundStyle(WarmPalette.ink3)
                     }
                 }
+                .padding(.vertical, 4)
             }
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
@@ -230,9 +231,11 @@ struct HomeView: View {
 
     private var greetingSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("\(greeting), \(firstName).")
-                .font(.system(size: 28, weight: .bold))
+            (Text("\(greeting), ")
                 .foregroundStyle(WarmPalette.ink1)
+            + Text("\(firstName).")
+                .foregroundStyle(TabAccent.home.color))
+                .font(.system(size: 28, weight: .bold))
             familyStatusSubtitle
         }
         .frame(maxWidth: .infinity, alignment: .leading)
