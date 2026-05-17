@@ -3090,6 +3090,31 @@ app.post('/api/coverage', requireAuth, async (req, res) => {
     }
 
     res.json({ success: true, id: request.id, recipients });
+
+    // Push to helpers who are app users
+    const senderName = req.session.user?.name || 'Someone';
+    for (const contactId of (contact_ids || [])) {
+      const helperId = await db.getUserIdByContactId(contactId);
+      if (helperId) {
+        push.pushToUser(db, helperId, `${senderName} needs your help`, reason || 'Coverage request', {
+          type: 'coverage', ref_id: request.id
+        });
+      }
+    }
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+// Incoming coverage requests for helpers (requests where user is a recipient)
+app.get('/api/coverage/incoming', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const userId = req.session.user?.id;
+    const requests = await db.getIncomingCoverageRequests(userId);
+    res.json(requests);
   } catch (err) {
     res.status(500).json({ error: err.message });
   } finally {
@@ -3204,10 +3229,80 @@ app.post('/api/coverage/approve/:token', async (req, res) => {
     const request = await db.getCoverageRequestById(recipient.request_id);
     if (request) {
       const helperName = recipient.contact_name || 'Your care team';
+      const requesterName = recipient.requester_name || 'Family';
       const timeDesc = approved_start && approved_end ? `${approved_start}–${approved_end}` : 'a time block';
       push.pushToUser(db, request.requester_id, 'Coverage Confirmed', `${helperName} approved ${timeDesc}`, {
         type: 'coverage', ref_id: recipient.request_id
       });
+
+      // Add coverage block to helper's calendar (if helper is an app user)
+      const helperId = await db.getUserIdByContactId(recipient.contact_id);
+      if (helperId && approved_date) {
+        await db.addAppointment({
+          title: `Helping ${requesterName} · Childcare`,
+          appointment_date: approved_date ? normalizeDate(approved_date) : null,
+          appointment_time: approved_start || null,
+          location: null,
+          notes: helper_note || null,
+          category: 'coverage',
+          person_tags: [requesterName],
+          group_id: await db.getUserHouseholdId(helperId)
+        });
+      }
+    }
+
+    res.json({ success: true, message: 'Coverage confirmed' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+// Authenticated in-app approval (helper approves from their app)
+app.post('/api/coverage/incoming/:id/approve', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const userId = req.session.user?.id;
+    const requestId = parseInt(req.params.id);
+    const recipient = await db.getRecipientByUserId(requestId, userId);
+    if (!recipient) return res.status(404).json({ error: 'Not found' });
+    if (recipient.status === 'approved') return res.status(409).json({ error: 'Already approved' });
+
+    const { window_id, approved_date, approved_start, approved_end, helper_note } = req.body;
+
+    await db.approveCoverage({
+      request_id: requestId,
+      recipient_id: recipient.id,
+      window_id,
+      approved_date: approved_date ? normalizeDate(approved_date) : null,
+      approved_start,
+      approved_end,
+      helper_note
+    });
+
+    // Push to requester
+    const request = await db.getCoverageRequestById(requestId);
+    if (request) {
+      const helperName = req.session.user?.name || 'Your care team';
+      const timeDesc = approved_start && approved_end ? `${approved_start}–${approved_end}` : 'a time block';
+      push.pushToUser(db, request.requester_id, 'Coverage Confirmed', `${helperName} approved ${timeDesc}`, {
+        type: 'coverage', ref_id: requestId
+      });
+
+      // Add to helper's calendar
+      if (approved_date) {
+        await db.addAppointment({
+          title: `Helping ${request.requester_name || 'Family'} · Childcare`,
+          appointment_date: normalizeDate(approved_date),
+          appointment_time: approved_start || null,
+          location: null,
+          notes: helper_note || null,
+          category: 'coverage',
+          person_tags: [req.session.user?.name],
+          group_id: await db.getUserHouseholdId(userId)
+        });
+      }
     }
 
     res.json({ success: true, message: 'Coverage confirmed' });

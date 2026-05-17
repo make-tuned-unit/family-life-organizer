@@ -1943,7 +1943,12 @@ class FamilyDB {
 
   getCoverageRequestById(id) {
     return new Promise((resolve, reject) => {
-      this.db.get('SELECT * FROM coverage_requests WHERE id = ?', [id], (err, row) => err ? reject(err) : resolve(row));
+      this.db.get(`
+        SELECT cr.*, u.name as requester_name
+        FROM coverage_requests cr
+        JOIN users u ON u.id = cr.requester_id
+        WHERE cr.id = ?
+      `, [id], (err, row) => err ? reject(err) : resolve(row));
     });
   }
 
@@ -2016,6 +2021,44 @@ class FamilyDB {
         WHERE ca.request_id = ?
         ORDER BY ca.approved_date, ca.approved_start
       `, [requestId], (err, rows) => err ? reject(err) : resolve(rows));
+    });
+  }
+
+  getUserIdByContactId(contactId) {
+    return new Promise((resolve, reject) => {
+      this.db.get(`
+        SELECT u.id FROM users u
+        JOIN contacts c ON LOWER(u.name) = LOWER(c.name)
+        WHERE c.id = ? LIMIT 1
+      `, [contactId], (err, row) => err ? reject(err) : resolve(row?.id || null));
+    });
+  }
+
+  getIncomingCoverageRequests(userId) {
+    return new Promise((resolve, reject) => {
+      this.db.all(`
+        SELECT cr.id, cr.reason, cr.note, cr.status, cr.created_at,
+          u.name as requester_name,
+          crec.id as recipient_id, crec.status as recipient_status, crec.invite_token
+        FROM coverage_requests cr
+        JOIN coverage_recipients crec ON crec.request_id = cr.id
+        JOIN contacts c ON c.id = crec.contact_id
+        JOIN users u ON u.id = cr.requester_id
+        WHERE LOWER(c.name) = (SELECT LOWER(name) FROM users WHERE id = ?)
+          AND cr.status IN ('pending', 'approved')
+        ORDER BY cr.created_at DESC
+      `, [userId], (err, rows) => err ? reject(err) : resolve(rows || []));
+    });
+  }
+
+  getRecipientByUserId(requestId, userId) {
+    return new Promise((resolve, reject) => {
+      this.db.get(`
+        SELECT crec.* FROM coverage_recipients crec
+        JOIN contacts c ON c.id = crec.contact_id
+        WHERE crec.request_id = ?
+          AND LOWER(c.name) = (SELECT LOWER(name) FROM users WHERE id = ?)
+      `, [requestId, userId], (err, row) => err ? reject(err) : resolve(row));
     });
   }
 
