@@ -15,7 +15,7 @@ struct CalendarView: View {
     @State private var selectedEvent: AppointmentResponse?
     @State private var displayMode: CalendarDisplayMode = .month
     @State private var showingCareCascade = false
-    @State private var showingIncomingCoverage = false
+    // showingIncomingCoverage removed — incoming handled in combined MyCoverageRequestsView
     @State private var showingMyRequests = false
     @State private var incomingCount = 0
     @State private var myRequestCount = 0
@@ -75,9 +75,6 @@ struct CalendarView: View {
         }
         .sheet(isPresented: $showingCareCascade) {
             NavigationStack { CareCascadeView() }
-        }
-        .sheet(isPresented: $showingIncomingCoverage) {
-            NavigationStack { IncomingCoverageView() }
         }
         .sheet(isPresented: $showingMyRequests) {
             NavigationStack { MyCoverageRequestsView() }
@@ -185,7 +182,7 @@ struct CalendarView: View {
     @ViewBuilder
     private var incomingCoverageBanner: some View {
         if incomingCount > 0 {
-            Button { showingIncomingCoverage = true } label: {
+            Button { showingMyRequests = true } label: {
                 HStack(spacing: 12) {
                     Image(systemName: "hand.raised.fill")
                         .font(.system(size: 18, weight: .medium))
