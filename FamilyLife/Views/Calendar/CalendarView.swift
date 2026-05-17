@@ -16,7 +16,9 @@ struct CalendarView: View {
     @State private var displayMode: CalendarDisplayMode = .month
     @State private var showingCareCascade = false
     @State private var showingIncomingCoverage = false
+    @State private var showingMyRequests = false
     @State private var incomingCount = 0
+    @State private var myRequestCount = 0
 
     private let weekdays = ["S", "M", "T", "W", "T", "F", "S"]
 
@@ -77,6 +79,9 @@ struct CalendarView: View {
         .sheet(isPresented: $showingIncomingCoverage) {
             NavigationStack { IncomingCoverageView() }
         }
+        .sheet(isPresented: $showingMyRequests) {
+            NavigationStack { MyCoverageRequestsView() }
+        }
         .sheet(item: $selectedEvent) { appt in
             NavigationStack {
                 EventDetailView(appointment: appt) {
@@ -97,6 +102,7 @@ struct CalendarView: View {
         .task {
             await viewModel.loadMonth(api: api)
             incomingCount = ((try? await api.fetchIncomingCoverage()) ?? []).filter { $0.recipient_status == "pending" }.count
+            myRequestCount = ((try? await api.fetchCoverageRequests()) ?? []).filter { $0.status == "pending" || $0.status == "approved" }.count
         }
         .onChange(of: viewModel.displayedMonth) {
             Task { await viewModel.loadMonth(api: api) }
@@ -109,37 +115,71 @@ struct CalendarView: View {
 
     // MARK: - Care Request Banner
 
+    @ViewBuilder
     private var careRequestBanner: some View {
-        Button { showingCareCascade = true } label: {
-            HStack(spacing: 12) {
-                Image(systemName: "arrow.triangle.swap")
-                    .font(.system(size: 18, weight: .medium))
-                    .foregroundStyle(TabAccent.care.color)
-                    .frame(width: 36, height: 36)
-                    .background(TabAccent.care.color.opacity(0.15))
-                    .clipShape(Circle())
+        if myRequestCount > 0 {
+            Button { showingMyRequests = true } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: "arrow.triangle.swap")
+                        .font(.system(size: 18, weight: .medium))
+                        .foregroundStyle(TabAccent.care.color)
+                        .frame(width: 36, height: 36)
+                        .background(TabAccent.care.color.opacity(0.15))
+                        .clipShape(Circle())
 
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Need coverage?")
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(WarmPalette.ink1)
-                    Text("Ask someone to cover a time slot")
-                        .font(.system(size: 13))
-                        .foregroundStyle(WarmPalette.ink3)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Your coverage requests")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(WarmPalette.ink1)
+                        Text("\(myRequestCount) active request\(myRequestCount == 1 ? "" : "s")")
+                            .font(.system(size: 13))
+                            .foregroundStyle(WarmPalette.ink3)
+                    }
+
+                    Spacer()
+
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(WarmPalette.ink4)
                 }
-
-                Spacer()
-
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(WarmPalette.ink4)
+                .padding(14)
+                .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
             }
-            .padding(14)
-            .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
+            .buttonStyle(.plain)
+            .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
+            .padding(.bottom, 8)
+        } else {
+            Button { showingCareCascade = true } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: "arrow.triangle.swap")
+                        .font(.system(size: 18, weight: .medium))
+                        .foregroundStyle(TabAccent.care.color)
+                        .frame(width: 36, height: 36)
+                        .background(TabAccent.care.color.opacity(0.15))
+                        .clipShape(Circle())
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Need coverage?")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(WarmPalette.ink1)
+                        Text("Ask someone to cover a time slot")
+                            .font(.system(size: 13))
+                            .foregroundStyle(WarmPalette.ink3)
+                    }
+
+                    Spacer()
+
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(WarmPalette.ink4)
+                }
+                .padding(14)
+                .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
+            }
+            .buttonStyle(.plain)
+            .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
+            .padding(.bottom, 8)
         }
-        .buttonStyle(.plain)
-        .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
-        .padding(.bottom, 8)
     }
 
     @ViewBuilder
