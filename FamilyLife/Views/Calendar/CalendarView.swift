@@ -209,7 +209,8 @@ struct CalendarView: View {
                     CalendarDayCell(
                         day: day,
                         isSelected: viewModel.selectedDate == day.date,
-                        appointmentCount: viewModel.appointmentCount(for: day.date)
+                        appointmentCount: viewModel.appointmentCount(for: day.date),
+                        hasCoverage: viewModel.hasCoverage(for: day.date)
                     )
                     .onTapGesture {
                         if day.isCurrentMonth { viewModel.selectedDate = day.date }
@@ -230,6 +231,7 @@ struct CalendarView: View {
     private var selectedDayEvents: some View {
         if let selected = viewModel.selectedDate {
             let dayAppointments = viewModel.appointments(for: selected)
+            let dayCoverage = viewModel.coverageBlocks(for: selected)
 
             WarmSectionHeader(
                 title: viewModel.selectedDateString,
@@ -237,7 +239,17 @@ struct CalendarView: View {
             )
             .padding(.bottom, 6)
 
-            if dayAppointments.isEmpty {
+            if !dayCoverage.isEmpty {
+                VStack(spacing: 6) {
+                    ForEach(dayCoverage) { block in
+                        CoverageBlockCard(block: block)
+                    }
+                }
+                .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
+                .padding(.bottom, 8)
+            }
+
+            if dayAppointments.isEmpty && dayCoverage.isEmpty {
                 VStack(spacing: 8) {
                     Image(systemName: "calendar.badge.plus")
                         .font(.system(size: 32))
@@ -268,6 +280,7 @@ struct CalendarView: View {
     private var dayView: some View {
         if let selected = viewModel.selectedDate {
             let dayAppointments = viewModel.appointments(for: selected)
+            let dayCoverage = viewModel.coverageBlocks(for: selected)
 
             // Date picker strip
             ScrollView(.horizontal, showsIndicators: false) {
@@ -309,7 +322,17 @@ struct CalendarView: View {
             )
             .padding(.bottom, 6)
 
-            if dayAppointments.isEmpty {
+            if !dayCoverage.isEmpty {
+                VStack(spacing: 6) {
+                    ForEach(dayCoverage) { block in
+                        CoverageBlockCard(block: block)
+                    }
+                }
+                .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
+                .padding(.bottom, 8)
+            }
+
+            if dayAppointments.isEmpty && dayCoverage.isEmpty {
                 VStack(spacing: 8) {
                     Image(systemName: "calendar.badge.plus")
                         .font(.system(size: 32))
@@ -348,6 +371,7 @@ struct CalendarDayCell: View {
     let day: CalendarDay
     let isSelected: Bool
     let appointmentCount: Int
+    var hasCoverage: Bool = false
 
     private let dotColors: [Color] = [
         AccentTheme.terracotta.color,
@@ -369,10 +393,19 @@ struct CalendarDayCell: View {
                             Circle()
                                 .fill(AccentTheme.terracotta.color)
                                 .frame(width: cellSize, height: cellSize)
+                        } else if hasCoverage {
+                            Circle()
+                                .fill(AccentTheme.sage.color.opacity(0.15))
+                                .frame(width: cellSize, height: cellSize)
                         }
                     }
 
                 HStack(spacing: 2) {
+                    if hasCoverage && appointmentCount == 0 {
+                        RoundedRectangle(cornerRadius: 2)
+                            .fill(AccentTheme.sage.color)
+                            .frame(width: 10, height: 4)
+                    }
                     ForEach(0..<min(appointmentCount, 3), id: \.self) { i in
                         Circle()
                             .fill(isSelected ? AccentTheme.terracotta.color : dotColors[i % dotColors.count])
@@ -494,6 +527,46 @@ struct AppointmentListRow: View {
         case "personal": AccentTheme.mauve.color
         default: TabAccent.calendar.color
         }
+    }
+}
+
+// MARK: - Coverage Block Card
+
+struct CoverageBlockCard: View {
+    let block: APIService.CoverageBlockResponse
+
+    var body: some View {
+        HStack(spacing: 12) {
+            RoundedRectangle(cornerRadius: 999)
+                .fill(AccentTheme.sage.color)
+                .frame(width: 4)
+
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
+                    Text("\(block.approved_start) – \(block.approved_end)")
+                        .font(.system(size: 15, weight: .bold))
+                        .foregroundStyle(AccentTheme.sage.color)
+                    Spacer()
+                    Image(systemName: "checkmark.shield.fill")
+                        .font(.system(size: 14))
+                        .foregroundStyle(AccentTheme.sage.color)
+                }
+                Text("\(block.helper_name) · Childcare confirmed")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(WarmPalette.ink1)
+                if let note = block.helper_note, !note.isEmpty {
+                    Text(note)
+                        .font(.system(size: 13))
+                        .foregroundStyle(WarmPalette.ink3)
+                }
+            }
+        }
+        .padding(14)
+        .background(AccentTheme.sage.color.opacity(0.08), in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
+        .overlay(
+            RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card)
+                .strokeBorder(AccentTheme.sage.color.opacity(0.2), lineWidth: 1)
+        )
     }
 }
 

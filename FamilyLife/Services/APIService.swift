@@ -933,6 +933,21 @@ final class APIService {
         let _: SuccessResponse = try await post("/api/coverage/\(id)/cancel", body: [:] as [String: String])
     }
 
+    struct CoverageBlockResponse: Codable, Identifiable {
+        let id: Int
+        let approved_date: String
+        let approved_start: String
+        let approved_end: String
+        let helper_note: String?
+        let helper_name: String
+        let reason: String
+        let request_id: Int
+    }
+
+    func fetchCoverageBlocks(dateFrom: String, dateTo: String) async throws -> [CoverageBlockResponse] {
+        try await get("/api/coverage/blocks", queryParams: ["date_from": dateFrom, "date_to": dateTo])
+    }
+
     // MARK: - Networking
 
     struct SuccessResponse: Codable {
