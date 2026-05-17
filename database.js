@@ -2019,6 +2019,26 @@ class FamilyDB {
     });
   }
 
+  getCoverageBlocks(userId, dateFrom, dateTo) {
+    return new Promise((resolve, reject) => {
+      let sql = `
+        SELECT ca.id, ca.approved_date, ca.approved_start, ca.approved_end,
+          ca.helper_note, c.name as helper_name,
+          cr.reason, cr.id as request_id
+        FROM coverage_approvals ca
+        JOIN coverage_recipients crec ON crec.id = ca.recipient_id
+        JOIN contacts c ON c.id = crec.contact_id
+        JOIN coverage_requests cr ON cr.id = ca.request_id
+        WHERE cr.requester_id = ? AND cr.status != 'cancelled'
+      `;
+      const params = [userId];
+      if (dateFrom) { sql += ' AND ca.approved_date >= ?'; params.push(dateFrom); }
+      if (dateTo) { sql += ' AND ca.approved_date <= ?'; params.push(dateTo); }
+      sql += ' ORDER BY ca.approved_date, ca.approved_start';
+      this.db.all(sql, params, (err, rows) => err ? reject(err) : resolve(rows || []));
+    });
+  }
+
   cancelCoverageRequest(id) {
     return new Promise((resolve, reject) => {
       this.db.run('UPDATE coverage_requests SET status = ? WHERE id = ?', ['cancelled', id], (err) => {
