@@ -948,6 +948,26 @@ final class APIService {
         try await get("/api/coverage/blocks", queryParams: ["date_from": dateFrom, "date_to": dateTo])
     }
 
+    struct IncomingCoverageRequest: Codable, Identifiable {
+        let id: Int
+        let reason: String
+        let note: String?
+        let status: String
+        let created_at: String?
+        let requester_name: String
+        let recipient_id: Int
+        let recipient_status: String
+        let invite_token: String?
+    }
+
+    func fetchIncomingCoverage() async throws -> [IncomingCoverageRequest] {
+        try await get("/api/coverage/incoming")
+    }
+
+    func approveIncomingCoverage(requestId: Int, data: [String: Any]) async throws {
+        let _: SuccessResponse = try await post("/api/coverage/incoming/\(requestId)/approve", body: data)
+    }
+
     // MARK: - Networking
 
     struct SuccessResponse: Codable {
