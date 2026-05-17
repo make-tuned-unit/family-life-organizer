@@ -15,6 +15,8 @@ struct CalendarView: View {
     @State private var selectedEvent: AppointmentResponse?
     @State private var displayMode: CalendarDisplayMode = .month
     @State private var showingCareCascade = false
+    @State private var showingIncomingCoverage = false
+    @State private var incomingCount = 0
 
     private let weekdays = ["S", "M", "T", "W", "T", "F", "S"]
 
@@ -23,6 +25,7 @@ struct CalendarView: View {
             VStack(spacing: 0) {
                 headerSection
                 careRequestBanner
+                incomingCoverageBanner
                 segmentedControl
 
                 switch displayMode {
@@ -71,6 +74,9 @@ struct CalendarView: View {
         .sheet(isPresented: $showingCareCascade) {
             NavigationStack { CareCascadeView() }
         }
+        .sheet(isPresented: $showingIncomingCoverage) {
+            NavigationStack { IncomingCoverageView() }
+        }
         .sheet(item: $selectedEvent) { appt in
             NavigationStack {
                 EventDetailView(appointment: appt) {
@@ -88,7 +94,10 @@ struct CalendarView: View {
         } message: {
             Text(viewModel.error ?? "An unexpected error occurred.")
         }
-        .task { await viewModel.loadMonth(api: api) }
+        .task {
+            await viewModel.loadMonth(api: api)
+            incomingCount = ((try? await api.fetchIncomingCoverage()) ?? []).filter { $0.recipient_status == "pending" }.count
+        }
         .onChange(of: viewModel.displayedMonth) {
             Task { await viewModel.loadMonth(api: api) }
         }
@@ -131,6 +140,45 @@ struct CalendarView: View {
         .buttonStyle(.plain)
         .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
         .padding(.bottom, 8)
+    }
+
+    @ViewBuilder
+    private var incomingCoverageBanner: some View {
+        if incomingCount > 0 {
+            Button { showingIncomingCoverage = true } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: "hand.raised.fill")
+                        .font(.system(size: 18, weight: .medium))
+                        .foregroundStyle(AccentTheme.sage.color)
+                        .frame(width: 36, height: 36)
+                        .background(AccentTheme.sage.color.opacity(0.15))
+                        .clipShape(Circle())
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Someone needs your help")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(WarmPalette.ink1)
+                        Text("\(incomingCount) pending request\(incomingCount == 1 ? "" : "s")")
+                            .font(.system(size: 13))
+                            .foregroundStyle(WarmPalette.ink3)
+                    }
+
+                    Spacer()
+
+                    Text("Review")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(AccentTheme.sage.color)
+                        .padding(.horizontal, 12).padding(.vertical, 6)
+                        .background(AccentTheme.sage.color.opacity(0.12), in: Capsule())
+                }
+                .padding(14)
+                .background(AccentTheme.sage.color.opacity(0.06), in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
+                .overlay(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card).stroke(AccentTheme.sage.color.opacity(0.15), lineWidth: 1))
+            }
+            .buttonStyle(.plain)
+            .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
+            .padding(.bottom, 8)
+        }
     }
 
     // MARK: - Header
@@ -551,7 +599,7 @@ struct CoverageBlockCard: View {
                         .font(.system(size: 14))
                         .foregroundStyle(AccentTheme.sage.color)
                 }
-                Text("\(block.helper_name) · Childcare confirmed")
+                Text("\(block.helper_name) · \(block.reason) confirmed")
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(WarmPalette.ink1)
                 if let note = block.helper_note, !note.isEmpty {
