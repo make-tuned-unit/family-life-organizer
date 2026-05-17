@@ -122,7 +122,7 @@ struct CoverageCascadeView: View {
                 // Reason
                 sectionLabel("What needs coverage")
                 VStack(spacing: 8) {
-                    ForEach(["Watch the kids", "Watch the dog", "House sitting"], id: \.self) { reason in
+                    ForEach(["Watch the kids", "Watch the dog", "Cat care", "House sitting", "Plant care", "Pet sitting", "Eldercare"], id: \.self) { reason in
                         reasonChip(label: reason, icon: reasonIcon(reason), selected: coverageReason == reason)
                             .onTapGesture { coverageReason = reason }
                     }
@@ -422,7 +422,11 @@ struct CoverageCascadeView: View {
         switch reason {
         case "Watch the kids": "figure.and.child.holdinghands"
         case "Watch the dog": "dog.fill"
+        case "Cat care": "cat.fill"
         case "House sitting": "house.fill"
+        case "Plant care": "leaf.fill"
+        case "Pet sitting": "pawprint.fill"
+        case "Eldercare": "heart.fill"
         default: "pencil"
         }
     }
