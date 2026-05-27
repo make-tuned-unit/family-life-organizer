@@ -237,6 +237,13 @@ struct RivalryDetailView: View {
             await loadEntries()
             if currentRivalry.challengeType == .steps {
                 await fetchHealthSteps()
+                // Auto-sync steps from HealthKit without requiring manual tap
+                if let hkSteps = healthSteps {
+                    let delta = hkSteps - myLoggedTotal
+                    if delta > 0 {
+                        await syncStepsFromHealth(delta: delta)
+                    }
+                }
             }
             // Auto-complete expired rivalries
             if currentRivalry.status == RivalryStatus.active.rawValue && isExpired {
