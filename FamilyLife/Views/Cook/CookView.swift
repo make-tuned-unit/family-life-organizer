@@ -27,7 +27,9 @@ struct CookView: View {
         .toolbar {
             if !embedded {
                 ToolbarItem(placement: .topBarTrailing) {
-                    GlassIconButton(systemName: "gearshape") {}
+                    GlassIconButton(systemName: "gearshape") {
+                        showingAIDisclosure = true
+                    }
                 }
             }
         }

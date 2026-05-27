@@ -175,8 +175,7 @@ struct TripsView: View {
     private func shouldTrack(trip: TripResponse) -> Bool {
         let currentNames = [
             auth.currentUser?.name.lowercased(),
-            auth.currentUser?.username.lowercased(),
-            "jesse"
+            auth.currentUser?.username.lowercased()
         ].compactMap { $0 }
         return currentNames.contains(trip.traveler.lowercased())
     }
