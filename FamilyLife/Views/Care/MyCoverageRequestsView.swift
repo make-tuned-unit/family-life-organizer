@@ -378,7 +378,7 @@ struct CoverageDetailSheet: View {
 }
 
 // Make CoverageDetailResponse Identifiable for sheet presentation
-extension APIService.CoverageDetailResponse: @retroactive Identifiable { }
+extension APIService.CoverageDetailResponse: Identifiable { }
 
 // Shared reason icon helper
 func coverageReasonIcon(_ reason: String) -> String {

@@ -10,6 +10,7 @@ struct ReceiptScannerView: View {
     var projectId: Int?
     var projectName: String?
     var onProjectExpenseSaved: (() async -> Void)?
+    var onReceiptSaved: (() async -> Void)?
 
     @State private var selectedPhoto: PhotosPickerItem?
     @State private var imageData: Data?
@@ -21,8 +22,12 @@ struct ReceiptScannerView: View {
     @State private var cameraPermissionDenied = false
     @State private var showingScanAnother = false
     @State private var savedCount = 0
+    @State private var currentScanSaved = false
+    @State private var selectedCategory = "Other"
+    @State private var categories = defaultBudgetCategories
 
     private var isProjectMode: Bool { projectId != nil }
+    private static let defaultBudgetCategories = ["Groceries", "Dining Out", "Gas/Transport", "Household", "Health", "Pets", "Entertainment", "Kids", "Other"]
 
     var body: some View {
         NavigationStack {
@@ -92,6 +97,7 @@ struct ReceiptScannerView: View {
                 }
             }
             .interactiveDismissDisabled(isSaving)
+            .task { await loadBudgetCategories() }
             .onChange(of: selectedPhoto) { loadAndScan() }
             .sheet(isPresented: $showingCamera) {
                 CameraView { data in
@@ -101,7 +107,9 @@ struct ReceiptScannerView: View {
                 .ignoresSafeArea()
             }
             .alert("Receipt Saved", isPresented: $showingScanAnother) {
-                Button("Scan Another") { resetForNextScan() }
+                Button("Scan Another") {
+                    Task { await saveAndResetForNextScan() }
+                }
                 Button("Done") { dismiss() }
             } message: {
                 Text("\(savedCount) receipt\(savedCount == 1 ? "" : "s") saved. Scan another?")
@@ -210,15 +218,32 @@ struct ReceiptScannerView: View {
             HStack {
                 Text(isProjectMode ? "Project" : "Category").font(.subheadline.weight(.medium))
                 Spacer()
-                Text(isProjectMode ? (projectName ?? "Project") : result.category)
-                    .font(.subheadline)
-                    .padding(.horizontal, DesignTokens.Spacing.inset)
-                    .padding(.vertical, DesignTokens.Spacing.chipVerticalPadding)
-                    .background((isProjectMode ? AccentTheme.sage.color : AccentTheme.ocean.color).opacity(DesignTokens.Opacity.cardTint))
-                    .clipShape(Capsule())
+                if isProjectMode {
+                    Text(projectName ?? "Project")
+                        .font(.subheadline)
+                        .padding(.horizontal, DesignTokens.Spacing.inset)
+                        .padding(.vertical, DesignTokens.Spacing.chipVerticalPadding)
+                        .background(AccentTheme.sage.color.opacity(DesignTokens.Opacity.cardTint))
+                        .clipShape(Capsule())
+                } else {
+                    Picker("Category", selection: $selectedCategory) {
+                        ForEach(categories, id: \.self) { category in
+                            Text(category).tag(category)
+                        }
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.menu)
+                    .tint(TabAccent.expenses.color)
+                }
             }
 
-            Button { save() } label: {
+            Button {
+                Task {
+                    if await saveCurrentReceiptIfNeeded() {
+                        showingScanAnother = true
+                    }
+                }
+            } label: {
                 if isSaving {
                     ProgressView().frame(maxWidth: .infinity)
                 } else {
@@ -232,16 +257,19 @@ struct ReceiptScannerView: View {
             .disabled(isSaving)
 
             Button {
-                imageData = nil
-                scanResult = nil
-                selectedPhoto = nil
-                error = nil
+                Task { await saveAndResetForNextScan() }
             } label: {
-                Text("Scan another")
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(WarmPalette.ink3)
-                    .frame(maxWidth: .infinity)
+                if isSaving {
+                    ProgressView()
+                        .frame(maxWidth: .infinity)
+                } else {
+                    Text("Scan another")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(WarmPalette.ink3)
+                        .frame(maxWidth: .infinity)
+                }
             }
+            .disabled(isSaving)
         }
         .padding(.horizontal)
     }
@@ -276,6 +304,23 @@ struct ReceiptScannerView: View {
         imageData = nil
         selectedPhoto = nil
         error = nil
+        currentScanSaved = false
+        selectedCategory = "Other"
+    }
+
+    private func loadBudgetCategories() async {
+        guard !isProjectMode else { return }
+        guard let remoteCategories = try? await api.fetchBudgetCategories() else { return }
+        var merged = Self.defaultBudgetCategories
+        for name in remoteCategories.map(\.name) where !merged.contains(where: { $0.localizedCaseInsensitiveCompare(name) == .orderedSame }) {
+            merged.append(name)
+        }
+        categories = merged
+    }
+
+    private func saveAndResetForNextScan() async {
+        guard await saveCurrentReceiptIfNeeded() else { return }
+        resetForNextScan()
     }
 
     private func loadAndScan() {
@@ -290,9 +335,17 @@ struct ReceiptScannerView: View {
     private func scanImage(_ data: Data) {
         isScanning = true
         error = nil
+        currentScanSaved = false
         Task {
             do {
-                scanResult = try await api.scanReceipt(imageData: data)
+                let result = try await api.scanReceipt(imageData: data)
+                scanResult = result
+                let category = normalizedCategory(for: result)
+                if !categories.contains(where: { $0.localizedCaseInsensitiveCompare(category) == .orderedSame }) {
+                    categories.append(category)
+                    categories.sort()
+                }
+                selectedCategory = category
             } catch {
                 self.error = "Could not scan receipt. Try adding manually."
             }
@@ -300,50 +353,88 @@ struct ReceiptScannerView: View {
         }
     }
 
-    private func save() {
-        guard let result = scanResult else { return }
+    @discardableResult
+    private func saveCurrentReceiptIfNeeded() async -> Bool {
+        guard !isSaving else { return false }
+        guard let result = scanResult else { return false }
+        guard !currentScanSaved else { return true }
+
         isSaving = true
-        Task {
-            do {
-                if let projectId {
-                    // Save as project expense — tag with project name, items in notes
-                    let itemDetail = result.items.map { item in
-                        if let price = item.price {
-                            return "\(item.name) — $\(String(format: "%.2f", price))"
-                        }
-                        return item.name
-                    }.joined(separator: "\n")
-                    let expenseData: [String: Any] = [
-                        "description": result.merchant,
-                        "amount": result.total,
-                        "category": projectName ?? "General",
-                        "notes": "\(result.category) receipt\n\(itemDetail)"
-                    ]
-                    let _ = try await api.addProjectExpense(projectId: projectId, expense: expenseData)
-                    // Dismiss first, then let parent reload — avoids task cancellation race
-                    dismiss()
-                    // Fire-and-forget: parent will pick up changes
-                    Task.detached { await onProjectExpenseSaved?() }
-                    return
-                } else {
-                    // Save as budget receipt with item breakdown in notes
-                    let itemDetail = result.items.map { item in
-                        if let price = item.price {
-                            return "\(item.name) — $\(String(format: "%.2f", price))"
-                        }
-                        return item.name
-                    }.joined(separator: "\n")
-                    try await api.saveScannedReceipt(result: result, notes: itemDetail)
-                    savedCount += 1
-                    isSaving = false
-                    showingScanAnother = true
-                    return
+        defer { isSaving = false }
+
+        do {
+            if let projectId {
+                // Save as project expense — tag with project name, items in notes
+                let itemDetail = result.items.map { item in
+                    if let price = item.price {
+                        return "\(item.name) — $\(String(format: "%.2f", price))"
+                    }
+                    return item.name
+                }.joined(separator: "\n")
+                let expenseData: [String: Any] = [
+                    "description": result.merchant,
+                    "amount": result.total,
+                    "category": projectName ?? "General",
+                    "notes": "\(selectedCategory) receipt\n\(itemDetail)"
+                ]
+                let _ = try await api.addProjectExpense(projectId: projectId, expense: expenseData)
+                currentScanSaved = true
+                dismiss()
+                Task.detached { await onProjectExpenseSaved?() }
+                return true
+            } else {
+                // Save as budget receipt with item breakdown in notes
+                let itemDetail = result.items.map { item in
+                    if let price = item.price {
+                        return "\(item.name) — $\(String(format: "%.2f", price))"
+                    }
+                    return item.name
+                }.joined(separator: "\n")
+                let savedId = try await api.saveScannedReceipt(result: result, category: selectedCategory, notes: itemDetail)
+                guard savedId > 0 else {
+                    self.error = "Receipt save did not return a valid id. Try again."
+                    return false
                 }
-            } catch {
-                self.error = "Failed to save: \(error.localizedDescription)"
-                isSaving = false
+                currentScanSaved = true
+                savedCount += 1
+                await onReceiptSaved?()
+                return true
+            }
+        } catch {
+            self.error = "Failed to save: \(error.localizedDescription)"
+            return false
+        }
+    }
+
+    private func save() {
+        Task {
+            if await saveCurrentReceiptIfNeeded() {
+                showingScanAnother = true
             }
         }
+    }
+
+    private func normalizedCategory(for result: ScanResult) -> String {
+        let scanned = result.category.trimmingCharacters(in: .whitespacesAndNewlines)
+        let knownCategory = categories.first { $0.localizedCaseInsensitiveCompare(scanned) == .orderedSame }
+        let fallback = knownCategory ?? (scanned.isEmpty ? "Other" : scanned)
+        let text = ([result.merchant, scanned] + result.items.map(\.name)).joined(separator: " ").lowercased()
+
+        if text.contains("shoe")
+            || text.contains("sneaker")
+            || text.contains("kids")
+            || text.contains("child")
+            || text.contains("children")
+            || text.contains("youth")
+            || text.contains("school") {
+            return categoryNamed("Kids") ?? fallback
+        }
+
+        return categoryNamed(fallback) ?? fallback
+    }
+
+    private func categoryNamed(_ name: String) -> String? {
+        categories.first { $0.localizedCaseInsensitiveCompare(name) == .orderedSame }
     }
 }
 

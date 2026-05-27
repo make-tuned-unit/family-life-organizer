@@ -1668,7 +1668,19 @@ class FamilyDB {
           COALESCE(a.person_tags, 'Family') as author, 'upcoming' as status,
           a.created_at,
           0 as reaction_count, 0 as comment_count, NULL as author_id, NULL as group_id, NULL as group_name
-        FROM appointments a WHERE a.appointment_date >= date('now') AND a.appointment_date <= date('now', '+7 days')${uid ? `
+        FROM appointments a
+        WHERE a.appointment_date <= date('now', '+7 days', 'localtime')
+          AND (
+            a.appointment_date > date('now', 'localtime')
+            OR (
+              a.appointment_date = date('now', 'localtime')
+              AND (
+                a.appointment_time IS NULL
+                OR a.appointment_time = ''
+                OR time(a.appointment_time) >= time('now', 'localtime')
+              )
+            )
+          )${uid ? `
           AND EXISTS (
             SELECT 1 FROM users hu
             JOIN group_members hgm ON hgm.user_id = hu.id
