@@ -161,6 +161,7 @@ struct HomeView: View {
             presenceMembers = (try? await api.fetchHouseholdPresence()) ?? []
             checkFeedNotifications()
             await checkMessageNotifications()
+            await pollLiveHomeData()
         }
         .onChange(of: selectedTab) {
             if selectedTab == .home {
@@ -189,6 +190,14 @@ struct HomeView: View {
             guard await NotificationService.shared.isAuthorized() else { return }
             NotificationService.shared.checkForNewMessages(convos)
         } catch {}
+    }
+
+    private func pollLiveHomeData() async {
+        while !Task.isCancelled {
+            try? await Task.sleep(for: .seconds(15))
+            await viewModel.reloadTrips(api: api)
+            presenceMembers = (try? await api.fetchHouseholdPresence()) ?? presenceMembers
+        }
     }
 
     private func openFeedEvent(id: Int) async {
@@ -261,7 +270,7 @@ struct HomeView: View {
 
     private var familyStatusText: String {
         if let trip = viewModel.activeTrips.first {
-            return "\(trip.traveler.capitalized) is on the way home."
+            return "\(trip.traveler.capitalized) is on the way to \(trip.destination)."
         }
 
         let othersAway = presenceMembers.filter { member in
@@ -306,7 +315,7 @@ struct HomeView: View {
                 PresenceChip(
                     initial: String(trip.traveler.prefix(1)).uppercased(),
                     name: trip.traveler.capitalized,
-                    status: eta <= 0 ? "Arriving now" : "On the way \u{00B7} \(eta) min",
+                    status: eta <= 0 ? "Arriving now" : "To \(trip.destination) \u{00B7} \(TripDisplayHelpers.etaText(trip.eta_minutes))",
                     statusColor: eta <= 0 ? WarmPalette.good : WarmPalette.warn,
                     showTrip: true
                 )
