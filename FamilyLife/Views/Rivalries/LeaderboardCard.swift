@@ -1,5 +1,4 @@
 import SwiftUI
-import SwiftData
 
 struct LeaderboardCard: View {
     let points: [FamilyMemberPoints]

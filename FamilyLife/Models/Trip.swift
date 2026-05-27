@@ -1,37 +1,4 @@
 import Foundation
-import SwiftData
-
-@Model
-final class Trip {
-    var serverId: Int?
-    var traveler: String
-    var origin: String?
-    var originLat: Double?
-    var originLng: Double?
-    var destination: String
-    var destinationLat: Double?
-    var destinationLng: Double?
-    var purpose: String?
-    var status: String
-    var currentLat: Double?
-    var currentLng: Double?
-    var etaMinutes: Int?
-    var startedAt: Date
-    var arrivedAt: Date?
-
-    init(
-        serverId: Int? = nil,
-        traveler: String,
-        destination: String,
-        status: String = "active"
-    ) {
-        self.serverId = serverId
-        self.traveler = traveler
-        self.destination = destination
-        self.status = status
-        self.startedAt = Date()
-    }
-}
 
 struct TripResponse: Codable, Identifiable {
     var id: Int
