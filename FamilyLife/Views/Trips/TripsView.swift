@@ -6,8 +6,8 @@ struct TripsView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(APIService.self) private var api
     @Environment(AuthService.self) private var auth
+    @Environment(LocationService.self) private var locationService
     @State private var viewModel = TripsViewModel()
-    @State private var locationService = LocationService()
     @State private var showingNewTrip = false
     @State private var showingAddresses = false
 
@@ -30,6 +30,13 @@ struct TripsView: View {
                 .padding(.horizontal, 22)
                 .padding(.top, 14)
                 .padding(.bottom, 16)
+
+                // Permission banner when tracking needs "Always" location
+                if viewModel.activeTrip != nil && !locationService.hasAlwaysPermission {
+                    LocationPermissionBanner(locationService: locationService)
+                        .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
+                        .padding(.bottom, 8)
+                }
 
                 if let active = viewModel.activeTrip {
                     ActiveTripCard(trip: active, viewModel: viewModel)
@@ -126,9 +133,6 @@ struct TripsView: View {
         .onChange(of: viewModel.activeTrip?.id) {
             Task { await syncTrackingIfNeeded() }
         }
-        .onDisappear {
-            locationService.stopTracking()
-        }
     }
 
     private var errorAlertIsPresented: Binding<Bool> {
@@ -144,16 +148,18 @@ struct TripsView: View {
             return
         }
 
-        locationService.requestPermission()
+        locationService.requestTripTrackingPermission()
         locationService.startTracking { coordinate in
             Task {
                 guard let latestTrip = viewModel.activeTrip, latestTrip.id == activeTrip.id else { return }
                 guard let destLat = latestTrip.destination_lat, let destLng = latestTrip.destination_lng else { return }
+                let destination = CLLocationCoordinate2D(latitude: destLat, longitude: destLng)
                 let distance = LocationService.distance(
                     from: coordinate,
-                    to: CLLocationCoordinate2D(latitude: destLat, longitude: destLng)
+                    to: destination
                 )
-                let eta = LocationService.etaMinutes(distanceMeters: distance)
+                let eta = await LocationService.routeEtaMinutes(from: coordinate, to: destination)
+                    ?? LocationService.etaMinutes(distanceMeters: distance)
                 await viewModel.updateLocation(
                     tripId: latestTrip.id,
                     lat: coordinate.latitude,
@@ -235,7 +241,7 @@ struct TripStatusHeader: View {
                     } else {
                         FamilyAvatar(initial: String(trip.traveler.prefix(1)).uppercased(), size: 28)
                     }
-                    Text("\(trip.traveler.capitalized) is on the way")
+                    Text("\(trip.traveler.capitalized) is on the way to \(trip.destination)")
                         .font(.headline)
                 }
 
@@ -260,10 +266,10 @@ struct TripStatusHeader: View {
 
             if let eta = trip.eta_minutes {
                 VStack(spacing: 2) {
-                    Text("\(max(0, eta))")
-                        .font(.title.bold())
+                    Text(TripDisplayHelpers.etaText(eta))
+                        .font(.title3.bold())
                         .foregroundStyle(eta <= 0 ? WarmPalette.good : TabAccent.home.color)
-                    Text(eta <= 0 ? "arrived" : "min")
+                    Text("ETA")
                         .font(.caption)
                         .foregroundStyle(WarmPalette.ink3)
                 }
@@ -548,6 +554,62 @@ private extension TripResponse {
     }
 }
 
+// MARK: - Location Permission Banner
+
+struct LocationPermissionBanner: View {
+    let locationService: LocationService
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                Image(systemName: "location.slash.circle.fill")
+                    .font(.system(size: 20))
+                    .foregroundStyle(AccentTheme.saffron.color)
+                Text("Background tracking limited")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(WarmPalette.ink1)
+            }
+            Text("Enable \"Always\" location so your trip stays tracked even when you switch apps or lock your phone.")
+                .font(.system(size: 12))
+                .foregroundStyle(WarmPalette.ink3)
+
+            if locationService.canRequestAlways {
+                Button {
+                    locationService.requestTripTrackingPermission()
+                } label: {
+                    Text("Enable Always Location")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 8)
+                        .background(AccentTheme.saffron.color, in: RoundedRectangle(cornerRadius: 8))
+                }
+            } else if locationService.isDenied || locationService.authorizationStatus == .authorizedWhenInUse {
+                Button {
+                    locationService.openLocationSettings()
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "gear")
+                            .font(.system(size: 12))
+                        Text("Open Settings")
+                            .font(.system(size: 13, weight: .semibold))
+                    }
+                    .foregroundStyle(AccentTheme.saffron.color)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
+                    .background(AccentTheme.saffron.color.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
+                }
+            }
+        }
+        .padding(12)
+        .background(AccentTheme.saffron.color.opacity(0.08), in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
+        .overlay(
+            RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card)
+                .stroke(AccentTheme.saffron.color.opacity(0.2), lineWidth: 1)
+        )
+    }
+}
+
 #Preview {
     NavigationStack {
         TripsView()
@@ -555,4 +617,5 @@ private extension TripResponse {
     .environment(APIService())
     .environment(AuthService())
     .environment(HouseholdService())
+    .environment(LocationService())
 }

@@ -1,3 +1,5 @@
+process.env.TZ = process.env.TZ || 'America/Halifax';
+
 const express = require('express');
 const session = require('express-session');
 const bodyParser = require('body-parser');
@@ -1333,12 +1335,21 @@ app.post('/api/appointments', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
     const data = { ...req.body };
+    const userId = req.session.user.id;
+    const senderName = req.session.user.name;
     if (data.appointment_date) data.appointment_date = normalizeDate(data.appointment_date);
     if (!data.group_id) {
-      data.group_id = await db.getUserHouseholdId(req.session.user.id);
+      data.group_id = await db.getUserHouseholdId(userId);
     }
     await db.addAppointment(data);
     res.json({ success: true });
+    // Notify household members about the new event
+    if (data.group_id) {
+      const title = data.title || 'New event';
+      const dateStr = data.appointment_date || '';
+      const body = dateStr ? `${title} on ${dateStr} has been added to your calendar.` : `${title} has been added to your calendar.`;
+      push.pushToGroup(db, data.group_id, userId, `${senderName} added an event`, body, { type: 'event' });
+    }
   } catch (err) {
     res.status(500).json({ error: err.message });
   } finally {
@@ -1593,7 +1604,7 @@ app.post('/api/receipts/scan', requireAuth, async (req, res) => {
           role: 'user',
           content: [
             { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: image } },
-            { type: 'text', text: 'Extract receipt data. Return ONLY valid JSON: {"merchant":"store name","date":"YYYY-MM-DD","total":0.00,"category":"Groceries|Dining Out|Gas/Transport|Household|Health|Pets|Entertainment|Kids|Other","items":[{"name":"item","price":0.00,"quantity":"1"}]}' }
+            { type: 'text', text: 'Extract receipt data. Use Kids for children\'s clothing, shoes, school supplies, toys, activities, and child-specific purchases. Return ONLY valid JSON: {"merchant":"store name","date":"YYYY-MM-DD","total":0.00,"category":"Groceries|Dining Out|Gas/Transport|Household|Health|Pets|Entertainment|Kids|Other","items":[{"name":"item","price":0.00,"quantity":"1"}]}' }
           ]
         }]
       })
@@ -1603,7 +1614,9 @@ app.post('/api/receipts/scan', requireAuth, async (req, res) => {
     const text = data.content[0].text;
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
-      res.json(JSON.parse(jsonMatch[0]));
+      const receipt = JSON.parse(jsonMatch[0]);
+      receipt.category = normalizeReceiptCategory(receipt);
+      res.json(receipt);
     } else {
       res.status(500).json({ error: 'Could not parse receipt' });
     }
@@ -1638,13 +1651,25 @@ app.post('/api/receipts/save', requireAuth, async (req, res) => {
       added_by: username
     });
 
-    res.json({ success: true, receipt_id: receipt.id });
+    res.json({ success: true, id: receipt.id, receipt_id: receipt.id });
   } catch (err) {
     res.status(500).json({ error: err.message });
   } finally {
     db.close();
   }
 });
+
+function normalizeReceiptCategory(receipt) {
+  const category = typeof receipt.category === 'string' ? receipt.category : 'Other';
+  const text = [
+    receipt.merchant,
+    category,
+    ...(Array.isArray(receipt.items) ? receipt.items.map(item => item?.name) : [])
+  ].filter(Boolean).join(' ').toLowerCase();
+
+  if (/shoe|sneaker|kids|child|children|youth|school/.test(text)) return 'Kids';
+  return category;
+}
 
 app.delete('/api/receipts/:id', requireAuth, async (req, res) => {
   const db = new FamilyDB();
@@ -2652,7 +2677,7 @@ app.post('/api/groups/:id/feed', requireAuth, async (req, res) => {
     res.json({ success: true, id: result.id });
     // Push to group members (fire-and-forget)
     const preview = req.body.title || req.body.body || 'New post';
-    push.pushToGroup(db, groupId, userId, senderName, preview, { type: 'group_message', ref_id: groupId });
+    push.pushToGroup(db, groupId, userId, `New from ${senderName}`, preview, { type: 'group_message', ref_id: groupId });
   } catch (err) {
     res.status(500).json({ error: err.message });
   } finally {
@@ -2869,8 +2894,8 @@ app.post('/api/messages', requireAuth, async (req, res) => {
     });
     res.json({ success: true, id: result.id });
     // Push notification to recipient (fire-and-forget)
-    const text = req.body.image_data ? 'Sent a photo' : (req.body.text || '');
-    push.pushToUser(db, req.body.recipient_id, senderName, text, { type: 'message', ref_id: senderId, name: senderName });
+    const text = req.body.image_data ? 'Sent you a photo' : (req.body.text || '');
+    push.pushToUser(db, req.body.recipient_id, `Message from ${senderName}`, text, { type: 'message', ref_id: senderId, name: senderName });
   } catch (err) { res.status(500).json({ error: err.message }); }
   finally { db.close(); }
 });

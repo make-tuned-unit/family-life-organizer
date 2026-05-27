@@ -6,7 +6,7 @@ struct NewTripView: View {
     @Environment(APIService.self) private var api
     @Environment(AuthService.self) private var auth
     @Environment(HouseholdService.self) private var household
-    @State private var locationService = LocationService()
+    @Environment(LocationService.self) private var locationService
 
     @State private var destination = ""
     @State private var purpose = ""
@@ -119,7 +119,7 @@ struct NewTripView: View {
                         HStack {
                             Image(systemName: "car.fill")
                                 .foregroundStyle(TabAccent.home.color)
-                            Text("\(eta) min drive")
+                            Text("\(TripDisplayHelpers.etaText(eta)) drive")
                                 .font(.system(size: 15, weight: .semibold))
                             Spacer()
                             Text("via Apple Maps")
@@ -170,7 +170,7 @@ struct NewTripView: View {
             }
             .task {
                 await loadAddresses()
-                locationService.requestPermission()
+                locationService.requestTripTrackingPermission()
             }
         }
     }
@@ -247,7 +247,7 @@ struct NewTripView: View {
         // Cross-post to group if selected
         if let groupId = shareGroupId {
             let dest = selectedAddress?.name ?? destination
-            let etaStr = etaMinutes.map { "\($0) min" } ?? ""
+            let etaStr = etaMinutes.map { TripDisplayHelpers.etaText($0) } ?? ""
             Task {
                 _ = try? await api.addFeedPost(groupId: groupId, data: [
                     "post_type": "event",
@@ -268,4 +268,5 @@ struct NewTripView: View {
         .environment(APIService())
         .environment(AuthService())
         .environment(HouseholdService())
+        .environment(LocationService())
 }

@@ -198,14 +198,33 @@ struct ConversationView: View {
 
     private func loadDecisions() async {
         do {
+            // Only show decisions referenced in this conversation's messages
+            let referencedIds = Set(
+                messages.compactMap { msg -> Int? in
+                    guard msg.reference_type == "decision" || msg.reference_type == "poll" else { return nil }
+                    return msg.reference_id
+                }
+            )
+            guard !referencedIds.isEmpty else {
+                openDecisions = []
+                return
+            }
             let all = try await api.fetchDecisions()
-            let myName = auth.currentUser?.name ?? ""
-            openDecisions = all.filter {
-                $0.status == DecisionStatus.active.rawValue
-                && ($0.creator_name.localizedCaseInsensitiveCompare(myName) == .orderedSame
-                    || $0.creator_name.localizedCaseInsensitiveCompare(partnerName) == .orderedSame)
+            let now = Date()
+            openDecisions = all.filter { decision in
+                referencedIds.contains(decision.id)
+                && decision.status == DecisionStatus.active.rawValue
+                && !isExpired(decision, now: now)
             }
         } catch {}
+    }
+
+    private func isExpired(_ decision: DecisionResponse, now: Date) -> Bool {
+        guard let expiresStr = decision.expires_at,
+              let expiresDate = ISO8601DateFormatter.flexible.date(from: expiresStr) else {
+            return false
+        }
+        return expiresDate <= now
     }
 
     private func send() {

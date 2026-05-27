@@ -30,12 +30,16 @@ final class NotificationService {
 
     func scheduleAppointmentReminder(id: Int, title: String, date: String, time: String?) {
         let content = UNMutableNotificationContent()
-        content.title = "Upcoming Appointment"
-        content.body = title
+        content.title = "In 1 hour: \(title)"
+        content.body = time != nil ? "Your appointment is at \(time!). Time to get ready." : "Your appointment is coming up soon."
         content.sound = .default
         content.categoryIdentifier = "APPOINTMENT"
 
         guard let triggerDate = parseDateTime(date: date, time: time, minutesBefore: 60) else { return }
+        guard triggerDate > Date() else {
+            UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: ["appt-\(id)"])
+            return
+        }
         let components = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute], from: triggerDate)
         let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
 
@@ -47,13 +51,17 @@ final class NotificationService {
 
     func schedulePantryExpiryAlert(id: Int, itemName: String, expiryDate: String) {
         let content = UNMutableNotificationContent()
-        content.title = "Item Expiring Soon"
-        content.body = "\(itemName) expires tomorrow"
+        content.title = "Heads up — \(itemName) expires tomorrow"
+        content.body = "Use it tonight or pop it in the freezer before it goes to waste."
         content.sound = .default
         content.categoryIdentifier = "PANTRY_EXPIRY"
 
         // Alert day before expiry at 9 AM
         guard let triggerDate = parseDateTime(date: expiryDate, time: "09:00", minutesBefore: 24 * 60) else { return }
+        guard triggerDate > Date() else {
+            UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: ["pantry-\(id)"])
+            return
+        }
         let components = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute], from: triggerDate)
         let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
 
@@ -65,8 +73,8 @@ final class NotificationService {
 
     func notifyTripStarted(traveler: String, destination: String) {
         let content = UNMutableNotificationContent()
-        content.title = "Trip Started"
-        content.body = "\(traveler) is on the way to \(destination)"
+        content.title = "\(traveler) is heading out"
+        content.body = "On the way to \(destination). You'll get updates along the way."
         content.sound = .default
         content.categoryIdentifier = "TRIP"
 
@@ -77,8 +85,8 @@ final class NotificationService {
 
     func notifyTripArrival(traveler: String, destination: String) {
         let content = UNMutableNotificationContent()
-        content.title = "Arrived!"
-        content.body = "\(traveler) has arrived at \(destination)"
+        content.title = "\(traveler) made it safely"
+        content.body = "Arrived at \(destination)."
         content.sound = .default
         content.categoryIdentifier = "TRIP"
 
@@ -89,8 +97,8 @@ final class NotificationService {
 
     func notifyTripETA(traveler: String, minutes: Int) {
         let content = UNMutableNotificationContent()
-        content.title = "Almost There"
-        content.body = "\(traveler) is about \(minutes) minutes away"
+        content.title = "\(traveler) is almost there"
+        content.body = "About \(minutes) minutes away."
         content.sound = .default
         content.categoryIdentifier = "TRIP"
 
@@ -119,8 +127,8 @@ final class NotificationService {
 
     func notifyCoverageApproved(helperName: String, date: String, startTime: String, endTime: String) {
         let content = UNMutableNotificationContent()
-        content.title = "Coverage Confirmed"
-        content.body = "\(helperName) confirmed \(date) from \(startTime) to \(endTime). You can now book your appointments."
+        content.title = "You're all set — \(helperName) has you covered"
+        content.body = "Confirmed for \(date), \(startTime) to \(endTime). Go ahead and book your appointments."
         content.sound = .default
         content.categoryIdentifier = "COVERAGE"
 
@@ -131,8 +139,8 @@ final class NotificationService {
 
     func scheduleCoverageBooked(title: String, date: String, time: String) {
         let content = UNMutableNotificationContent()
-        content.title = "Appointment Booked"
-        content.body = "\(title) on \(date) at \(time) — covered by your care team"
+        content.title = "All booked — \(title)"
+        content.body = "\(date) at \(time). Your care team has you covered."
         content.sound = .default
         content.categoryIdentifier = "COVERAGE"
 
@@ -145,7 +153,7 @@ final class NotificationService {
 
     func notifyNewPost(author: String, preview: String) {
         let content = UNMutableNotificationContent()
-        content.title = "\(author) shared a post"
+        content.title = "New from \(author)"
         content.body = String(preview.prefix(80))
         content.sound = .default
         content.categoryIdentifier = "SOCIAL"
@@ -157,8 +165,8 @@ final class NotificationService {
 
     func notifyNewComment(author: String, onPost: String, comment: String) {
         let content = UNMutableNotificationContent()
-        content.title = "\(author) commented"
-        content.body = String(comment.prefix(80))
+        content.title = "\(author) replied"
+        content.body = "\"\(String(comment.prefix(70)))\""
         content.sound = .default
         content.categoryIdentifier = "SOCIAL"
 
@@ -229,8 +237,8 @@ final class NotificationService {
 
     func notifyNewEvent(author: String, title: String) {
         let content = UNMutableNotificationContent()
-        content.title = "New event"
-        content.body = title
+        content.title = "\(author) added an event"
+        content.body = "\(title) has been added to your calendar."
         content.sound = .default
         content.categoryIdentifier = "CALENDAR"
 
@@ -241,8 +249,8 @@ final class NotificationService {
 
     func notifyCoverageRequest(author: String, reason: String) {
         let content = UNMutableNotificationContent()
-        content.title = "\(author) needs coverage"
-        content.body = reason
+        content.title = "\(author) could use your help"
+        content.body = reason.isEmpty ? "Can you help cover?" : reason
         content.sound = .default
         content.categoryIdentifier = "COVERAGE"
 
@@ -253,8 +261,8 @@ final class NotificationService {
 
     func notifyNewMessage(from sender: String, text: String, hasImage: Bool = false, userInfo: [String: Any] = [:]) {
         let content = UNMutableNotificationContent()
-        content.title = sender
-        content.body = hasImage ? "Sent a photo" : String(text.prefix(100))
+        content.title = "Message from \(sender)"
+        content.body = hasImage ? "Sent you a photo" : String(text.prefix(100))
         content.sound = .default
         content.categoryIdentifier = "MESSAGE"
         if !userInfo.isEmpty { content.userInfo = userInfo }
@@ -329,17 +337,17 @@ final class NotificationService {
 
             switch item.feed_type {
             case "post":
-                postLocal(title: "\(author) shared a post", body: String((item.body ?? item.title ?? "").prefix(80)), category: "SOCIAL", userInfo: info)
+                postLocal(title: "New from \(author)", body: String((item.body ?? item.title ?? "").prefix(80)), category: "SOCIAL", userInfo: info)
             case "comment":
-                postLocal(title: "\(author) commented", body: item.body ?? "on a post", category: "FEED", userInfo: info)
+                postLocal(title: "\(author) replied", body: "\"\(item.body ?? "left a comment")\"", category: "FEED", userInfo: info)
             case "decision":
-                postLocal(title: "\(author) needs your input", body: item.title ?? "New decision", category: "SOCIAL", userInfo: info)
+                postLocal(title: "\(author) needs your input", body: item.title ?? "Weigh in on a new decision.", category: "SOCIAL", userInfo: info)
             case "rivalry":
-                postLocal(title: "\(author) challenged you", body: item.title ?? "New challenge", category: "SOCIAL", userInfo: info)
+                postLocal(title: "\(author) challenged you", body: item.title ?? "A new challenge is waiting.", category: "SOCIAL", userInfo: info)
             case "event":
-                postLocal(title: "New event", body: item.title ?? "", category: "CALENDAR", userInfo: info)
+                postLocal(title: "\(author) added an event", body: "\(item.title ?? "A new event") has been added to your calendar.", category: "CALENDAR", userInfo: info)
             case "coverage":
-                postLocal(title: "\(author) needs coverage", body: item.title ?? "Coverage needed", category: "COVERAGE", userInfo: info)
+                postLocal(title: "\(author) could use your help", body: item.title ?? "Can you help cover?", category: "COVERAGE", userInfo: info)
             default:
                 seen.insert(item.stableKey)
                 continue
@@ -385,6 +393,31 @@ final class NotificationService {
 
     func removeAllPending() {
         UNUserNotificationCenter.current().removeAllPendingNotificationRequests()
+    }
+
+    func removeStalePendingCalendarNotifications() {
+        UNUserNotificationCenter.current().getPendingNotificationRequests { requests in
+            let now = Date()
+            let staleIds = requests.compactMap { request -> String? in
+                guard request.content.categoryIdentifier == "APPOINTMENT"
+                        || request.content.categoryIdentifier == "PANTRY_EXPIRY" else {
+                    return nil
+                }
+
+                guard let trigger = request.trigger as? UNCalendarNotificationTrigger else {
+                    return nil
+                }
+
+                guard let nextTriggerDate = trigger.nextTriggerDate() else {
+                    return request.identifier
+                }
+
+                return nextTriggerDate <= now ? request.identifier : nil
+            }
+
+            guard !staleIds.isEmpty else { return }
+            UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: staleIds)
+        }
     }
 
     private func tripETAKey(tripId: Int, minutes: Int) -> String {

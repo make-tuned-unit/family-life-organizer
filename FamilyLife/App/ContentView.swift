@@ -1,3 +1,4 @@
+import CoreLocation
 import SwiftUI
 
 enum MainTab: Hashable, CaseIterable {
@@ -42,7 +43,8 @@ struct MainTabView: View {
     @State private var showingChat = false
     @State private var chatInitialThread: ChatSheet.ChatThread?
     @State private var unreadCount = 0
-    @State private var locationService = LocationService()
+    @Environment(LocationService.self) private var locationService
+    @State private var trackedTripId: Int?
     @State private var deepRivalry: RivalryResponse?
     @State private var deepDecision: DecisionResponse?
     @State private var deepEvent: AppointmentResponse?
@@ -124,6 +126,7 @@ struct MainTabView: View {
         var isFirstPoll = true
         // Clear stale local notifications on launch to prevent flood
         UNUserNotificationCenter.current().removeAllDeliveredNotifications()
+        NotificationService.shared.removeStalePendingCalendarNotifications()
         while !Task.isCancelled {
             // Update badge count
             unreadCount = (try? await api.fetchUnreadMessageCount()) ?? 0
@@ -162,8 +165,72 @@ struct MainTabView: View {
                 }
             }
 
+            await syncActiveTripTracking()
+
             try? await Task.sleep(for: .seconds(15))
         }
+    }
+
+    private func syncActiveTripTracking() async {
+        guard let trip = await currentUserActiveTrip() else {
+            trackedTripId = nil
+            locationService.stopTracking()
+            return
+        }
+
+        if trackedTripId == trip.id, locationService.isTracking { return }
+
+        trackedTripId = trip.id
+        locationService.requestTripTrackingPermission()
+        locationService.startTracking { coordinate in
+            Task { await updateTripLocation(tripId: trip.id, coordinate: coordinate) }
+        }
+
+        // Set up geofence for auto-arrive
+        if let destLat = trip.destination_lat, let destLng = trip.destination_lng {
+            let dest = CLLocationCoordinate2D(latitude: destLat, longitude: destLng)
+            locationService.monitorArrival(tripId: trip.id, destination: dest) {
+                Task {
+                    try? await api.arriveTrip(id: trip.id)
+                    NotificationService.shared.notifyTripArrival(
+                        traveler: trip.traveler.capitalized,
+                        destination: trip.destination
+                    )
+                    NotificationService.shared.clearTripAlertState(tripId: trip.id)
+                    trackedTripId = nil
+                    locationService.stopTracking()
+                }
+            }
+        }
+    }
+
+    private func currentUserActiveTrip() async -> TripResponse? {
+        guard let trips = try? await api.fetchTrips(status: "active") else { return nil }
+        let currentNames = [
+            auth.currentUser?.name.lowercased(),
+            auth.currentUser?.username.lowercased()
+        ].compactMap { $0 }
+        return trips.first { currentNames.contains($0.traveler.lowercased()) }
+    }
+
+    private func updateTripLocation(tripId: Int, coordinate: CLLocationCoordinate2D) async {
+        guard let trips = try? await api.fetchTrips(status: "active"),
+              let trip = trips.first(where: { $0.id == tripId }),
+              let destLat = trip.destination_lat,
+              let destLng = trip.destination_lng else { return }
+
+        let distance = LocationService.distance(
+            from: coordinate,
+            to: CLLocationCoordinate2D(latitude: destLat, longitude: destLng)
+        )
+        let destination = CLLocationCoordinate2D(latitude: destLat, longitude: destLng)
+        let eta = await LocationService.routeEtaMinutes(from: coordinate, to: destination)
+            ?? LocationService.etaMinutes(distanceMeters: distance)
+        try? await api.updateTrip(id: tripId, updates: [
+            "current_lat": coordinate.latitude,
+            "current_lng": coordinate.longitude,
+            "eta_minutes": eta
+        ])
     }
 
     private func handleDeepLink(type: String) async {
@@ -271,4 +338,5 @@ struct FloatingTabBar: View {
         .environment(ProfileImageCache())
         .environment(DeepLinkRouter())
         .environment(MessageCache())
+        .environment(LocationService())
 }
