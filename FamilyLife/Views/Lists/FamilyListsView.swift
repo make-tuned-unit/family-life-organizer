@@ -192,6 +192,7 @@ struct ListDetailSection: View {
     @State private var isLoading = false
     @State private var showingDeleteConfirm = false
     @State private var showCompleted = false
+    @FocusState private var isInputFocused: Bool
 
     private var activeItems: [APIService.ListItemResponse] {
         items.filter { !$0.isDone }
@@ -212,6 +213,7 @@ struct ListDetailSection: View {
                     TextField("Add item...", text: $newItem)
                         .font(.system(size: 15))
                         .foregroundStyle(WarmPalette.ink1)
+                        .focused($isInputFocused)
                         .onSubmit { addItem() }
                 }
                 .padding(12)
@@ -316,6 +318,7 @@ struct ListDetailSection: View {
         let title = newItem.trimmingCharacters(in: .whitespaces)
         guard !title.isEmpty else { return }
         newItem = ""
+        isInputFocused = true
         Task {
             do {
                 let _ = try await api.addListItem(listId: list.id, title: title)
