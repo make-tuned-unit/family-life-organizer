@@ -1,5 +1,4 @@
 import Foundation
-import SwiftData
 
 enum ChallengeType: String, Codable, CaseIterable, Identifiable {
     case steps
@@ -74,98 +73,25 @@ enum RivalryStatus: String, Codable, CaseIterable {
     case declined
 }
 
-@Model
-final class Rivalry {
-    @Attribute(.unique) var id: UUID
-    var title: String
-    var challengeType: ChallengeType
-    var initiatorID: UUID
-    var initiatorName: String
-    var opponentID: UUID
-    var opponentName: String
-    var startDate: Date
-    var endDate: Date
-    var status: RivalryStatus
-    var pointValue: Int
-    var winnerID: UUID?
-    var createdAt: Date
-
-    init(
-        title: String,
-        challengeType: ChallengeType,
-        initiatorID: UUID,
-        initiatorName: String,
-        opponentID: UUID,
-        opponentName: String,
-        startDate: Date = Date(),
-        endDate: Date,
-        pointValue: Int = 100
-    ) {
-        self.id = UUID()
-        self.title = title
-        self.challengeType = challengeType
-        self.initiatorID = initiatorID
-        self.initiatorName = initiatorName
-        self.opponentID = opponentID
-        self.opponentName = opponentName
-        self.startDate = startDate
-        self.endDate = endDate
-        self.status = .active
-        self.pointValue = pointValue
-        self.createdAt = Date()
-    }
-}
-
-@Model
-final class RivalryEntry {
-    @Attribute(.unique) var id: UUID
-    var rivalryID: UUID
-    var memberID: UUID
-    var memberName: String
-    var value: Double
-    var note: String?
-    var loggedAt: Date
-    var isVerified: Bool
-
-    init(
-        rivalryID: UUID,
-        memberID: UUID,
-        memberName: String,
-        value: Double,
-        note: String? = nil,
-        isVerified: Bool = false
-    ) {
-        self.id = UUID()
-        self.rivalryID = rivalryID
-        self.memberID = memberID
-        self.memberName = memberName
-        self.value = value
-        self.note = note
-        self.loggedAt = Date()
-        self.isVerified = isVerified
-    }
-}
-
-@Model
-final class FamilyMemberPoints {
-    @Attribute(.unique) var id: UUID
+// Used by LeaderboardCard for local display
+final class FamilyMemberPoints: Identifiable {
+    let id = UUID()
     var memberID: UUID
     var memberName: String
     var totalPoints: Int
     var rivalriesWon: Int
     var rivalriesCompleted: Int
-    var lastUpdated: Date
 
     init(memberID: UUID, memberName: String) {
-        self.id = UUID()
         self.memberID = memberID
         self.memberName = memberName
         self.totalPoints = 0
         self.rivalriesWon = 0
         self.rivalriesCompleted = 0
-        self.lastUpdated = Date()
     }
 }
+
+// MARK: - API Response Types
 
 struct RivalryResponse: Codable, Identifiable {
     let id: Int
@@ -179,7 +105,7 @@ struct RivalryResponse: Codable, Identifiable {
     let point_value: Int
     let winner_name: String?
     let created_at: String?
-    let participants: String? // JSON array of all participant names
+    let participants: String?
 
     var participantNames: [String] {
         guard let participants, let data = participants.data(using: .utf8),

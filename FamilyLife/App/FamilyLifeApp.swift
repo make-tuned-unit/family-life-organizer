@@ -32,14 +32,12 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
         // Detect if app was launched by a significant location change (trip tracking)
         if launchOptions?[.location] != nil {
             launchedForLocation = true
-            print("📍 App launched for location update (trip tracking)")
         }
         return true
     }
 
     func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
         let token = deviceToken.map { String(format: "%02x", $0) }.joined()
-        print("📱 APNs device token: \(token)")
         guard let api = apiService else { return }
         Task {
             try? await api.registerDeviceToken(token)
@@ -47,7 +45,6 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
     }
 
     func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {
-        print("APNs registration failed: \(error.localizedDescription)")
     }
 
     // Show notifications even when app is in foreground

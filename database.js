@@ -124,8 +124,8 @@ class FamilyDB {
           SELECT gm.user_id, g.id as group_id, g.name as group_name
           FROM group_members gm
           JOIN groups g ON g.id = gm.group_id AND g.group_type = 'household'
-          WHERE gm.user_id IN (${userIds.join(',')})
-        `, (err2, memberships) => {
+          WHERE gm.user_id IN (${userIds.map(() => '?').join(',')})
+        `, userIds, (err2, memberships) => {
           console.log('Current household memberships:', JSON.stringify(memberships));
 
           this.db.serialize(() => {

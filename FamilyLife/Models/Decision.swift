@@ -1,5 +1,4 @@
 import Foundation
-import SwiftData
 
 enum DecisionType: String, Codable, CaseIterable, Identifiable {
     case text
@@ -32,86 +31,6 @@ enum DecisionStatus: String, Codable {
     case active
     case resolved
     case expired
-}
-
-@Model
-final class Decision {
-    @Attribute(.unique) var id: UUID
-    var title: String
-    var decisionType: DecisionType
-    var body: String?
-    var linkURL: String?
-    var photoData: Data?
-    var pollOptions: [String]
-    var creatorName: String
-    var status: DecisionStatus
-    var createdAt: Date
-    var expiresAt: Date
-
-    init(
-        title: String,
-        decisionType: DecisionType,
-        body: String? = nil,
-        linkURL: String? = nil,
-        pollOptions: [String] = [],
-        creatorName: String = "Jesse"
-    ) {
-        self.id = UUID()
-        self.title = title
-        self.decisionType = decisionType
-        self.body = body
-        self.linkURL = linkURL
-        self.pollOptions = pollOptions
-        self.creatorName = creatorName
-        self.status = .active
-        self.createdAt = Date()
-        self.expiresAt = Calendar.current.date(byAdding: .day, value: 7, to: Date()) ?? Date()
-    }
-}
-
-@Model
-final class DecisionReaction {
-    @Attribute(.unique) var id: UUID
-    var decisionID: UUID
-    var memberName: String
-    var reactionType: String // thumbsUp, thumbsDown, heart, vote
-    var pollChoice: Int? // index of poll option if vote
-    var createdAt: Date
-
-    init(
-        decisionID: UUID,
-        memberName: String,
-        reactionType: String,
-        pollChoice: Int? = nil
-    ) {
-        self.id = UUID()
-        self.decisionID = decisionID
-        self.memberName = memberName
-        self.reactionType = reactionType
-        self.pollChoice = pollChoice
-        self.createdAt = Date()
-    }
-}
-
-@Model
-final class DecisionComment {
-    @Attribute(.unique) var id: UUID
-    var decisionID: UUID
-    var memberName: String
-    var text: String
-    var createdAt: Date
-
-    init(
-        decisionID: UUID,
-        memberName: String,
-        text: String
-    ) {
-        self.id = UUID()
-        self.decisionID = decisionID
-        self.memberName = memberName
-        self.text = text
-        self.createdAt = Date()
-    }
 }
 
 struct DecisionResponse: Codable, Identifiable {
