@@ -100,6 +100,14 @@ final class HomeViewModel {
         isLoading = false
     }
 
+    func reloadTrips(api: APIService) async {
+        do {
+            activeTrips = try await api.fetchTrips(status: "active")
+        } catch {
+            guard !error.isCancellation else { return }
+        }
+    }
+
     // MARK: - Feed preparation
 
     static func prepareFeed(_ items: [APIService.ActivityItem], currentUserName: String? = nil, currentUsername: String? = nil) -> [PreparedFeedItem] {
