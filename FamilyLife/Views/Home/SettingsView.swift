@@ -6,6 +6,7 @@ struct SettingsView: View {
     @Environment(AuthService.self) private var auth
     @Environment(APIService.self) private var api
     @Environment(HouseholdService.self) private var household
+    @Environment(LocationService.self) private var locationService
     @Environment(\.dismiss) private var dismiss
 
     @State private var serverURL: String = ""
@@ -247,8 +248,7 @@ struct SettingsView: View {
         .task {
             let settings = await UNUserNotificationCenter.current().notificationSettings()
             notificationsEnabled = settings.authorizationStatus == .authorized
-            let locService = LocationService()
-            locationEnabled = locService.authorizationStatus == .authorizedWhenInUse || locService.authorizationStatus == .authorizedAlways
+            locationEnabled = locationService.authorizationStatus == .authorizedWhenInUse || locationService.authorizationStatus == .authorizedAlways
         }
     }
 }
@@ -260,4 +260,5 @@ struct SettingsView: View {
     .environment(AuthService())
     .environment(APIService())
     .environment(HouseholdService())
+    .environment(LocationService())
 }

@@ -356,11 +356,21 @@ struct GroupChatView: View {
     private func loadDecisions() async {
         do {
             let all = try await api.fetchDecisions()
-            openDecisions = all.filter {
-                $0.status == DecisionStatus.active.rawValue
-                && $0.group_id == groupId
+            let now = Date()
+            openDecisions = all.filter { decision in
+                decision.status == DecisionStatus.active.rawValue
+                && decision.group_id == groupId
+                && !isExpired(decision, now: now)
             }
         } catch {}
+    }
+
+    private func isExpired(_ decision: DecisionResponse, now: Date) -> Bool {
+        guard let expiresStr = decision.expires_at,
+              let expiresDate = ISO8601DateFormatter.flexible.date(from: expiresStr) else {
+            return false
+        }
+        return expiresDate <= now
     }
 
     private func send() {
