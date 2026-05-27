@@ -121,8 +121,11 @@ struct MainTabView: View {
         }
     }
 
+    private let healthKit = HealthKitManager()
+
     private func pollUnread() async {
         var locationReportCounter = 0
+        var stepSyncCounter = 19  // trigger on second poll cycle (30s in)
         var isFirstPoll = true
         // Clear stale local notifications on launch to prevent flood
         UNUserNotificationCenter.current().removeAllDeliveredNotifications()
@@ -165,6 +168,13 @@ struct MainTabView: View {
                 }
             }
 
+            // Auto-sync HealthKit steps for active step rivalries every ~5 minutes
+            stepSyncCounter += 1
+            if stepSyncCounter >= 20 {
+                stepSyncCounter = 0
+                await syncStepRivalries()
+            }
+
             await syncActiveTripTracking()
 
             try? await Task.sleep(for: .seconds(15))
@@ -201,6 +211,40 @@ struct MainTabView: View {
                     locationService.stopTracking()
                 }
             }
+        }
+    }
+
+    private func syncStepRivalries() async {
+        guard await healthKit.requestStepAuthorization() else { return }
+        guard let rivalries = try? await api.fetchRivalries() else { return }
+        let myName = auth.currentUser?.username ?? auth.currentUser?.name ?? ""
+
+        let activeStepRivalries = rivalries.filter {
+            $0.status == RivalryStatus.active.rawValue
+            && $0.challengeType == .steps
+        }
+
+        for rivalry in activeStepRivalries {
+            let startDate = ISO8601DateFormatter.flexible.date(from: rivalry.start_date)
+                ?? DateFormatter.isoDate.date(from: rivalry.start_date)
+                ?? Date()
+            let endDate = rivalry.endDate ?? Date()
+            let hkSteps = await healthKit.fetchSteps(from: startDate, to: min(endDate, Date()))
+            guard hkSteps > 0 else { continue }
+
+            let entries = (try? await api.fetchRivalryEntries(id: rivalry.id)) ?? []
+            let myLogged = entries
+                .filter { $0.member_name.localizedCaseInsensitiveCompare(myName) == .orderedSame }
+                .reduce(0.0) { $0 + $1.value }
+            let delta = hkSteps - myLogged
+            guard delta > 0 else { continue }
+
+            try? await api.addRivalryEntry(id: rivalry.id, data: [
+                "member_name": myName,
+                "value": delta,
+                "note": "Synced from Apple Health",
+                "is_verified": true
+            ])
         }
     }
 
