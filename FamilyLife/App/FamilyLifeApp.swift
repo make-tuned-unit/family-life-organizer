@@ -1,5 +1,6 @@
 import SwiftUI
 import UIKit
+import CoreLocation
 
 @Observable
 class DeepLinkRouter {
@@ -24,8 +25,15 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
     var apiService: APIService?
     var deepLinkRouter: DeepLinkRouter?
 
+    var launchedForLocation = false
+
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         UNUserNotificationCenter.current().delegate = self
+        // Detect if app was launched by a significant location change (trip tracking)
+        if launchOptions?[.location] != nil {
+            launchedForLocation = true
+            print("📍 App launched for location update (trip tracking)")
+        }
         return true
     }
 
@@ -68,6 +76,7 @@ struct FamilyLifeApp: App {
     @State private var profileImageCache = ProfileImageCache()
     @State private var messageCache = MessageCache()
     @State private var deepLinkRouter = DeepLinkRouter()
+    @State private var locationService = LocationService()
 
     var body: some Scene {
         WindowGroup {
@@ -78,6 +87,7 @@ struct FamilyLifeApp: App {
                 .environment(profileImageCache)
                 .environment(messageCache)
                 .environment(deepLinkRouter)
+                .environment(locationService)
                 .task {
                     // Wire up API service and deep link router to app delegate
                     appDelegate.apiService = apiService
