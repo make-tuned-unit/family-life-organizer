@@ -94,8 +94,8 @@ class FamilyDB {
         this.db.run('ALTER TABLE lists ADD COLUMN pinned BOOLEAN DEFAULT 0', () => {});
         this.db.run('ALTER TABLE lists ADD COLUMN list_type TEXT DEFAULT \'standard\'', () => {});
         this.db.run('ALTER TABLE list_items ADD COLUMN category TEXT', () => {});
-        // Auto-migrate existing grocery-named lists
-        this.db.run("UPDATE lists SET list_type = 'grocery' WHERE lower(name) IN ('groceries', 'grocery', 'costco', 'walmart') AND (list_type IS NULL OR list_type = 'standard')", () => {});
+        // Auto-migrate existing grocery-named lists (run every startup to catch stragglers)
+        this.db.run("UPDATE lists SET list_type = 'grocery' WHERE lower(name) IN ('groceries', 'grocery', 'costco', 'walmart') AND (list_type IS NULL OR list_type = 'standard' OR list_type = '')", () => {});
         // Grocery household isolation
         this.db.run('ALTER TABLE groceries ADD COLUMN group_id INTEGER REFERENCES groups(id)', () => {});
         // Multi-player rivalries
