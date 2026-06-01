@@ -3053,8 +3053,15 @@ app.post('/api/lists/:id/items', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
     const userName = req.session.user?.name || req.session.user?.username;
-    const result = await db.addListItem({ list_id: req.params.id, title: req.body.title, added_by: userName });
-    res.json({ success: true, id: result.id });
+    // Auto-categorize if the parent list is a grocery list
+    const list = await new Promise((resolve, reject) => {
+      db.db.get('SELECT list_type FROM lists WHERE id = ?', [req.params.id], (err, row) => err ? reject(err) : resolve(row));
+    });
+    const category = (list && list.list_type === 'grocery')
+      ? FamilyDB.categorizeGroceryItem(req.body.title)
+      : null;
+    const result = await db.addListItem({ list_id: req.params.id, title: req.body.title, added_by: userName, category });
+    res.json({ success: true, id: result.id, category });
   } catch (err) {
     res.status(500).json({ error: err.message });
   } finally {
@@ -3066,6 +3073,41 @@ app.post('/api/lists/items/:id/toggle', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
     await db.toggleListItem(req.params.id);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+app.put('/api/lists/items/:id', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const updates = { title: req.body.title };
+    // Re-categorize if parent list is grocery type
+    if (req.body.title) {
+      const item = await new Promise((resolve, reject) => {
+        db.db.get('SELECT li.list_id, l.list_type FROM list_items li JOIN lists l ON l.id = li.list_id WHERE li.id = ?',
+          [req.params.id], (err, row) => err ? reject(err) : resolve(row));
+      });
+      if (item && item.list_type === 'grocery') {
+        updates.category = FamilyDB.categorizeGroceryItem(req.body.title);
+      }
+    }
+    await db.updateListItem(req.params.id, updates);
+    res.json({ success: true, category: updates.category || null });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+app.post('/api/lists/:id/reorder', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    await db.reorderListItems(req.body.ordered_ids);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });

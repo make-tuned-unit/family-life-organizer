@@ -436,6 +436,7 @@ CREATE TABLE IF NOT EXISTS lists (
     icon TEXT DEFAULT 'list.bullet',
     color TEXT,
     pinned BOOLEAN DEFAULT 0,
+    list_type TEXT DEFAULT 'standard',  -- 'standard' or 'grocery'
     created_by INTEGER,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (created_by) REFERENCES users(id)
@@ -448,6 +449,7 @@ CREATE TABLE IF NOT EXISTS list_items (
     is_done BOOLEAN DEFAULT 0,
     sort_order INTEGER DEFAULT 0,
     added_by TEXT,
+    category TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     completed_at DATETIME,
     FOREIGN KEY (list_id) REFERENCES lists(id) ON DELETE CASCADE
