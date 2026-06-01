@@ -20,11 +20,13 @@ struct ReceiptScannerView: View {
     @State private var error: String?
     @State private var showingCamera = false
     @State private var cameraPermissionDenied = false
-    @State private var showingScanAnother = false
     @State private var savedCount = 0
     @State private var currentScanSaved = false
     @State private var selectedCategory = "Other"
     @State private var categories = defaultBudgetCategories
+    @State private var editableTotal = ""
+    @State private var editableMerchant = ""
+    @State private var editableDate = ""
 
     private var isProjectMode: Bool { projectId != nil }
     private static let defaultBudgetCategories = ["Groceries", "Dining Out", "Gas/Transport", "Household", "Health", "Pets", "Entertainment", "Kids", "Other"]
@@ -106,14 +108,6 @@ struct ReceiptScannerView: View {
                 }
                 .ignoresSafeArea()
             }
-            .alert("Receipt Saved", isPresented: $showingScanAnother) {
-                Button("Scan Another") {
-                    Task { await saveAndResetForNextScan() }
-                }
-                Button("Done") { dismiss() }
-            } message: {
-                Text("\(savedCount) receipt\(savedCount == 1 ? "" : "s") saved. Scan another?")
-            }
         }
     }
 
@@ -174,15 +168,41 @@ struct ReceiptScannerView: View {
 
     private func scanResultSection(_ result: ScanResult) -> some View {
         VStack(alignment: .leading, spacing: 16) {
-            HStack {
-                VStack(alignment: .leading) {
-                    Text(result.merchant).font(.headline)
-                    Text(result.date).font(.caption).foregroundStyle(WarmPalette.ink3)
+            // Editable header — merchant, date, total
+            VStack(spacing: 12) {
+                HStack {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Merchant").font(.caption.weight(.medium)).foregroundStyle(WarmPalette.ink3)
+                        TextField("Store name", text: $editableMerchant)
+                            .font(.headline)
+                            .foregroundStyle(WarmPalette.ink1)
+                    }
+                    Spacer()
                 }
-                Spacer()
-                Text("$\(result.total, specifier: "%.2f")")
-                    .font(.title2.bold())
-                    .foregroundStyle(TabAccent.home.color)
+
+                HStack {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Date").font(.caption.weight(.medium)).foregroundStyle(WarmPalette.ink3)
+                        TextField("YYYY-MM-DD", text: $editableDate)
+                            .font(.subheadline)
+                            .foregroundStyle(WarmPalette.ink2)
+                    }
+                    Spacer()
+                    VStack(alignment: .trailing, spacing: 6) {
+                        Text("Total").font(.caption.weight(.medium)).foregroundStyle(WarmPalette.ink3)
+                        HStack(spacing: 2) {
+                            Text("$")
+                                .font(.title2.bold())
+                                .foregroundStyle(TabAccent.home.color)
+                            TextField("0.00", text: $editableTotal)
+                                .font(.title2.bold())
+                                .foregroundStyle(TabAccent.home.color)
+                                .keyboardType(.decimalPad)
+                                .multilineTextAlignment(.trailing)
+                                .frame(maxWidth: 100)
+                        }
+                    }
+                }
             }
             .padding()
             .background(WarmPalette.ink1.opacity(0.06))
@@ -237,39 +257,64 @@ struct ReceiptScannerView: View {
                 }
             }
 
-            Button {
-                Task {
-                    if await saveCurrentReceiptIfNeeded() {
-                        showingScanAnother = true
-                    }
+            if currentScanSaved {
+                // Confirmed saved — show success state
+                HStack(spacing: 10) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 20))
+                        .foregroundStyle(WarmPalette.good)
+                    Text("Receipt saved!")
+                        .font(.headline)
+                        .foregroundStyle(WarmPalette.good)
+                    Spacer()
                 }
-            } label: {
-                if isSaving {
-                    ProgressView().frame(maxWidth: .infinity)
-                } else {
-                    Text(isProjectMode ? "Add to Project" : "Save Receipt")
+                .padding()
+                .background(WarmPalette.good.opacity(0.1))
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+
+                Button {
+                    resetForNextScan()
+                } label: {
+                    Text("Scan Another Receipt")
                         .font(.headline).frame(maxWidth: .infinity)
                 }
-            }
-            .buttonStyle(.borderedProminent)
-            .tint(isProjectMode ? AccentTheme.sage.color : TabAccent.home.color)
-            .controlSize(.large)
-            .disabled(isSaving)
+                .buttonStyle(.borderedProminent)
+                .tint(TabAccent.home.color)
+                .controlSize(.large)
 
-            Button {
-                Task { await saveAndResetForNextScan() }
-            } label: {
-                if isSaving {
-                    ProgressView()
-                        .frame(maxWidth: .infinity)
-                } else {
-                    Text("Scan another")
+                Button { dismiss() } label: {
+                    Text("Done")
                         .font(.system(size: 14, weight: .medium))
                         .foregroundStyle(WarmPalette.ink3)
                         .frame(maxWidth: .infinity)
                 }
+            } else {
+                // Not yet saved — show save button
+                Button {
+                    Task { await saveReceipt() }
+                } label: {
+                    if isSaving {
+                        ProgressView().frame(maxWidth: .infinity)
+                    } else {
+                        Text(isProjectMode ? "Add to Project" : "Save Receipt")
+                            .font(.headline).frame(maxWidth: .infinity)
+                    }
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(isProjectMode ? AccentTheme.sage.color : TabAccent.home.color)
+                .controlSize(.large)
+                .disabled(isSaving || editableTotal.isEmpty || editableMerchant.isEmpty)
+
+                Button {
+                    resetForNextScan()
+                } label: {
+                    Text("Discard & Scan Again")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(WarmPalette.ink3)
+                        .frame(maxWidth: .infinity)
+                }
+                .disabled(isSaving)
             }
-            .disabled(isSaving)
         }
         .padding(.horizontal)
     }
@@ -306,6 +351,9 @@ struct ReceiptScannerView: View {
         error = nil
         currentScanSaved = false
         selectedCategory = "Other"
+        editableTotal = ""
+        editableMerchant = ""
+        editableDate = ""
     }
 
     private func loadBudgetCategories() async {
@@ -316,11 +364,6 @@ struct ReceiptScannerView: View {
             merged.append(name)
         }
         categories = merged
-    }
-
-    private func saveAndResetForNextScan() async {
-        guard await saveCurrentReceiptIfNeeded() else { return }
-        resetForNextScan()
     }
 
     private func loadAndScan() {
@@ -340,6 +383,10 @@ struct ReceiptScannerView: View {
             do {
                 let result = try await api.scanReceipt(imageData: data)
                 scanResult = result
+                // Populate editable fields from scan
+                editableMerchant = result.merchant
+                editableDate = result.date
+                editableTotal = String(format: "%.2f", result.total)
                 let category = normalizedCategory(for: result)
                 if !categories.contains(where: { $0.localizedCaseInsensitiveCompare(category) == .orderedSame }) {
                     categories.append(category)
@@ -353,24 +400,30 @@ struct ReceiptScannerView: View {
         }
     }
 
-    @discardableResult
-    private func saveCurrentReceiptIfNeeded() async -> Bool {
-        guard !isSaving else { return false }
-        guard let result = scanResult else { return false }
-        guard !currentScanSaved else { return true }
+    private func saveReceipt() async {
+        guard !isSaving else { return }
+        guard var result = scanResult else { return }
+        guard !currentScanSaved else { return }
+
+        // Apply user edits to the result
+        let parsedTotal = Double(editableTotal) ?? result.total
+        result.total = parsedTotal
+        result.merchant = editableMerchant.isEmpty ? result.merchant : editableMerchant
+        result.date = editableDate.isEmpty ? result.date : editableDate
+        scanResult = result
 
         isSaving = true
         defer { isSaving = false }
 
         do {
+            let itemDetail = result.items.map { item in
+                if let price = item.price {
+                    return "\(item.name) — $\(String(format: "%.2f", price))"
+                }
+                return item.name
+            }.joined(separator: "\n")
+
             if let projectId {
-                // Save as project expense — tag with project name, items in notes
-                let itemDetail = result.items.map { item in
-                    if let price = item.price {
-                        return "\(item.name) — $\(String(format: "%.2f", price))"
-                    }
-                    return item.name
-                }.joined(separator: "\n")
                 let expenseData: [String: Any] = [
                     "description": result.merchant,
                     "amount": result.total,
@@ -379,38 +432,20 @@ struct ReceiptScannerView: View {
                 ]
                 let _ = try await api.addProjectExpense(projectId: projectId, expense: expenseData)
                 currentScanSaved = true
-                dismiss()
+                savedCount += 1
                 Task.detached { await onProjectExpenseSaved?() }
-                return true
             } else {
-                // Save as budget receipt with item breakdown in notes
-                let itemDetail = result.items.map { item in
-                    if let price = item.price {
-                        return "\(item.name) — $\(String(format: "%.2f", price))"
-                    }
-                    return item.name
-                }.joined(separator: "\n")
                 let savedId = try await api.saveScannedReceipt(result: result, category: selectedCategory, notes: itemDetail)
                 guard savedId > 0 else {
                     self.error = "Receipt save did not return a valid id. Try again."
-                    return false
+                    return
                 }
                 currentScanSaved = true
                 savedCount += 1
                 await onReceiptSaved?()
-                return true
             }
         } catch {
             self.error = "Failed to save: \(error.localizedDescription)"
-            return false
-        }
-    }
-
-    private func save() {
-        Task {
-            if await saveCurrentReceiptIfNeeded() {
-                showingScanAnother = true
-            }
         }
     }
 
@@ -475,11 +510,11 @@ struct CameraView: UIViewControllerRepresentable {
 // MARK: - API Response Types
 
 struct ScanResult: Codable {
-    let merchant: String
-    let date: String
-    let total: Double
-    let category: String
-    let items: [ScanItem]
+    var merchant: String
+    var date: String
+    var total: Double
+    var category: String
+    var items: [ScanItem]
 }
 
 struct ScanItem: Codable {

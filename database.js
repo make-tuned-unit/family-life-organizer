@@ -92,6 +92,10 @@ class FamilyDB {
         this.db.run('ALTER TABLE users ADD COLUMN last_lng REAL', () => {});
         this.db.run('ALTER TABLE users ADD COLUMN last_location_name TEXT', () => {});
         this.db.run('ALTER TABLE lists ADD COLUMN pinned BOOLEAN DEFAULT 0', () => {});
+        this.db.run('ALTER TABLE lists ADD COLUMN list_type TEXT DEFAULT \'standard\'', () => {});
+        this.db.run('ALTER TABLE list_items ADD COLUMN category TEXT', () => {});
+        // Auto-migrate existing grocery-named lists
+        this.db.run("UPDATE lists SET list_type = 'grocery' WHERE lower(name) IN ('groceries', 'grocery', 'costco', 'walmart') AND (list_type IS NULL OR list_type = 'standard')", () => {});
         // Grocery household isolation
         this.db.run('ALTER TABLE groceries ADD COLUMN group_id INTEGER REFERENCES groups(id)', () => {});
         // Multi-player rivalries
@@ -1794,11 +1798,37 @@ class FamilyDB {
   // Lists
   // ============================================
 
+  // Grocery auto-categorizer — keyword-based
+  static categorizeGroceryItem(title) {
+    const t = title.toLowerCase().trim();
+    const categories = {
+      'Produce': ['apple','banana','orange','lemon','lime','grape','strawberr','blueberr','raspberr','blackberr','peach','pear','plum','mango','pineapple','melon','watermelon','avocado','tomato','potato','onion','garlic','ginger','carrot','celery','broccoli','cauliflower','spinach','lettuce','kale','arugula','cucumber','pepper','zucchini','squash','corn','mushroom','asparagus','green bean','snap pea','radish','beet','sweet potato','cabbage','brussels','eggplant','artichoke','leek','shallot','cilantro','parsley','basil','mint','dill','rosemary','thyme','jalapen','serrano','habanero','chive','scallion','green onion','fruit','vegetable','produce','salad','herb','berry','citrus','clementine','tangerine','grapefruit','kiwi','fig','pomegranate','cranberr','cherry','apricot','nectarine','coconut','plantain','yam','turnip','parsnip','rutabaga','bok choy','fennel','okra','watercress','endive','radicchio'],
+      'Dairy': ['milk','cream','cheese','yogurt','yoghurt','butter','egg','eggs','sour cream','cottage','ricotta','mozzarella','cheddar','parmesan','gouda','brie','feta','cream cheese','whipping cream','half and half','half & half','buttermilk','kefir','ghee','dairy','margarine','oat milk','almond milk','soy milk','coconut milk'],
+      'Meat & Seafood': ['chicken','beef','pork','steak','ground','turkey','lamb','sausage','bacon','ham','salami','pepperoni','prosciutto','fish','salmon','tuna','shrimp','prawn','crab','lobster','scallop','clam','mussel','oyster','cod','tilapia','halibut','mahi','trout','sardine','anchov','meat','seafood','hot dog','wiener','brisket','ribs','roast','chop','filet','fillet','deli','veal','duck','bison','venison','chorizo','kielbasa','bratwurst','meatball'],
+      'Bakery': ['bread','bagel','croissant','muffin','roll','bun','tortilla','pita','naan','wrap','cake','pie','cookie','pastry','donut','doughnut','danish','scone','biscuit','loaf','sourdough','rye','ciabatta','focaccia','baguette','english muffin','hamburger bun','hot dog bun','crouton','breadcrumb','flatbread'],
+      'Frozen': ['frozen','ice cream','pizza','fries','waffle','popsicle','gelato','sorbet','frozen dinner','tv dinner','frozen fruit','frozen vegetable','frozen meal','fish stick','corn dog','frozen pie'],
+      'Pantry': ['rice','pasta','noodle','flour','sugar','salt','pepper','oil','olive oil','vinegar','soy sauce','ketchup','mustard','mayo','mayonnaise','relish','hot sauce','bbq sauce','barbecue sauce','salsa','peanut butter','almond butter','jam','jelly','honey','maple syrup','cereal','oatmeal','granola','cracker','chip','pretzel','popcorn','nut','almond','cashew','walnut','pecan','pistachio','peanut','can','canned','bean','lentil','chickpea','broth','stock','soup','sauce','dressing','spice','seasoning','cinnamon','cumin','paprika','oregano','turmeric','curry','chili powder','nutmeg','vanilla','baking soda','baking powder','yeast','cornstarch','cocoa','chocolate','panko','breadcrumb','quinoa','couscous','barley','taco','tortilla chip','salsa','hummus','tahini','coconut oil','sesame','teriyaki','worcestershire','sriracha','ranch','italian','balsamic','dijon'],
+      'Beverages': ['water','juice','soda','pop','cola','coffee','tea','beer','wine','kombucha','lemonade','gatorade','energy drink','sparkling','seltzer','tonic','liquor','vodka','rum','whiskey','bourbon','gin','tequila','champagne','prosecco','cider','smoothie','protein shake','creamer','espresso','matcha','drink','beverage'],
+      'Snacks': ['chip','chips','cracker','pretzel','popcorn','trail mix','granola bar','protein bar','candy','chocolate bar','gummy','dried fruit','jerky','cookie','fruit snack','rice cake','cheese puff','goldfish','animal cracker','snack'],
+      'Deli': ['deli','lunch meat','roast beef','turkey breast','pastrami','corned beef','hummus','olive','pickle','coleslaw','potato salad','rotisserie','prepared','sub','hoagie'],
+      'Household': ['paper towel','toilet paper','tissue','napkin','trash bag','garbage bag','aluminum foil','plastic wrap','saran','parchment','wax paper','ziploc','sandwich bag','sponge','dish soap','detergent','laundry','fabric softener','dryer sheet','bleach','cleaner','disinfectant','wipe','mop','broom','light bulb','battery','candle','air freshener','soap'],
+      'Personal Care': ['shampoo','conditioner','body wash','lotion','deodorant','toothpaste','toothbrush','floss','mouthwash','razor','shaving','sunscreen','bandaid','band-aid','medicine','vitamin','supplement','tylenol','advil','ibuprofen','allergy','antacid','cotton','q-tip','nail','lip balm','hand sanitizer'],
+      'Baby & Kids': ['diaper','wipe','formula','baby food','sippy','pacifier','baby','kids','children','juice box'],
+      'Pet': ['dog food','cat food','pet food','kitty litter','cat litter','dog treat','cat treat','pet','chew toy','flea','tick']
+    };
+    for (const [category, keywords] of Object.entries(categories)) {
+      for (const kw of keywords) {
+        if (t.includes(kw)) return category;
+      }
+    }
+    return 'Other';
+  }
+
   createList(list) {
     return new Promise((resolve, reject) => {
       this.db.run(
-        'INSERT INTO lists (name, icon, color, created_by) VALUES (?, ?, ?, ?)',
-        [list.name, list.icon || 'list.bullet', list.color || null, list.created_by || null],
+        'INSERT INTO lists (name, icon, color, list_type, created_by) VALUES (?, ?, ?, ?, ?)',
+        [list.name, list.icon || 'list.bullet', list.color || null, list.list_type || 'standard', list.created_by || null],
         function(err) {
           if (err) reject(err);
           else resolve({ id: this.lastID });
@@ -1856,7 +1886,7 @@ class FamilyDB {
   getListItems(listId) {
     return new Promise((resolve, reject) => {
       this.db.all(
-        'SELECT * FROM list_items WHERE list_id = ? ORDER BY is_done ASC, sort_order ASC, id DESC',
+        'SELECT * FROM list_items WHERE list_id = ? ORDER BY is_done ASC, category ASC, sort_order ASC, id DESC',
         [listId], (err, rows) => err ? reject(err) : resolve(rows)
       );
     });
@@ -1865,8 +1895,8 @@ class FamilyDB {
   addListItem(item) {
     return new Promise((resolve, reject) => {
       this.db.run(
-        'INSERT INTO list_items (list_id, title, added_by) VALUES (?, ?, ?)',
-        [item.list_id, item.title, item.added_by || null],
+        'INSERT INTO list_items (list_id, title, added_by, category) VALUES (?, ?, ?, ?)',
+        [item.list_id, item.title, item.added_by || null, item.category || null],
         function(err) {
           if (err) reject(err);
           else resolve({ id: this.lastID });
@@ -1884,6 +1914,35 @@ class FamilyDB {
           else resolve({ id });
         }
       );
+    });
+  }
+
+  updateListItem(id, updates) {
+    return new Promise((resolve, reject) => {
+      const fields = [];
+      const params = [];
+      for (const [key, value] of Object.entries(updates)) {
+        fields.push(`${key} = ?`);
+        params.push(value);
+      }
+      params.push(id);
+      this.db.run(`UPDATE list_items SET ${fields.join(', ')} WHERE id = ?`, params, (err) => {
+        if (err) reject(err);
+        else resolve({ id, ...updates });
+      });
+    });
+  }
+
+  reorderListItems(orderedIds) {
+    return new Promise((resolve, reject) => {
+      const stmt = this.db.prepare('UPDATE list_items SET sort_order = ? WHERE id = ?');
+      for (let i = 0; i < orderedIds.length; i++) {
+        stmt.run(i, orderedIds[i]);
+      }
+      stmt.finalize((err) => {
+        if (err) reject(err);
+        else resolve({ success: true });
+      });
     });
   }
 

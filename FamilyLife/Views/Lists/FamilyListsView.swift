@@ -190,16 +190,49 @@ struct ListDetailSection: View {
     @State private var items: [APIService.ListItemResponse] = []
     @State private var newItem = ""
     @State private var isLoading = false
-    @State private var showingDeleteConfirm = false
     @State private var showCompleted = false
+    @State private var editingItemId: Int?
+    @State private var editingText = ""
+    @State private var recentlyToggledIds: Set<Int> = []
     @FocusState private var isInputFocused: Bool
+    @FocusState private var isEditFocused: Bool
 
+    // Items currently being animated (checked off but still shown in active section)
     private var activeItems: [APIService.ListItemResponse] {
-        items.filter { !$0.isDone }
+        items.filter { !$0.isDone || recentlyToggledIds.contains($0.id) }
     }
 
     private var doneItems: [APIService.ListItemResponse] {
-        items.filter { $0.isDone }
+        items.filter { $0.isDone && !recentlyToggledIds.contains($0.id) }
+    }
+
+    // Group active items by category for grocery lists
+    private var categorizedActiveItems: [(category: String, items: [APIService.ListItemResponse])] {
+        let grouped = Dictionary(grouping: activeItems) { $0.category ?? "Other" }
+        let order = ["Produce", "Dairy", "Meat & Seafood", "Bakery", "Deli", "Frozen", "Pantry", "Beverages", "Snacks", "Household", "Personal Care", "Baby & Kids", "Pet", "Other"]
+        return order.compactMap { cat in
+            guard let items = grouped[cat], !items.isEmpty else { return nil }
+            return (category: cat, items: items)
+        }
+    }
+
+    private func categoryIcon(_ category: String) -> String {
+        switch category {
+        case "Produce": return "leaf.fill"
+        case "Dairy": return "cup.and.saucer.fill"
+        case "Meat & Seafood": return "fish.fill"
+        case "Bakery": return "birthday.cake.fill"
+        case "Deli": return "takeoutbag.and.cup.and.straw.fill"
+        case "Frozen": return "snowflake"
+        case "Pantry": return "cabinet.fill"
+        case "Beverages": return "waterbottle.fill"
+        case "Snacks": return "popcorn.fill"
+        case "Household": return "house.fill"
+        case "Personal Care": return "heart.fill"
+        case "Baby & Kids": return "figure.and.child.holdinghands"
+        case "Pet": return "pawprint.fill"
+        default: return "bag.fill"
+        }
     }
 
     var body: some View {
@@ -230,79 +263,302 @@ struct ListDetailSection: View {
             .padding(.horizontal, 22)
             .padding(.bottom, 14)
 
-            ScrollView(showsIndicators: false) {
-                VStack(spacing: 0) {
-                    if activeItems.isEmpty && doneItems.isEmpty && !isLoading {
-                        WarmEmptyState(
-                            title: "List is empty",
-                            systemImage: list.icon ?? "list.bullet",
-                            description: "Add items above to get started"
-                        )
-                    }
+            if list.isGrocery {
+                groceryContent
+            } else {
+                flatListContent
+            }
+        }
+        .task(id: list.id) { await loadItems() }
+    }
 
-                    // Active items
-                    if !activeItems.isEmpty {
+    // MARK: - Flat List with Drag Reorder
+
+    private var flatListContent: some View {
+        List {
+            if activeItems.isEmpty && doneItems.isEmpty && !isLoading {
+                WarmEmptyState(
+                    title: "List is empty",
+                    systemImage: list.icon ?? "list.bullet",
+                    description: "Add items above to get started"
+                )
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
+            }
+
+            if !activeItems.isEmpty {
+                Section {
+                    ForEach(activeItems) { item in
+                        itemRowContent(item)
+                            .listRowBackground(WarmPalette.cardSurface)
+                    }
+                    .onMove(perform: moveItems)
+                }
+            }
+
+            if !doneItems.isEmpty {
+                Section {
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.2)) { showCompleted.toggle() }
+                    } label: {
+                        HStack {
+                            Text("Completed")
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundStyle(WarmPalette.ink3)
+                            Text("\(doneItems.count)")
+                                .font(.system(size: 12, weight: .bold))
+                                .foregroundStyle(WarmPalette.ink4)
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundStyle(WarmPalette.ink4)
+                                .rotationEffect(.degrees(showCompleted ? 90 : 0))
+                        }
+                    }
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
+
+                    if showCompleted {
+                        ForEach(doneItems) { item in
+                            itemRowContent(item)
+                                .listRowBackground(WarmPalette.cardSurface.opacity(0.6))
+                        }
+                    }
+                }
+            }
+        }
+        .listStyle(.plain)
+        .scrollContentBackground(.hidden)
+        .environment(\.editMode, .constant(.active))
+    }
+
+    // MARK: - Grocery Grouped (ScrollView, no reorder)
+
+    private var groceryContent: some View {
+        ScrollView(showsIndicators: false) {
+            VStack(spacing: 0) {
+                if activeItems.isEmpty && doneItems.isEmpty && !isLoading {
+                    WarmEmptyState(
+                        title: "List is empty",
+                        systemImage: list.icon ?? "list.bullet",
+                        description: "Add items above to get started"
+                    )
+                }
+
+                ForEach(categorizedActiveItems, id: \.category) { group in
+                    VStack(spacing: 0) {
+                        HStack(spacing: 8) {
+                            Image(systemName: categoryIcon(group.category))
+                                .font(.system(size: 12))
+                                .foregroundStyle(TabAccent.home.color)
+                            Text(group.category)
+                                .font(.system(size: 13, weight: .bold))
+                                .foregroundStyle(WarmPalette.ink2)
+                            Text("\(group.items.count)")
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundStyle(WarmPalette.ink4)
+                            Spacer()
+                        }
+                        .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
+                        .padding(.top, 10)
+                        .padding(.bottom, 4)
+
                         VStack(spacing: 0) {
-                            ForEach(Array(activeItems.enumerated()), id: \.element.id) { index, item in
+                            ForEach(Array(group.items.enumerated()), id: \.element.id) { index, item in
                                 if index > 0 { GlassDivider() }
-                                ListItemRow(item: item) {
-                                    Task { await toggleItem(item.id) }
-                                } onDelete: {
-                                    Task { await deleteItem(item.id) }
-                                }
+                                groceryItemRow(item)
+                            }
+                        }
+                        .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
+                        .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
+                        .padding(.bottom, 8)
+                    }
+                }
+
+                // Completed section
+                if !doneItems.isEmpty {
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.2)) { showCompleted.toggle() }
+                    } label: {
+                        HStack {
+                            Text("Completed")
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundStyle(WarmPalette.ink3)
+                            Text("\(doneItems.count)")
+                                .font(.system(size: 12, weight: .bold))
+                                .foregroundStyle(WarmPalette.ink4)
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundStyle(WarmPalette.ink4)
+                                .rotationEffect(.degrees(showCompleted ? 90 : 0))
+                        }
+                        .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
+                        .padding(.bottom, 6)
+                    }
+                    .buttonStyle(.plain)
+
+                    if showCompleted {
+                        VStack(spacing: 0) {
+                            ForEach(Array(doneItems.enumerated()), id: \.element.id) { index, item in
+                                if index > 0 { GlassDivider() }
+                                groceryItemRow(item)
                             }
                         }
                         .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
                         .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
                         .padding(.bottom, 14)
-                    }
-
-                    // Completed items — collapsed by default
-                    if !doneItems.isEmpty {
-                        Button {
-                            withAnimation(.easeInOut(duration: 0.2)) { showCompleted.toggle() }
-                        } label: {
-                            HStack {
-                                Text("Completed")
-                                    .font(.system(size: 13, weight: .semibold))
-                                    .foregroundStyle(WarmPalette.ink3)
-                                Text("\(doneItems.count)")
-                                    .font(.system(size: 12, weight: .bold))
-                                    .foregroundStyle(WarmPalette.ink4)
-                                Spacer()
-                                Image(systemName: "chevron.right")
-                                    .font(.system(size: 12, weight: .semibold))
-                                    .foregroundStyle(WarmPalette.ink4)
-                                    .rotationEffect(.degrees(showCompleted ? 90 : 0))
-                            }
-                            .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
-                            .padding(.bottom, 6)
-                        }
-                        .buttonStyle(.plain)
-
-                        if showCompleted {
-                            VStack(spacing: 0) {
-                                ForEach(Array(doneItems.enumerated()), id: \.element.id) { index, item in
-                                    if index > 0 { GlassDivider() }
-                                    ListItemRow(item: item) {
-                                        Task { await toggleItem(item.id) }
-                                    } onDelete: {
-                                        Task { await deleteItem(item.id) }
-                                    }
-                                }
-                            }
-                            .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
-                            .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
-                            .padding(.bottom, 14)
-                            .opacity(0.6)
-                        }
+                        .opacity(0.6)
                     }
                 }
-                .padding(.bottom, DesignTokens.Spacing.bottomBuffer)
+            }
+            .padding(.bottom, DesignTokens.Spacing.bottomBuffer)
+        }
+    }
+
+    // MARK: - Item Row (used in List for flat lists)
+
+    @ViewBuilder
+    private func itemRowContent(_ item: APIService.ListItemResponse) -> some View {
+        let isEditing = editingItemId == item.id
+        HStack(spacing: 12) {
+            Button {
+                Task { await toggleItem(item.id) }
+            } label: {
+                Image(systemName: item.isDone ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 22))
+                    .foregroundStyle(item.isDone ? WarmPalette.good : WarmPalette.ink4)
+            }
+            .buttonStyle(.plain)
+
+            if isEditing {
+                TextField("Item name", text: $editingText)
+                    .font(.system(size: 15))
+                    .foregroundStyle(WarmPalette.ink1)
+                    .focused($isEditFocused)
+                    .onSubmit { commitEdit(item) }
+            } else {
+                Text(item.title)
+                    .font(.system(size: 15))
+                    .foregroundStyle(item.isDone ? WarmPalette.ink3 : WarmPalette.ink1)
+                    .strikethrough(item.isDone)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        guard !item.isDone else { return }
+                        editingItemId = item.id
+                        editingText = item.title
+                        isEditFocused = true
+                    }
+            }
+
+            if isEditing {
+                Button { commitEdit(item) } label: {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 20))
+                        .foregroundStyle(WarmPalette.good)
+                }
+                .buttonStyle(.plain)
+                Button { editingItemId = nil } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 20))
+                        .foregroundStyle(WarmPalette.ink4)
+                }
+                .buttonStyle(.plain)
             }
         }
-        .task(id: list.id) { await loadItems() }
+        .contextMenu {
+            if !item.isDone {
+                Button {
+                    editingItemId = item.id
+                    editingText = item.title
+                    isEditFocused = true
+                } label: {
+                    Label("Edit", systemImage: "pencil")
+                }
+            }
+            Button(role: .destructive) {
+                Task { await deleteItem(item.id) }
+            } label: {
+                Label("Delete", systemImage: "trash")
+            }
+        }
     }
+
+    // MARK: - Grocery Item Row (used in ScrollView for grocery lists)
+
+    @ViewBuilder
+    private func groceryItemRow(_ item: APIService.ListItemResponse) -> some View {
+        let isEditing = editingItemId == item.id
+        HStack(spacing: 12) {
+            Button {
+                Task { await toggleItem(item.id) }
+            } label: {
+                Image(systemName: item.isDone ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 22))
+                    .foregroundStyle(item.isDone ? WarmPalette.good : WarmPalette.ink4)
+            }
+
+            if isEditing {
+                TextField("Item name", text: $editingText)
+                    .font(.system(size: 15))
+                    .foregroundStyle(WarmPalette.ink1)
+                    .focused($isEditFocused)
+                    .onSubmit { commitEdit(item) }
+            } else {
+                Text(item.title)
+                    .font(.system(size: 15))
+                    .foregroundStyle(item.isDone ? WarmPalette.ink3 : WarmPalette.ink1)
+                    .strikethrough(item.isDone)
+                    .onTapGesture {
+                        guard !item.isDone else { return }
+                        editingItemId = item.id
+                        editingText = item.title
+                        isEditFocused = true
+                    }
+            }
+
+            Spacer()
+
+            if isEditing {
+                Button { commitEdit(item) } label: {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 20))
+                        .foregroundStyle(WarmPalette.good)
+                }
+                Button { editingItemId = nil } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 20))
+                        .foregroundStyle(WarmPalette.ink4)
+                }
+            } else if let by = item.added_by, !by.isEmpty, !item.isDone {
+                Text(by)
+                    .font(.system(size: 11))
+                    .foregroundStyle(WarmPalette.ink4)
+            }
+        }
+        .padding(.vertical, 12)
+        .padding(.horizontal, 14)
+        .contentShape(Rectangle())
+        .contextMenu {
+            if !item.isDone {
+                Button {
+                    editingItemId = item.id
+                    editingText = item.title
+                    isEditFocused = true
+                } label: {
+                    Label("Edit", systemImage: "pencil")
+                }
+            }
+            Button(role: .destructive) {
+                Task { await deleteItem(item.id) }
+            } label: {
+                Label("Delete", systemImage: "trash")
+            }
+        }
+    }
+
+    // MARK: - Actions
 
     private func loadItems() async {
         isLoading = true
@@ -330,11 +586,33 @@ struct ListDetailSection: View {
     }
 
     private func toggleItem(_ id: Int) async {
+        guard let idx = items.firstIndex(where: { $0.id == id }) else { return }
+        let wasDone = items[idx].isDone
+
+        // Keep item in its current section during animation
+        if !wasDone {
+            recentlyToggledIds.insert(id)
+        }
+
+        // Flip the is_done flag so checkmark + strikethrough appear
+        withAnimation(.easeInOut(duration: 0.2)) {
+            items[idx].is_done = wasDone ? 0 : 1
+        }
+
+        // Pause so user sees the visual feedback before item moves
+        if !wasDone {
+            try? await Task.sleep(for: .milliseconds(700))
+        }
+
+        // Release from hold — item moves to correct section
+        recentlyToggledIds.remove(id)
+
         do {
             try await api.toggleListItem(id: id)
             await loadItems()
         } catch {
             guard !error.isCancellation else { return }
+            await loadItems()
         }
     }
 
@@ -346,39 +624,30 @@ struct ListDetailSection: View {
             guard !error.isCancellation else { return }
         }
     }
-}
 
-// MARK: - List Item Row
-
-struct ListItemRow: View {
-    let item: APIService.ListItemResponse
-    let onToggle: () -> Void
-    let onDelete: () -> Void
-
-    var body: some View {
-        HStack(spacing: 12) {
-            Button(action: onToggle) {
-                Image(systemName: item.isDone ? "checkmark.circle.fill" : "circle")
-                    .font(.system(size: 22))
-                    .foregroundStyle(item.isDone ? WarmPalette.good : WarmPalette.ink4)
-            }
-            Text(item.title)
-                .font(.system(size: 15))
-                .foregroundStyle(item.isDone ? WarmPalette.ink3 : WarmPalette.ink1)
-                .strikethrough(item.isDone)
-            Spacer()
-            if let by = item.added_by, !by.isEmpty {
-                Text(by)
-                    .font(.system(size: 11))
-                    .foregroundStyle(WarmPalette.ink4)
+    private func commitEdit(_ item: APIService.ListItemResponse) {
+        let trimmed = editingText.trimmingCharacters(in: .whitespaces)
+        editingItemId = nil
+        guard !trimmed.isEmpty, trimmed != item.title else { return }
+        Task {
+            do {
+                try await api.updateListItem(id: item.id, title: trimmed)
+                await loadItems()
+            } catch {
+                guard !error.isCancellation else { return }
             }
         }
-        .padding(.vertical, 12)
-        .padding(.horizontal, 14)
-        .swipeActions(edge: .trailing) {
-            Button(role: .destructive, action: onDelete) {
-                Label("Delete", systemImage: "trash")
-            }
+    }
+
+    private func moveItems(from source: IndexSet, to destination: Int) {
+        var active = activeItems
+        active.move(fromOffsets: source, toOffset: destination)
+        // Update local state immediately
+        items = active + doneItems
+        // Persist to server
+        let orderedIds = active.map(\.id)
+        Task {
+            try? await api.reorderListItems(listId: list.id, orderedIds: orderedIds)
         }
     }
 }
@@ -391,6 +660,7 @@ struct NewListSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var name = ""
     @State private var selectedIcon = "list.bullet"
+    @State private var isGroceryList = false
 
     private let icons = [
         ("list.bullet", "General"),
@@ -409,6 +679,28 @@ struct NewListSheet: View {
                 Section("List Name") {
                     TextField("e.g. Grocery, Camping Trip, Spring Cleaning", text: $name)
                 }
+
+                Section {
+                    Toggle(isOn: $isGroceryList) {
+                        HStack(spacing: 10) {
+                            Image(systemName: "cart.fill")
+                                .font(.system(size: 16))
+                                .foregroundStyle(TabAccent.home.color)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Grocery List")
+                                    .font(.system(size: 15, weight: .medium))
+                                Text("Auto-sort items into categories like Produce, Dairy, Meat")
+                                    .font(.system(size: 12))
+                                    .foregroundStyle(WarmPalette.ink3)
+                            }
+                        }
+                    }
+                    .tint(TabAccent.home.color)
+                    .onChange(of: isGroceryList) {
+                        if isGroceryList { selectedIcon = "cart.fill" }
+                    }
+                }
+
                 Section("Icon") {
                     LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 4), spacing: 12) {
                         ForEach(icons, id: \.0) { icon, label in
@@ -449,7 +741,11 @@ struct NewListSheet: View {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Create") {
                         Task {
-                            let _ = try? await api.createList(["name": name, "icon": selectedIcon])
+                            var body: [String: Any] = ["name": name, "icon": selectedIcon]
+                            if isGroceryList {
+                                body["list_type"] = "grocery"
+                            }
+                            let _ = try? await api.createList(body)
                             await onComplete()
                             dismiss()
                         }
