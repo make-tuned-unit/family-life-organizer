@@ -3040,7 +3040,23 @@ app.delete('/api/lists/:id', requireAuth, async (req, res) => {
 app.get('/api/lists/:id/items', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
+    // Check if this is a grocery list and backfill missing categories
+    const list = await new Promise((resolve, reject) => {
+      db.db.get('SELECT name, list_type FROM lists WHERE id = ?', [req.params.id], (err, row) => err ? reject(err) : resolve(row));
+    });
+    const isGrocery = list && (
+      list.list_type === 'grocery' ||
+      ['groceries', 'grocery', 'costco', 'walmart'].includes((list.name || '').toLowerCase())
+    );
     const items = await db.getListItems(req.params.id);
+    if (isGrocery) {
+      for (const item of items) {
+        if (!item.category) {
+          item.category = FamilyDB.categorizeGroceryItem(item.title);
+          db.db.run('UPDATE list_items SET category = ? WHERE id = ?', [item.category, item.id]);
+        }
+      }
+    }
     res.json(items);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -3055,11 +3071,19 @@ app.post('/api/lists/:id/items', requireAuth, async (req, res) => {
     const userName = req.session.user?.name || req.session.user?.username;
     // Auto-categorize if the parent list is a grocery list
     const list = await new Promise((resolve, reject) => {
-      db.db.get('SELECT list_type FROM lists WHERE id = ?', [req.params.id], (err, row) => err ? reject(err) : resolve(row));
+      db.db.get('SELECT name, list_type FROM lists WHERE id = ?', [req.params.id], (err, row) => err ? reject(err) : resolve(row));
     });
-    const category = (list && list.list_type === 'grocery')
+    const isGrocery = list && (
+      list.list_type === 'grocery' ||
+      ['groceries', 'grocery', 'costco', 'walmart'].includes((list.name || '').toLowerCase())
+    );
+    const category = isGrocery
       ? FamilyDB.categorizeGroceryItem(req.body.title)
       : null;
+    // Auto-fix list_type if it wasn't set
+    if (isGrocery && list.list_type !== 'grocery') {
+      db.db.run("UPDATE lists SET list_type = 'grocery' WHERE id = ?", [req.params.id]);
+    }
     const result = await db.addListItem({ list_id: req.params.id, title: req.body.title, added_by: userName, category });
     res.json({ success: true, id: result.id, category });
   } catch (err) {
@@ -3088,10 +3112,14 @@ app.put('/api/lists/items/:id', requireAuth, async (req, res) => {
     // Re-categorize if parent list is grocery type
     if (req.body.title) {
       const item = await new Promise((resolve, reject) => {
-        db.db.get('SELECT li.list_id, l.list_type FROM list_items li JOIN lists l ON l.id = li.list_id WHERE li.id = ?',
+        db.db.get('SELECT li.list_id, l.list_type, l.name as list_name FROM list_items li JOIN lists l ON l.id = li.list_id WHERE li.id = ?',
           [req.params.id], (err, row) => err ? reject(err) : resolve(row));
       });
-      if (item && item.list_type === 'grocery') {
+      const isGrocery = item && (
+        item.list_type === 'grocery' ||
+        ['groceries', 'grocery', 'costco', 'walmart'].includes((item.list_name || '').toLowerCase())
+      );
+      if (isGrocery) {
         updates.category = FamilyDB.categorizeGroceryItem(req.body.title);
       }
     }
