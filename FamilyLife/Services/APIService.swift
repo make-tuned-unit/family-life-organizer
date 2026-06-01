@@ -780,11 +780,13 @@ final class APIService {
         var icon: String?
         var color: String?
         var pinned: Int?
+        var list_type: String?
         var active_count: Int?
         var total_count: Int?
         var created_at: String?
 
         var isPinned: Bool { (pinned ?? 0) != 0 }
+        var isGrocery: Bool { list_type == "grocery" }
     }
 
     struct ListItemResponse: Codable, Identifiable {
@@ -794,6 +796,7 @@ final class APIService {
         var is_done: Int  // 0 or 1
         var sort_order: Int?
         var added_by: String?
+        var category: String?
         var created_at: String?
         var completed_at: String?
 
@@ -834,6 +837,14 @@ final class APIService {
 
     func toggleListItem(id: Int) async throws {
         let _: SuccessResponse = try await post("/api/lists/items/\(id)/toggle", body: [:] as [String: String])
+    }
+
+    func updateListItem(id: Int, title: String) async throws {
+        let _: SuccessResponse = try await put("/api/lists/items/\(id)", body: ["title": title])
+    }
+
+    func reorderListItems(listId: Int, orderedIds: [Int]) async throws {
+        let _: SuccessResponse = try await post("/api/lists/\(listId)/reorder", body: ["ordered_ids": orderedIds])
     }
 
     func deleteListItem(id: Int) async throws {
