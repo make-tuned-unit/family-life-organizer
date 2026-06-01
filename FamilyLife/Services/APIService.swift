@@ -786,7 +786,11 @@ final class APIService {
         var created_at: String?
 
         var isPinned: Bool { (pinned ?? 0) != 0 }
-        var isGrocery: Bool { list_type == "grocery" }
+        var isGrocery: Bool {
+            if list_type == "grocery" { return true }
+            let n = name.lowercased()
+            return n == "groceries" || n == "grocery" || n == "costco" || n == "walmart"
+        }
     }
 
     struct ListItemResponse: Codable, Identifiable {
