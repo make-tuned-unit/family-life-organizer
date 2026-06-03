@@ -14,7 +14,7 @@ struct AddReceiptView: View {
     @State private var isSaving = false
     @State private var error: String?
 
-    private let categories = ["Groceries", "Dining Out", "Gas/Transport", "Household", "Health", "Entertainment", "Kids", "Other"]
+    private let categories = ["Groceries", "Dining Out", "Gas/Transport", "Household", "Health", "Pets", "Entertainment", "Kids", "Other"]
 
     var body: some View {
         NavigationStack {
