@@ -35,7 +35,11 @@ const patterns = {
   grocery: /grocery|supermarket|walmart|target|costco|loblaws|sobeys/i,
   dining: /restaurant|cafe|coffee|mcdonalds|starbucks|tim hortons/i,
   gas: /gas|petro|shell|esso|ultramar/i,
-  pharmacy: /pharmacy|shoppers|rexall|drug/i
+  pharmacy: /pharmacy|shoppers|rexall|drug/i,
+  household: /home\s?depot|lowes|ikea|canadian tire|dollar|hardware/i,
+  pets: /pet|vet|veterinar|petsmart|petcetera|animal hospital/i,
+  entertainment: /cinema|movie|theatre|theater|netflix|spotify|ticket|concert|amusement/i,
+  kids: /toy|school|daycare|childcare|children|youth/i
 };
 
 function guessCategory(text) {
@@ -44,6 +48,10 @@ function guessCategory(text) {
   if (patterns.dining.test(lower)) return 'Dining Out';
   if (patterns.gas.test(lower)) return 'Gas/Transport';
   if (patterns.pharmacy.test(lower)) return 'Health';
+  if (patterns.household.test(lower)) return 'Household';
+  if (patterns.pets.test(lower)) return 'Pets';
+  if (patterns.entertainment.test(lower)) return 'Entertainment';
+  if (patterns.kids.test(lower)) return 'Kids';
   return 'Other';
 }
 
