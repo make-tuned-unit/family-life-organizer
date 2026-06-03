@@ -977,9 +977,14 @@ function renderDashboard(user, summary, groceries, tasksByCategory, appointments
               <select class="form-select">
                 <option>Select category...</option>
                 <option>Groceries</option>
-                <option>Dining</option>
-                <option>Gas</option>
+                <option>Dining Out</option>
+                <option>Gas/Transport</option>
                 <option>Household</option>
+                <option>Health</option>
+                <option>Pets</option>
+                <option>Entertainment</option>
+                <option>Kids</option>
+                <option>Other</option>
               </select>
               <button class="btn btn-primary">Add Receipt</button>
             </div>
@@ -1633,7 +1638,15 @@ app.post('/api/receipts/save', requireAuth, async (req, res) => {
     const username = req.session.user?.username || 'jesse';
 
     // Normalize date to YYYY-MM-DD for strftime compatibility
-    const normalizedDate = normalizeDate(date);
+    // If the AI returned a date more than 60 days in the past or in the future, use today
+    let normalizedDate = normalizeDate(date);
+    const receiptDate = new Date(normalizedDate);
+    const now = new Date();
+    const diffDays = Math.abs((now - receiptDate) / (1000 * 60 * 60 * 24));
+    if (diffDays > 60) {
+      console.log(`[receipt-save] AI date "${date}" (${normalizedDate}) is ${Math.round(diffDays)} days off — using today`);
+      normalizedDate = now.toISOString().split('T')[0];
+    }
 
     // Ensure budget category exists (auto-create if new)
     if (category) {
@@ -1650,6 +1663,17 @@ app.post('/api/receipts/save', requireAuth, async (req, res) => {
       processed_by: 'scan',
       added_by: username
     });
+
+    console.log(`[receipt-save] id=${receipt.id} amount=${total} merchant="${merchant}" date=${normalizedDate} category="${category}" by=${username}`);
+
+    // Verify the receipt was actually written
+    const verify = await new Promise((resolve, reject) => {
+      db.db.get('SELECT id, amount, date, category FROM receipts WHERE id = ?', [receipt.id], (err, row) => err ? reject(err) : resolve(row));
+    });
+    if (!verify) {
+      console.error(`[receipt-save] VERIFICATION FAILED — receipt id=${receipt.id} not found after insert`);
+      return res.status(500).json({ error: 'Receipt insert verification failed' });
+    }
 
     res.json({ success: true, id: receipt.id, receipt_id: receipt.id });
   } catch (err) {
