@@ -262,7 +262,10 @@ struct RivalryDetailView: View {
 
     private func fetchHealthSteps() async {
         let authorized = await healthKit.requestStepAuthorization()
-        guard authorized else { return }
+        guard authorized else {
+            healthSteps = 0
+            return
+        }
 
         let startDate = ISO8601DateFormatter.flexible.date(from: currentRivalry.start_date)
             ?? DateFormatter.isoDate.date(from: currentRivalry.start_date)
