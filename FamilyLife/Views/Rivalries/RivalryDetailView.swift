@@ -127,12 +127,12 @@ struct RivalryDetailView: View {
                 .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
 
                 if currentRivalry.status == RivalryStatus.active.rawValue {
-                    // HealthKit auto-sync for steps challenges
-                    if currentRivalry.challengeType == .steps && healthSteps == nil {
+                    // HealthKit auto-sync for steps/stairs challenges
+                    if currentRivalry.challengeType.isHealthKitSynced && healthSteps == nil {
                         HStack {
                             ProgressView()
                                 .controlSize(.small)
-                            Text("Loading steps from Apple Health...")
+                            Text("Loading \(currentRivalry.challengeType.healthMetricLabel) from Apple Health...")
                                 .font(.system(size: 13))
                                 .foregroundStyle(WarmPalette.ink3)
                         }
@@ -142,14 +142,14 @@ struct RivalryDetailView: View {
                         .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
                     }
 
-                    if currentRivalry.challengeType == .steps, let hkSteps = healthSteps {
+                    if currentRivalry.challengeType.isHealthKitSynced, let hkSteps = healthSteps {
                         let myTotal = myLoggedTotal
                         let delta = hkSteps - myTotal
                         VStack(spacing: 8) {
                             HStack {
                                 Image(systemName: "heart.fill")
                                     .foregroundStyle(.red)
-                                Text("Apple Health: \(Int(hkSteps)) steps")
+                                Text("Apple Health: \(Int(hkSteps)) \(currentRivalry.challengeType.healthMetricLabel)")
                                     .font(.system(size: 14, weight: .semibold))
                                 Spacer()
                                 if delta > 0 {
@@ -162,13 +162,13 @@ struct RivalryDetailView: View {
                                 Button {
                                     Task { await syncStepsFromHealth(delta: delta) }
                                 } label: {
-                                    Label(isSyncingSteps ? "Syncing..." : "Sync Steps from Health", systemImage: "arrow.triangle.2.circlepath")
+                                    Label(isSyncingSteps ? "Syncing..." : "Sync from Health", systemImage: "arrow.triangle.2.circlepath")
                                         .frame(maxWidth: .infinity)
                                 }
                                 .buttonStyle(.flPrimary(tint: AccentTheme.ocean.color))
                                 .disabled(isSyncingSteps)
                             } else {
-                                Text("Steps are up to date")
+                                Text("\(currentRivalry.challengeType.displayName) are up to date")
                                     .font(.system(size: 12))
                                     .foregroundStyle(WarmPalette.ink3)
                             }
@@ -178,8 +178,8 @@ struct RivalryDetailView: View {
                         .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
                     }
 
-                    // For steps challenges, HealthKit sync replaces manual logging
-                    if currentRivalry.challengeType != .steps {
+                    // For HealthKit challenges, sync replaces manual logging
+                    if !currentRivalry.challengeType.isHealthKitSynced {
                         HStack(spacing: 12) {
                             Button {
                                 showingLogProgress = true
@@ -235,9 +235,9 @@ struct RivalryDetailView: View {
         }
         .task {
             await loadEntries()
-            if currentRivalry.challengeType == .steps {
-                await fetchHealthSteps()
-                // Auto-sync steps from HealthKit without requiring manual tap
+            if currentRivalry.challengeType.isHealthKitSynced {
+                await fetchHealthData()
+                // Auto-sync from HealthKit without requiring manual tap
                 if let hkSteps = healthSteps {
                     let delta = hkSteps - myLoggedTotal
                     if delta > 0 {
@@ -260,8 +260,13 @@ struct RivalryDetailView: View {
         return entries.filter { $0.member_name.localizedCaseInsensitiveCompare(myName) == .orderedSame }.reduce(0) { $0 + $1.value }
     }
 
-    private func fetchHealthSteps() async {
-        let authorized = await healthKit.requestStepAuthorization()
+    private func fetchHealthData() async {
+        let authorized: Bool
+        if currentRivalry.challengeType == .stairs {
+            authorized = await healthKit.requestFlightsAuthorization()
+        } else {
+            authorized = await healthKit.requestStepAuthorization()
+        }
         guard authorized else {
             healthSteps = 0
             return
@@ -272,8 +277,11 @@ struct RivalryDetailView: View {
             ?? Date()
         let endDate = currentRivalry.endDate ?? Date()
 
-        let steps = await healthKit.fetchSteps(from: startDate, to: min(endDate, Date()))
-        healthSteps = steps
+        if currentRivalry.challengeType == .stairs {
+            healthSteps = await healthKit.fetchFlightsClimbed(from: startDate, to: min(endDate, Date()))
+        } else {
+            healthSteps = await healthKit.fetchSteps(from: startDate, to: min(endDate, Date()))
+        }
     }
 
     private func syncStepsFromHealth(delta: Double) async {
@@ -286,7 +294,7 @@ struct RivalryDetailView: View {
                 "is_verified": true
             ])
             await loadEntries()
-            await fetchHealthSteps()
+            await fetchHealthData()
         } catch {
             guard !error.isCancellation else { return }
             self.error = error.localizedDescription
@@ -296,7 +304,7 @@ struct RivalryDetailView: View {
 
     private var challengeColor: Color {
         switch currentRivalry.challengeType {
-        case .steps: AccentTheme.ocean.color
+        case .steps, .stairs: AccentTheme.ocean.color
         case .workout, .pushups, .squats, .situps, .plank: AccentTheme.saffron.color
         case .running: AccentTheme.ocean.color
         case .habit: WarmPalette.good
@@ -315,7 +323,7 @@ struct RivalryDetailView: View {
 
     private func autoCompleteRivalry() async {
         // Auto-sync steps first if applicable
-        if currentRivalry.challengeType == .steps, let hkSteps = healthSteps {
+        if currentRivalry.challengeType.isHealthKitSynced, let hkSteps = healthSteps {
             let delta = hkSteps - myLoggedTotal
             if delta > 0 {
                 await syncStepsFromHealth(delta: delta)

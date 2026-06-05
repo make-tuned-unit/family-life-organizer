@@ -60,6 +60,7 @@ struct LogProgressView: View {
     private var placeholder: String {
         switch rivalry.challengeType {
         case .steps: "Steps"
+        case .stairs: "Flights climbed"
         case .workout: "Workouts completed"
         case .pushups: "Push-ups"
         case .squats: "Squats"
@@ -74,6 +75,7 @@ struct LogProgressView: View {
     private var unitLabel: String {
         switch rivalry.challengeType {
         case .steps: "steps"
+        case .stairs: "flights"
         case .workout: "workouts"
         case .pushups: "push-ups"
         case .squats: "squats"
