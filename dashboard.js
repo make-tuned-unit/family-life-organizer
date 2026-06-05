@@ -2284,14 +2284,19 @@ app.post('/api/rivalries/:id/entries', requireAuth, async (req, res) => {
 
         const loggerName = entry.member_name;
         const ct = (rivalry.challenge_type || 'challenge').replace(/_/g, ' ');
+        const nameMatch = (a, b) => {
+          const aL = a.toLowerCase(), bL = b.toLowerCase();
+          return aL === bL || aL.startsWith(bL + ' ') || bL.startsWith(aL + ' ');
+        };
+        const findTotal = (name) => totals.find(t => nameMatch(t.member_name, name))?.total || 0;
 
         for (const pName of participants) {
-          if (pName.toLowerCase() === loggerName.toLowerCase()) continue;
+          if (nameMatch(pName, loggerName)) continue;
           const pId = await db.getUserIdByName(pName);
           if (!pId) continue;
 
-          const myTotal = totals.find(t => t.member_name.toLowerCase() === pName.toLowerCase())?.total || 0;
-          const theirTotal = totals.find(t => t.member_name.toLowerCase() === loggerName.toLowerCase())?.total || 0;
+          const myTotal = findTotal(pName);
+          const theirTotal = findTotal(loggerName);
           const diff = Math.abs(myTotal - theirTotal);
           const fmtDiff = fmt(diff);
 

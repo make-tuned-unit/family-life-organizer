@@ -1059,9 +1059,16 @@ class FamilyDB {
 
   getUserIdByName(name) {
     return new Promise((resolve, reject) => {
+      // Try exact match first, then first-name prefix match (e.g. "Sophie Chiasson" finds user "Sophie")
       this.db.get('SELECT id FROM users WHERE name = ? COLLATE NOCASE', [name], (err, row) => {
-        if (err) reject(err);
-        else resolve(row?.id || null);
+        if (err) return reject(err);
+        if (row) return resolve(row.id);
+        const firstName = name.split(' ')[0];
+        if (firstName === name) return resolve(null);
+        this.db.get('SELECT id FROM users WHERE name = ? COLLATE NOCASE', [firstName], (err2, row2) => {
+          if (err2) reject(err2);
+          else resolve(row2?.id || null);
+        });
       });
     });
   }
@@ -1080,13 +1087,20 @@ class FamilyDB {
           try { participants = JSON.parse(rivalry.participants || '[]'); } catch { participants = []; }
           if (!participants.length) participants = [rivalry.initiator_name, rivalry.opponent_name];
 
+          // Match entry names to participant names, handling "Sophie" vs "Sophie Chiasson"
+          const nameMatch = (a, b) => {
+            const aL = a.toLowerCase(), bL = b.toLowerCase();
+            return aL === bL || aL.startsWith(bL + ' ') || bL.startsWith(aL + ' ');
+          };
+          const findTotal = (name) => totals.find(t => nameMatch(t.member_name, name))?.total || 0;
+
           const scores = participants.map(name => ({
             name,
-            total: totals.find(t => t.member_name.toLowerCase() === name.toLowerCase())?.total || 0
+            total: findTotal(name)
           })).sort((a, b) => b.total - a.total);
 
-          const iTotal = totals.find(t => t.member_name.toLowerCase() === rivalry.initiator_name.toLowerCase())?.total || 0;
-          const oTotal = totals.find(t => t.member_name.toLowerCase() === rivalry.opponent_name.toLowerCase())?.total || 0;
+          const iTotal = findTotal(rivalry.initiator_name);
+          const oTotal = findTotal(rivalry.opponent_name);
 
           if (rivalry.status === 'completed') {
             return resolve({ rivalry, initiator_total: iTotal, opponent_total: oTotal, scores, winner_name: rivalry.winner_name, already_completed: true });
