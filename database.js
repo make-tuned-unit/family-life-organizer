@@ -973,6 +973,22 @@ class FamilyDB {
     });
   }
 
+  getRivalryById(id) {
+    return new Promise((resolve, reject) => {
+      this.db.get('SELECT * FROM rivalries WHERE id = ?', [id], (err, row) => err ? reject(err) : resolve(row));
+    });
+  }
+
+  getRivalryEntryTotals(rivalryId) {
+    return new Promise((resolve, reject) => {
+      this.db.all(
+        'SELECT member_name, SUM(value) as total FROM rivalry_entries WHERE rivalry_id = ? GROUP BY member_name',
+        [rivalryId],
+        (err, rows) => err ? reject(err) : resolve(rows || [])
+      );
+    });
+  }
+
   getRivalries(filters = {}, userId = null) {
     return new Promise((resolve, reject) => {
       let sql = 'SELECT * FROM rivalries WHERE 1=1';

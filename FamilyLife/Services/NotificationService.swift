@@ -369,6 +369,127 @@ final class NotificationService {
         UserDefaults.standard.set(Array(trimmed), forKey: "notified_feed_keys")
     }
 
+    // MARK: - Rivalry milestone reminders
+
+    /// Schedule local notifications for active rivalry milestones (halfway, 1-day-left, daily nudge at 9am).
+    /// Call whenever rivalries are loaded/refreshed. Idempotent — removes stale rivalry notifications first.
+    func scheduleRivalryMilestones(_ rivalries: [RivalryResponse], myName: String, entriesByRivalry: [Int: [RivalryEntryResponse]]) {
+        // Remove any previously scheduled rivalry reminders
+        UNUserNotificationCenter.current().getPendingNotificationRequests { requests in
+            let ids = requests.filter { $0.identifier.hasPrefix("rivalry-milestone-") }.map(\.identifier)
+            if !ids.isEmpty {
+                UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: ids)
+            }
+        }
+
+        let now = Date()
+        let calendar = Calendar.current
+
+        for rivalry in rivalries {
+            guard rivalry.status == RivalryStatus.active.rawValue || rivalry.status == RivalryStatus.pending.rawValue else { continue }
+            guard let endDate = rivalry.endDate, endDate > now else { continue }
+            let startDate = ISO8601DateFormatter.flexible.date(from: rivalry.start_date)
+                ?? DateFormatter.isoDate.date(from: rivalry.start_date)
+                ?? now
+
+            let entries = entriesByRivalry[rivalry.id] ?? []
+            let myTotal = entries.filter { $0.member_name.localizedCaseInsensitiveCompare(myName) == .orderedSame }.reduce(0.0) { $0 + $1.value }
+            let opponents = rivalry.participantNames.filter { $0.localizedCaseInsensitiveCompare(myName) != .orderedSame }
+            let topOpponent = opponents.max { a, b in
+                let aTotal = entries.filter { $0.member_name.localizedCaseInsensitiveCompare(a) == .orderedSame }.reduce(0.0) { $0 + $1.value }
+                let bTotal = entries.filter { $0.member_name.localizedCaseInsensitiveCompare(b) == .orderedSame }.reduce(0.0) { $0 + $1.value }
+                return aTotal < bTotal
+            }
+            let opTotal = topOpponent.map { name in
+                entries.filter { $0.member_name.localizedCaseInsensitiveCompare(name) == .orderedSame }.reduce(0.0) { $0 + $1.value }
+            } ?? 0
+            let opName = topOpponent ?? "your opponent"
+
+            let scoreStatus: String
+            let diff = Int(abs(myTotal - opTotal))
+            if myTotal > opTotal {
+                scoreStatus = "You're ahead by \(diff)!"
+            } else if opTotal > myTotal {
+                scoreStatus = "\(opName) leads by \(diff) — time to catch up!"
+            } else if myTotal > 0 {
+                scoreStatus = "You're tied with \(opName)!"
+            } else {
+                scoreStatus = "Get moving and take the lead!"
+            }
+
+            // 1) Halfway reminder
+            let totalDuration = endDate.timeIntervalSince(startDate)
+            let halfwayDate = startDate.addingTimeInterval(totalDuration / 2)
+            if halfwayDate > now {
+                scheduleRivalryNotification(
+                    id: "rivalry-milestone-half-\(rivalry.id)",
+                    title: "Halfway through \(rivalry.title)!",
+                    body: scoreStatus,
+                    date: halfwayDate,
+                    rivalryId: rivalry.id
+                )
+            }
+
+            // 2) Last day morning reminder (9am on final day)
+            let lastDayStart = calendar.startOfDay(for: endDate)
+            if let lastMorning = calendar.date(bySettingHour: 9, minute: 0, second: 0, of: lastDayStart),
+               lastMorning > now {
+                scheduleRivalryNotification(
+                    id: "rivalry-milestone-lastday-\(rivalry.id)",
+                    title: "Last day of \(rivalry.title)!",
+                    body: "Final push! \(scoreStatus)",
+                    date: lastMorning,
+                    rivalryId: rivalry.id
+                )
+            }
+
+            // 3) Daily encouragement at 9am (skip today if already past 9am, max 7 days out)
+            let tomorrow = calendar.date(byAdding: .day, value: 1, to: calendar.startOfDay(for: now)) ?? now
+            var nudgeDay = tomorrow
+            var nudgeCount = 0
+            while nudgeDay < endDate && nudgeCount < 7 {
+                // Skip the last day (already has its own notification)
+                if calendar.isDate(nudgeDay, inSameDayAs: lastDayStart) {
+                    nudgeDay = calendar.date(byAdding: .day, value: 1, to: nudgeDay) ?? endDate
+                    continue
+                }
+                if let nudgeTime = calendar.date(bySettingHour: 9, minute: 0, second: 0, of: nudgeDay),
+                   nudgeTime > now {
+                    let daysLeft = calendar.dateComponents([.day], from: nudgeDay, to: endDate).day ?? 0
+                    let messages = [
+                        "\(daysLeft) days left — \(scoreStatus)",
+                        "Keep it up! \(daysLeft) days remaining. \(scoreStatus)",
+                        "Don't let \(opName) get comfortable! \(daysLeft) days to go",
+                        "\(scoreStatus) \(daysLeft) days left to make your move!",
+                    ]
+                    scheduleRivalryNotification(
+                        id: "rivalry-milestone-daily-\(rivalry.id)-\(nudgeCount)",
+                        title: rivalry.title,
+                        body: messages[nudgeCount % messages.count],
+                        date: nudgeTime,
+                        rivalryId: rivalry.id
+                    )
+                }
+                nudgeDay = calendar.date(byAdding: .day, value: 1, to: nudgeDay) ?? endDate
+                nudgeCount += 1
+            }
+        }
+    }
+
+    private func scheduleRivalryNotification(id: String, title: String, body: String, date: Date, rivalryId: Int) {
+        let content = UNMutableNotificationContent()
+        content.title = title
+        content.body = body
+        content.sound = .default
+        content.categoryIdentifier = "SOCIAL"
+        content.userInfo = ["type": "rivalry", "ref_id": rivalryId]
+
+        let comps = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute], from: date)
+        let trigger = UNCalendarNotificationTrigger(dateMatching: comps, repeats: false)
+        let request = UNNotificationRequest(identifier: id, content: content, trigger: trigger)
+        UNUserNotificationCenter.current().add(request)
+    }
+
     // MARK: - Helpers
 
     private func postLocal(title: String, body: String, category: String, userInfo: [String: Any] = [:]) {

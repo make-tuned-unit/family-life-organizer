@@ -147,6 +147,11 @@ struct RivalriesView: View {
                 nextEntries[rivalry.id] = try await api.fetchRivalryEntries(id: rivalry.id)
             }
             entriesByRivalry = nextEntries
+
+            // Schedule local milestone notifications for active rivalries
+            if let myName = auth.currentUser?.name {
+                NotificationService.shared.scheduleRivalryMilestones(fetchedRivalries, myName: myName, entriesByRivalry: nextEntries)
+            }
         } catch {
             guard !error.isCancellation else { return }
             self.error = error.localizedDescription
