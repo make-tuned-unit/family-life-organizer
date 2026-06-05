@@ -22,18 +22,30 @@ struct RivalryDetailView: View {
     }
 
     private var initiatorTotal: Double {
-        entries.filter { $0.member_name.localizedCaseInsensitiveCompare(currentRivalry.initiator_name) == .orderedSame }.reduce(0) { $0 + $1.value }
+        entriesTotal(for: currentRivalry.initiator_name)
     }
 
     private var opponentTotal: Double {
-        entries.filter { $0.member_name.localizedCaseInsensitiveCompare(currentRivalry.opponent_name) == .orderedSame }.reduce(0) { $0 + $1.value }
+        entriesTotal(for: currentRivalry.opponent_name)
     }
 
     private var participantScores: [(name: String, total: Double)] {
         currentRivalry.participantNames.map { name in
-            let total = entries.filter { $0.member_name.localizedCaseInsensitiveCompare(name) == .orderedSame }.reduce(0) { $0 + $1.value }
-            return (name: name, total: total)
+            (name: name, total: entriesTotal(for: name))
         }.sorted { $0.total > $1.total }
+    }
+
+    /// Match entries to a participant name, handling "Sophie" vs "Sophie Chiasson" mismatches
+    private func entriesTotal(for name: String) -> Double {
+        entries.filter { nameMatches($0.member_name, name) }.reduce(0) { $0 + $1.value }
+    }
+
+    private func nameMatches(_ a: String, _ b: String) -> Bool {
+        let aL = a.lowercased(), bL = b.lowercased()
+        if aL == bL { return true }
+        // First-name prefix match: "Sophie" matches "Sophie Chiasson"
+        if aL.hasPrefix(bL + " ") || bL.hasPrefix(aL + " ") { return true }
+        return false
     }
 
     private var isExpired: Bool {
@@ -224,7 +236,7 @@ struct RivalryDetailView: View {
         .navigationTitle(currentRivalry.title)
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $showingLogProgress) {
-            LogProgressView(rivalry: currentRivalry, memberName: auth.currentUser?.name ?? auth.currentUser?.username ?? "Me") {
+            LogProgressView(rivalry: currentRivalry, memberName: myRivalryName) {
                 await loadEntries()
             }
         }
@@ -255,9 +267,28 @@ struct RivalryDetailView: View {
         }
     }
 
+    /// Find the current user's name as it appears in the rivalry (e.g. "Sophie Chiasson" not "Sophie")
+    private var myRivalryName: String {
+        let name = auth.currentUser?.name ?? ""
+        let username = auth.currentUser?.username ?? ""
+        for participant in currentRivalry.participantNames {
+            let pLower = participant.lowercased()
+            // Exact match (case-insensitive)
+            if pLower == name.lowercased() || pLower == username.lowercased() { return participant }
+            // First-name match: "Sophie Chiasson" starts with "Sophie"
+            if !name.isEmpty && pLower.hasPrefix(name.lowercased() + " ") { return participant }
+            if !username.isEmpty && pLower.hasPrefix(username.lowercased() + " ") { return participant }
+        }
+        return name.isEmpty ? username : name
+    }
+
     private var myLoggedTotal: Double {
-        let myName = auth.currentUser?.name ?? auth.currentUser?.username ?? ""
-        return entries.filter { $0.member_name.localizedCaseInsensitiveCompare(myName) == .orderedSame }.reduce(0) { $0 + $1.value }
+        let myName = myRivalryName
+        return entries.filter {
+            $0.member_name.localizedCaseInsensitiveCompare(myName) == .orderedSame
+            || myName.lowercased().hasPrefix($0.member_name.lowercased() + " ")
+            || $0.member_name.lowercased().hasPrefix(myName.lowercased() + " ")
+        }.reduce(0) { $0 + $1.value }
     }
 
     private func fetchHealthData() async {
@@ -288,7 +319,7 @@ struct RivalryDetailView: View {
         isSyncingSteps = true
         do {
             try await api.addRivalryEntry(id: currentRivalry.id, data: [
-                "member_name": auth.currentUser?.name ?? auth.currentUser?.username ?? "Me",
+                "member_name": myRivalryName,
                 "value": delta,
                 "note": "Synced from Apple Health",
                 "is_verified": true
