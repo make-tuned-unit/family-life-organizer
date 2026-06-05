@@ -2,6 +2,7 @@ import Foundation
 
 enum ChallengeType: String, Codable, CaseIterable, Identifiable {
     case steps
+    case stairs
     case workout
     case pushups
     case squats
@@ -16,6 +17,7 @@ enum ChallengeType: String, Codable, CaseIterable, Identifiable {
     var displayName: String {
         switch self {
         case .steps: "Steps"
+        case .stairs: "Stairs"
         case .workout: "Workouts"
         case .pushups: "Push-ups"
         case .squats: "Squats"
@@ -30,6 +32,7 @@ enum ChallengeType: String, Codable, CaseIterable, Identifiable {
     var icon: String {
         switch self {
         case .steps: "figure.walk"
+        case .stairs: "figure.stairs"
         case .workout: "dumbbell.fill"
         case .pushups: "figure.strengthtraining.traditional"
         case .squats: "figure.cooldown"
@@ -44,6 +47,7 @@ enum ChallengeType: String, Codable, CaseIterable, Identifiable {
     var hint: String {
         switch self {
         case .steps: "Who can log the most steps?"
+        case .stairs: "Who can climb the most flights? Syncs from Apple Health."
         case .workout: "Track completed workouts. Each workout counts as 1."
         case .pushups: "Daily push-up count — e.g. 20 per day for a month."
         case .squats: "Daily squat count — set a target and go."
@@ -55,9 +59,18 @@ enum ChallengeType: String, Codable, CaseIterable, Identifiable {
         }
     }
 
+    var isHealthKitSynced: Bool {
+        self == .steps || self == .stairs
+    }
+
+    var healthMetricLabel: String {
+        self == .stairs ? "flights" : "steps"
+    }
+
     var color: String {
         switch self {
         case .steps: "blue"
+        case .stairs: "blue"
         case .workout, .pushups, .squats, .situps, .plank: "orange"
         case .running: "teal"
         case .habit: "green"

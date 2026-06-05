@@ -23,7 +23,19 @@ final class HealthKitManager {
             isAuthorized = true
             return true
         } catch {
-            // HealthKit not available (simulator, missing entitlement, or missing Info.plist key)
+            return false
+        }
+    }
+
+    func requestFlightsAuthorization() async -> Bool {
+        guard let store, isAvailable else { return false }
+        guard let flightsType = HKQuantityType.quantityType(forIdentifier: .flightsClimbed) else { return false }
+
+        do {
+            try await store.requestAuthorization(toShare: Set(), read: Set([flightsType]))
+            isAuthorized = true
+            return true
+        } catch {
             return false
         }
     }
@@ -42,6 +54,25 @@ final class HealthKitManager {
             ) { _, result, _ in
                 let steps = result?.sumQuantity()?.doubleValue(for: .count()) ?? 0
                 continuation.resume(returning: steps)
+            }
+            store.execute(query)
+        }
+    }
+
+    func fetchFlightsClimbed(from startDate: Date, to endDate: Date) async -> Double {
+        guard let store, isAvailable else { return 0 }
+        guard let flightsType = HKQuantityType.quantityType(forIdentifier: .flightsClimbed) else { return 0 }
+
+        let predicate = HKQuery.predicateForSamples(withStart: startDate, end: min(endDate, Date()), options: .strictStartDate)
+
+        return await withCheckedContinuation { continuation in
+            let query = HKStatisticsQuery(
+                quantityType: flightsType,
+                quantitySamplePredicate: predicate,
+                options: .cumulativeSum
+            ) { _, result, _ in
+                let flights = result?.sumQuantity()?.doubleValue(for: .count()) ?? 0
+                continuation.resume(returning: flights)
             }
             store.execute(query)
         }
