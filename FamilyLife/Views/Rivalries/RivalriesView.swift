@@ -172,11 +172,18 @@ struct RivalryCardRemote: View {
     let entries: [RivalryEntryResponse]
 
     private var initiatorTotal: Double {
-        entries.filter { $0.member_name.localizedCaseInsensitiveCompare(rivalry.initiator_name) == .orderedSame }.reduce(0) { $0 + $1.value }
+        entries.filter { nameMatches($0.member_name, rivalry.initiator_name) }.reduce(0) { $0 + $1.value }
     }
 
     private var opponentTotal: Double {
-        entries.filter { $0.member_name.localizedCaseInsensitiveCompare(rivalry.opponent_name) == .orderedSame }.reduce(0) { $0 + $1.value }
+        entries.filter { nameMatches($0.member_name, rivalry.opponent_name) }.reduce(0) { $0 + $1.value }
+    }
+
+    private func nameMatches(_ a: String, _ b: String) -> Bool {
+        let aL = a.lowercased(), bL = b.lowercased()
+        if aL == bL { return true }
+        if aL.hasPrefix(bL + " ") || bL.hasPrefix(aL + " ") { return true }
+        return false
     }
 
     var body: some View {
