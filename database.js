@@ -253,9 +253,16 @@ class FamilyDB {
             [householdId, householdId], function() {
               console.log(`Backfill: updated ${this.changes} rivalries to household ${householdId}`);
             });
-          // No groceries backfill — added_by defaults to 'jesse' for all users,
-          // making it impossible to tell whose items are whose. Users re-add items;
-          // new items get proper group_id from the session.
+          // Fix rivalry entries where member_name is a username instead of display name
+          this.db.run(`UPDATE rivalry_entries SET member_name = (
+            SELECT u.name FROM users u WHERE LOWER(u.username) = LOWER(rivalry_entries.member_name)
+          ) WHERE EXISTS (
+            SELECT 1 FROM users u
+            WHERE LOWER(u.username) = LOWER(rivalry_entries.member_name)
+            AND u.name != rivalry_entries.member_name
+          )`, function() {
+            if (this.changes > 0) console.log(`Backfill: fixed ${this.changes} rivalry entries (username -> display name)`);
+          });
           resolve();
         });
       });
