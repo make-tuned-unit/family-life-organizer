@@ -974,6 +974,9 @@ class FamilyDB {
       if (userId) {
         const uid = parseInt(userId);
         sql += ` AND (group_id IN (SELECT group_id FROM group_members WHERE user_id = ${uid})
+          OR initiator_name = (SELECT name FROM users WHERE id = ${uid})
+          OR opponent_name = (SELECT name FROM users WHERE id = ${uid})
+          OR participants LIKE '%"' || (SELECT name FROM users WHERE id = ${uid}) || '"%'
           OR (group_id IS NULL AND (
             initiator_name IN (
               SELECT u.name FROM users u JOIN group_members gm ON gm.user_id = u.id
@@ -1092,6 +1095,9 @@ class FamilyDB {
     return new Promise((resolve, reject) => {
       const groupFilter = userId
         ? `WHERE (group_id IN (SELECT group_id FROM group_members WHERE user_id = ${parseInt(userId)})
+            OR initiator_name = (SELECT name FROM users WHERE id = ${parseInt(userId)})
+            OR opponent_name = (SELECT name FROM users WHERE id = ${parseInt(userId)})
+            OR participants LIKE '%"' || (SELECT name FROM users WHERE id = ${parseInt(userId)}) || '"%'
             OR (group_id IS NULL AND (initiator_name IN (
               SELECT u.name FROM users u JOIN group_members gm ON gm.user_id = u.id
               JOIN groups g ON g.id = gm.group_id AND g.group_type = 'household'
