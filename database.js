@@ -253,15 +253,39 @@ class FamilyDB {
             [householdId, householdId], function() {
               console.log(`Backfill: updated ${this.changes} rivalries to household ${householdId}`);
             });
-          // Fix rivalry entries where member_name is a username instead of display name
-          this.db.run(`UPDATE rivalry_entries SET member_name = (
-            SELECT u.name FROM users u WHERE LOWER(u.username) = LOWER(rivalry_entries.member_name)
-          ) WHERE EXISTS (
-            SELECT 1 FROM users u
-            WHERE LOWER(u.username) = LOWER(rivalry_entries.member_name)
-            AND u.name != rivalry_entries.member_name
-          )`, function() {
-            if (this.changes > 0) console.log(`Backfill: fixed ${this.changes} rivalry entries (username -> display name)`);
+          // Fix rivalry entries where member_name doesn't match the rivalry's participant name
+          // e.g. entry has "Sophie" or "sophie" but rivalry has "Sophie Chiasson"
+          this.db.all(`
+            SELECT re.id, re.member_name, r.initiator_name, r.opponent_name, r.participants
+            FROM rivalry_entries re
+            JOIN rivalries r ON r.id = re.rivalry_id
+          `, (bfErr, rows) => {
+            if (bfErr || !rows) { resolve(); return; }
+            let fixed = 0;
+            const stmts = [];
+            for (const row of rows) {
+              let participants;
+              try { participants = JSON.parse(row.participants || '[]'); } catch { participants = []; }
+              if (!participants.length) participants = [row.initiator_name, row.opponent_name];
+              // Check if member_name already exactly matches a participant (case-insensitive)
+              const exactMatch = participants.find(p => p.toLowerCase() === row.member_name.toLowerCase());
+              if (exactMatch) continue;
+              // Find participant whose first name matches entry member_name
+              const prefixMatch = participants.find(p =>
+                p.toLowerCase().startsWith(row.member_name.toLowerCase() + ' ')
+                || row.member_name.toLowerCase().startsWith(p.toLowerCase() + ' ')
+              );
+              if (prefixMatch) {
+                stmts.push([prefixMatch, row.id]);
+                fixed++;
+              }
+            }
+            if (stmts.length > 0) {
+              for (const [name, id] of stmts) {
+                this.db.run('UPDATE rivalry_entries SET member_name = ? WHERE id = ?', [name, id]);
+              }
+              console.log(`Backfill: normalized ${fixed} rivalry entry names to match participant names`);
+            }
           });
           resolve();
         });
