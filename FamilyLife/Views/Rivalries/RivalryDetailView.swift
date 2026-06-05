@@ -224,7 +224,7 @@ struct RivalryDetailView: View {
         .navigationTitle(currentRivalry.title)
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $showingLogProgress) {
-            LogProgressView(rivalry: currentRivalry, memberName: auth.currentUser?.username ?? "Me") {
+            LogProgressView(rivalry: currentRivalry, memberName: auth.currentUser?.name ?? auth.currentUser?.username ?? "Me") {
                 await loadEntries()
             }
         }
@@ -256,7 +256,7 @@ struct RivalryDetailView: View {
     }
 
     private var myLoggedTotal: Double {
-        let myName = auth.currentUser?.username ?? auth.currentUser?.name ?? ""
+        let myName = auth.currentUser?.name ?? auth.currentUser?.username ?? ""
         return entries.filter { $0.member_name.localizedCaseInsensitiveCompare(myName) == .orderedSame }.reduce(0) { $0 + $1.value }
     }
 
@@ -280,7 +280,7 @@ struct RivalryDetailView: View {
         isSyncingSteps = true
         do {
             try await api.addRivalryEntry(id: currentRivalry.id, data: [
-                "member_name": auth.currentUser?.username ?? "Me",
+                "member_name": auth.currentUser?.name ?? auth.currentUser?.username ?? "Me",
                 "value": delta,
                 "note": "Synced from Apple Health",
                 "is_verified": true
