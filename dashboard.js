@@ -2214,6 +2214,23 @@ app.post('/api/rivalries', requireAuth, async (req, res) => {
     }
     const result = await db.addRivalry(data);
     res.json({ success: true, id: result.id });
+
+    // Push notification to all opponents
+    const senderName = req.session.user.name || data.initiator_name;
+    let opponents = [];
+    if (data.participants) {
+      try { opponents = JSON.parse(data.participants).filter(n => n !== senderName); } catch {}
+    }
+    if (!opponents.length && data.opponent_name) opponents = [data.opponent_name];
+    const ct = (data.challenge_type || 'challenge').replace(/_/g, ' ');
+    for (const opName of opponents) {
+      const opId = await db.getUserIdByName(opName);
+      if (opId) {
+        push.pushToUser(db, opId, `${senderName} challenged you!`,
+          pick(RIVALRY_CHALLENGE_PUSH)(senderName, ct),
+          { type: 'rivalry', ref_id: result.id });
+      }
+    }
   } catch (err) {
     res.status(500).json({ error: err.message });
   } finally {
@@ -2251,9 +2268,51 @@ app.get('/api/rivalries/:id/entries', requireAuth, async (req, res) => {
 app.post('/api/rivalries/:id/entries', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
-    const entry = { ...req.body, rivalry_id: Number(req.params.id) };
+    const rivalryId = Number(req.params.id);
+    const entry = { ...req.body, rivalry_id: rivalryId };
     await db.addRivalryEntry(entry);
     res.json({ success: true });
+
+    // Send score-update push to other participants
+    try {
+      const rivalry = await db.getRivalryById(rivalryId);
+      if (rivalry && rivalry.status === 'active') {
+        const totals = await db.getRivalryEntryTotals(rivalryId);
+        let participants;
+        try { participants = JSON.parse(rivalry.participants || '[]'); } catch { participants = []; }
+        if (!participants.length) participants = [rivalry.initiator_name, rivalry.opponent_name];
+
+        const loggerName = entry.member_name;
+        const ct = (rivalry.challenge_type || 'challenge').replace(/_/g, ' ');
+
+        for (const pName of participants) {
+          if (pName.toLowerCase() === loggerName.toLowerCase()) continue;
+          const pId = await db.getUserIdByName(pName);
+          if (!pId) continue;
+
+          const myTotal = totals.find(t => t.member_name.toLowerCase() === pName.toLowerCase())?.total || 0;
+          const theirTotal = totals.find(t => t.member_name.toLowerCase() === loggerName.toLowerCase())?.total || 0;
+          const diff = Math.abs(myTotal - theirTotal);
+          const fmtDiff = fmt(diff);
+
+          if (theirTotal > myTotal && diff > 0) {
+            // They pulled ahead of this participant
+            push.pushToUser(db, pId, rivalry.title, pick(RIVALRY_AHEAD_PUSH)(loggerName, fmtDiff, ct), { type: 'rivalry', ref_id: rivalryId });
+          } else if (myTotal > theirTotal) {
+            // This participant is still ahead
+            push.pushToUser(db, pId, rivalry.title, pick(RIVALRY_BEHIND_PUSH)(loggerName, ct), { type: 'rivalry', ref_id: rivalryId });
+          } else if (diff === 0 && myTotal > 0) {
+            // Tied
+            push.pushToUser(db, pId, rivalry.title, `It's a dead tie with ${loggerName}! ${fmt(myTotal)} ${ct} each`, { type: 'rivalry', ref_id: rivalryId });
+          } else if (diff > 0 && diff <= myTotal * 0.1) {
+            // Very close
+            push.pushToUser(db, pId, rivalry.title, pick(RIVALRY_CLOSE_PUSH)(loggerName, fmtDiff, ct), { type: 'rivalry', ref_id: rivalryId });
+          }
+        }
+      }
+    } catch (pushErr) {
+      console.error('Rivalry entry push error:', pushErr.message);
+    }
   } catch (err) {
     res.status(500).json({ error: err.message });
   } finally {
@@ -2262,6 +2321,27 @@ app.post('/api/rivalries/:id/entries', requireAuth, async (req, res) => {
 });
 
 // Rivalry completion with announcements
+const RIVALRY_CHALLENGE_PUSH = [
+  (name, ct) => `Think you can keep up? ${name} wants a ${ct} showdown!`,
+  (name, ct) => `${name} just threw down the gauntlet — ${ct} challenge. You in?`,
+  (name, ct) => `${name} thinks they can beat you at ${ct}. Prove them wrong!`,
+  (name, ct) => `Game on! ${name} started a ${ct} challenge with you`,
+  (name, ct) => `${name} is feeling brave — they want a ${ct} battle!`,
+];
+const RIVALRY_AHEAD_PUSH = [
+  (name, lead, ct) => `${name} just pulled ahead by ${lead} ${ct}! Time to step it up`,
+  (name, lead, ct) => `Uh oh — ${name} is now leading by ${lead} ${ct}. Can you catch up?`,
+  (name, lead, ct) => `${name} logged more ${ct} and leads by ${lead}. Don't let them run away with it!`,
+];
+const RIVALRY_BEHIND_PUSH = [
+  (name, ct) => `Nice work! You just took the lead over ${name} in ${ct}!`,
+  (name, ct) => `You're ahead of ${name} now — keep the pressure on!`,
+  (name, ct) => `${name} is eating your dust! You pulled ahead in ${ct}`,
+];
+const RIVALRY_CLOSE_PUSH = [
+  (name, diff, ct) => `It's neck and neck with ${name} — only ${diff} ${ct} apart!`,
+  (name, diff, ct) => `You and ${name} are just ${diff} ${ct} apart. Every bit counts!`,
+];
 const RIVALRY_WINNER_MESSAGES = [
   (w, l, ws, ls, ct) => `${w} absolutely CRUSHED it with ${fmt(ws)} ${ct}! ${l} managed ${fmt(ls)}... we'll pretend that didn't happen`,
   (w, l, ws, ls, ct) => `Breaking news: ${w} defeats ${l} in an EPIC ${ct} showdown! Final score: ${fmt(ws)} to ${fmt(ls)}`,
