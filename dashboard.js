@@ -1634,7 +1634,7 @@ app.post('/api/receipts/scan', requireAuth, async (req, res) => {
 app.post('/api/receipts/save', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
-    const { merchant, date, total, category, notes } = req.body;
+    const { merchant, date, total, category, notes, itinerary_id } = req.body;
     const username = req.session.user?.username || 'jesse';
 
     // Normalize date to YYYY-MM-DD for strftime compatibility
@@ -1661,7 +1661,8 @@ app.post('/api/receipts/save', requireAuth, async (req, res) => {
       category: category || 'Other',
       notes: notes || null,
       processed_by: 'scan',
-      added_by: username
+      added_by: username,
+      itinerary_id: itinerary_id || null
     });
 
     console.log(`[receipt-save] id=${receipt.id} amount=${total} merchant="${merchant}" date=${normalizedDate} category="${category}" by=${username}`);
@@ -2508,6 +2509,19 @@ app.delete('/api/itineraries/:id', requireAuth, async (req, res) => {
     }
     await db.deleteItinerary(req.params.id);
     res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+app.get('/api/itineraries/:id/expenses', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const expenses = await db.getItineraryExpenses(req.params.id);
+    const totals = await db.getItineraryExpenseTotal(req.params.id);
+    res.json({ expenses, total: totals.total, count: totals.count });
   } catch (err) {
     res.status(500).json({ error: err.message });
   } finally {
