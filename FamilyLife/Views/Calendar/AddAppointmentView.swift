@@ -193,7 +193,7 @@ struct AddAppointmentView: View {
         }
         if !location.isEmpty { data["location"] = location }
         if !notes.isEmpty { data["description"] = notes }
-        if !personTags.isEmpty { data["person_tags"] = Array(personTags) }
+        if !personTags.isEmpty { data["person_tags"] = personTags.sorted().joined(separator: ",") }
         if recurrence != .none {
             data["recurrence_rule"] = recurrence.rawValue
             if showRecurrenceEnd, let end = recurrenceEnd {
