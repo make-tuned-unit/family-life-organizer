@@ -35,12 +35,28 @@ struct FeedCard: View {
             // Header — always visible
             header
 
-            // Body text — always visible for posts
+            // Title — show for all items that have one
+            if let title = item.title, !title.isEmpty, !prepared.isPost || prepared.body == nil {
+                Text(title)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(WarmPalette.ink1)
+                    .padding(.horizontal, 14)
+                    .padding(.bottom, prepared.isPost || item.body != nil ? 4 : 12)
+            }
+
+            // Body text — for posts and non-posts with body content
             if let body = prepared.body {
                 Text(body)
                     .font(.system(size: 15))
                     .foregroundStyle(WarmPalette.ink1)
                     .lineSpacing(3)
+                    .padding(.horizontal, 14)
+                    .padding(.bottom, 12)
+            } else if let bodyText = item.body, !bodyText.isEmpty, !prepared.isPost {
+                Text(bodyText)
+                    .font(.system(size: 14))
+                    .foregroundStyle(WarmPalette.ink2)
+                    .lineSpacing(2)
                     .padding(.horizontal, 14)
                     .padding(.bottom, 12)
             }
@@ -434,7 +450,16 @@ struct FeedCard: View {
         case "event": "Event"
         case "coverage": "Coverage"
         case "rivalry": "Challenge"
-        case "post": "Post"
+        case "post":
+            // Use post_type (stored in status) for more specific badges
+            switch item.status {
+            case "event": "Event"
+            case "rivalry": "Challenge"
+            case "decision", "poll": "Decision"
+            case "photo": "Photo"
+            case "link": "Link"
+            default: "Post"
+            }
         default: "Update"
         }
     }
