@@ -179,7 +179,7 @@ final class APIService {
     }
 
     @discardableResult
-    func saveScannedReceipt(result: ScanResult, category: String, notes: String? = nil) async throws -> Int {
+    func saveScannedReceipt(result: ScanResult, category: String, notes: String? = nil, itineraryId: Int? = nil) async throws -> Int {
         var body: [String: Any] = [
             "merchant": result.merchant,
             "date": result.date,
@@ -187,6 +187,7 @@ final class APIService {
             "category": category
         ]
         if let notes, !notes.isEmpty { body["notes"] = notes }
+        if let itineraryId { body["itinerary_id"] = itineraryId }
         let response: IDResponse = try await post("/api/receipts/save", body: body)
         return response.id
     }
@@ -1029,6 +1030,16 @@ final class APIService {
 
     func fetchPendingStayRequests() async throws -> [ItineraryStayResponse] {
         try await get("/api/stays/pending")
+    }
+
+    struct TripExpensesResponse: Codable {
+        let expenses: [ReceiptResponse]
+        let total: Double
+        let count: Int
+    }
+
+    func fetchItineraryExpenses(itineraryId: Int) async throws -> TripExpensesResponse {
+        try await get("/api/itineraries/\(itineraryId)/expenses")
     }
 
     // MARK: - Networking

@@ -5,6 +5,10 @@ struct AddReceiptView: View {
     @Environment(APIService.self) private var api
     @Environment(\.dismiss) private var dismiss
 
+    /// Optional pre-selection for Trip category
+    var preselectedCategory: String?
+    var preselectedItinerary: ItineraryResponse?
+
     @State private var amount = ""
     @State private var merchant = ""
     @State private var category = "Groceries"
@@ -13,8 +17,10 @@ struct AddReceiptView: View {
     @State private var selectedPhoto: PhotosPickerItem?
     @State private var isSaving = false
     @State private var error: String?
+    @State private var selectedItinerary: ItineraryResponse?
+    @State private var itineraries: [ItineraryResponse] = []
 
-    private let categories = ["Groceries", "Dining Out", "Gas/Transport", "Household", "Health", "Pets", "Entertainment", "Kids", "Other"]
+    private let categories = ["Groceries", "Dining Out", "Gas/Transport", "Household", "Health", "Pets", "Entertainment", "Kids", "Trip", "Other"]
 
     var body: some View {
         NavigationStack {
@@ -34,6 +40,26 @@ struct AddReceiptView: View {
                     }
 
                     DatePicker("Date", selection: $date, displayedComponents: .date)
+                }
+
+                if category == "Trip" {
+                    Section("Which trip?") {
+                        ForEach(itineraries) { itin in
+                            Button {
+                                selectedItinerary = itin
+                            } label: {
+                                HStack {
+                                    Text(itin.title)
+                                        .foregroundStyle(.primary)
+                                    Spacer()
+                                    if selectedItinerary?.id == itin.id {
+                                        Image(systemName: "checkmark")
+                                            .foregroundStyle(AccentTheme.ocean.color)
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
 
                 Section("Notes") {
@@ -56,6 +82,15 @@ struct AddReceiptView: View {
             } message: {
                 Text(error ?? "An unexpected error occurred.")
             }
+            .task {
+                itineraries = (try? await api.fetchItineraries()) ?? []
+                if let preselectedCategory {
+                    category = preselectedCategory
+                }
+                if let preselectedItinerary {
+                    selectedItinerary = preselectedItinerary
+                }
+            }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
@@ -77,7 +112,7 @@ struct AddReceiptView: View {
         }
         isSaving = true
 
-        let body: [String: Any] = [
+        var body: [String: Any] = [
             "amount": amountValue,
             "merchant": merchant,
             "date": DateFormatter.isoDate.string(from: date),
@@ -85,6 +120,9 @@ struct AddReceiptView: View {
             "notes": notes.isEmpty ? NSNull() : notes,
             "processed_by": "manual"
         ]
+        if category == "Trip", let itineraryId = selectedItinerary?.id {
+            body["itinerary_id"] = itineraryId
+        }
 
         Task {
             do {

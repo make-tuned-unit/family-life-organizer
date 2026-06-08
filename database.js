@@ -103,6 +103,7 @@ class FamilyDB {
         this.db.run('CREATE INDEX IF NOT EXISTS idx_groceries_group ON groceries(group_id)', () => {});
         // Itinerary travelers column (added after initial table creation)
         this.db.run('ALTER TABLE itineraries ADD COLUMN travelers TEXT', () => {});
+        this.db.run('ALTER TABLE receipts ADD COLUMN itinerary_id INTEGER REFERENCES itineraries(id)', () => {});
         this.db.run('ALTER TABLE users ADD COLUMN last_location_at DATETIME', (err) => {
           if (err) console.error('Migration error:', err.message);
           resolve();
@@ -560,7 +561,7 @@ class FamilyDB {
   addReceipt(receipt) {
     return new Promise((resolve, reject) => {
       this.db.run(
-        'INSERT INTO receipts (amount, merchant, date, category, payment_method, image_path, notes, processed_by, email_id, added_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        'INSERT INTO receipts (amount, merchant, date, category, payment_method, image_path, notes, processed_by, email_id, added_by, itinerary_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
         [
           receipt.amount,
           receipt.merchant,
@@ -571,7 +572,8 @@ class FamilyDB {
           receipt.notes || null,
           receipt.processed_by || 'manual',
           receipt.email_id || null,
-          receipt.added_by || 'jesse'
+          receipt.added_by || 'jesse',
+          receipt.itinerary_id || null
         ],
         function(err) {
           if (err) reject(err);
@@ -622,7 +624,7 @@ class FamilyDB {
           c.color,
           COALESCE(SUM(r.amount), 0) as spent
         FROM budget_categories c
-        LEFT JOIN receipts r ON LOWER(c.name) = LOWER(r.category) AND strftime('%Y-%m', r.date) = ?
+        LEFT JOIN receipts r ON LOWER(c.name) = LOWER(r.category) AND strftime('%Y-%m', r.date) = ? AND r.itinerary_id IS NULL
         GROUP BY c.name
         ORDER BY c.name
       `;
@@ -1325,6 +1327,26 @@ class FamilyDB {
          ORDER BY s.check_in ASC`,
         [userId],
         (err, rows) => err ? reject(err) : resolve(rows || [])
+      );
+    });
+  }
+
+  getItineraryExpenses(itineraryId) {
+    return new Promise((resolve, reject) => {
+      this.db.all(
+        'SELECT * FROM receipts WHERE itinerary_id = ? ORDER BY date DESC',
+        [itineraryId],
+        (err, rows) => err ? reject(err) : resolve(rows || [])
+      );
+    });
+  }
+
+  getItineraryExpenseTotal(itineraryId) {
+    return new Promise((resolve, reject) => {
+      this.db.get(
+        'SELECT COALESCE(SUM(amount), 0) as total, COUNT(*) as count FROM receipts WHERE itinerary_id = ?',
+        [itineraryId],
+        (err, row) => err ? reject(err) : resolve(row || { total: 0, count: 0 })
       );
     });
   }
