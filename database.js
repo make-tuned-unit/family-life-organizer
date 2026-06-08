@@ -449,7 +449,7 @@ class FamilyDB {
           appointment.location || null,
           appointment.with_person || null,
           appointment.category || 'appointments',
-          appointment.person_tags ? appointment.person_tags.join(',') : null,
+          appointment.person_tags ? (Array.isArray(appointment.person_tags) ? appointment.person_tags.join(',') : String(appointment.person_tags)) : null,
           appointment.recurrence_rule || null,
           appointment.recurrence_end || null,
           appointment.group_id || null

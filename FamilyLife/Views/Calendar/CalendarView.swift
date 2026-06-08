@@ -525,7 +525,8 @@ struct CalendarEventCard: View {
                         .foregroundStyle(WarmPalette.ink1)
                     Spacer()
                     HStack(spacing: 4) {
-                        if let tags = appointment.person_tags, !tags.isEmpty {
+                        if let tags = appointment.person_tags, !tags.isEmpty,
+                           !tags.contains("[object") {
                             Text(tags)
                         }
                         if let rule = appointment.recurrence_rule, !rule.isEmpty {
@@ -551,7 +552,7 @@ struct CalendarEventCard: View {
             }
 
             // Attendee avatars (overlapping)
-            if let tags = appointment.person_tags, !tags.isEmpty {
+            if let tags = appointment.person_tags, !tags.isEmpty, !tags.contains("[object") {
                 let initials = tags.split(separator: ",").map { String($0.trimmingCharacters(in: .whitespaces).prefix(1)).uppercased() }
                 HStack(spacing: -8) {
                     ForEach(Array(initials.enumerated()), id: \.offset) { _, initial in
