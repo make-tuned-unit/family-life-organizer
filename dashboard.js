@@ -1398,8 +1398,8 @@ app.get('/api/appointments', requireAuth, async (req, res) => {
       const recurring = await db.getRecurringAppointments(req.session.user.id);
       const existingDates = new Set(appointments.map(a => `${a.id}-${a.appointment_date}`));
       for (const appt of recurring) {
-        const originDate = new Date(appt.appointment_date + 'T00:00:00');
-        const endDate = appt.recurrence_end ? new Date(appt.recurrence_end + 'T23:59:59') : null;
+        const originDate = new Date(appt.appointment_date + 'T12:00:00Z');
+        const endDate = appt.recurrence_end ? new Date(appt.recurrence_end + 'T23:59:59Z') : null;
         const occurrences = expandRecurrence(appt.recurrence_rule, originDate, rangeStart, new Date(rangeEnd.getTime() + 86400000), endDate);
         for (const date of occurrences) {
           const dateStr = date.toISOString().slice(0, 10);
@@ -1438,8 +1438,8 @@ app.get('/api/appointments/:year/:month', requireAuth, async (req, res) => {
     const recurring = await db.getRecurringAppointments(userId);
     const existingDates = new Set(appointments.map(a => `${a.id}-${a.appointment_date}`));
     for (const appt of recurring) {
-      const originDate = new Date(appt.appointment_date + 'T00:00:00');
-      const endDate = appt.recurrence_end ? new Date(appt.recurrence_end + 'T23:59:59') : null;
+      const originDate = new Date(appt.appointment_date + 'T12:00:00Z');
+      const endDate = appt.recurrence_end ? new Date(appt.recurrence_end + 'T23:59:59Z') : null;
       const occurrences = expandRecurrence(appt.recurrence_rule, originDate, rangeStart, rangeEnd, endDate);
       for (const date of occurrences) {
         const dateStr = date.toISOString().slice(0, 10);
