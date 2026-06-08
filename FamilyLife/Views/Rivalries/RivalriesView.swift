@@ -172,18 +172,11 @@ struct RivalryCardRemote: View {
     let entries: [RivalryEntryResponse]
 
     private var initiatorTotal: Double {
-        entries.filter { nameMatches($0.member_name, rivalry.initiator_name) }.reduce(0) { $0 + $1.value }
+        entries.filter { rivalryNameMatches($0.member_name, rivalry.initiator_name) }.reduce(0) { $0 + $1.value }
     }
 
     private var opponentTotal: Double {
-        entries.filter { nameMatches($0.member_name, rivalry.opponent_name) }.reduce(0) { $0 + $1.value }
-    }
-
-    private func nameMatches(_ a: String, _ b: String) -> Bool {
-        let aL = a.lowercased(), bL = b.lowercased()
-        if aL == bL { return true }
-        if aL.hasPrefix(bL + " ") || bL.hasPrefix(aL + " ") { return true }
-        return false
+        entries.filter { rivalryNameMatches($0.member_name, rivalry.opponent_name) }.reduce(0) { $0 + $1.value }
     }
 
     var body: some View {

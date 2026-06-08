@@ -12,7 +12,7 @@ struct RivalryDetailView: View {
     @State private var isSyncingSteps = false
     @State private var completionMessage: String?
     @State private var showingLevelUp: FamilyTier?
-    private let healthKit = HealthKitManager()
+    @State private var healthKit = HealthKitManager()
 
     @Environment(AuthService.self) private var auth
 
@@ -37,15 +37,7 @@ struct RivalryDetailView: View {
 
     /// Match entries to a participant name, handling "Sophie" vs "Sophie Chiasson" mismatches
     private func entriesTotal(for name: String) -> Double {
-        entries.filter { nameMatches($0.member_name, name) }.reduce(0) { $0 + $1.value }
-    }
-
-    private func nameMatches(_ a: String, _ b: String) -> Bool {
-        let aL = a.lowercased(), bL = b.lowercased()
-        if aL == bL { return true }
-        // First-name prefix match: "Sophie" matches "Sophie Chiasson"
-        if aL.hasPrefix(bL + " ") || bL.hasPrefix(aL + " ") { return true }
-        return false
+        entries.filter { rivalryNameMatches($0.member_name, name) }.reduce(0) { $0 + $1.value }
     }
 
     private var isExpired: Bool {
@@ -272,23 +264,16 @@ struct RivalryDetailView: View {
         let name = auth.currentUser?.name ?? ""
         let username = auth.currentUser?.username ?? ""
         for participant in currentRivalry.participantNames {
-            let pLower = participant.lowercased()
-            // Exact match (case-insensitive)
-            if pLower == name.lowercased() || pLower == username.lowercased() { return participant }
-            // First-name match: "Sophie Chiasson" starts with "Sophie"
-            if !name.isEmpty && pLower.hasPrefix(name.lowercased() + " ") { return participant }
-            if !username.isEmpty && pLower.hasPrefix(username.lowercased() + " ") { return participant }
+            if rivalryNameMatches(participant, name) || rivalryNameMatches(participant, username) {
+                return participant
+            }
         }
         return name.isEmpty ? username : name
     }
 
     private var myLoggedTotal: Double {
         let myName = myRivalryName
-        return entries.filter {
-            $0.member_name.localizedCaseInsensitiveCompare(myName) == .orderedSame
-            || myName.lowercased().hasPrefix($0.member_name.lowercased() + " ")
-            || $0.member_name.lowercased().hasPrefix(myName.lowercased() + " ")
-        }.reduce(0) { $0 + $1.value }
+        return entries.filter { rivalryNameMatches($0.member_name, myName) }.reduce(0) { $0 + $1.value }
     }
 
     private func fetchHealthData() async {

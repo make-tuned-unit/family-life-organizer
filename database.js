@@ -1042,13 +1042,16 @@ class FamilyDB {
   }
 
   updateRivalry(id, updates) {
+    const ALLOWED = new Set(['title', 'challenge_type', 'initiator_name', 'opponent_name', 'start_date', 'end_date', 'status', 'point_value', 'winner_name', 'participants']);
     return new Promise((resolve, reject) => {
       const fields = [];
       const params = [];
       for (const [key, value] of Object.entries(updates)) {
+        if (!ALLOWED.has(key)) continue;
         fields.push(`${key} = ?`);
         params.push(value);
       }
+      if (!fields.length) return resolve({ id });
       params.push(id);
       this.db.run(`UPDATE rivalries SET ${fields.join(', ')} WHERE id = ?`, params, (err) => {
         if (err) reject(err);
@@ -1225,13 +1228,16 @@ class FamilyDB {
   }
 
   updateItinerary(id, updates) {
+    const ALLOWED = new Set(['title', 'start_date', 'end_date', 'travelers', 'notes', 'status', 'group_id']);
     return new Promise((resolve, reject) => {
       const fields = [];
       const params = [];
       for (const [key, value] of Object.entries(updates)) {
+        if (!ALLOWED.has(key)) continue;
         fields.push(`${key} = ?`);
         params.push(value);
       }
+      if (!fields.length) return resolve({ id });
       params.push(id);
       this.db.run(`UPDATE itineraries SET ${fields.join(', ')} WHERE id = ?`, params, (err) => {
         if (err) reject(err);
@@ -1274,13 +1280,16 @@ class FamilyDB {
   }
 
   updateItineraryStay(id, updates) {
+    const ALLOWED = new Set(['check_in', 'check_out', 'host_name', 'host_user_id', 'host_contact_id', 'location_name', 'address', 'lat', 'lng', 'notes', 'status', 'calendar_event_id', 'host_calendar_event_id']);
     return new Promise((resolve, reject) => {
       const fields = [];
       const params = [];
       for (const [key, value] of Object.entries(updates)) {
+        if (!ALLOWED.has(key)) continue;
         fields.push(`${key} = ?`);
         params.push(value);
       }
+      if (!fields.length) return resolve({ id });
       params.push(id);
       this.db.run(`UPDATE itinerary_stays SET ${fields.join(', ')} WHERE id = ?`, params, (err) => {
         if (err) reject(err);

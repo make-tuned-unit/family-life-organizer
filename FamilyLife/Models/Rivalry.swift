@@ -164,3 +164,14 @@ struct RivalryLeaderboardResponse: Codable, Identifiable {
     let rivalries_won: Int
     let total_points: Int
 }
+
+// MARK: - Name Matching
+
+/// Match rivalry participant names, handling "Sophie" vs "Sophie Chiasson" mismatches.
+/// Used for scoring, entry attribution, and participant identification.
+func rivalryNameMatches(_ a: String, _ b: String) -> Bool {
+    let aL = a.lowercased(), bL = b.lowercased()
+    if aL == bL { return true }
+    if aL.hasPrefix(bL + " ") || bL.hasPrefix(aL + " ") { return true }
+    return false
+}
