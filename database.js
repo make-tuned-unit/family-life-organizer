@@ -101,6 +101,8 @@ class FamilyDB {
         // Multi-player rivalries
         this.db.run('ALTER TABLE rivalries ADD COLUMN participants TEXT', () => {});
         this.db.run('CREATE INDEX IF NOT EXISTS idx_groceries_group ON groceries(group_id)', () => {});
+        // Itinerary travelers column (added after initial table creation)
+        this.db.run('ALTER TABLE itineraries ADD COLUMN travelers TEXT', () => {});
         this.db.run('ALTER TABLE users ADD COLUMN last_location_at DATETIME', (err) => {
           if (err) console.error('Migration error:', err.message);
           resolve();
