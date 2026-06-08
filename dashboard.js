@@ -1411,14 +1411,18 @@ app.get('/api/appointments/:year/:month', requireAuth, async (req, res) => {
     const rangeStart = new Date(year, month - 1, 1);
     const rangeEnd = new Date(month === 12 ? year + 1 : year, month === 12 ? 0 : month, 1);
     const recurring = await db.getRecurringAppointments(userId);
+    const existingDates = new Set(appointments.map(a => `${a.id}-${a.appointment_date}`));
     for (const appt of recurring) {
       const originDate = new Date(appt.appointment_date + 'T00:00:00');
-      if (originDate >= rangeStart && originDate < rangeEnd) continue; // already in results
       const endDate = appt.recurrence_end ? new Date(appt.recurrence_end + 'T23:59:59') : null;
       const occurrences = expandRecurrence(appt.recurrence_rule, originDate, rangeStart, rangeEnd, endDate);
       for (const date of occurrences) {
         const dateStr = date.toISOString().slice(0, 10);
-        appointments.push({ ...appt, appointment_date: dateStr, _recurring_source: appt.id });
+        const key = `${appt.id}-${dateStr}`;
+        if (!existingDates.has(key)) {
+          appointments.push({ ...appt, appointment_date: dateStr, _recurring_source: appt.id });
+          existingDates.add(key);
+        }
       }
     }
 
