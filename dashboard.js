@@ -2486,6 +2486,10 @@ app.post('/api/itineraries', requireAuth, async (req, res) => {
 app.put('/api/itineraries/:id', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
+    const itinerary = await db.getItineraryById(req.params.id);
+    if (!itinerary || itinerary.traveler_id !== req.session.user.id) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
     await db.updateItinerary(req.params.id, req.body);
     res.json({ success: true });
   } catch (err) {
@@ -2498,6 +2502,10 @@ app.put('/api/itineraries/:id', requireAuth, async (req, res) => {
 app.delete('/api/itineraries/:id', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
+    const itinerary = await db.getItineraryById(req.params.id);
+    if (!itinerary || itinerary.traveler_id !== req.session.user.id) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
     await db.deleteItinerary(req.params.id);
     res.json({ success: true });
   } catch (err) {
@@ -2510,6 +2518,19 @@ app.delete('/api/itineraries/:id', requireAuth, async (req, res) => {
 app.get('/api/itineraries/:id/stays', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
+    const itinerary = await db.getItineraryById(req.params.id);
+    if (!itinerary) return res.status(404).json({ error: 'Not found' });
+    const userId = req.session.user.id;
+    if (itinerary.traveler_id !== userId) {
+      // Check if user is in the same group
+      const groups = await new Promise((resolve, reject) => {
+        db.db.all('SELECT group_id FROM group_members WHERE user_id = ?', [userId], (err, rows) => err ? reject(err) : resolve(rows || []));
+      });
+      const groupIds = groups.map(g => g.group_id);
+      if (!itinerary.group_id || !groupIds.includes(itinerary.group_id)) {
+        return res.status(403).json({ error: 'Forbidden' });
+      }
+    }
     const stays = await db.getItineraryStays(req.params.id);
     res.json(stays);
   } catch (err) {
@@ -2522,6 +2543,10 @@ app.get('/api/itineraries/:id/stays', requireAuth, async (req, res) => {
 app.post('/api/itineraries/:id/stays', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
+    const itinerary = await db.getItineraryById(req.params.id);
+    if (!itinerary || itinerary.traveler_id !== req.session.user.id) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
     const stay = { ...req.body, itinerary_id: Number(req.params.id) };
     const result = await db.addItineraryStay(stay);
     res.json({ success: true, id: result.id });
@@ -2535,6 +2560,10 @@ app.post('/api/itineraries/:id/stays', requireAuth, async (req, res) => {
 app.put('/api/itineraries/:id/stays/:stayId', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
+    const itinerary = await db.getItineraryById(req.params.id);
+    if (!itinerary || itinerary.traveler_id !== req.session.user.id) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
     await db.updateItineraryStay(req.params.stayId, req.body);
     res.json({ success: true });
   } catch (err) {
@@ -2547,6 +2576,10 @@ app.put('/api/itineraries/:id/stays/:stayId', requireAuth, async (req, res) => {
 app.delete('/api/itineraries/:id/stays/:stayId', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
+    const itinerary = await db.getItineraryById(req.params.id);
+    if (!itinerary || itinerary.traveler_id !== req.session.user.id) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
     await db.deleteItineraryStay(req.params.stayId);
     res.json({ success: true });
   } catch (err) {
@@ -2562,6 +2595,11 @@ app.post('/api/stays/:stayId/request', requireAuth, async (req, res) => {
   try {
     const stay = await db.getItineraryStayById(req.params.stayId);
     if (!stay) return res.status(404).json({ error: 'Stay not found' });
+
+    const itinerary = await db.getItineraryById(stay.itinerary_id);
+    if (!itinerary || itinerary.traveler_id !== req.session.user.id) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
 
     await db.updateItineraryStay(stay.id, { status: 'requested' });
 
@@ -2590,6 +2628,10 @@ app.post('/api/stays/:stayId/respond', requireAuth, async (req, res) => {
   try {
     const stay = await db.getItineraryStayById(req.params.stayId);
     if (!stay) return res.status(404).json({ error: 'Stay not found' });
+
+    if (stay.host_user_id !== req.session.user.id) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
 
     const { approved } = req.body;
     const itinerary = await db.getItineraryById(stay.itinerary_id);
