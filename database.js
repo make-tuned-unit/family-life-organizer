@@ -1196,9 +1196,9 @@ class FamilyDB {
   createItinerary(data) {
     return new Promise((resolve, reject) => {
       this.db.run(
-        `INSERT INTO itineraries (title, traveler_id, traveler_name, start_date, end_date, notes, status, group_id)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-        [data.title, data.traveler_id, data.traveler_name, data.start_date, data.end_date, data.notes || null, data.status || 'planning', data.group_id || null],
+        `INSERT INTO itineraries (title, traveler_id, traveler_name, start_date, end_date, travelers, notes, status, group_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [data.title, data.traveler_id, data.traveler_name, data.start_date, data.end_date, data.travelers || null, data.notes || null, data.status || 'planning', data.group_id || null],
         function(err) {
           if (err) reject(err);
           else resolve({ id: this.lastID, ...data });

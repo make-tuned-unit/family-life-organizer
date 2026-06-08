@@ -7,6 +7,7 @@ struct ItineraryResponse: Codable, Identifiable {
     let traveler_name: String
     var start_date: String
     var end_date: String
+    var travelers: String?
     var notes: String?
     var status: String
     let group_id: Int?

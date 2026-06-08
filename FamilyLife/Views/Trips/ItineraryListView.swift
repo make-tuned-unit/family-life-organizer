@@ -125,6 +125,18 @@ struct ItineraryCard: View {
                     .font(.caption)
                     .foregroundStyle(WarmPalette.ink4)
             }
+
+            if let travelers = itinerary.travelers, !travelers.isEmpty {
+                HStack {
+                    Image(systemName: "person.2.fill")
+                        .font(.caption)
+                        .foregroundStyle(WarmPalette.ink3)
+                    Text(travelers)
+                        .font(.caption)
+                        .foregroundStyle(WarmPalette.ink3)
+                        .lineLimit(1)
+                }
+            }
         }
         .padding(DesignTokens.Spacing.cardPadding)
         .flCard(tint: AccentTheme.ocean.color)
@@ -155,6 +167,7 @@ struct ItineraryCard: View {
 
 struct NewItinerarySheet: View {
     @Environment(APIService.self) private var api
+    @Environment(HouseholdService.self) private var household
     @Environment(\.dismiss) private var dismiss
 
     let onSaved: () async -> Void
@@ -162,6 +175,7 @@ struct NewItinerarySheet: View {
     @State private var title = ""
     @State private var startDate = Date()
     @State private var endDate = Calendar.current.date(byAdding: .day, value: 7, to: Date()) ?? Date()
+    @State private var selectedTravelers: Set<String> = []
     @State private var notes = ""
     @State private var isSaving = false
     @State private var error: String?
@@ -175,6 +189,28 @@ struct NewItinerarySheet: View {
                 Section("Dates") {
                     DatePicker("Start", selection: $startDate, displayedComponents: .date)
                     DatePicker("End", selection: $endDate, in: startDate..., displayedComponents: .date)
+                }
+                Section("Traveling with") {
+                    ForEach(household.members) { member in
+                        Button {
+                            if selectedTravelers.contains(member.name) {
+                                selectedTravelers.remove(member.name)
+                            } else {
+                                selectedTravelers.insert(member.name)
+                            }
+                        } label: {
+                            HStack {
+                                FamilyAvatar(initial: member.avatar_initial ?? String(member.name.prefix(1)).uppercased(), size: 28)
+                                Text(member.name)
+                                    .foregroundStyle(.primary)
+                                Spacer()
+                                if selectedTravelers.contains(member.name) {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .foregroundStyle(AccentTheme.ocean.color)
+                                }
+                            }
+                        }
+                    }
                 }
                 Section("Notes") {
                     TextField("Optional notes", text: $notes, axis: .vertical)
@@ -202,12 +238,16 @@ struct NewItinerarySheet: View {
         let fmt = DateFormatter()
         fmt.dateFormat = "yyyy-MM-dd"
         do {
-            _ = try await api.createItinerary([
+            var data: [String: Any] = [
                 "title": title,
                 "start_date": fmt.string(from: startDate),
-                "end_date": fmt.string(from: endDate),
-                "notes": notes.isEmpty ? "" : notes
-            ])
+                "end_date": fmt.string(from: endDate)
+            ]
+            if !selectedTravelers.isEmpty {
+                data["travelers"] = selectedTravelers.sorted().joined(separator: ", ")
+            }
+            if !notes.isEmpty { data["notes"] = notes }
+            _ = try await api.createItinerary(data)
             await onSaved()
             dismiss()
         } catch {
