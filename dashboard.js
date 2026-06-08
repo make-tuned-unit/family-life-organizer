@@ -1390,6 +1390,31 @@ app.get('/api/appointments', requireAuth, async (req, res) => {
     if (req.query.date_to) filters.date_to = req.query.date_to;
     if (req.query.person) filters.person = req.query.person;
     const appointments = await db.getAppointments(filters, req.session.user.id);
+
+    // Expand recurring events into the queried date range
+    if (filters.date_from || filters.date_to) {
+      const rangeStart = filters.date_from ? new Date(filters.date_from + 'T00:00:00') : new Date('2020-01-01');
+      const rangeEnd = filters.date_to ? new Date(filters.date_to + 'T23:59:59') : new Date('2030-12-31');
+      const recurring = await db.getRecurringAppointments(req.session.user.id);
+      const existingDates = new Set(appointments.map(a => `${a.id}-${a.appointment_date}`));
+      for (const appt of recurring) {
+        const originDate = new Date(appt.appointment_date + 'T00:00:00');
+        const endDate = appt.recurrence_end ? new Date(appt.recurrence_end + 'T23:59:59') : null;
+        const occurrences = expandRecurrence(appt.recurrence_rule, originDate, rangeStart, new Date(rangeEnd.getTime() + 86400000), endDate);
+        for (const date of occurrences) {
+          const dateStr = date.toISOString().slice(0, 10);
+          if (filters.date_from && dateStr < filters.date_from) continue;
+          if (filters.date_to && dateStr > filters.date_to) continue;
+          const key = `${appt.id}-${dateStr}`;
+          if (!existingDates.has(key)) {
+            appointments.push({ ...appt, appointment_date: dateStr, _recurring_source: appt.id });
+            existingDates.add(key);
+          }
+        }
+      }
+      appointments.sort((a, b) => (a.appointment_date + (a.appointment_time || '')).localeCompare(b.appointment_date + (b.appointment_time || '')));
+    }
+
     res.json(appointments);
   } catch (err) {
     res.status(500).json({ error: err.message });
