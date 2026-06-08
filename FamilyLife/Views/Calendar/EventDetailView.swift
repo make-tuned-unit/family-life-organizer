@@ -108,11 +108,12 @@ struct EventDetailView: View {
                 .padding(.bottom, 14)
 
                 // People
-                if let tags = appointment.person_tags, !tags.isEmpty {
+                if let tags = appointment.person_tags, !tags.isEmpty,
+                   !tags.contains("[object Object]") {
                     WarmSectionHeader(title: "People")
                         .padding(.bottom, 8)
 
-                    let names = tags.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
+                    let names = tags.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty && !$0.hasPrefix("[") }
                     VStack(spacing: 0) {
                         ForEach(Array(names.enumerated()), id: \.offset) { index, name in
                             if index > 0 { GlassDivider() }
