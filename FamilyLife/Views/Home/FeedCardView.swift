@@ -35,16 +35,19 @@ struct FeedCard: View {
             // Header — always visible
             header
 
-            // Title — show for all items that have one
-            if let title = item.title, !title.isEmpty, !prepared.isPost || prepared.body == nil {
-                Text(title)
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(WarmPalette.ink1)
-                    .padding(.horizontal, 14)
-                    .padding(.bottom, prepared.isPost || item.body != nil ? 4 : 12)
+            // Title — show for all items except plain text posts (where title is just truncated body)
+            if let title = item.title, !title.isEmpty {
+                let isPlainTextPost = prepared.isPost && (item.status == nil || item.status == "text")
+                if !isPlainTextPost {
+                    Text(title)
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(WarmPalette.ink1)
+                        .padding(.horizontal, 14)
+                        .padding(.bottom, 4)
+                }
             }
 
-            // Body text — for posts and non-posts with body content
+            // Body text — for posts (attributed) and non-posts (plain)
             if let body = prepared.body {
                 Text(body)
                     .font(.system(size: 15))
@@ -52,7 +55,7 @@ struct FeedCard: View {
                     .lineSpacing(3)
                     .padding(.horizontal, 14)
                     .padding(.bottom, 12)
-            } else if let bodyText = item.body, !bodyText.isEmpty, !prepared.isPost {
+            } else if let bodyText = item.body, !bodyText.isEmpty {
                 Text(bodyText)
                     .font(.system(size: 14))
                     .foregroundStyle(WarmPalette.ink2)
