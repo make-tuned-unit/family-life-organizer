@@ -580,3 +580,45 @@ INSERT OR IGNORE INTO budget_categories (name, monthly_limit, color)
   SELECT 'Pets', 150.00, '#fccb90' WHERE NOT EXISTS (SELECT 1 FROM budget_categories WHERE name='Pets');
 INSERT OR IGNORE INTO budget_categories (name, monthly_limit, color)
   SELECT 'Other', 100.00, '#a8edea' WHERE NOT EXISTS (SELECT 1 FROM budget_categories WHERE name='Other');
+
+-- Itinerary planner
+CREATE TABLE IF NOT EXISTS itineraries (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    traveler_id INTEGER NOT NULL,
+    traveler_name TEXT NOT NULL,
+    start_date TEXT NOT NULL,
+    end_date TEXT NOT NULL,
+    notes TEXT,
+    status TEXT DEFAULT 'planning',
+    group_id INTEGER,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (traveler_id) REFERENCES users(id),
+    FOREIGN KEY (group_id) REFERENCES groups(id)
+);
+
+CREATE TABLE IF NOT EXISTS itinerary_stays (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    itinerary_id INTEGER NOT NULL,
+    check_in TEXT NOT NULL,
+    check_out TEXT NOT NULL,
+    host_name TEXT,
+    host_user_id INTEGER,
+    host_contact_id INTEGER,
+    location_name TEXT,
+    address TEXT,
+    lat REAL,
+    lng REAL,
+    notes TEXT,
+    status TEXT DEFAULT 'draft',
+    calendar_event_id INTEGER,
+    host_calendar_event_id INTEGER,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (itinerary_id) REFERENCES itineraries(id) ON DELETE CASCADE,
+    FOREIGN KEY (host_user_id) REFERENCES users(id),
+    FOREIGN KEY (host_contact_id) REFERENCES contacts(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_itineraries_traveler ON itineraries(traveler_id);
+CREATE INDEX IF NOT EXISTS idx_itinerary_stays_itinerary ON itinerary_stays(itinerary_id);
+CREATE INDEX IF NOT EXISTS idx_itinerary_stays_host ON itinerary_stays(host_user_id);
