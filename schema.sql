@@ -589,6 +589,7 @@ CREATE TABLE IF NOT EXISTS itineraries (
     traveler_name TEXT NOT NULL,
     start_date TEXT NOT NULL,
     end_date TEXT NOT NULL,
+    travelers TEXT,
     notes TEXT,
     status TEXT DEFAULT 'planning',
     group_id INTEGER,
