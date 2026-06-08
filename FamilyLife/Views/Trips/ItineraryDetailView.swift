@@ -12,6 +12,9 @@ struct ItineraryDetailView: View {
     @State private var editingStay: ItineraryStayResponse?
     @State private var error: String?
     @State private var isSendingAll = false
+    @State private var tripExpenseTotal: Double = 0
+    @State private var tripExpenseCount: Int = 0
+    @State private var showingAddTripExpense = false
 
     var body: some View {
         ScrollView {
@@ -35,6 +38,35 @@ struct ItineraryDetailView: View {
                 }
                 .padding(DesignTokens.Spacing.cardPadding)
                 .flCard(tint: AccentTheme.ocean.color)
+                .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
+
+                // Trip expenses summary
+                if tripExpenseTotal > 0 || tripExpenseCount > 0 {
+                    HStack {
+                        Image(systemName: "creditcard.fill")
+                            .foregroundStyle(AccentTheme.saffron.color)
+                        Text("Trip Expenses")
+                            .font(.subheadline.weight(.semibold))
+                        Spacer()
+                        Text("$\(tripExpenseTotal, specifier: "%.2f")")
+                            .font(.subheadline.weight(.bold))
+                            .foregroundStyle(WarmPalette.ink1)
+                        Text("(\(tripExpenseCount) receipts)")
+                            .font(.caption)
+                            .foregroundStyle(WarmPalette.ink3)
+                    }
+                    .padding(DesignTokens.Spacing.cardPadding)
+                    .flCard(tint: AccentTheme.saffron.color)
+                    .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
+                }
+
+                Button {
+                    showingAddTripExpense = true
+                } label: {
+                    Label("Add Trip Expense", systemImage: "plus.circle.fill")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.flPrimary(tint: AccentTheme.saffron.color))
                 .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
 
                 // Send all requests button
@@ -81,8 +113,17 @@ struct ItineraryDetailView: View {
                 await loadStays()
             }
         }
-        .refreshable { await loadStays() }
-        .task { await loadStays() }
+        .sheet(isPresented: $showingAddTripExpense) {
+            AddReceiptView(preselectedCategory: "Trip", preselectedItinerary: itinerary)
+        }
+        .refreshable {
+            await loadStays()
+            await loadTripExpenses()
+        }
+        .task {
+            await loadStays()
+            await loadTripExpenses()
+        }
     }
 
     private func loadStays() async {
@@ -93,6 +134,13 @@ struct ItineraryDetailView: View {
             self.error = error.localizedDescription
         }
         isLoading = false
+    }
+
+    private func loadTripExpenses() async {
+        if let expenseData = try? await api.fetchItineraryExpenses(itineraryId: itinerary.id) {
+            tripExpenseTotal = expenseData.total
+            tripExpenseCount = expenseData.count
+        }
     }
 
     private func deleteStay(_ stay: ItineraryStayResponse) async {

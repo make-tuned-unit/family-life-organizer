@@ -27,9 +27,37 @@ struct ReceiptScannerView: View {
     @State private var editableTotal = ""
     @State private var editableMerchant = ""
     @State private var editableDate = ""
+    @State private var selectedItinerary: ItineraryResponse?
+    @State private var itineraries: [ItineraryResponse] = []
 
     private var isProjectMode: Bool { projectId != nil }
-    private static let defaultBudgetCategories = ["Groceries", "Dining Out", "Gas/Transport", "Household", "Health", "Pets", "Entertainment", "Kids", "Other"]
+
+    private var dateNeedsAttention: Bool {
+        guard !editableDate.isEmpty else { return false }
+        let parts = editableDate.split(separator: "-")
+        guard parts.count >= 2, let year = Int(parts[0]), let month = Int(parts[1]) else { return true }
+        let cal = Calendar.current
+        let now = Date()
+        let currentYear = cal.component(.year, from: now)
+        let currentMonth = cal.component(.month, from: now)
+        // Flag if date is more than 2 months from current month
+        let monthDiff = abs((currentYear * 12 + currentMonth) - (year * 12 + month))
+        return monthDiff > 2
+    }
+
+    private var formattedSavedMonth: String {
+        // Parse the YYYY-MM-DD date and format as "Month YYYY"
+        let parts = editableDate.split(separator: "-")
+        guard parts.count >= 2,
+              let year = Int(parts[0]),
+              let month = Int(parts[1]),
+              (1...12).contains(month) else {
+            return editableDate
+        }
+        let monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+        return "\(monthNames[month - 1]) \(year)"
+    }
+    private static let defaultBudgetCategories = ["Groceries", "Dining Out", "Gas/Transport", "Household", "Health", "Pets", "Entertainment", "Kids", "Trip", "Other"]
 
     var body: some View {
         NavigationStack {
@@ -99,7 +127,10 @@ struct ReceiptScannerView: View {
                 }
             }
             .interactiveDismissDisabled(isSaving)
-            .task { await loadBudgetCategories() }
+            .task {
+                await loadBudgetCategories()
+                itineraries = (try? await api.fetchItineraries()) ?? []
+            }
             .onChange(of: selectedPhoto) { loadAndScan() }
             .sheet(isPresented: $showingCamera) {
                 CameraView { data in
@@ -182,10 +213,17 @@ struct ReceiptScannerView: View {
 
                 HStack {
                     VStack(alignment: .leading, spacing: 6) {
-                        Text("Date").font(.caption.weight(.medium)).foregroundStyle(WarmPalette.ink3)
+                        HStack(spacing: 4) {
+                            Text("Date").font(.caption.weight(.medium)).foregroundStyle(WarmPalette.ink3)
+                            if dateNeedsAttention {
+                                Image(systemName: "exclamationmark.triangle.fill")
+                                    .font(.caption2)
+                                    .foregroundStyle(AccentTheme.saffron.color)
+                            }
+                        }
                         TextField("YYYY-MM-DD", text: $editableDate)
                             .font(.subheadline)
-                            .foregroundStyle(WarmPalette.ink2)
+                            .foregroundStyle(dateNeedsAttention ? .red : WarmPalette.ink2)
                     }
                     Spacer()
                     VStack(alignment: .trailing, spacing: 6) {
@@ -257,16 +295,44 @@ struct ReceiptScannerView: View {
                 }
             }
 
+            if selectedCategory == "Trip" {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Which trip?")
+                        .font(.subheadline.weight(.medium))
+                    ForEach(itineraries) { itin in
+                        Button {
+                            selectedItinerary = itin
+                        } label: {
+                            HStack {
+                                Text(itin.title)
+                                    .foregroundStyle(.primary)
+                                Spacer()
+                                if selectedItinerary?.id == itin.id {
+                                    Image(systemName: "checkmark")
+                                        .foregroundStyle(AccentTheme.ocean.color)
+                                }
+                            }
+                            .padding(.vertical, 4)
+                        }
+                    }
+                }
+            }
+
             if currentScanSaved {
-                // Confirmed saved — show success state
-                HStack(spacing: 10) {
-                    Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 20))
-                        .foregroundStyle(WarmPalette.good)
-                    Text("Receipt saved!")
-                        .font(.headline)
-                        .foregroundStyle(WarmPalette.good)
-                    Spacer()
+                // Confirmed saved — show success state with details
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(spacing: 10) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.system(size: 20))
+                            .foregroundStyle(WarmPalette.good)
+                        Text("Receipt saved!")
+                            .font(.headline)
+                            .foregroundStyle(WarmPalette.good)
+                        Spacer()
+                    }
+                    Text("$\(editableTotal) → \(selectedCategory) • \(formattedSavedMonth)")
+                        .font(.subheadline)
+                        .foregroundStyle(WarmPalette.ink3)
                 }
                 .padding()
                 .background(WarmPalette.good.opacity(0.1))
@@ -435,7 +501,8 @@ struct ReceiptScannerView: View {
                 savedCount += 1
                 Task.detached { await onProjectExpenseSaved?() }
             } else {
-                let savedId = try await api.saveScannedReceipt(result: result, category: selectedCategory, notes: itemDetail)
+                let itinId = selectedCategory == "Trip" ? selectedItinerary?.id : nil
+                let savedId = try await api.saveScannedReceipt(result: result, category: selectedCategory, notes: itemDetail, itineraryId: itinId)
                 guard savedId > 0 else {
                     self.error = "Receipt save did not return a valid id. Try again."
                     return
