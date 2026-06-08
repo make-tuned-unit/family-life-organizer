@@ -985,6 +985,52 @@ final class APIService {
         let _: SuccessResponse = try await post("/api/coverage/incoming/\(requestId)/approve", body: data)
     }
 
+    // MARK: - Itineraries
+
+    func fetchItineraries() async throws -> [ItineraryResponse] {
+        try await get("/api/itineraries")
+    }
+
+    func createItinerary(_ data: [String: Any]) async throws -> IDResponse {
+        try await post("/api/itineraries", body: data)
+    }
+
+    func updateItinerary(id: Int, data: [String: Any]) async throws {
+        let _: SuccessResponse = try await put("/api/itineraries/\(id)", body: data)
+    }
+
+    func deleteItinerary(id: Int) async throws {
+        let _: SuccessResponse = try await delete("/api/itineraries/\(id)")
+    }
+
+    func fetchItineraryStays(itineraryId: Int) async throws -> [ItineraryStayResponse] {
+        try await get("/api/itineraries/\(itineraryId)/stays")
+    }
+
+    func addItineraryStay(itineraryId: Int, data: [String: Any]) async throws -> IDResponse {
+        try await post("/api/itineraries/\(itineraryId)/stays", body: data)
+    }
+
+    func updateItineraryStay(itineraryId: Int, stayId: Int, data: [String: Any]) async throws {
+        let _: SuccessResponse = try await put("/api/itineraries/\(itineraryId)/stays/\(stayId)", body: data)
+    }
+
+    func deleteItineraryStay(itineraryId: Int, stayId: Int) async throws {
+        let _: SuccessResponse = try await delete("/api/itineraries/\(itineraryId)/stays/\(stayId)")
+    }
+
+    func requestStay(stayId: Int) async throws {
+        let _: SuccessResponse = try await post("/api/stays/\(stayId)/request", body: [:] as [String: String])
+    }
+
+    func respondToStay(stayId: Int, approved: Bool) async throws {
+        let _: SuccessResponse = try await post("/api/stays/\(stayId)/respond", body: ["approved": approved])
+    }
+
+    func fetchPendingStayRequests() async throws -> [ItineraryStayResponse] {
+        try await get("/api/stays/pending")
+    }
+
     // MARK: - Networking
 
     struct SuccessResponse: Codable {

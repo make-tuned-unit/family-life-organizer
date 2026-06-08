@@ -97,6 +97,10 @@
 		AA000080 /* IncomingCoverageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000080 /* IncomingCoverageView.swift */; };
 		AA000081 /* MyCoverageRequestsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000081 /* MyCoverageRequestsView.swift */; };
 		AA000082 /* TripDisplayHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000082 /* TripDisplayHelpers.swift */; };
+		AA000083 /* Itinerary.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000083 /* Itinerary.swift */; };
+		AA000084 /* ItineraryListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000084 /* ItineraryListView.swift */; };
+		AA000085 /* ItineraryDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000085 /* ItineraryDetailView.swift */; };
+		AA000086 /* AddStayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000086 /* AddStayView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -190,6 +194,10 @@
 		BB000080 /* IncomingCoverageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IncomingCoverageView.swift; sourceTree = "<group>"; };
 		BB000081 /* MyCoverageRequestsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MyCoverageRequestsView.swift; sourceTree = "<group>"; };
 		BB000082 /* TripDisplayHelpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripDisplayHelpers.swift; sourceTree = "<group>"; };
+		BB000083 /* Itinerary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Itinerary.swift; sourceTree = "<group>"; };
+		BB000084 /* ItineraryListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ItineraryListView.swift; sourceTree = "<group>"; };
+		BB000085 /* ItineraryDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ItineraryDetailView.swift; sourceTree = "<group>"; };
+		BB000086 /* AddStayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddStayView.swift; sourceTree = "<group>"; };
 		CC000001 /* FamilyLife.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = FamilyLife.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -257,6 +265,7 @@
 				BB000025 /* Rivalry.swift */,
 				BB00002C /* Decision.swift */,
 				BB000031 /* Gift.swift */,
+				BB000083 /* Itinerary.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -377,6 +386,9 @@
 				BB000023 /* NewTripView.swift */,
 				BB000024 /* FamilyAddressesView.swift */,
 				BB000082 /* TripDisplayHelpers.swift */,
+				BB000084 /* ItineraryListView.swift */,
+				BB000085 /* ItineraryDetailView.swift */,
+				BB000086 /* AddStayView.swift */,
 			);
 			path = Trips;
 			sourceTree = "<group>";
@@ -575,6 +587,10 @@
 				AA000023 /* NewTripView.swift in Sources */,
 				AA000024 /* FamilyAddressesView.swift in Sources */,
 				AA000082 /* TripDisplayHelpers.swift in Sources */,
+				AA000083 /* Itinerary.swift in Sources */,
+				AA000084 /* ItineraryListView.swift in Sources */,
+				AA000085 /* ItineraryDetailView.swift in Sources */,
+				AA000086 /* AddStayView.swift in Sources */,
 				AA000025 /* Rivalry.swift in Sources */,
 				AA000026 /* HealthKitManager.swift in Sources */,
 				AA000027 /* RivalriesView.swift in Sources */,
@@ -639,9 +655,12 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = FamilyLife/FamilyLife.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 82;
+				CURRENT_PROJECT_VERSION = 98;
 				DEVELOPMENT_ASSET_PATHS = "";
+				DEVELOPMENT_TEAM = GANM22MFCH;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = Kinrows;
@@ -665,6 +684,7 @@
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.mylauft.kinrows;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -676,9 +696,12 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = FamilyLife/FamilyLife.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 82;
+				CURRENT_PROJECT_VERSION = 98;
 				DEVELOPMENT_ASSET_PATHS = "";
+				DEVELOPMENT_TEAM = GANM22MFCH;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = Kinrows;
@@ -702,6 +725,7 @@
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.mylauft.kinrows;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
