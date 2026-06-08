@@ -64,6 +64,7 @@ struct ItineraryDetailView: View {
                 .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
             }
             .padding(.vertical)
+            .padding(.bottom, 80)
         }
         .background { AmbientBackground(style: .trips) }
         .navigationTitle(itinerary.title)
@@ -231,14 +232,29 @@ struct TimelineDayRow: View {
                     .padding(.vertical, 8)
                 }
                 .padding(.bottom, 4)
-            } else {
-                // Continuation of a stay — show thin bar
-                HStack {
-                    RoundedRectangle(cornerRadius: 4)
-                        .fill(stayStatusColor(day.stay!).opacity(0.2))
-                        .frame(height: 4)
+            } else if let stay = day.stay {
+                // Continuation day — show compact host row
+                HStack(spacing: 8) {
+                    if let host = stay.host_name {
+                        FamilyAvatar(initial: String(host.prefix(1)).uppercased(), size: 22)
+                        Text(host)
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(WarmPalette.ink2)
+                    } else {
+                        Image(systemName: "house.fill")
+                            .font(.caption)
+                            .foregroundStyle(stayStatusColor(stay))
+                        Text(stay.location_name ?? "Stay")
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(WarmPalette.ink2)
+                    }
+                    Spacer()
                 }
-                .padding(.vertical, 12)
+                .padding(.vertical, 6)
+                .padding(.horizontal, 8)
+                .background(stayStatusColor(stay).opacity(0.08))
+                .clipShape(RoundedRectangle(cornerRadius: 6))
+                .padding(.bottom, 2)
             }
         }
     }

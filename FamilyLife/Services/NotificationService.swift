@@ -388,6 +388,13 @@ final class NotificationService {
         for rivalry in rivalries {
             guard rivalry.status == RivalryStatus.active.rawValue || rivalry.status == RivalryStatus.pending.rawValue else { continue }
             guard let endDate = rivalry.endDate, endDate > now else { continue }
+            // Only schedule for rivalries the user is actually in
+            let isParticipant = rivalry.participantNames.contains {
+                $0.localizedCaseInsensitiveCompare(myName) == .orderedSame
+                || $0.lowercased().hasPrefix(myName.lowercased() + " ")
+                || myName.lowercased().hasPrefix($0.lowercased() + " ")
+            }
+            guard isParticipant else { continue }
             let startDate = ISO8601DateFormatter.flexible.date(from: rivalry.start_date)
                 ?? DateFormatter.isoDate.date(from: rivalry.start_date)
                 ?? now
