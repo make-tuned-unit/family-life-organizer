@@ -290,6 +290,32 @@ class FamilyDB {
               console.log(`Backfill: normalized ${fixed} rivalry entry names to match participant names`);
             }
           });
+          // Consolidate duplicate HealthKit entries per rivalry per member per day
+          // Multiple syncs on the same day should be one entry (the largest value)
+          this.db.all(`
+            SELECT rivalry_id, member_name, date(logged_at) as log_date,
+              MAX(id) as keep_id, COUNT(*) as cnt, SUM(value) as total_value, MAX(value) as max_value
+            FROM rivalry_entries
+            WHERE note = 'Synced from Apple Health'
+            GROUP BY rivalry_id, member_name, date(logged_at)
+            HAVING cnt > 1
+          `, (dedupErr, groups) => {
+            if (dedupErr || !groups || !groups.length) { /* no dupes */ }
+            else {
+              let cleaned = 0;
+              for (const g of groups) {
+                // Keep only the entry with the highest value for each day, delete the rest
+                this.db.run(`DELETE FROM rivalry_entries
+                  WHERE rivalry_id = ? AND member_name = ? AND date(logged_at) = ?
+                  AND note = 'Synced from Apple Health' AND id != ?`,
+                  [g.rivalry_id, g.member_name, g.log_date, g.keep_id]);
+                // Update the kept entry to have the max single-sync value (not cumulative duplicates)
+                this.db.run(`UPDATE rivalry_entries SET value = ? WHERE id = ?`, [g.max_value, g.keep_id]);
+                cleaned += g.cnt - 1;
+              }
+              if (cleaned > 0) console.log(`Backfill: consolidated ${cleaned} duplicate HealthKit entries`);
+            }
+          });
           resolve();
         });
       });
@@ -1076,16 +1102,35 @@ class FamilyDB {
 
   addRivalryEntry(entry) {
     return new Promise((resolve, reject) => {
-      this.db.run(
-        `INSERT INTO rivalry_entries (rivalry_id, member_name, value, note, is_verified)
-         VALUES (?, ?, ?, ?, ?)`,
-        [entry.rivalry_id, entry.member_name, entry.value, entry.note || null, entry.is_verified ? 1 : 0],
-        function(err) {
-          if (err) reject(err);
-          else resolve({ id: this.lastID, ...entry });
-        }
-      );
+      // For HealthKit syncs, prevent duplicates within a 5-minute window
+      if (entry.note === 'Synced from Apple Health') {
+        this.db.get(
+          `SELECT id FROM rivalry_entries
+           WHERE rivalry_id = ? AND member_name = ? AND note = 'Synced from Apple Health'
+           AND datetime(logged_at) > datetime('now', '-5 minutes')`,
+          [entry.rivalry_id, entry.member_name],
+          (err, existing) => {
+            if (err) return reject(err);
+            if (existing) return resolve({ id: existing.id, deduplicated: true, ...entry });
+            this._insertRivalryEntry(entry, resolve, reject);
+          }
+        );
+      } else {
+        this._insertRivalryEntry(entry, resolve, reject);
+      }
     });
+  }
+
+  _insertRivalryEntry(entry, resolve, reject) {
+    this.db.run(
+      `INSERT INTO rivalry_entries (rivalry_id, member_name, value, note, is_verified)
+       VALUES (?, ?, ?, ?, ?)`,
+      [entry.rivalry_id, entry.member_name, entry.value, entry.note || null, entry.is_verified ? 1 : 0],
+      function(err) {
+        if (err) reject(err);
+        else resolve({ id: this.lastID, ...entry });
+      }
+    );
   }
 
   getUserIdByName(name) {
