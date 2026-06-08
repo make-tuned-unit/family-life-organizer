@@ -52,6 +52,13 @@ struct ItineraryListView: View {
                                 ItineraryCard(itinerary: itinerary)
                             }
                             .buttonStyle(.plain)
+                            .contextMenu {
+                                Button(role: .destructive) {
+                                    Task { await deleteItinerary(itinerary) }
+                                } label: {
+                                    Label("Delete Itinerary", systemImage: "trash")
+                                }
+                            }
                         }
                     }
                     .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
@@ -74,6 +81,24 @@ struct ItineraryListView: View {
         }
         .refreshable { await loadAll() }
         .task { await loadAll() }
+        .alert("Error", isPresented: errorAlertIsPresented) {
+            Button("OK") { error = nil }
+        } message: {
+            Text(error ?? "")
+        }
+    }
+
+    private var errorAlertIsPresented: Binding<Bool> {
+        Binding(get: { error != nil }, set: { if !$0 { error = nil } })
+    }
+
+    private func deleteItinerary(_ itinerary: ItineraryResponse) async {
+        do {
+            try await api.deleteItinerary(id: itinerary.id)
+            await loadAll()
+        } catch {
+            self.error = error.localizedDescription
+        }
     }
 
     private func loadAll() async {
@@ -232,6 +257,11 @@ struct NewItinerarySheet: View {
                     }
                     .disabled(title.isEmpty || isSaving)
                 }
+            }
+            .alert("Couldn't create itinerary", isPresented: Binding(get: { error != nil }, set: { if !$0 { error = nil } })) {
+                Button("OK") { error = nil }
+            } message: {
+                Text(error ?? "")
             }
         }
     }
