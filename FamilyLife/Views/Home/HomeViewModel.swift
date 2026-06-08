@@ -114,7 +114,7 @@ final class HomeViewModel {
         // Filter out comment/reaction events — those are for notifications only
         items.filter { $0.feed_type != "comment" && $0.feed_type != "reaction" }.map { item in
             let isPost = item.feed_type == "post"
-            let accent = accentColor(for: item.feed_type)
+            let accent = accentColor(for: item.feed_type, postType: item.status)
             let body: AttributedString? = if isPost, let text = item.body, !text.isEmpty {
                 buildAttributedBody(text, accent: accent)
             } else {
@@ -155,13 +155,19 @@ final class HomeViewModel {
         return date.formatted(.relative(presentation: .named))
     }
 
-    private static func accentColor(for feedType: String) -> Color {
+    static func accentColor(for feedType: String, postType: String? = nil) -> Color {
         switch feedType {
         case "decision": TabAccent.decisions.color
         case "event":    TabAccent.calendar.color
         case "coverage": TabAccent.care.color
         case "rivalry":  AccentTheme.saffron.color
-        case "post":     AccentTheme.ocean.color
+        case "post":
+            switch postType {
+            case "event":             TabAccent.calendar.color
+            case "rivalry":           AccentTheme.saffron.color
+            case "decision", "poll":  TabAccent.decisions.color
+            default:                  AccentTheme.ocean.color
+            }
         default:         WarmPalette.ink3
         }
     }

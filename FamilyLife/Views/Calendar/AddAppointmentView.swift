@@ -205,10 +205,14 @@ struct AddAppointmentView: View {
         if let groupId = shareGroupId {
             let dateStr = date.formatted(date: .abbreviated, time: .omitted)
             let timeStr = includeTime ? " at \(DateFormatter.hourMinute.string(from: time))" : ""
+            var eventBody = "\(dateStr)\(timeStr)"
+            if !location.isEmpty { eventBody += "\n\(location)" }
+            if !personTags.isEmpty { eventBody += "\nWith \(personTags.sorted().joined(separator: ", "))" }
+            if recurrence != .none { eventBody += "\nRepeats \(recurrence.rawValue)" }
             _ = try? await api.addFeedPost(groupId: groupId, data: [
                 "post_type": "event",
-                "title": title,
-                "body": "\(dateStr)\(timeStr)\(!location.isEmpty ? " \u{00B7} \(location)" : "")"
+                "title": "New event: \(title)",
+                "body": eventBody
             ])
         }
         if addReminder {
