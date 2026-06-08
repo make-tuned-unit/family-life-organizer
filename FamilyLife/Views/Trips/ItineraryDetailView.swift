@@ -88,6 +88,8 @@ struct ItineraryDetailView: View {
                         TimelineDayRow(day: day, onTapOpen: {
                             editingStay = nil
                             showingAddStay = true
+                        }, onEdit: { stay in
+                            editingStay = stay
                         }, onDelete: { stay in
                             Task { await deleteStay(stay) }
                         })
@@ -115,6 +117,11 @@ struct ItineraryDetailView: View {
         }
         .sheet(isPresented: $showingAddTripExpense) {
             AddReceiptView(preselectedCategory: "Trip", preselectedItinerary: itinerary)
+        }
+        .sheet(item: $editingStay) { stay in
+            EditStayView(itinerary: itinerary, stay: stay) {
+                await loadStays()
+            }
         }
         .refreshable {
             await loadStays()
@@ -243,6 +250,7 @@ struct TimelineDay {
 struct TimelineDayRow: View {
     let day: TimelineDay
     let onTapOpen: () -> Void
+    let onEdit: (ItineraryStayResponse) -> Void
     let onDelete: (ItineraryStayResponse) -> Void
 
     var body: some View {
@@ -272,7 +280,7 @@ struct TimelineDayRow: View {
 
             // Content
             if let stay = day.stay, day.isFirstNight {
-                StayCard(stay: stay, onDelete: { onDelete(stay) })
+                StayCard(stay: stay, onEdit: { onEdit(stay) }, onDelete: { onDelete(stay) })
                     .padding(.bottom, 4)
             } else if day.stay == nil {
                 Button(action: onTapOpen) {
@@ -350,6 +358,7 @@ struct TimelineDayRow: View {
 
 struct StayCard: View {
     let stay: ItineraryStayResponse
+    let onEdit: () -> Void
     let onDelete: () -> Void
 
     var body: some View {
@@ -405,10 +414,11 @@ struct StayCard: View {
         .padding(DesignTokens.Spacing.cardPadding)
         .flCard(tint: statusColor)
         .contextMenu {
-            if stay.status == "draft" {
-                Button(role: .destructive) { onDelete() } label: {
-                    Label("Remove Stay", systemImage: "trash")
-                }
+            Button { onEdit() } label: {
+                Label("Edit Stay", systemImage: "pencil")
+            }
+            Button(role: .destructive) { onDelete() } label: {
+                Label("Remove Stay", systemImage: "trash")
             }
         }
     }
