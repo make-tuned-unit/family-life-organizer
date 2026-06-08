@@ -2452,6 +2452,222 @@ app.get('/api/rivalries/leaderboard', requireAuth, async (req, res) => {
   }
 });
 
+// Itineraries
+app.get('/api/itineraries', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const itineraries = await db.getItineraries(req.session.user.id);
+    res.json(itineraries);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+app.post('/api/itineraries', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const data = { ...req.body };
+    data.traveler_id = req.session.user.id;
+    data.traveler_name = req.session.user.name;
+    if (!data.group_id) {
+      data.group_id = await db.getUserHouseholdId(req.session.user.id);
+    }
+    const result = await db.createItinerary(data);
+    res.json({ success: true, id: result.id });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+app.put('/api/itineraries/:id', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    await db.updateItinerary(req.params.id, req.body);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+app.delete('/api/itineraries/:id', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    await db.deleteItinerary(req.params.id);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+app.get('/api/itineraries/:id/stays', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const stays = await db.getItineraryStays(req.params.id);
+    res.json(stays);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+app.post('/api/itineraries/:id/stays', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const stay = { ...req.body, itinerary_id: Number(req.params.id) };
+    const result = await db.addItineraryStay(stay);
+    res.json({ success: true, id: result.id });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+app.put('/api/itineraries/:id/stays/:stayId', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    await db.updateItineraryStay(req.params.stayId, req.body);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+app.delete('/api/itineraries/:id/stays/:stayId', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    await db.deleteItineraryStay(req.params.stayId);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+// Send stay request to host
+app.post('/api/stays/:stayId/request', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const stay = await db.getItineraryStayById(req.params.stayId);
+    if (!stay) return res.status(404).json({ error: 'Stay not found' });
+
+    await db.updateItineraryStay(stay.id, { status: 'requested' });
+
+    // Push notification to host if they're an app user
+    if (stay.host_user_id) {
+      const itinerary = await db.getItineraryById(stay.itinerary_id);
+      const traveler = itinerary?.traveler_name || 'Someone';
+      push.pushToUser(db, stay.host_user_id,
+        `${traveler} wants to stay with you`,
+        `${stay.check_in} to ${stay.check_out}${stay.notes ? ' — ' + stay.notes : ''}`,
+        { type: 'stay_request', ref_id: stay.id }
+      );
+    }
+
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+// Host responds to stay request
+app.post('/api/stays/:stayId/respond', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const stay = await db.getItineraryStayById(req.params.stayId);
+    if (!stay) return res.status(404).json({ error: 'Stay not found' });
+
+    const { approved } = req.body;
+    const itinerary = await db.getItineraryById(stay.itinerary_id);
+    const travelerName = itinerary?.traveler_name || 'Visitor';
+    const hostName = req.session.user.name;
+
+    if (approved) {
+      // Create calendar event for traveler
+      const travelerEvent = await db.addAppointment({
+        title: `Staying at ${hostName}'s`,
+        appointment_date: stay.check_in,
+        description: `${stay.check_in} to ${stay.check_out}${stay.location_name ? ' · ' + stay.location_name : ''}`,
+        location: stay.address || stay.location_name || null,
+        category: 'social',
+        with_person: hostName,
+        group_id: itinerary?.group_id || null
+      });
+
+      // Create calendar event for host
+      const hostGroupId = await db.getUserHouseholdId(req.session.user.id);
+      const hostEvent = await db.addAppointment({
+        title: `${travelerName} visiting`,
+        appointment_date: stay.check_in,
+        description: `${stay.check_in} to ${stay.check_out}`,
+        location: stay.address || stay.location_name || null,
+        category: 'social',
+        with_person: travelerName,
+        group_id: hostGroupId
+      });
+
+      await db.updateItineraryStay(stay.id, {
+        status: 'confirmed',
+        calendar_event_id: travelerEvent.id,
+        host_calendar_event_id: hostEvent.id
+      });
+
+      // Notify traveler
+      if (itinerary?.traveler_id) {
+        push.pushToUser(db, itinerary.traveler_id,
+          `${hostName} confirmed your stay!`,
+          `${stay.check_in} to ${stay.check_out} is all set`,
+          { type: 'stay_confirmed', ref_id: stay.id }
+        );
+      }
+    } else {
+      await db.updateItineraryStay(stay.id, { status: 'declined' });
+
+      // Notify traveler
+      if (itinerary?.traveler_id) {
+        push.pushToUser(db, itinerary.traveler_id,
+          `${hostName} can't host ${stay.check_in} to ${stay.check_out}`,
+          'You may need to adjust your itinerary',
+          { type: 'stay_declined', ref_id: stay.id }
+        );
+      }
+    }
+
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+// Get pending stay requests for current user (as host)
+app.get('/api/stays/pending', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const pending = await db.getPendingStayRequests(req.session.user.id);
+    res.json(pending);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
 // Gifts
 app.get('/api/gifts/people', requireAuth, async (req, res) => {
   const db = new FamilyDB();

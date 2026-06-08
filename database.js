@@ -1192,6 +1192,132 @@ class FamilyDB {
     });
   }
 
+  // Itinerary operations
+  createItinerary(data) {
+    return new Promise((resolve, reject) => {
+      this.db.run(
+        `INSERT INTO itineraries (title, traveler_id, traveler_name, start_date, end_date, notes, status, group_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [data.title, data.traveler_id, data.traveler_name, data.start_date, data.end_date, data.notes || null, data.status || 'planning', data.group_id || null],
+        function(err) {
+          if (err) reject(err);
+          else resolve({ id: this.lastID, ...data });
+        }
+      );
+    });
+  }
+
+  getItineraries(userId) {
+    return new Promise((resolve, reject) => {
+      const uid = parseInt(userId);
+      this.db.all(
+        `SELECT * FROM itineraries WHERE traveler_id = ? OR group_id IN (SELECT group_id FROM group_members WHERE user_id = ?) ORDER BY datetime(start_date) DESC`,
+        [uid, uid],
+        (err, rows) => err ? reject(err) : resolve(rows || [])
+      );
+    });
+  }
+
+  getItineraryById(id) {
+    return new Promise((resolve, reject) => {
+      this.db.get('SELECT * FROM itineraries WHERE id = ?', [id], (err, row) => err ? reject(err) : resolve(row));
+    });
+  }
+
+  updateItinerary(id, updates) {
+    return new Promise((resolve, reject) => {
+      const fields = [];
+      const params = [];
+      for (const [key, value] of Object.entries(updates)) {
+        fields.push(`${key} = ?`);
+        params.push(value);
+      }
+      params.push(id);
+      this.db.run(`UPDATE itineraries SET ${fields.join(', ')} WHERE id = ?`, params, (err) => {
+        if (err) reject(err);
+        else resolve({ id, ...updates });
+      });
+    });
+  }
+
+  deleteItinerary(id) {
+    return new Promise((resolve, reject) => {
+      this.db.run('DELETE FROM itineraries WHERE id = ?', [id], function(err) {
+        if (err) reject(err);
+        else resolve({ deleted: this.changes });
+      });
+    });
+  }
+
+  addItineraryStay(stay) {
+    return new Promise((resolve, reject) => {
+      this.db.run(
+        `INSERT INTO itinerary_stays (itinerary_id, check_in, check_out, host_name, host_user_id, host_contact_id, location_name, address, lat, lng, notes, status)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [stay.itinerary_id, stay.check_in, stay.check_out, stay.host_name || null, stay.host_user_id || null, stay.host_contact_id || null, stay.location_name || null, stay.address || null, stay.lat || null, stay.lng || null, stay.notes || null, stay.status || 'draft'],
+        function(err) {
+          if (err) reject(err);
+          else resolve({ id: this.lastID, ...stay });
+        }
+      );
+    });
+  }
+
+  getItineraryStays(itineraryId) {
+    return new Promise((resolve, reject) => {
+      this.db.all(
+        'SELECT * FROM itinerary_stays WHERE itinerary_id = ? ORDER BY check_in ASC',
+        [itineraryId],
+        (err, rows) => err ? reject(err) : resolve(rows || [])
+      );
+    });
+  }
+
+  updateItineraryStay(id, updates) {
+    return new Promise((resolve, reject) => {
+      const fields = [];
+      const params = [];
+      for (const [key, value] of Object.entries(updates)) {
+        fields.push(`${key} = ?`);
+        params.push(value);
+      }
+      params.push(id);
+      this.db.run(`UPDATE itinerary_stays SET ${fields.join(', ')} WHERE id = ?`, params, (err) => {
+        if (err) reject(err);
+        else resolve({ id, ...updates });
+      });
+    });
+  }
+
+  deleteItineraryStay(id) {
+    return new Promise((resolve, reject) => {
+      this.db.run('DELETE FROM itinerary_stays WHERE id = ?', [id], function(err) {
+        if (err) reject(err);
+        else resolve({ deleted: this.changes });
+      });
+    });
+  }
+
+  getItineraryStayById(id) {
+    return new Promise((resolve, reject) => {
+      this.db.get('SELECT * FROM itinerary_stays WHERE id = ?', [id], (err, row) => err ? reject(err) : resolve(row));
+    });
+  }
+
+  getPendingStayRequests(userId) {
+    return new Promise((resolve, reject) => {
+      this.db.all(
+        `SELECT s.*, i.title as itinerary_title, i.traveler_name
+         FROM itinerary_stays s
+         JOIN itineraries i ON i.id = s.itinerary_id
+         WHERE s.host_user_id = ? AND s.status = 'requested'
+         ORDER BY s.check_in ASC`,
+        [userId],
+        (err, rows) => err ? reject(err) : resolve(rows || [])
+      );
+    });
+  }
+
   // Gift operations
   addGiftPerson(person) {
     return new Promise((resolve, reject) => {

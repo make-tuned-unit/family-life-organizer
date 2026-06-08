@@ -37,6 +37,10 @@ struct MoreView: View {
                         moreRow(icon: "car.fill", title: "Trips", subtitle: "Share departures and ETA updates", color: AccentTheme.ocean.color)
                     }
 
+                    NavigationLink { ItineraryListView() } label: {
+                        moreRow(icon: "map.fill", title: "Itineraries", subtitle: "Plan stays with family and friends", color: AccentTheme.ocean.color)
+                    }
+
                     NavigationLink { FamilyAddressesView() } label: {
                         moreRow(icon: "mappin.and.ellipse", title: "Addresses", subtitle: "Saved family locations", color: TabAccent.home.color)
                     }
