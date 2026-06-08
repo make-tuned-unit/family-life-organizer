@@ -135,3 +135,107 @@ struct AddStayView: View {
         }
     }
 }
+
+// MARK: - Edit Stay View
+
+struct EditStayView: View {
+    @Environment(APIService.self) private var api
+    @Environment(\.dismiss) private var dismiss
+
+    let itinerary: ItineraryResponse
+    let stay: ItineraryStayResponse
+    let onSaved: () async -> Void
+
+    @State private var checkIn: Date
+    @State private var checkOut: Date
+    @State private var locationName: String
+    @State private var notes: String
+    @State private var isSaving = false
+    @State private var error: String?
+
+    init(itinerary: ItineraryResponse, stay: ItineraryStayResponse, onSaved: @escaping () async -> Void) {
+        self.itinerary = itinerary
+        self.stay = stay
+        self.onSaved = onSaved
+        _checkIn = State(initialValue: stay.checkInDate ?? Date())
+        _checkOut = State(initialValue: stay.checkOutDate ?? Date())
+        _locationName = State(initialValue: stay.location_name ?? "")
+        _notes = State(initialValue: stay.notes ?? "")
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                if let host = stay.host_name {
+                    Section("Host") {
+                        HStack {
+                            FamilyAvatar(initial: String(host.prefix(1)).uppercased(), size: 28)
+                            Text(host)
+                        }
+                    }
+                }
+                Section("Dates") {
+                    DatePicker("Check in", selection: $checkIn, in: dateRange, displayedComponents: .date)
+                    DatePicker("Check out", selection: $checkOut, in: checkIn...(itinerary.endDate ?? Date.distantFuture), displayedComponents: .date)
+                        .onChange(of: checkIn) { _, newVal in
+                            if checkOut <= newVal {
+                                checkOut = Calendar.current.date(byAdding: .day, value: 1, to: newVal) ?? newVal
+                            }
+                        }
+                }
+                Section("Location") {
+                    TextField("Place name", text: $locationName)
+                }
+                Section("Notes") {
+                    TextField("Notes", text: $notes, axis: .vertical)
+                        .lineLimit(3)
+                }
+            }
+            .navigationTitle("Edit Stay")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") {
+                        Task { await save() }
+                    }
+                    .disabled(isSaving)
+                }
+            }
+            .alert("Error", isPresented: Binding(get: { error != nil }, set: { if !$0 { error = nil } })) {
+                Button("OK") { error = nil }
+            } message: {
+                Text(error ?? "")
+            }
+        }
+    }
+
+    private var dateRange: ClosedRange<Date> {
+        let start = itinerary.startDate ?? Date.distantPast
+        let end = itinerary.endDate ?? Date.distantFuture
+        return start...end
+    }
+
+    private func save() async {
+        isSaving = true
+        let fmt = DateFormatter()
+        fmt.dateFormat = "yyyy-MM-dd"
+        var data: [String: Any] = [
+            "check_in": fmt.string(from: checkIn),
+            "check_out": fmt.string(from: checkOut)
+        ]
+        if !locationName.isEmpty { data["location_name"] = locationName }
+        if !notes.isEmpty { data["notes"] = notes }
+
+        do {
+            try await api.updateItineraryStay(itineraryId: itinerary.id, stayId: stay.id, data: data)
+            await onSaved()
+            dismiss()
+        } catch {
+            self.error = error.localizedDescription
+            isSaving = false
+        }
+    }
+}
