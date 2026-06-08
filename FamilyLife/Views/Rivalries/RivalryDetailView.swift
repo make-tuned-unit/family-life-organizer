@@ -10,6 +10,7 @@ struct RivalryDetailView: View {
     @State private var error: String?
     @State private var healthSteps: Double?
     @State private var isSyncingSteps = false
+    @State private var hasAutoSynced = false
     @State private var completionMessage: String?
     @State private var showingLevelUp: FamilyTier?
     @State private var healthKit = HealthKitManager()
@@ -239,7 +240,8 @@ struct RivalryDetailView: View {
         }
         .task {
             await loadEntries()
-            if currentRivalry.challengeType.isHealthKitSynced {
+            if currentRivalry.challengeType.isHealthKitSynced && !hasAutoSynced {
+                hasAutoSynced = true
                 await fetchHealthData()
                 // Auto-sync from HealthKit without requiring manual tap
                 if let hkSteps = healthSteps {
@@ -338,13 +340,7 @@ struct RivalryDetailView: View {
     }
 
     private func autoCompleteRivalry() async {
-        // Auto-sync steps first if applicable
-        if currentRivalry.challengeType.isHealthKitSynced, let hkSteps = healthSteps {
-            let delta = hkSteps - myLoggedTotal
-            if delta > 0 {
-                await syncStepsFromHealth(delta: delta)
-            }
-        }
+        // Steps already synced by .task — just complete
         await completeRivalry()
     }
 
