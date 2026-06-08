@@ -106,28 +106,35 @@ struct ItineraryDetailView: View {
 
     private func sendAllRequests() async {
         isSendingAll = true
+        var failCount = 0
         for stay in stays where stay.status == "draft" && stay.host_user_id != nil {
             do {
                 try await api.requestStay(stayId: stay.id)
             } catch {
-                // Continue sending others even if one fails
+                failCount += 1
             }
         }
         await loadStays()
+        if failCount > 0 {
+            self.error = "Failed to send \(failCount) request(s). Please try again."
+        }
         isSendingAll = false
     }
 
     // MARK: - Computed
 
+    private static let monthDayFmt: DateFormatter = {
+        let f = DateFormatter(); f.dateFormat = "MMM d"; return f
+    }()
+    private static let monthDayYearFmt: DateFormatter = {
+        let f = DateFormatter(); f.dateFormat = "MMM d, yyyy"; return f
+    }()
+
     private var dateRange: String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "MMM d"
         guard let start = itinerary.startDate, let end = itinerary.endDate else {
             return "\(itinerary.start_date) \u{2013} \(itinerary.end_date)"
         }
-        let yearFmt = DateFormatter()
-        yearFmt.dateFormat = "MMM d, yyyy"
-        return "\(formatter.string(from: start)) \u{2013} \(yearFmt.string(from: end))"
+        return "\(Self.monthDayFmt.string(from: start)) \u{2013} \(Self.monthDayYearFmt.string(from: end))"
     }
 
     private var totalNights: Int? {
@@ -159,7 +166,7 @@ struct ItineraryDetailView: View {
         var days: [TimelineDay] = []
         var current = start
 
-        while current < end {
+        while current <= end {
             let dateStr = DateFormatter.isoDate.string(from: current)
             let stay = stays.first { stayCoversDate(dateStr, stay: $0) }
             let isFirst = stay.map { $0.check_in == dateStr } ?? false
@@ -259,16 +266,19 @@ struct TimelineDayRow: View {
         }
     }
 
+    private static let weekdayFmt: DateFormatter = {
+        let f = DateFormatter(); f.dateFormat = "EEE"; return f
+    }()
+    private static let dayFmt: DateFormatter = {
+        let f = DateFormatter(); f.dateFormat = "d"; return f
+    }()
+
     private var dayOfWeek: String {
-        let fmt = DateFormatter()
-        fmt.dateFormat = "EEE"
-        return fmt.string(from: day.displayDate)
+        Self.weekdayFmt.string(from: day.displayDate)
     }
 
     private var dayNumber: String {
-        let fmt = DateFormatter()
-        fmt.dateFormat = "d"
-        return fmt.string(from: day.displayDate)
+        Self.dayFmt.string(from: day.displayDate)
     }
 
     private var dotColor: Color {

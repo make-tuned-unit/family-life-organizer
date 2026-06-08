@@ -142,15 +142,18 @@ struct ItineraryCard: View {
         .flCard(tint: AccentTheme.ocean.color)
     }
 
+    private static let monthDayFmt: DateFormatter = {
+        let f = DateFormatter(); f.dateFormat = "MMM d"; return f
+    }()
+    private static let monthDayYearFmt: DateFormatter = {
+        let f = DateFormatter(); f.dateFormat = "MMM d, yyyy"; return f
+    }()
+
     private var dateRange: String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "MMM d"
         guard let start = itinerary.startDate, let end = itinerary.endDate else {
             return "\(itinerary.start_date) – \(itinerary.end_date)"
         }
-        let yearFmt = DateFormatter()
-        yearFmt.dateFormat = "MMM d, yyyy"
-        return "\(formatter.string(from: start)) – \(yearFmt.string(from: end))"
+        return "\(Self.monthDayFmt.string(from: start)) – \(Self.monthDayYearFmt.string(from: end))"
     }
 
     private var statusColor: Color {
