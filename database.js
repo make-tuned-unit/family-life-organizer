@@ -301,8 +301,10 @@ class FamilyDB {
           // idempotent per-day total per member, so wiping active synced rows lets
           // them repopulate correctly on next sync. Completed rivalries keep their
           // stored final totals; manual entries (note != synced) are untouched.
+          // Only legacy rows (no activity_date) — new per-day rows survive restarts.
           this.db.run(`DELETE FROM rivalry_entries
             WHERE note = 'Synced from Apple Health'
+            AND activity_date IS NULL
             AND rivalry_id IN (SELECT id FROM rivalries WHERE status = 'active')`,
             function(delErr) {
               if (delErr) return;
