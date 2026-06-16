@@ -104,6 +104,11 @@ class FamilyDB {
         // Itinerary travelers column (added after initial table creation)
         this.db.run('ALTER TABLE itineraries ADD COLUMN travelers TEXT', () => {});
         this.db.run('ALTER TABLE receipts ADD COLUMN itinerary_id INTEGER REFERENCES itineraries(id)', () => {});
+        // Per-day HealthKit totals: one synced row per member per calendar day
+        this.db.run('ALTER TABLE rivalry_entries ADD COLUMN activity_date TEXT', () => {});
+        this.db.run(`CREATE UNIQUE INDEX IF NOT EXISTS idx_rivalry_entries_daily
+          ON rivalry_entries(rivalry_id, member_name, activity_date)
+          WHERE note = 'Synced from Apple Health'`, () => {});
         this.db.run('ALTER TABLE users ADD COLUMN last_location_at DATETIME', (err) => {
           if (err) console.error('Migration error:', err.message);
           resolve();
@@ -290,32 +295,19 @@ class FamilyDB {
               console.log(`Backfill: normalized ${fixed} rivalry entry names to match participant names`);
             }
           });
-          // Consolidate duplicate HealthKit entries per rivalry per member per day
-          // Multiple syncs on the same day should be one entry (the largest value)
-          this.db.all(`
-            SELECT rivalry_id, member_name, date(logged_at) as log_date,
-              MAX(id) as keep_id, COUNT(*) as cnt, SUM(value) as total_value, MAX(value) as max_value
-            FROM rivalry_entries
+          // Clear legacy delta-append HealthKit entries on ACTIVE rivalries. The old
+          // model appended a delta row per sync (and split across "jesse"/"Jesse"
+          // name forms), double-counting via SUM(value). The app now pushes one
+          // idempotent per-day total per member, so wiping active synced rows lets
+          // them repopulate correctly on next sync. Completed rivalries keep their
+          // stored final totals; manual entries (note != synced) are untouched.
+          this.db.run(`DELETE FROM rivalry_entries
             WHERE note = 'Synced from Apple Health'
-            GROUP BY rivalry_id, member_name, date(logged_at)
-            HAVING cnt > 1
-          `, (dedupErr, groups) => {
-            if (dedupErr || !groups || !groups.length) { /* no dupes */ }
-            else {
-              let cleaned = 0;
-              for (const g of groups) {
-                // Keep only the entry with the highest value for each day, delete the rest
-                this.db.run(`DELETE FROM rivalry_entries
-                  WHERE rivalry_id = ? AND member_name = ? AND date(logged_at) = ?
-                  AND note = 'Synced from Apple Health' AND id != ?`,
-                  [g.rivalry_id, g.member_name, g.log_date, g.keep_id]);
-                // Update the kept entry to have the max single-sync value (not cumulative duplicates)
-                this.db.run(`UPDATE rivalry_entries SET value = ? WHERE id = ?`, [g.max_value, g.keep_id]);
-                cleaned += g.cnt - 1;
-              }
-              if (cleaned > 0) console.log(`Backfill: consolidated ${cleaned} duplicate HealthKit entries`);
-            }
-          });
+            AND rivalry_id IN (SELECT id FROM rivalries WHERE status = 'active')`,
+            function(delErr) {
+              if (delErr) return;
+              if (this.changes) console.log(`Backfill: cleared ${this.changes} legacy synced entries on active rivalries (re-syncing as daily totals)`);
+            });
           resolve();
         });
       });
@@ -1102,17 +1094,18 @@ class FamilyDB {
 
   addRivalryEntry(entry) {
     return new Promise((resolve, reject) => {
-      // For HealthKit syncs, prevent duplicates within a 5-minute window
-      if (entry.note === 'Synced from Apple Health') {
-        this.db.get(
-          `SELECT id FROM rivalry_entries
-           WHERE rivalry_id = ? AND member_name = ? AND note = 'Synced from Apple Health'
-           AND datetime(logged_at) > datetime('now', '-5 minutes')`,
-          [entry.rivalry_id, entry.member_name],
-          (err, existing) => {
-            if (err) return reject(err);
-            if (existing) return resolve({ id: existing.id, deduplicated: true, ...entry });
-            this._insertRivalryEntry(entry, resolve, reject);
+      // HealthKit syncs carry a daily total tagged with activity_date. Upsert so
+      // re-syncing a day OVERWRITES its total instead of appending — never doubles.
+      if (entry.note === 'Synced from Apple Health' && entry.activity_date) {
+        this.db.run(
+          `INSERT INTO rivalry_entries (rivalry_id, member_name, value, note, is_verified, activity_date)
+           VALUES (?, ?, ?, ?, ?, ?)
+           ON CONFLICT(rivalry_id, member_name, activity_date) WHERE note = 'Synced from Apple Health'
+           DO UPDATE SET value = excluded.value, is_verified = excluded.is_verified, logged_at = CURRENT_TIMESTAMP`,
+          [entry.rivalry_id, entry.member_name, entry.value, entry.note, entry.is_verified ? 1 : 0, entry.activity_date],
+          function(err) {
+            if (err) reject(err);
+            else resolve({ id: this.lastID, ...entry });
           }
         );
       } else {
@@ -1123,9 +1116,9 @@ class FamilyDB {
 
   _insertRivalryEntry(entry, resolve, reject) {
     this.db.run(
-      `INSERT INTO rivalry_entries (rivalry_id, member_name, value, note, is_verified)
-       VALUES (?, ?, ?, ?, ?)`,
-      [entry.rivalry_id, entry.member_name, entry.value, entry.note || null, entry.is_verified ? 1 : 0],
+      `INSERT INTO rivalry_entries (rivalry_id, member_name, value, note, is_verified, activity_date)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [entry.rivalry_id, entry.member_name, entry.value, entry.note || null, entry.is_verified ? 1 : 0, entry.activity_date || null],
       function(err) {
         if (err) reject(err);
         else resolve({ id: this.lastID, ...entry });

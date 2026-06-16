@@ -1,4 +1,5 @@
 import CoreLocation
+import HealthKit
 import SwiftUI
 
 enum MainTab: Hashable, CaseIterable {
@@ -215,37 +216,58 @@ struct MainTabView: View {
     }
 
     private func syncStepRivalries() async {
-        guard await healthKit.requestStepAuthorization() else { return }
         guard let rivalries = try? await api.fetchRivalries() else { return }
-        let myName = auth.currentUser?.username ?? auth.currentUser?.name ?? ""
 
-        let activeStepRivalries = rivalries.filter {
-            $0.status == RivalryStatus.active.rawValue
-            && $0.challengeType == .steps
+        let active = rivalries.filter {
+            $0.status == RivalryStatus.active.rawValue && $0.challengeType.isHealthKitSynced
         }
+        guard !active.isEmpty else { return }
 
-        for rivalry in activeStepRivalries {
+        let dayFormatter = DateFormatter()
+        dayFormatter.calendar = Calendar.current
+        dayFormatter.locale = Locale(identifier: "en_US_POSIX")
+        dayFormatter.dateFormat = "yyyy-MM-dd"
+
+        for rivalry in active {
+            let isStairs = rivalry.challengeType == .stairs
+            let authorized = isStairs
+                ? await healthKit.requestFlightsAuthorization()
+                : await healthKit.requestStepAuthorization()
+            guard authorized else { continue }
+
             let startDate = ISO8601DateFormatter.flexible.date(from: rivalry.start_date)
                 ?? DateFormatter.isoDate.date(from: rivalry.start_date)
                 ?? Date()
             let endDate = rivalry.endDate ?? Date()
-            let hkSteps = await healthKit.fetchSteps(from: startDate, to: min(endDate, Date()))
-            guard hkSteps > 0 else { continue }
+            let identifier: HKQuantityTypeIdentifier = isStairs ? .flightsClimbed : .stepCount
+            let daily = await healthKit.fetchDailyTotals(for: identifier, from: startDate, to: min(endDate, Date()))
+            let myName = myRivalryName(in: rivalry)
 
-            let entries = (try? await api.fetchRivalryEntries(id: rivalry.id)) ?? []
-            let myLogged = entries
-                .filter { $0.member_name.localizedCaseInsensitiveCompare(myName) == .orderedSame }
-                .reduce(0.0) { $0 + $1.value }
-            let delta = hkSteps - myLogged
-            guard delta > 0 else { continue }
-
-            try? await api.addRivalryEntry(id: rivalry.id, data: [
-                "member_name": myName,
-                "value": delta,
-                "note": "Synced from Apple Health",
-                "is_verified": true
-            ])
+            for entry in daily {
+                try? await api.addRivalryEntry(id: rivalry.id, data: [
+                    "member_name": myName,
+                    "value": Int(entry.value.rounded()),
+                    "activity_date": dayFormatter.string(from: entry.day),
+                    "note": "Synced from Apple Health",
+                    "is_verified": true
+                ])
+            }
         }
+    }
+
+    /// The current user's name as it appears in this rivalry's participants
+    /// (e.g. "Sophie Chiasson" not "sophie"), so synced rows match across paths.
+    private func myRivalryName(in rivalry: RivalryResponse) -> String {
+        let name = auth.currentUser?.name ?? ""
+        let username = auth.currentUser?.username ?? ""
+        for participant in rivalry.participantNames {
+            let p = participant.lowercased()
+            for candidate in [name, username] where !candidate.isEmpty {
+                let c = candidate.lowercased()
+                if p == c || p.hasPrefix(c + " ") || c.hasPrefix(p + " ") { return participant }
+            }
+        }
+        return name.isEmpty ? username : name
     }
 
     private func currentUserActiveTrip() async -> TripResponse? {
