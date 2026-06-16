@@ -242,12 +242,17 @@ CREATE TABLE IF NOT EXISTS rivalry_entries (
     value REAL NOT NULL,
     note TEXT,
     is_verified BOOLEAN DEFAULT 0,
+    activity_date TEXT,
     logged_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (rivalry_id) REFERENCES rivalries(id) ON DELETE CASCADE
 );
 
 CREATE INDEX IF NOT EXISTS idx_rivalries_status ON rivalries(status);
 CREATE INDEX IF NOT EXISTS idx_rivalry_entries_rivalry_id ON rivalry_entries(rivalry_id);
+-- One HealthKit-synced row per member per calendar day (idempotent daily totals)
+CREATE UNIQUE INDEX IF NOT EXISTS idx_rivalry_entries_daily
+    ON rivalry_entries(rivalry_id, member_name, activity_date)
+    WHERE note = 'Synced from Apple Health';
 
 -- Gifts and events
 CREATE TABLE IF NOT EXISTS gift_people (

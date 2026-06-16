@@ -59,6 +59,42 @@ final class HealthKitManager {
         }
     }
 
+    /// Per-day totals for a quantity type, bucketed by local calendar day.
+    /// Returns one entry per day with steps/flights > 0. This is the source of
+    /// truth for rivalry sync — each day is pushed as an idempotent daily total.
+    func fetchDailyTotals(for identifier: HKQuantityTypeIdentifier, from startDate: Date, to endDate: Date) async -> [(day: Date, value: Double)] {
+        guard let store, isAvailable else { return [] }
+        guard let quantityType = HKQuantityType.quantityType(forIdentifier: identifier) else { return [] }
+
+        let calendar = Calendar.current
+        let anchor = calendar.startOfDay(for: startDate)
+        let end = min(endDate, Date())
+        guard end > anchor else { return [] }
+
+        let predicate = HKQuery.predicateForSamples(withStart: anchor, end: end, options: .strictStartDate)
+        var interval = DateComponents()
+        interval.day = 1
+
+        return await withCheckedContinuation { continuation in
+            let query = HKStatisticsCollectionQuery(
+                quantityType: quantityType,
+                quantitySamplePredicate: predicate,
+                options: .cumulativeSum,
+                anchorDate: anchor,
+                intervalComponents: interval
+            )
+            query.initialResultsHandler = { _, results, _ in
+                var out: [(day: Date, value: Double)] = []
+                results?.enumerateStatistics(from: anchor, to: end) { stat, _ in
+                    let value = stat.sumQuantity()?.doubleValue(for: .count()) ?? 0
+                    if value > 0 { out.append((day: stat.startDate, value: value)) }
+                }
+                continuation.resume(returning: out)
+            }
+            store.execute(query)
+        }
+    }
+
     func fetchFlightsClimbed(from startDate: Date, to endDate: Date) async -> Double {
         guard let store, isAvailable else { return 0 }
         guard let flightsType = HKQuantityType.quantityType(forIdentifier: .flightsClimbed) else { return 0 }

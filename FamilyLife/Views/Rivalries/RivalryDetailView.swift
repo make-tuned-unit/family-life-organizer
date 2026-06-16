@@ -1,3 +1,4 @@
+import HealthKit
 import SwiftUI
 
 struct RivalryDetailView: View {
@@ -165,7 +166,7 @@ struct RivalryDetailView: View {
                             }
                             if delta > 0 {
                                 Button {
-                                    Task { await syncStepsFromHealth(delta: delta) }
+                                    Task { await syncDailyTotalsFromHealth() }
                                 } label: {
                                     Label(isSyncingSteps ? "Syncing..." : "Sync from Health", systemImage: "arrow.triangle.2.circlepath")
                                         .frame(maxWidth: .infinity)
@@ -243,13 +244,8 @@ struct RivalryDetailView: View {
             if currentRivalry.challengeType.isHealthKitSynced && !hasAutoSynced {
                 hasAutoSynced = true
                 await fetchHealthData()
-                // Auto-sync from HealthKit without requiring manual tap
-                if let hkSteps = healthSteps {
-                    let delta = hkSteps - myLoggedTotal
-                    if delta > 0 {
-                        await syncStepsFromHealth(delta: delta)
-                    }
-                }
+                // Auto-sync per-day totals from HealthKit without requiring manual tap
+                await syncDailyTotalsFromHealth()
             }
             // Auto-complete expired rivalries
             if currentRivalry.status == RivalryStatus.active.rawValue && isExpired {
@@ -302,15 +298,39 @@ struct RivalryDetailView: View {
         }
     }
 
-    private func syncStepsFromHealth(delta: Double) async {
+    /// Push one idempotent daily total per calendar day to the backend. The
+    /// server upserts per (rivalry, member, day), so re-syncing never doubles.
+    private func syncDailyTotalsFromHealth() async {
+        let isStairs = currentRivalry.challengeType == .stairs
+        let authorized = isStairs
+            ? await healthKit.requestFlightsAuthorization()
+            : await healthKit.requestStepAuthorization()
+        guard authorized else { return }
+
+        let startDate = ISO8601DateFormatter.flexible.date(from: currentRivalry.start_date)
+            ?? DateFormatter.isoDate.date(from: currentRivalry.start_date)
+            ?? Date()
+        let endDate = currentRivalry.endDate ?? Date()
+        let identifier: HKQuantityTypeIdentifier = isStairs ? .flightsClimbed : .stepCount
+        let daily = await healthKit.fetchDailyTotals(for: identifier, from: startDate, to: min(endDate, Date()))
+        guard !daily.isEmpty else { return }
+
+        let dayFormatter = DateFormatter()
+        dayFormatter.calendar = Calendar.current
+        dayFormatter.locale = Locale(identifier: "en_US_POSIX")
+        dayFormatter.dateFormat = "yyyy-MM-dd"
+
         isSyncingSteps = true
         do {
-            try await api.addRivalryEntry(id: currentRivalry.id, data: [
-                "member_name": myRivalryName,
-                "value": delta,
-                "note": "Synced from Apple Health",
-                "is_verified": true
-            ])
+            for entry in daily {
+                try await api.addRivalryEntry(id: currentRivalry.id, data: [
+                    "member_name": myRivalryName,
+                    "value": Int(entry.value.rounded()),
+                    "activity_date": dayFormatter.string(from: entry.day),
+                    "note": "Synced from Apple Health",
+                    "is_verified": true
+                ])
+            }
             await loadEntries()
             await fetchHealthData()
         } catch {
