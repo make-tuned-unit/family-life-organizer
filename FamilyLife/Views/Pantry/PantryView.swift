@@ -28,6 +28,9 @@ struct PantryView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackgroundVisibility(.hidden, for: .navigationBar)
         .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                AskButlerButton(prompt: "What should I cook with what's expiring soon?")
+            }
             if showsDismissButton {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Done") { dismiss() }

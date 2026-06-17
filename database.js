@@ -81,6 +81,8 @@ class FamilyDB {
         this.db.run('ALTER TABLE appointments ADD COLUMN group_id INTEGER REFERENCES groups(id)', () => {});
         this.db.run('ALTER TABLE decisions ADD COLUMN group_id INTEGER REFERENCES groups(id)', () => {});
         this.db.run('ALTER TABLE rivalries ADD COLUMN group_id INTEGER REFERENCES groups(id)', () => {});
+        this.db.run('ALTER TABLE tasks ADD COLUMN group_id INTEGER REFERENCES groups(id)', () => {});
+        this.db.run('CREATE INDEX IF NOT EXISTS idx_tasks_group ON tasks(group_id)', () => {});
         this.db.run('CREATE INDEX IF NOT EXISTS idx_appointments_group ON appointments(group_id)', () => {});
         this.db.run('CREATE INDEX IF NOT EXISTS idx_decisions_group ON decisions(group_id)', () => {});
         this.db.run('CREATE INDEX IF NOT EXISTS idx_rivalries_group ON rivalries(group_id)', () => {});
@@ -261,6 +263,12 @@ class FamilyDB {
             [householdId, householdId], function() {
               console.log(`Backfill: updated ${this.changes} rivalries to household ${householdId}`);
             });
+          // Assign legacy tasks (no group) to the primary household — NULL-only so
+          // future per-household assignments are preserved.
+          this.db.run('UPDATE tasks SET group_id = ? WHERE group_id IS NULL',
+            [householdId], function() {
+              console.log(`Backfill: updated ${this.changes} tasks to household ${householdId}`);
+            });
           // Fix rivalry entries where member_name doesn't match the rivalry's participant name
           // e.g. entry has "Sophie" or "sophie" but rivalry has "Sophie Chiasson"
           this.db.all(`
@@ -352,10 +360,10 @@ class FamilyDB {
   addTask(task) {
     return new Promise((resolve, reject) => {
       const stmt = this.db.prepare(`
-        INSERT INTO tasks (category, title, description, priority, due_date, due_time, assigned_to, recurrence_pattern, tags)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO tasks (category, title, description, priority, due_date, due_time, assigned_to, recurrence_pattern, tags, group_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
-      
+
       stmt.run([
         task.category,
         task.title,
@@ -365,7 +373,8 @@ class FamilyDB {
         task.due_time || null,
         task.assigned_to || null,
         task.recurrence || null,
-        task.tags ? task.tags.join(',') : null
+        task.tags ? task.tags.join(',') : null,
+        task.group_id || null
       ], function(err) {
         stmt.finalize();
         if (err) reject(err);
@@ -374,7 +383,7 @@ class FamilyDB {
     });
   }
 
-  getTasks(filters = {}) {
+  getTasks(filters = {}, userId = null) {
     return new Promise((resolve, reject) => {
       let sql = 'SELECT * FROM tasks WHERE 1=1';
       const params = [];
@@ -392,6 +401,12 @@ class FamilyDB {
         params.push(filters.assigned_to);
       }
 
+      if (userId) {
+        sql += ` AND (group_id IN (SELECT group_id FROM group_members WHERE user_id = ?)
+          OR group_id IS NULL)`;
+        params.push(parseInt(userId, 10));
+      }
+
       sql += ' ORDER BY created_at DESC';
 
       this.db.all(sql, params, (err, rows) => {
@@ -401,14 +416,17 @@ class FamilyDB {
     });
   }
 
-  completeTask(id) {
+  // Scoped to the user's household when groupId is provided (prevents cross-household completion).
+  completeTask(id, groupId = null) {
     return new Promise((resolve, reject) => {
-      this.db.run(
-        'UPDATE tasks SET status = "completed", completed_at = CURRENT_TIMESTAMP WHERE id = ?',
-        [id],
-        (err) => {
+      const sql = groupId
+        ? 'UPDATE tasks SET status = "completed", completed_at = CURRENT_TIMESTAMP WHERE id = ? AND group_id = ?'
+        : 'UPDATE tasks SET status = "completed", completed_at = CURRENT_TIMESTAMP WHERE id = ?';
+      const params = groupId ? [id, groupId] : [id];
+      this.db.run(sql, params,
+        function(err) {
           if (err) reject(err);
-          else resolve({ id, status: 'completed' });
+          else resolve({ id, status: 'completed', changed: this.changes });
         }
       );
     });
@@ -2588,6 +2606,164 @@ class FamilyDB {
     return new Promise((resolve, reject) => {
       this.db.run('DELETE FROM device_tokens WHERE token = ?', [token],
         (err) => err ? reject(err) : resolve());
+    });
+  }
+
+  // === Concierge (chat + memory) ===
+
+  createConciergeConversation(userId, groupId) {
+    return new Promise((resolve, reject) => {
+      this.db.run(
+        'INSERT INTO concierge_conversations (user_id, group_id) VALUES (?, ?)',
+        [userId, groupId || null],
+        function(err) { err ? reject(err) : resolve({ id: this.lastID }); }
+      );
+    });
+  }
+
+  getConciergeConversation(id) {
+    return new Promise((resolve, reject) => {
+      this.db.get('SELECT * FROM concierge_conversations WHERE id = ?', [id],
+        (err, row) => err ? reject(err) : resolve(row || null));
+    });
+  }
+
+  getConciergeMessages(conversationId, limit = 20) {
+    return new Promise((resolve, reject) => {
+      this.db.all(
+        'SELECT role, content FROM concierge_messages WHERE conversation_id = ? ORDER BY id DESC LIMIT ?',
+        [conversationId, limit],
+        (err, rows) => err ? reject(err) : resolve((rows || []).reverse())
+      );
+    });
+  }
+
+  addConciergeMessage(conversationId, role, content) {
+    return new Promise((resolve, reject) => {
+      this.db.run(
+        'INSERT INTO concierge_messages (conversation_id, role, content) VALUES (?, ?, ?)',
+        [conversationId, role, content],
+        function(err) { err ? reject(err) : resolve({ id: this.lastID }); }
+      );
+    });
+  }
+
+  touchConciergeConversation(id) {
+    return new Promise((resolve, reject) => {
+      this.db.run('UPDATE concierge_conversations SET updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+        [id], (err) => err ? reject(err) : resolve());
+    });
+  }
+
+  getConciergeMemory(groupId) {
+    return new Promise((resolve, reject) => {
+      this.db.all(
+        'SELECT content FROM concierge_memory WHERE group_id IS ? ORDER BY created_at DESC LIMIT 50',
+        [groupId || null],
+        (err, rows) => err ? reject(err) : resolve(rows || [])
+      );
+    });
+  }
+
+  addConciergeMemory(userId, groupId, content) {
+    return new Promise((resolve, reject) => {
+      this.db.run(
+        'INSERT INTO concierge_memory (user_id, group_id, content) VALUES (?, ?, ?)',
+        [userId, groupId || null, content],
+        function(err) { err ? reject(err) : resolve({ id: this.lastID }); }
+      );
+    });
+  }
+
+  // === Subscriptions (per-household premium entitlement) ===
+
+  // Insert or update by original_transaction_id (the stable subscription key).
+  upsertSubscription(sub) {
+    return new Promise((resolve, reject) => {
+      this.db.run(
+        `INSERT INTO subscriptions (group_id, user_id, product_id, original_transaction_id, expires_at, environment, status, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+         ON CONFLICT(original_transaction_id) DO UPDATE SET
+           group_id = excluded.group_id,
+           user_id = excluded.user_id,
+           product_id = excluded.product_id,
+           expires_at = excluded.expires_at,
+           environment = excluded.environment,
+           status = excluded.status,
+           updated_at = CURRENT_TIMESTAMP`,
+        [sub.group_id || null, sub.user_id, sub.product_id || null,
+         sub.original_transaction_id, sub.expires_at || null,
+         sub.environment || null, sub.status || 'active'],
+        (err) => err ? reject(err) : resolve({ ok: true })
+      );
+    });
+  }
+
+  // The household's currently-active subscription (expiry in the future), if any.
+  getActiveSubscriptionForGroup(groupId) {
+    return new Promise((resolve, reject) => {
+      if (!groupId) return resolve(null); // never treat the NULL-group bucket as entitled
+      this.db.get(
+        `SELECT * FROM subscriptions
+         WHERE group_id = ? AND status = 'active' AND expires_at > CURRENT_TIMESTAMP
+         ORDER BY expires_at DESC LIMIT 1`,
+        [groupId],
+        (err, row) => err ? reject(err) : resolve(row || null)
+      );
+    });
+  }
+
+  // Distinct household groups with an active (unexpired) subscription.
+  getPremiumGroups() {
+    return new Promise((resolve, reject) => {
+      this.db.all(
+        `SELECT DISTINCT group_id FROM subscriptions
+         WHERE group_id IS NOT NULL AND status = 'active' AND expires_at > CURRENT_TIMESTAMP`,
+        [],
+        (err, rows) => err ? reject(err) : resolve((rows || []).map(r => r.group_id))
+      );
+    });
+  }
+
+  updateSubscriptionStatus(originalTransactionId, status, expiresAt) {
+    return new Promise((resolve, reject) => {
+      this.db.run(
+        `UPDATE subscriptions SET status = ?, expires_at = COALESCE(?, expires_at), updated_at = CURRENT_TIMESTAMP
+         WHERE original_transaction_id = ?`,
+        [status, expiresAt || null, String(originalTransactionId)],
+        function(err) { err ? reject(err) : resolve({ changed: this.changes }); }
+      );
+    });
+  }
+
+  // === Concierge proactive nudges (throttle/dedup) ===
+
+  recordNudge(groupId, key) {
+    return new Promise((resolve, reject) => {
+      this.db.run('INSERT INTO concierge_nudges (group_id, nudge_key) VALUES (?, ?)',
+        [groupId, key], (err) => err ? reject(err) : resolve());
+    });
+  }
+
+  // How many nudges this group received in the last N hours (daily-cap check).
+  countRecentNudges(groupId, hours) {
+    return new Promise((resolve, reject) => {
+      this.db.get(
+        `SELECT COUNT(*) AS n FROM concierge_nudges WHERE group_id = ? AND sent_at > datetime('now', ?)`,
+        [groupId, `-${hours} hours`],
+        (err, row) => err ? reject(err) : resolve(row ? row.n : 0)
+      );
+    });
+  }
+
+  // Whether this exact nudge key was sent to the group within the last N hours (dedup).
+  recentNudgeKey(groupId, key, hours) {
+    return new Promise((resolve, reject) => {
+      this.db.get(
+        `SELECT 1 FROM concierge_nudges WHERE group_id = ? AND nudge_key = ? AND sent_at > datetime('now', ?) LIMIT 1`,
+        [groupId, key, `-${hours} hours`],
+        (err, row) => err ? reject(err) : resolve(!!row)
+      );
     });
   }
 

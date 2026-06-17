@@ -7,6 +7,20 @@ const bcrypt = require('bcryptjs');
 const path = require('path');
 const FamilyDB = require('./database');
 const push = require('./push');
+const ai = require('./services/anthropic');
+const { buildSnapshot } = require('./services/conciergeContext');
+const { generateBrief } = require('./services/conciergeBrief');
+const { handleChat } = require('./services/conciergeChat');
+const subscription = require('./services/subscription');
+const { runProactiveSweep } = require('./services/conciergeNudge');
+const { createRateLimiter } = require('./services/rateLimit');
+
+// Per-user rate limit for the (AI-backed, costly) concierge endpoints.
+const conciergeLimiter = createRateLimiter({ windowMs: 60000, max: 30, keyFn: req => req.session.user.id });
+
+// Short-lived per-user cache for the daily brief (regenerated on ?refresh).
+const briefCache = new Map();
+const BRIEF_TTL_MS = 10 * 60 * 1000;
 
 const app = express();
 const PORT = process.env.PORT || 3456;
@@ -50,6 +64,22 @@ function requireAuth(req, res, next) {
     } else {
       res.redirect('/login');
     }
+  }
+}
+
+// Premium gate: requires an active household subscription. Returns 402 otherwise.
+async function requirePremium(req, res, next) {
+  const db = new FamilyDB();
+  try {
+    if (await subscription.isHouseholdPremium(db, req.session.user.id)) {
+      next();
+    } else {
+      res.status(402).json({ error: 'Premium required', premium: false });
+    }
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
   }
 }
 
@@ -491,7 +521,7 @@ app.get('/', requireAuth, async (req, res) => {
     const userId = req.session.user?.id;
     const summary = await db.getDailySummary(userId);
     const groceries = await db.getGroceries('needed');
-    const tasks = await db.getTasks({ status: 'active' });
+    const tasks = await db.getTasks({ status: 'active' }, userId);
     const appointments = await db.getAppointments({}, userId);
     const tasksByCategory = {};
     tasks.forEach(task => {
@@ -1295,7 +1325,8 @@ app.post('/api/add', requireAuth, async (req, res) => {
       });
       await db.addGrocery(data.item, data.category || null, data.quantity || '1', username, userGroupId);
     } else if (type === 'task') {
-      await db.addTask({...data, status: 'active'});
+      const groupId = await db.getUserHouseholdId(req.session.user?.id);
+      await db.addTask({...data, status: 'active', group_id: groupId});
     }
     res.json({ success: true });
   } catch (err) {
@@ -1312,7 +1343,8 @@ app.post('/api/complete', requireAuth, async (req, res) => {
     if (type === 'grocery') {
       await db.purchaseGrocery(id);
     } else if (type === 'task') {
-      await db.completeTask(id);
+      const groupId = await db.getUserHouseholdId(req.session.user?.id);
+      await db.completeTask(id, groupId);
     }
     res.json({ success: true });
   } catch (err) {
@@ -1372,7 +1404,7 @@ app.get('/api/tasks', requireAuth, async (req, res) => {
     if (req.query.status) filters.status = req.query.status;
     if (req.query.category) filters.category = req.query.category;
     if (req.query.assigned_to) filters.assigned_to = req.query.assigned_to;
-    const tasks = await db.getTasks(filters);
+    const tasks = await db.getTasks(filters, req.session.user.id);
     res.json(tasks);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -1624,36 +1656,19 @@ app.post('/api/receipts/scan', requireAuth, async (req, res) => {
       return;
     }
 
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': process.env.ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01'
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 1500,
-        messages: [{
-          role: 'user',
-          content: [
-            { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: image } },
-            { type: 'text', text: 'Extract receipt data. Use Kids for children\'s clothing, shoes, school supplies, toys, activities, and child-specific purchases. Return ONLY valid JSON: {"merchant":"store name","date":"YYYY-MM-DD","total":0.00,"category":"Groceries|Dining Out|Gas/Transport|Household|Health|Pets|Entertainment|Kids|Other","items":[{"name":"item","price":0.00,"quantity":"1"}]}' }
-          ]
-        }]
-      })
+    const text = await ai.callClaude({
+      maxTokens: 1500,
+      messages: [{
+        role: 'user',
+        content: [
+          { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: image } },
+          { type: 'text', text: 'Extract receipt data. Use Kids for children\'s clothing, shoes, school supplies, toys, activities, and child-specific purchases. Return ONLY valid JSON: {"merchant":"store name","date":"YYYY-MM-DD","total":0.00,"category":"Groceries|Dining Out|Gas/Transport|Household|Health|Pets|Entertainment|Kids|Other","items":[{"name":"item","price":0.00,"quantity":"1"}]}' }
+        ]
+      }]
     });
-
-    const data = await response.json();
-    const text = data.content[0].text;
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      const receipt = JSON.parse(jsonMatch[0]);
-      receipt.category = normalizeReceiptCategory(receipt);
-      res.json(receipt);
-    } else {
-      res.status(500).json({ error: 'Could not parse receipt' });
-    }
+    const receipt = ai.extractJSON(text);
+    receipt.category = normalizeReceiptCategory(receipt);
+    res.json(receipt);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -1855,6 +1870,91 @@ app.delete('/api/pantry/:id', requireAuth, async (req, res) => {
   }
 });
 
+// Concierge - daily brief (read-only): what needs attention + warm summary
+app.get('/api/concierge/brief', requireAuth, conciergeLimiter, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const userId = req.session.user.id;
+    const cached = briefCache.get(userId);
+    if (!req.query.refresh && cached && Date.now() - cached.ts < BRIEF_TTL_MS) {
+      return res.json(cached.brief);
+    }
+    const snapshot = await buildSnapshot(db, userId);
+    const brief = await generateBrief(snapshot, req.session.user.name);
+    const now = Date.now();
+    for (const [k, v] of briefCache) if (now - v.ts >= BRIEF_TTL_MS) briefCache.delete(k);
+    briefCache.set(userId, { brief, ts: now });
+    res.json(brief);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+// Subscriptions - verify a StoreKit 2 transaction and store household entitlement
+app.post('/api/subscription/verify', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const signed = req.body.signed_transaction || req.body.transaction;
+    if (!signed) return res.status(400).json({ error: 'signed_transaction required' });
+    const status = await subscription.verifyAndStore(db, req.session.user.id, signed);
+    res.json(status);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+// App Store Server Notifications (v2) - Apple calls this; auth is the signature.
+app.post('/api/subscription/notifications', async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const signedPayload = req.body.signedPayload;
+    if (!signedPayload) return res.status(400).json({ error: 'signedPayload required' });
+    const result = await subscription.verifyAndApplyNotification(db, signedPayload);
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+// Subscriptions - current household entitlement status
+app.get('/api/subscription/status', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    res.json(await subscription.getStatus(db, req.session.user.id));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+// Concierge - conversational chat with tool-calling (premium)
+app.post('/api/concierge/chat', requireAuth, conciergeLimiter, requirePremium, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const message = (req.body.message || '').trim();
+    if (!message) return res.status(400).json({ error: 'message required' });
+    if (message.length > 4000) return res.status(400).json({ error: 'message too long' });
+    const result = await handleChat(db, {
+      userId: req.session.user.id,
+      userName: req.session.user.name,
+      message,
+      conversationId: req.body.conversation_id || null,
+    });
+    res.json(result);
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
 // Cook - recipe suggestions (requires ANTHROPIC_API_KEY env var)
 app.post('/api/cook/suggest', requireAuth, async (req, res) => {
   const db = new FamilyDB();
@@ -1900,19 +2000,11 @@ app.post('/api/cook/suggest', requireAuth, async (req, res) => {
     }
 
     // Call Claude API for real suggestions
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': process.env.ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01'
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 2000,
-        messages: [{
-          role: 'user',
-          content: `You are a helpful cooking assistant for a family. Here is what's in their pantry: ${pantryList}
+    const text = await ai.callClaude({
+      maxTokens: 2000,
+      messages: [{
+        role: 'user',
+        content: `You are a helpful cooking assistant for a family. Here is what's in their pantry: ${pantryList}
 
 Their question: ${query}
 
@@ -1920,18 +2012,9 @@ Suggest exactly 3 recipes. Return ONLY valid JSON with this structure:
 {"recipes": [{"name": "...", "cook_time": 20, "difficulty": "Easy|Medium|Hard", "servings": 4, "ingredients": [{"name": "...", "quantity": "...", "available": true/false}], "steps": ["step 1", "step 2"]}]}
 
 Mark ingredients as available:true if they're in the pantry list, available:false if not.`
-        }]
-      })
+      }]
     });
-
-    const data = await response.json();
-    const text = data.content[0].text;
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      res.json(JSON.parse(jsonMatch[0]));
-    } else {
-      res.status(500).json({ error: 'Could not parse recipe response' });
-    }
+    res.json(ai.extractJSON(text));
   } catch (err) {
     res.status(500).json({ error: err.message });
   } finally {
@@ -3837,5 +3920,27 @@ initializeDatabase().then(() => {
   app.listen(PORT, () => {
     console.log('Kinrows running on port', PORT);
     console.log('AI features:', process.env.ANTHROPIC_API_KEY ? 'ENABLED' : 'DISABLED (no ANTHROPIC_API_KEY)');
+    startProactiveNudges();
   });
 });
+
+// Proactive concierge nudges: sweep premium households hourly, but only push
+// during waking hours. Throttling/dedup lives in the sweep itself.
+function startProactiveNudges() {
+  const SWEEP_MS = 60 * 60 * 1000; // hourly
+  const runIfDaytime = async () => {
+    const hour = new Date().getHours(); // server TZ (America/Halifax)
+    if (hour < 8 || hour >= 21) return;
+    const db = new FamilyDB();
+    try {
+      const summary = await runProactiveSweep(db);
+      if (summary.sent) console.log('Proactive nudges sent:', JSON.stringify(summary));
+    } catch (err) {
+      console.error('Proactive sweep error:', err.message);
+    } finally {
+      db.close();
+    }
+  };
+  const handle = setInterval(runIfDaytime, SWEEP_MS);
+  handle.unref(); // don't keep the process alive solely for the sweep
+}

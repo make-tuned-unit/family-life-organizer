@@ -31,6 +31,15 @@
 		AA000017 /* AddPantryItemView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000017 /* AddPantryItemView.swift */; };
 		AA000018 /* CookView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000018 /* CookView.swift */; };
 		AA000019 /* CookViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000019 /* CookViewModel.swift */; };
+		AA000087 /* ConciergeModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000087 /* ConciergeModels.swift */; };
+		AA000088 /* ConciergeViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000088 /* ConciergeViewModel.swift */; };
+		AA000089 /* ConciergeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000089 /* ConciergeView.swift */; };
+		AA000090 /* ConciergeChatViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000090 /* ConciergeChatViewModel.swift */; };
+		AA000091 /* ConciergeChatView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000091 /* ConciergeChatView.swift */; };
+		AA000092 /* SubscriptionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000092 /* SubscriptionService.swift */; };
+		AA000093 /* PaywallView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000093 /* PaywallView.swift */; };
+		AA000094 /* AskButlerButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000094 /* AskButlerButton.swift */; };
+		AA000095 /* OnDeviceSummarizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000095 /* OnDeviceSummarizer.swift */; };
 		AA00001A /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00001A /* SettingsView.swift */; };
 		AA00001B /* AddTaskView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00001B /* AddTaskView.swift */; };
 		AA00001C /* AddReceiptView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00001C /* AddReceiptView.swift */; };
@@ -128,6 +137,15 @@
 		BB000017 /* AddPantryItemView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddPantryItemView.swift; sourceTree = "<group>"; };
 		BB000018 /* CookView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CookView.swift; sourceTree = "<group>"; };
 		BB000019 /* CookViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CookViewModel.swift; sourceTree = "<group>"; };
+		BB000087 /* ConciergeModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConciergeModels.swift; sourceTree = "<group>"; };
+		BB000088 /* ConciergeViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConciergeViewModel.swift; sourceTree = "<group>"; };
+		BB000089 /* ConciergeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConciergeView.swift; sourceTree = "<group>"; };
+		BB000090 /* ConciergeChatViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConciergeChatViewModel.swift; sourceTree = "<group>"; };
+		BB000091 /* ConciergeChatView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConciergeChatView.swift; sourceTree = "<group>"; };
+		BB000092 /* SubscriptionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubscriptionService.swift; sourceTree = "<group>"; };
+		BB000093 /* PaywallView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaywallView.swift; sourceTree = "<group>"; };
+		BB000094 /* AskButlerButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AskButlerButton.swift; sourceTree = "<group>"; };
+		BB000095 /* OnDeviceSummarizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnDeviceSummarizer.swift; sourceTree = "<group>"; };
 		BB00001A /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		BB00001B /* AddTaskView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddTaskView.swift; sourceTree = "<group>"; };
 		BB00001C /* AddReceiptView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddReceiptView.swift; sourceTree = "<group>"; };
@@ -281,6 +299,7 @@
 				BB000050 /* HouseholdService.swift */,
 				BB000070 /* ProfileImageCache.swift */,
 				BB000077 /* MessageCache.swift */,
+				BB000092 /* SubscriptionService.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -293,6 +312,7 @@
 				EE00000B /* Expenses */,
 				EE00000C /* Pantry */,
 				EE00000D /* Cook */,
+				EE000021 /* Concierge */,
 				EE00000E /* Trips */,
 				EE000020 /* Messages */,
 				EE00000F /* Rivalries */,
@@ -376,6 +396,21 @@
 				BB000046 /* AIDisclosureView.swift */,
 			);
 			path = Cook;
+			sourceTree = "<group>";
+		};
+		EE000021 /* Concierge */ = {
+			isa = PBXGroup;
+			children = (
+				BB000087 /* ConciergeModels.swift */,
+				BB000088 /* ConciergeViewModel.swift */,
+				BB000089 /* ConciergeView.swift */,
+				BB000090 /* ConciergeChatViewModel.swift */,
+				BB000091 /* ConciergeChatView.swift */,
+				BB000093 /* PaywallView.swift */,
+				BB000094 /* AskButlerButton.swift */,
+				BB000095 /* OnDeviceSummarizer.swift */,
+			);
+			path = Concierge;
 			sourceTree = "<group>";
 		};
 		EE00000E /* Trips */ = {
@@ -575,6 +610,15 @@
 				AA000017 /* AddPantryItemView.swift in Sources */,
 				AA000018 /* CookView.swift in Sources */,
 				AA000019 /* CookViewModel.swift in Sources */,
+				AA000087 /* ConciergeModels.swift in Sources */,
+				AA000088 /* ConciergeViewModel.swift in Sources */,
+				AA000089 /* ConciergeView.swift in Sources */,
+				AA000090 /* ConciergeChatViewModel.swift in Sources */,
+				AA000091 /* ConciergeChatView.swift in Sources */,
+				AA000092 /* SubscriptionService.swift in Sources */,
+				AA000093 /* PaywallView.swift in Sources */,
+				AA000094 /* AskButlerButton.swift in Sources */,
+				AA000095 /* OnDeviceSummarizer.swift in Sources */,
 				AA00001A /* SettingsView.swift in Sources */,
 				AA00001B /* AddTaskView.swift in Sources */,
 				AA00001C /* AddReceiptView.swift in Sources */,
@@ -658,7 +702,7 @@
 				CODE_SIGN_ENTITLEMENTS = FamilyLife/FamilyLife.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 105;
+				CURRENT_PROJECT_VERSION = 106;
 				DEVELOPMENT_ASSET_PATHS = "";
 				DEVELOPMENT_TEAM = GANM22MFCH;
 				ENABLE_PREVIEWS = YES;
@@ -699,7 +743,7 @@
 				CODE_SIGN_ENTITLEMENTS = FamilyLife/FamilyLife.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 105;
+				CURRENT_PROJECT_VERSION = 106;
 				DEVELOPMENT_ASSET_PATHS = "";
 				DEVELOPMENT_TEAM = GANM22MFCH;
 				ENABLE_PREVIEWS = YES;

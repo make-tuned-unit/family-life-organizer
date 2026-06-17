@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS tasks (
     created_by TEXT DEFAULT 'jesse',
     recurrence_pattern TEXT,
     tags TEXT,
+    group_id INTEGER REFERENCES groups(id),
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     completed_at DATETIME,
@@ -628,3 +629,63 @@ CREATE TABLE IF NOT EXISTS itinerary_stays (
 CREATE INDEX IF NOT EXISTS idx_itineraries_traveler ON itineraries(traveler_id);
 CREATE INDEX IF NOT EXISTS idx_itinerary_stays_itinerary ON itinerary_stays(itinerary_id);
 CREATE INDEX IF NOT EXISTS idx_itinerary_stays_host ON itinerary_stays(host_user_id);
+
+-- AI Concierge (chat + memory)
+CREATE TABLE IF NOT EXISTS concierge_conversations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    group_id INTEGER,
+    title TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id)
+);
+
+CREATE TABLE IF NOT EXISTS concierge_messages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    conversation_id INTEGER NOT NULL,
+    role TEXT NOT NULL,          -- 'user' | 'assistant'
+    content TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (conversation_id) REFERENCES concierge_conversations(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS concierge_memory (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    group_id INTEGER,
+    content TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_concierge_msgs_convo ON concierge_messages(conversation_id);
+CREATE INDEX IF NOT EXISTS idx_concierge_convo_user ON concierge_conversations(user_id);
+CREATE INDEX IF NOT EXISTS idx_concierge_memory_group ON concierge_memory(group_id);
+
+-- Concierge premium subscriptions (per-household entitlement)
+CREATE TABLE IF NOT EXISTS subscriptions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    group_id INTEGER,
+    user_id INTEGER NOT NULL,
+    product_id TEXT,
+    original_transaction_id TEXT UNIQUE,
+    expires_at DATETIME,
+    environment TEXT,                       -- 'Sandbox' | 'Production'
+    status TEXT DEFAULT 'active',
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_subscriptions_group ON subscriptions(group_id);
+
+-- Concierge proactive nudges (throttle/dedup log)
+CREATE TABLE IF NOT EXISTS concierge_nudges (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    group_id INTEGER,
+    nudge_key TEXT,
+    sent_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_concierge_nudges_group ON concierge_nudges(group_id, sent_at);

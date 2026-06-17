@@ -22,7 +22,7 @@ final class APIService {
         config.httpCookieAcceptPolicy = .always
         config.httpCookieStorage = .shared
         config.timeoutIntervalForRequest = 20
-        config.timeoutIntervalForResource = 30
+        config.timeoutIntervalForResource = 60  // ceiling; AI-backed calls (concierge brief) can run long
         self.session = URLSession(configuration: config)
     }
 
@@ -225,6 +225,31 @@ final class APIService {
     func deductIngredients(ingredients: [String]) async throws {
         let body: [String: Any] = ["ingredients": ingredients]
         let _: SuccessResponse = try await post("/api/cook/deduct", body: body)
+    }
+
+    // MARK: - Concierge
+
+    func fetchConciergeBrief(forceRefresh: Bool = false) async throws -> ConciergeBrief {
+        // AI-backed endpoint: allow extra headroom for the Claude round-trip.
+        let params = forceRefresh ? ["refresh": "1"] : [:]
+        return try await get("/api/concierge/brief", queryParams: params, timeout: 45)
+    }
+
+    // MARK: - Subscription
+
+    func verifySubscription(signedTransaction: String) async throws -> SubscriptionStatus {
+        try await post("/api/subscription/verify", body: ["signed_transaction": signedTransaction])
+    }
+
+    func fetchSubscriptionStatus() async throws -> SubscriptionStatus {
+        try await get("/api/subscription/status")
+    }
+
+    func sendConciergeMessage(_ message: String, conversationId: Int?) async throws -> ConciergeChatResponse {
+        var body: [String: Any] = ["message": message]
+        if let conversationId { body["conversation_id"] = conversationId }
+        // Tool-calling loop can take a while — generous timeout.
+        return try await post("/api/concierge/chat", body: body, timeout: 60)
     }
 
     // MARK: - Trips
@@ -1053,7 +1078,7 @@ final class APIService {
         let id: Int
     }
 
-    private func get<T: Decodable>(_ path: String, queryParams: [String: String] = [:]) async throws -> T {
+    private func get<T: Decodable>(_ path: String, queryParams: [String: String] = [:], timeout: TimeInterval? = nil) async throws -> T {
         guard var components = URLComponents(string: baseURL + path) else {
             throw APIError.invalidResponse
         }
@@ -1063,17 +1088,19 @@ final class APIService {
         guard let url = components.url else { throw APIError.invalidResponse }
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
+        if let timeout { request.timeoutInterval = timeout }
         let (data, response) = try await session.data(for: request)
         try checkResponse(response)
         return try JSONDecoder().decode(T.self, from: data)
     }
 
-    private func post<T: Decodable>(_ path: String, body: Any) async throws -> T {
+    private func post<T: Decodable>(_ path: String, body: Any, timeout: TimeInterval? = nil) async throws -> T {
         guard let url = URL(string: baseURL + path) else { throw APIError.invalidResponse }
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        if let timeout { request.timeoutInterval = timeout }
         let (data, response) = try await session.data(for: request)
         try checkResponse(response)
         return try JSONDecoder().decode(T.self, from: data)

@@ -74,6 +74,8 @@ struct FamilyLifeApp: App {
     @State private var messageCache = MessageCache()
     @State private var deepLinkRouter = DeepLinkRouter()
     @State private var locationService = LocationService()
+    @State private var subscriptionService = SubscriptionService()
+    @State private var conciergeLaunch = ConciergeLaunch()
 
     var body: some Scene {
         WindowGroup {
@@ -85,6 +87,8 @@ struct FamilyLifeApp: App {
                 .environment(messageCache)
                 .environment(deepLinkRouter)
                 .environment(locationService)
+                .environment(subscriptionService)
+                .environment(conciergeLaunch)
                 .task {
                     // Wire up API service and deep link router to app delegate
                     appDelegate.apiService = apiService
@@ -94,6 +98,7 @@ struct FamilyLifeApp: App {
                         await authService.validateSession(api: apiService)
                     }
                     if authService.isAuthenticated {
+                        subscriptionService.start(api: apiService)
                         await householdService.reload(api: apiService, profileCache: profileImageCache, currentUserId: authService.currentUser?.id)
                         if let userId = authService.currentUser?.id {
                             messageCache.preload(api: apiService, userId: userId)
@@ -109,6 +114,7 @@ struct FamilyLifeApp: App {
                 }
                 .onChange(of: authService.isAuthenticated) { _, isAuthenticated in
                     if isAuthenticated {
+                        subscriptionService.start(api: apiService)
                         Task {
                             await householdService.reload(api: apiService, profileCache: profileImageCache, currentUserId: authService.currentUser?.id)
                             // Re-register for push on login

@@ -51,6 +51,9 @@ struct CalendarView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackgroundVisibility(.hidden, for: .navigationBar)
         .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                AskButlerButton(prompt: "What's coming up this week?")
+            }
             if showsDismissButton {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Done") { dismiss() }
