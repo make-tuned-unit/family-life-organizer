@@ -2699,6 +2699,21 @@ class FamilyDB {
     });
   }
 
+  // Every household group with a representative member user id — used to seed
+  // comp ("on the house") premium for the family.
+  getHouseholdGroupsWithMember() {
+    return new Promise((resolve, reject) => {
+      this.db.all(
+        `SELECT g.id AS group_id, MIN(gm.user_id) AS user_id
+         FROM groups g JOIN group_members gm ON gm.group_id = g.id
+         WHERE g.group_type = 'household'
+         GROUP BY g.id`,
+        [],
+        (err, rows) => err ? reject(err) : resolve(rows || [])
+      );
+    });
+  }
+
   // The household's currently-active subscription (expiry in the future), if any.
   getActiveSubscriptionForGroup(groupId) {
     return new Promise((resolve, reject) => {

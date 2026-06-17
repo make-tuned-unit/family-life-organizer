@@ -44,6 +44,54 @@ async function verifyAndStore(db, userId, signedTransaction) {
   return getStatus(db, userId);
 }
 
+// Comp ("on the house") premium — a non-billed entitlement we grant the family
+// directly, no App Store transaction involved. Keyed to a sentinel transaction
+// id per household so it's idempotent and untouched by Apple notifications.
+const COMP_TXN_PREFIX = 'comp-group-';
+const COMP_EXPIRES = '2099-12-31 23:59:59';
+
+async function grantCompForGroup(db, groupId, userId) {
+  if (!groupId) return false;
+  await db.upsertSubscription({
+    group_id: groupId,
+    user_id: userId,
+    product_id: PRODUCT_ID,
+    original_transaction_id: `${COMP_TXN_PREFIX}${groupId}`,
+    expires_at: COMP_EXPIRES,
+    environment: 'Comp',
+    status: 'active',
+  });
+  return true;
+}
+
+// Boot-time seeder. Set COMP_PREMIUM_ALL=1 to comp every household, or
+// COMP_PREMIUM_USERNAMES="jesse,sophie,ariel" to comp specific people's
+// households. Safe no-op when neither is set. Idempotent.
+async function ensureCompPremium(db) {
+  if (process.env.COMP_PREMIUM_ALL === '1') {
+    const groups = await db.getHouseholdGroupsWithMember();
+    for (const g of groups) {
+      await grantCompForGroup(db, g.group_id, g.user_id);
+      console.log(`[comp] premium → household ${g.group_id}`);
+    }
+    return;
+  }
+  const raw = process.env.COMP_PREMIUM_USERNAMES;
+  if (!raw) return;
+  const names = raw.split(',').map(s => s.trim()).filter(Boolean);
+  const seen = new Set();
+  for (const name of names) {
+    const user = await db.getUserByUsername(name);
+    if (!user) { console.log(`[comp] no user "${name}" — skipped`); continue; }
+    const groupId = await db.getUserHouseholdId(user.id);
+    if (!groupId) { console.log(`[comp] "${name}" has no household — skipped`); continue; }
+    if (seen.has(groupId)) continue;
+    seen.add(groupId);
+    await grantCompForGroup(db, groupId, user.id);
+    console.log(`[comp] premium → household ${groupId} (via ${name})`);
+  }
+}
+
 // Whether the user's household currently has premium.
 async function isHouseholdPremium(db, userId) {
   const groupId = await db.getUserHouseholdId(userId);
@@ -90,4 +138,4 @@ async function getStatus(db, userId) {
   };
 }
 
-module.exports = { verifyAndStore, verifyAndApplyNotification, getStatus, isHouseholdPremium, PRODUCT_ID, BUNDLE_ID };
+module.exports = { verifyAndStore, verifyAndApplyNotification, getStatus, isHouseholdPremium, grantCompForGroup, ensureCompPremium, PRODUCT_ID, BUNDLE_ID };

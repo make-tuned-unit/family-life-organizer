@@ -3,7 +3,7 @@
 // (cook, receipts, concierge) shares one code path and one model default.
 
 const API_URL = 'https://api.anthropic.com/v1/messages';
-const DEFAULT_MODEL = 'claude-sonnet-4-20250514';
+const DEFAULT_MODEL = 'claude-sonnet-4-6';
 
 function isAIEnabled() {
   return !!process.env.ANTHROPIC_API_KEY;

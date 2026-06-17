@@ -3907,6 +3907,7 @@ async function initializeDatabase() {
   try {
     await db.initSchema();
     await db.runHouseholdMigrations();
+    await subscription.ensureCompPremium(db);
     console.log('✅ Database initialized with full schema + household isolation');
   } catch (err) {
     console.error('❌ Database init error:', err.message);
