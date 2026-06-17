@@ -23,6 +23,9 @@ struct ExpensesView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackgroundVisibility(.hidden, for: .navigationBar)
         .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                AskButlerButton(prompt: "How are we doing on our budget this month?")
+            }
             if showsDismissButton {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Done") { dismiss() }

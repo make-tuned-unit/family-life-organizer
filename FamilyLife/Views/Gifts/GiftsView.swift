@@ -96,6 +96,9 @@ struct GiftsView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackgroundVisibility(.hidden, for: .navigationBar)
         .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                AskButlerButton(prompt: "Any upcoming occasions I should plan gifts for?")
+            }
             if showsDismissButton {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Done") { dismiss() }

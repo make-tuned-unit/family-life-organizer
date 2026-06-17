@@ -25,6 +25,9 @@ struct CookView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackgroundVisibility(.hidden, for: .navigationBar)
         .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                AskButlerButton(prompt: "What should we make for dinner tonight?")
+            }
             if !embedded {
                 ToolbarItem(placement: .topBarTrailing) {
                     GlassIconButton(systemName: "gearshape") {

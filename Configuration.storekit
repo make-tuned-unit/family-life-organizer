@@ -1,0 +1,43 @@
+{
+  "identifier" : "A1B2C3D4-0000-0000-0000-CONCIERGE001",
+  "nonRenewingSubscriptions" : [],
+  "products" : [],
+  "settings" : {
+    "_failTransactionsEnabled" : false,
+    "_storeKitErrors" : []
+  },
+  "subscriptionGroups" : [
+    {
+      "id" : "20000001",
+      "localizations" : [],
+      "name" : "Concierge",
+      "subscriptions" : [
+        {
+          "adHocOffers" : [],
+          "codeOffers" : [],
+          "displayPrice" : "4.99",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "30000001",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "Your AI life concierge — chat with your butler and let it organize your household.",
+              "displayName" : "Concierge Monthly",
+              "locale" : "en_US"
+            }
+          ],
+          "productID" : "com.mylauft.kinrows.concierge.monthly",
+          "recurringSubscriptionPeriod" : "P1M",
+          "referenceName" : "Concierge Monthly",
+          "subscriptionGroupID" : "20000001",
+          "type" : "RecurringSubscription"
+        }
+      ]
+    }
+  ],
+  "version" : {
+    "major" : 3,
+    "minor" : 0
+  }
+}

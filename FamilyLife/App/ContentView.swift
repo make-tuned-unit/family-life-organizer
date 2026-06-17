@@ -3,15 +3,16 @@ import HealthKit
 import SwiftUI
 
 enum MainTab: Hashable, CaseIterable {
-    case calendar, lists, home, budget, more
+    case calendar, lists, home, concierge, budget, more
 
     var icon: String {
         switch self {
-        case .calendar:  "calendar"
-        case .lists:     "list.bullet.rectangle.fill"
-        case .home:      "house.fill"
-        case .budget:    "creditcard.fill"
-        case .more:      "ellipsis.circle.fill"
+        case .calendar:   "calendar"
+        case .lists:      "list.bullet.rectangle.fill"
+        case .home:       "house.fill"
+        case .concierge:  "sparkles"
+        case .budget:     "creditcard.fill"
+        case .more:       "ellipsis.circle.fill"
         }
     }
 }
@@ -45,6 +46,7 @@ struct MainTabView: View {
     @State private var chatInitialThread: ChatSheet.ChatThread?
     @State private var unreadCount = 0
     @Environment(LocationService.self) private var locationService
+    @Environment(ConciergeLaunch.self) private var conciergeLaunch
     @State private var trackedTripId: Int?
     @State private var deepRivalry: RivalryResponse?
     @State private var deepDecision: DecisionResponse?
@@ -116,6 +118,12 @@ struct MainTabView: View {
         .onChange(of: deepLinkRouter.pendingType) {
             guard let type = deepLinkRouter.pendingType else { return }
             Task { await handleDeepLink(type: type) }
+        }
+        .onChange(of: conciergeLaunch.requestedPrompt) {
+            if conciergeLaunch.requestedPrompt != nil {
+                loadedTabs.insert(.concierge)
+                selectedTab = .concierge
+            }
         }
         .task {
             await pollUnread()
@@ -332,6 +340,8 @@ struct MainTabView: View {
             showingChat = true
         case "coverage":
             selectedTab = .home
+        case "concierge":
+            selectedTab = .concierge
         default:
             selectedTab = .home
         }
@@ -343,6 +353,7 @@ struct MainTabView: View {
         case .calendar:  NavigationStack { CalendarView() }
         case .lists:     NavigationStack { FamilyListsView(pendingListName: $pendingListName) }
         case .home:      NavigationStack { HomeView(selectedTab: $selectedTab, pendingListName: $pendingListName) }
+        case .concierge: NavigationStack { ConciergeView(selectedTab: $selectedTab) }
         case .budget:    NavigationStack { ExpensesView() }
         case .more:      NavigationStack { MoreView() }
         }
@@ -390,6 +401,7 @@ struct FloatingTabBar: View {
         case .calendar:  TabAccent.calendar.color
         case .lists:     TabAccent.home.color
         case .home:      TabAccent.home.color
+        case .concierge: AccentTheme.saffron.color
         case .budget:    AccentTheme.terracotta.color
         case .more:      WarmPalette.ink2
         }
@@ -405,4 +417,6 @@ struct FloatingTabBar: View {
         .environment(DeepLinkRouter())
         .environment(MessageCache())
         .environment(LocationService())
+        .environment(SubscriptionService())
+        .environment(ConciergeLaunch())
 }
