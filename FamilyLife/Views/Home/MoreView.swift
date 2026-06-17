@@ -45,6 +45,10 @@ struct MoreView: View {
                         moreRow(icon: "mappin.and.ellipse", title: "Addresses", subtitle: "Saved family locations", color: TabAccent.home.color)
                     }
 
+                    NavigationLink { ConciergeIntroView() } label: {
+                        moreRow(icon: "sparkles", title: "AI Concierge", subtitle: "Daily brief and a chat that helps", color: AccentTheme.saffron.color)
+                    }
+
                     NavigationLink { SettingsView() } label: {
                         moreRow(icon: "gearshape.fill", title: "Settings", subtitle: "Server, notifications, and account", color: WarmPalette.ink3)
                     }
@@ -92,4 +96,5 @@ struct MoreView: View {
         MoreView()
     }
     .environment(APIService())
+    .environment(SubscriptionService())
 }

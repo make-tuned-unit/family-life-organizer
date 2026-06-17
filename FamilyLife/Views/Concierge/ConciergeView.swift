@@ -31,6 +31,17 @@ struct ConciergeView: View {
             .refreshable { await viewModel.load(api: api, force: true) }
         }
         .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackgroundVisibility(.hidden, for: .navigationBar)
+        .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                Button { selectedTab = .home } label: {
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(WarmPalette.ink2)
+                }
+                .accessibilityLabel("Back to home")
+            }
+        }
         .sheet(isPresented: $showingChat) {
             ConciergeChatView(initialPrompt: chatPrompt)
         }

@@ -15,6 +15,10 @@ enum MainTab: Hashable, CaseIterable {
         case .more:       "ellipsis.circle.fill"
         }
     }
+
+    /// Tabs shown in the floating bar. Concierge is intentionally excluded —
+    /// it's an opt-in AI surface reached from its own floating button.
+    static var barTabs: [MainTab] { [.calendar, .lists, .home, .budget, .more] }
 }
 
 struct ContentView: View {
@@ -51,6 +55,7 @@ struct MainTabView: View {
     @State private var deepRivalry: RivalryResponse?
     @State private var deepDecision: DecisionResponse?
     @State private var deepEvent: AppointmentResponse?
+    @AppStorage("aiConciergeEnabled") private var aiConciergeEnabled = false
 
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -93,6 +98,30 @@ struct MainTabView: View {
                     }
                     .padding(.trailing, 20)
                     .padding(.bottom, 80)
+                }
+            }
+
+            // Floating AI concierge launcher — opt-in, mirrored across from chat
+            if aiConciergeEnabled {
+                VStack {
+                    Spacer()
+                    HStack {
+                        Button {
+                            loadedTabs.insert(.concierge)
+                            selectedTab = .concierge
+                        } label: {
+                            Image(systemName: "sparkles")
+                                .font(.system(size: 20, weight: .semibold))
+                                .foregroundStyle(.white)
+                                .frame(width: 52, height: 52)
+                                .background(AccentTheme.saffron.color, in: Circle())
+                                .shadow(color: .black.opacity(0.15), radius: 8, y: 4)
+                        }
+                        .accessibilityLabel("Open AI concierge")
+                        .padding(.leading, 20)
+                        .padding(.bottom, 80)
+                        Spacer()
+                    }
                 }
             }
         }
@@ -367,7 +396,7 @@ struct FloatingTabBar: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            ForEach(MainTab.allCases, id: \.self) { tab in
+            ForEach(MainTab.barTabs, id: \.self) { tab in
                 Button {
                     selectedTab = tab
                 } label: {
