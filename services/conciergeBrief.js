@@ -90,9 +90,8 @@ function fallbackSummary(s) {
   if (c.upcomingEvents) bits.push(`${c.upcomingEvents} upcoming occasion${c.upcomingEvents === 1 ? '' : 's'}`);
   if (c.expiringPantry) bits.push(`${c.expiringPantry} item${c.expiringPantry === 1 ? '' : 's'} expiring soon`);
 
-  if (!bits.length) return "You're all caught up — nothing needs your attention right now.";
-  const last = bits.pop();
-  return `Here's where things stand: ${bits.length ? bits.join(', ') + ', and ' : ''}${last}.`;
+  if (!bits.length) return "• You're all caught up — nothing needs your attention.";
+  return bits.map(b => `• ${b.charAt(0).toUpperCase()}${b.slice(1)}`).join('\n');
 }
 
 // Warm butler-voiced summary via Claude, falling back to the deterministic line.
@@ -103,8 +102,8 @@ async function generateSummary(s, userName) {
       upcomingAppointments: s.upcomingAppointments.slice(0, 3), upcomingEvents: s.upcomingEvents.slice(0, 3),
       budgetAlerts: s.budgetAlerts.slice(0, 3), openDecisions: s.openDecisions.slice(0, 3) });
     const text = await ai.callClaude({
-      maxTokens: 300,
-      system: `You are a warm, concise family life concierge — a personal butler. Address ${userName || 'the user'} directly. Write 2-3 short sentences summarizing what needs attention today, in priority order, in a calm reassuring tone. No lists, no markdown, no preamble. If nothing needs attention, say so warmly.`,
+      maxTokens: 200,
+      system: `You are a warm, concise family life concierge for ${userName || 'the user'}. Summarize what needs attention today as 3-5 short bullet points in priority order. Rules: each bullet starts with "• "; keep each to ~8 words, scannable, no fluff or preamble; plain text only (no markdown, no bold, no headers). If nothing needs attention, return exactly one line: "• You're all caught up.".`,
       messages: [{ role: 'user', content: `Today's snapshot:\n${facts}` }],
     });
     return text.trim();
