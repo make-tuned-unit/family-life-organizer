@@ -1,9 +1,11 @@
 import SwiftUI
+import PhotosUI
 
 struct FamilyGroupsView: View {
     @Environment(APIService.self) private var api
     @Environment(AuthService.self) private var auth
     @Environment(HouseholdService.self) private var household
+    @Environment(ProfileImageCache.self) private var profileCache
     @State private var groups: [APIService.GroupResponse] = []
     @State private var householdMemberNames: Set<String> = []
     @State private var isLoading = false
@@ -74,6 +76,7 @@ struct FamilyGroupsView: View {
         isLoading = true
         do {
             groups = try await api.fetchGroups()
+            profileCache.loadFromGroups(groups)
             // Load household members to separate them from wider family
             if let hhGroup = groups.first(where: { $0.group_type == "household" }) {
                 let members = (try? await api.fetchGroupMembers(groupId: hhGroup.id)) ?? []
@@ -114,12 +117,7 @@ struct FamilyGroupsView: View {
             Button { selectedGroup = hh } label: {
                 VStack(alignment: .leading, spacing: 8) {
                     HStack(spacing: 12) {
-                        Image(systemName: "house.fill")
-                            .font(.system(size: 18))
-                            .foregroundStyle(AccentTheme.sage.color)
-                            .frame(width: 36, height: 36)
-                            .background(AccentTheme.sage.color.opacity(0.15))
-                            .clipShape(Circle())
+                        GroupAvatar(groupId: hh.id, name: hh.name, size: 36)
                         VStack(alignment: .leading, spacing: 2) {
                             Text(hh.name)
                                 .font(.system(size: 17, weight: .semibold))
@@ -221,12 +219,7 @@ struct GroupRow: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            Image(systemName: group.group_type == "tribe" ? "globe" : "person.3.fill")
-                .font(.system(size: 16))
-                .foregroundStyle(group.group_type == "tribe" ? AccentTheme.ocean.color : AccentTheme.mauve.color)
-                .frame(width: 32, height: 32)
-                .background((group.group_type == "tribe" ? AccentTheme.ocean.color : AccentTheme.mauve.color).opacity(0.15))
-                .clipShape(RoundedRectangle(cornerRadius: 10))
+            GroupAvatar(groupId: group.id, name: group.name, size: 32)
             VStack(alignment: .leading, spacing: 2) {
                 Text(group.name)
                     .font(.system(size: 15, weight: .semibold))
@@ -288,6 +281,7 @@ struct GroupDetailView: View {
     @Environment(APIService.self) private var api
     @Environment(AuthService.self) private var auth
     @Environment(HouseholdService.self) private var household
+    @Environment(ProfileImageCache.self) private var profileCache
     @Environment(\.dismiss) private var dismiss
     @State private var members: [APIService.GroupMemberResponse] = []
     @State private var feed: [APIService.FeedPostResponse] = []
@@ -296,6 +290,9 @@ struct GroupDetailView: View {
     @State private var showingLeaveConfirm = false
     @State private var selectedTab = 0
     @State private var copiedCode = false
+    @State private var groupImage: UIImage?
+    @State private var showingPhotoPicker = false
+    @State private var selectedPhoto: PhotosPickerItem?
 
     private var isCreator: Bool {
         group.created_by == auth.currentUser?.id
@@ -309,13 +306,17 @@ struct GroupDetailView: View {
         ScrollView(showsIndicators: false) {
             VStack(spacing: 0) {
                 // Header
-                VStack(spacing: 8) {
-                    Text(group.name)
-                        .font(.system(size: 24, weight: .bold))
-                        .foregroundStyle(WarmPalette.ink1)
-                    Text("\(group.group_type.capitalized) \u{00B7} \(members.count) members")
-                        .font(.system(size: 13))
-                        .foregroundStyle(WarmPalette.ink3)
+                VStack(spacing: 10) {
+                    Button { showingPhotoPicker = true } label: { groupAvatarView }
+                        .buttonStyle(.plain)
+                    VStack(spacing: 4) {
+                        Text(group.name)
+                            .font(.system(size: 24, weight: .bold))
+                            .foregroundStyle(WarmPalette.ink1)
+                        Text("\(group.group_type.capitalized) \u{00B7} \(members.count) members")
+                            .font(.system(size: 13))
+                            .foregroundStyle(WarmPalette.ink3)
+                    }
                 }
                 .padding(.top, 14)
                 .padding(.bottom, 12)
@@ -455,10 +456,68 @@ struct GroupDetailView: View {
                  : "You'll no longer see this group's feed or members.")
         }
         .task {
+            seedGroupImage()
             async let m: () = loadMembers()
             async let f: () = loadFeed()
             _ = await (m, f)
         }
+        .photosPicker(isPresented: $showingPhotoPicker, selection: $selectedPhoto, matching: .images)
+        .onChange(of: selectedPhoto) {
+            Task { await handlePickedPhoto() }
+        }
+    }
+
+    // MARK: - Group avatar
+
+    private var groupAvatarView: some View {
+        ZStack {
+            if let img = currentGroupImage {
+                Image(uiImage: img)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: 72, height: 72)
+                    .clipShape(Circle())
+                    .overlay(Circle().stroke(.white.opacity(0.3), lineWidth: 1))
+            } else {
+                FamilyAvatar(initial: String(group.name.prefix(1)).uppercased(), size: 72)
+            }
+        }
+        .overlay(alignment: .bottomTrailing) {
+            Image(systemName: "camera.fill")
+                .font(.system(size: 11))
+                .foregroundStyle(.white)
+                .frame(width: 24, height: 24)
+                .background(WarmPalette.ink1)
+                .clipShape(Circle())
+                .overlay(Circle().stroke(.white, lineWidth: 1.5))
+        }
+    }
+
+    private var currentGroupImage: UIImage? {
+        groupImage ?? profileCache.groupImage(for: group.id)
+    }
+
+    private func seedGroupImage() {
+        guard groupImage == nil else { return }
+        if let cached = profileCache.groupImage(for: group.id) {
+            groupImage = cached
+        } else if let base64 = group.profile_image,
+                  let data = Data(base64Encoded: base64),
+                  let img = UIImage(data: data) {
+            groupImage = img
+            profileCache.setGroupImage(img, for: group.id)
+        } else {
+            profileCache.fetchGroupIfNeeded(groupId: group.id, api: api)
+        }
+    }
+
+    private func handlePickedPhoto() async {
+        guard let data = try? await selectedPhoto?.loadTransferable(type: Data.self) else { return }
+        let compressed = UIImage(data: data)?.jpegData(compressionQuality: 0.6) ?? data
+        guard let img = UIImage(data: compressed) else { return }
+        groupImage = img
+        profileCache.setGroupImage(img, for: group.id)
+        try? await api.uploadGroupImage(groupId: group.id, compressed.base64EncodedString())
     }
 
     // MARK: - Feed

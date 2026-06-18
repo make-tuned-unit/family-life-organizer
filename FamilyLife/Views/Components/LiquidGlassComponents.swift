@@ -135,6 +135,33 @@ struct UserAvatar: View {
     }
 }
 
+// MARK: - Group Avatar
+
+/// Avatar for a group/household — shows its uploaded image if set, otherwise
+/// falls back to the group's initial. Lazily fetches the image by group id.
+struct GroupAvatar: View {
+    let groupId: Int
+    let name: String
+    var size: CGFloat = 32
+    @Environment(APIService.self) private var api
+    @Environment(ProfileImageCache.self) private var profileCache
+
+    var body: some View {
+        Group {
+            if let img = profileCache.groupImage(for: groupId) {
+                Image(uiImage: ProfileAvatar.preRenderedCircle(
+                    img, diameter: size, borderColor: .clear, borderWidth: 0
+                ))
+                .resizable()
+                .frame(width: size, height: size)
+            } else {
+                FamilyAvatar(initial: String(name.prefix(1)).uppercased(), size: size)
+            }
+        }
+        .onAppear { profileCache.fetchGroupIfNeeded(groupId: groupId, api: api) }
+    }
+}
+
 // MARK: - Presence Chip
 
 struct PresenceChip: View {

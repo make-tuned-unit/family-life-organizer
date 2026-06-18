@@ -457,6 +457,8 @@ final class APIService {
         var member_count: Int?
         var created_by: Int?
         var created_at: String?
+        var profile_image: String?  // base64 — set via default so the memberwise init stays callable
+            = nil
     }
 
     struct GroupMemberResponse: Codable, Identifiable {
@@ -795,6 +797,15 @@ final class APIService {
 
     func fetchProfileImage(userId: Int) async throws -> String {
         let response: AvatarResponse = try await get("/api/users/\(userId)/avatar")
+        return response.image
+    }
+
+    func uploadGroupImage(groupId: Int, _ base64: String) async throws {
+        let _: SuccessResponse = try await put("/api/groups/\(groupId)/avatar", body: ["image": base64])
+    }
+
+    func fetchGroupImage(groupId: Int) async throws -> String {
+        let response: AvatarResponse = try await get("/api/groups/\(groupId)/avatar")
         return response.image
     }
 

@@ -74,6 +74,8 @@ class FamilyDB {
         this.db.run('ALTER TABLE appointments ADD COLUMN recurrence_end TEXT', () => {});
         // Profile image column
         this.db.run('ALTER TABLE users ADD COLUMN profile_image TEXT', () => {});
+        // Group/household profile image
+        this.db.run('ALTER TABLE groups ADD COLUMN profile_image TEXT', () => {});
         // DM image support
         this.db.run('ALTER TABLE direct_messages ADD COLUMN image_data TEXT', () => {});
         this.db.run('CREATE INDEX IF NOT EXISTS idx_feed_posts_group ON feed_posts(group_id, id DESC)', () => {});
@@ -1655,6 +1657,28 @@ class FamilyDB {
     });
   }
 
+  // Group profile image (base64), mirroring the user-avatar storage.
+  updateGroupAvatar(groupId, image) {
+    return new Promise((resolve, reject) => {
+      this.db.run('UPDATE groups SET profile_image = ? WHERE id = ?', [image, groupId],
+        (err) => err ? reject(err) : resolve({ ok: true }));
+    });
+  }
+
+  getGroupAvatar(groupId) {
+    return new Promise((resolve, reject) => {
+      this.db.get('SELECT profile_image FROM groups WHERE id = ?', [groupId],
+        (err, row) => err ? reject(err) : resolve(row?.profile_image || null));
+    });
+  }
+
+  isGroupMember(groupId, userId) {
+    return new Promise((resolve, reject) => {
+      this.db.get('SELECT 1 FROM group_members WHERE group_id = ? AND user_id = ? LIMIT 1',
+        [groupId, userId], (err, row) => err ? reject(err) : resolve(!!row));
+    });
+  }
+
   addGroupMember(groupId, { user_id, contact_id, role, added_by }) {
     return new Promise((resolve, reject) => {
       this.db.run(
@@ -1946,17 +1970,18 @@ class FamilyDB {
            AND gm.group_id IN (SELECT group_id FROM group_members WHERE user_id = ${uid})`
         : `SELECT name FROM users`;
       const sql = `
-        SELECT 'decision' as feed_type, id as ref_id, title, NULL as body,
-          creator_name as author, status, created_at,
-          0 as reaction_count, 0 as comment_count, NULL as author_id, NULL as group_id, NULL as group_name
-        FROM decisions WHERE status = 'active'
-          AND creator_name IN (${myHouseholdMembers})
+        SELECT 'decision' as feed_type, d.id as ref_id, d.title, NULL as body,
+          d.creator_name as author, d.status, d.created_at as created_at,
+          0 as reaction_count, 0 as comment_count, NULL as author_id, d.group_id, g.name as group_name
+        FROM decisions d LEFT JOIN groups g ON g.id = d.group_id
+        WHERE d.status = 'active'
+          AND d.creator_name IN (${myHouseholdMembers})
         UNION ALL
         SELECT 'event' as feed_type, a.id as ref_id, a.title, a.location as body,
           COALESCE(a.person_tags, 'Family') as author, 'upcoming' as status,
           a.created_at,
-          0 as reaction_count, 0 as comment_count, NULL as author_id, NULL as group_id, NULL as group_name
-        FROM appointments a
+          0 as reaction_count, 0 as comment_count, NULL as author_id, a.group_id, g.name as group_name
+        FROM appointments a LEFT JOIN groups g ON g.id = a.group_id
         WHERE a.appointment_date <= date('now', '+7 days', 'localtime')
           AND (
             a.appointment_date > date('now', 'localtime')

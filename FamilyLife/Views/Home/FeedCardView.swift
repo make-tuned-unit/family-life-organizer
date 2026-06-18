@@ -99,14 +99,30 @@ struct FeedCard: View {
 
     // MARK: - Header (no Button — just a view)
 
+    // The post represents the group/household itself (a bare "Family" event,
+    // a group decision) rather than an individual — show the group's image.
+    private var groupAuthored: Bool {
+        guard let gid = item.group_id, gid > 0 else { return false }
+        guard let author = item.author, !author.isEmpty else { return true }
+        if author.localizedCaseInsensitiveCompare("Family") == .orderedSame { return true }
+        if let gn = item.group_name, author.localizedCaseInsensitiveCompare(gn) == .orderedSame { return true }
+        return false
+    }
+
     private var header: some View {
         HStack(spacing: 10) {
-            UserAvatar(name: item.author ?? "?", userId: item.author_id, size: 32)
-                .onAppear {
-                    if let authorId = item.author_id {
-                        profileCache.fetchIfNeeded(userId: authorId, api: api)
-                    }
+            Group {
+                if groupAuthored, let gid = item.group_id {
+                    GroupAvatar(groupId: gid, name: item.group_name ?? item.author ?? "Family", size: 32)
+                } else {
+                    UserAvatar(name: item.author ?? "?", userId: item.author_id, size: 32)
+                        .onAppear {
+                            if let authorId = item.author_id {
+                                profileCache.fetchIfNeeded(userId: authorId, api: api)
+                            }
+                        }
                 }
+            }
 
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
