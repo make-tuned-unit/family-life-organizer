@@ -4187,6 +4187,7 @@ async function initializeDatabase() {
   try {
     await db.initSchema();
     await db.runHouseholdMigrations();
+    await db.reattributeHouseholdsOnce();
     await subscription.ensureCompPremium(db);
     console.log('✅ Database initialized with full schema + household isolation');
   } catch (err) {

@@ -1862,6 +1862,104 @@ class FamilyDB {
     });
   }
 
+  // Tables that carry a per-row owner NAME we can map back to a household.
+  // The one durable ownership signal that survives the legacy backfill.
+  static get REATTRIBUTION_OWNED() {
+    return [
+      { table: 'receipts', col: 'added_by' },
+      { table: 'pantry', col: 'added_by' },
+      { table: 'trips', col: 'traveler' },
+      { table: 'budget_projects', col: 'created_by' },
+      { table: 'decisions', col: 'creator_name' },
+      { table: 'rivalries', col: 'initiator_name' },
+      { table: 'family_addresses', col: 'created_by' },
+      { table: 'appointments', col: 'person_tags', tags: true, fallback: 'with_person' },
+    ];
+  }
+
+  // Core re-attribution: move household-scoped rows to the household their
+  // owner-name resolves to. Conservative — a row is moved ONLY when its owner
+  // resolves UNAMBIGUOUSLY to a single household different from its current one;
+  // unresolved/ambiguous owners are left untouched (never set to NULL). Shared
+  // by the CLI script and the one-time startup pass so there is one source of
+  // truth. Returns { moves, applied }.
+  reattributeHouseholds({ apply = false, onLog = () => {} } = {}) {
+    return new Promise((resolve, reject) => {
+      const all = (sql, p = []) => new Promise((r, j) => this.db.all(sql, p, (e, x) => e ? j(e) : r(x)));
+      const run = (sql, p = []) => new Promise((r, j) => this.db.run(sql, p, function (e) { e ? j(e) : r(this); }));
+      const cache = new Map();
+      const hhForName = async (raw) => {
+        if (!raw) return null;
+        const key = String(raw).trim().toLowerCase();
+        if (!key) return null;
+        if (cache.has(key)) return cache.get(key);
+        const rows = await all(`SELECT DISTINCT g.id FROM users u
+          JOIN group_members gm ON gm.user_id = u.id
+          JOIN groups g ON g.id = gm.group_id AND g.group_type = 'household'
+          WHERE LOWER(u.name) = ? OR LOWER(u.username) = ?`, [key, key]);
+        const hh = rows.length === 1 ? rows[0].id : null; // >1 household = ambiguous, leave it
+        cache.set(key, hh);
+        return hh;
+      };
+      const hhForTags = async (val, fb) => {
+        let parts = [];
+        const v = (val || '').trim();
+        if (v.startsWith('[')) { try { parts = JSON.parse(v); } catch { parts = []; } }
+        else if (v) { parts = v.split(','); }
+        parts = parts.map(s => String(s).trim()).filter(Boolean);
+        if (!parts.length && fb) parts = [String(fb).trim()].filter(Boolean);
+        if (!parts.length) return null;
+        const set = new Set();
+        for (const p of parts) { const hh = await hhForName(p); if (!hh) return null; set.add(hh); }
+        return set.size === 1 ? [...set][0] : null;
+      };
+      (async () => {
+        const moves = [];
+        for (const cfg of FamilyDB.REATTRIBUTION_OWNED) {
+          const cols = await all(`PRAGMA table_info(${cfg.table})`);
+          if (!cols.some(c => c.name === 'group_id')) continue;
+          const extra = cfg.fallback ? `, ${cfg.fallback}` : '';
+          const rows = await all(`SELECT id, group_id, ${cfg.col}${extra} FROM ${cfg.table}`);
+          for (const row of rows) {
+            const target = cfg.tags
+              ? await hhForTags(row[cfg.col], cfg.fallback ? row[cfg.fallback] : null)
+              : await hhForName(row[cfg.col]);
+            if (!target || target === row.group_id) continue;
+            moves.push({ table: cfg.table, id: row.id, from: row.group_id, to: target, by: row[cfg.col] });
+          }
+        }
+        if (apply && moves.length) {
+          await run('BEGIN');
+          try {
+            for (const m of moves) await run(`UPDATE ${m.table} SET group_id = ? WHERE id = ?`, [m.to, m.id]);
+            await run('COMMIT');
+          } catch (e) { await run('ROLLBACK').catch(() => {}); throw e; }
+        }
+        onLog(`household re-attribution: ${moves.length} ${apply ? 'applied' : 'proposed'}`);
+        resolve({ moves, applied: apply ? moves.length : 0 });
+      })().catch(reject);
+    });
+  }
+
+  // One-time, self-guarded startup pass. Runs reattributeHouseholds({apply})
+  // exactly once (tracked via app_meta) so a deploy auto-corrects any legacy
+  // mis-attribution and never repeats. No-op on a clean DB.
+  reattributeHouseholdsOnce() {
+    return new Promise((resolve, reject) => {
+      const get = (sql, p = []) => new Promise((r, j) => this.db.get(sql, p, (e, x) => e ? j(e) : r(x)));
+      const run = (sql, p = []) => new Promise((r, j) => this.db.run(sql, p, function (e) { e ? j(e) : r(this); }));
+      (async () => {
+        await run(`CREATE TABLE IF NOT EXISTS app_meta (key TEXT PRIMARY KEY, value TEXT)`);
+        const done = await get(`SELECT value FROM app_meta WHERE key = 'reattribution_v1'`);
+        if (done) return resolve({ skipped: true });
+        const res = await this.reattributeHouseholds({ apply: true, onLog: (m) => console.log('[startup]', m) });
+        await run(`INSERT OR REPLACE INTO app_meta (key, value) VALUES ('reattribution_v1', ?)`, [String(res.applied)]);
+        console.log(`[startup] one-time household re-attribution complete (${res.applied} rows moved)`);
+        resolve(res);
+      })().catch(reject);
+    });
+  }
+
   // ============================================
   // Contacts (non-app family members)
   // ============================================
