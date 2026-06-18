@@ -5,10 +5,19 @@
 const http2 = require('http2');
 const crypto = require('crypto');
 
-const APNS_HOST = process.env.APNS_ENV === 'development'
-  ? 'api.sandbox.push.apple.com'
-  : 'api.push.apple.com';
+const APNS_PROD_HOST = 'api.push.apple.com';
+const APNS_SANDBOX_HOST = 'api.sandbox.push.apple.com';
+// Primary host honors APNS_ENV (default production), but we fall back to the
+// other host per-token: debug/Xcode builds mint sandbox tokens while
+// TestFlight/App Store builds mint production ones, and one household has both.
+const PRIMARY_HOST = process.env.APNS_ENV === 'development' ? APNS_SANDBOX_HOST : APNS_PROD_HOST;
+const ALTERNATE_HOST = PRIMARY_HOST === APNS_PROD_HOST ? APNS_SANDBOX_HOST : APNS_PROD_HOST;
 const APNS_PORT = 443;
+
+// Reasons that mean "valid credentials, wrong environment for this token" —
+// retry the other host. BadEnvironmentKeyInToken is APNs's (undocumented) 403
+// for exactly this; BadDeviceToken is the 400 variant.
+const ENV_MISMATCH_REASONS = new Set(['BadEnvironmentKeyInToken', 'BadDeviceToken']);
 
 // APNs auth key config (from environment variables)
 const KEY_ID = process.env.APNS_KEY_ID;
@@ -80,12 +89,10 @@ function derToRaw(derSig) {
  * @param {object} payload - APNs payload { aps: { alert: { title, body }, sound, badge } }
  * @returns {Promise<boolean>} true if sent successfully
  */
-function sendPush(deviceToken, payload) {
-  if (!isConfigured()) return Promise.resolve(false);
-
+function sendOnce(deviceToken, payload, host) {
   return new Promise((resolve) => {
-    const client = http2.connect(`https://${APNS_HOST}:${APNS_PORT}`);
-    client.on('error', () => { client.close(); resolve(false); });
+    const client = http2.connect(`https://${host}:${APNS_PORT}`);
+    client.on('error', () => { client.close(); resolve({ ok: false, reason: 'connect_error' }); });
 
     const jwt = getJWT();
     const body = JSON.stringify(payload);
@@ -103,22 +110,37 @@ function sendPush(deviceToken, payload) {
 
     req.on('response', (headers) => {
       const status = headers[':status'];
-      if (status === 200) {
-        resolve(true);
-      } else {
-        let data = '';
-        req.on('data', (chunk) => { data += chunk; });
-        req.on('end', () => {
-          console.error(`APNs error ${status} for ${deviceToken.substring(0, 8)}...: ${data}`);
-          resolve(false);
-        });
-      }
-      client.close();
+      if (status === 200) { client.close(); resolve({ ok: true }); return; }
+      let data = '';
+      req.on('data', (chunk) => { data += chunk; });
+      req.on('end', () => {
+        client.close();
+        let reason = '';
+        try { reason = JSON.parse(data).reason || ''; } catch { /* non-JSON body */ }
+        resolve({ ok: false, status, reason, data });
+      });
     });
 
-    req.on('error', () => { client.close(); resolve(false); });
+    req.on('error', () => { client.close(); resolve({ ok: false, reason: 'request_error' }); });
     req.end(body);
   });
+}
+
+function sendPush(deviceToken, payload) {
+  if (!isConfigured()) return Promise.resolve(false);
+
+  return (async () => {
+    let res = await sendOnce(deviceToken, payload, PRIMARY_HOST);
+    // The same auth key is valid for both environments — only the host differs,
+    // so an environment-mismatch reason just means "try the other host".
+    if (!res.ok && ENV_MISMATCH_REASONS.has(res.reason)) {
+      res = await sendOnce(deviceToken, payload, ALTERNATE_HOST);
+    }
+    if (!res.ok) {
+      console.error(`APNs error ${res.status || ''} for ${deviceToken.substring(0, 8)}...: ${res.data || res.reason}`);
+    }
+    return res.ok;
+  })();
 }
 
 /**
