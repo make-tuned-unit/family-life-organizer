@@ -327,6 +327,26 @@ CREATE TABLE IF NOT EXISTS project_expenses (
 
 CREATE INDEX IF NOT EXISTS idx_project_expenses_project_id ON project_expenses(project_id);
 
+-- Recurring monthly payments (rent, mortgage, streaming, insurance, car, ...)
+-- Track-only: surfaced in budget stats/projections; does NOT auto-create receipts.
+CREATE TABLE IF NOT EXISTS recurring_payments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    amount REAL NOT NULL,
+    category TEXT,
+    frequency TEXT DEFAULT 'monthly',   -- monthly | weekly | yearly
+    due_day INTEGER,                     -- day of month (1-31) for monthly cadence
+    due_date TEXT,                       -- MM-DD anchor for yearly cadence (optional)
+    autopay INTEGER DEFAULT 0,
+    icon TEXT,
+    notes TEXT,
+    active INTEGER DEFAULT 1,
+    created_by TEXT,
+    group_id INTEGER REFERENCES groups(id),
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_recurring_payments_group ON recurring_payments(group_id);
+
 -- ============================================
 -- Family Graph: Users, Groups, Contacts, Feed
 -- ============================================
