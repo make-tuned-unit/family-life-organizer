@@ -1672,12 +1672,120 @@ app.get('/api/receipts', requireAuth, async (req, res) => {
 });
 
 // Budget summary by month
+// Budget stats / trends (declared before /api/budget/:month so it isn't
+// captured as a month param). Monthly trend, category breakdown, budget vs
+// actual, recurring fixed costs, and derived insights — all household-scoped.
+app.get('/api/budget/stats', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const groupId = await db.getUserHouseholdId(req.session.user?.id);
+    const months = parseInt(req.query.months) || 6;
+    const stats = await db.getSpendingStats(groupId, months);
+    const budgetVsActual = await db.getBudgetSummary(stats.thisMonth, groupId);
+
+    // Derived figures the iOS Stats view renders as insight cards.
+    const series = stats.monthly;
+    const curr = series.length ? series[series.length - 1].total : 0;
+    const prev = series.length > 1 ? series[series.length - 2].total : 0;
+    const momPct = prev > 0 ? Math.round(((curr - prev) / prev) * 100) : null;
+    const avg = series.length ? series.reduce((s, m) => s + m.total, 0) / series.length : 0;
+
+    // Run-rate projection for the current month + remaining fixed commitments.
+    const now = new Date();
+    const dayOfMonth = now.getDate();
+    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    const runRate = dayOfMonth > 0 ? (curr / dayOfMonth) * daysInMonth : curr;
+    const projectedMonthEnd = Math.round(Math.max(runRate, curr));
+
+    const overBudget = budgetVsActual.filter(b => b.monthly_limit > 0 && b.spent > b.monthly_limit)
+      .map(b => ({ category: b.category, spent: b.spent, limit: b.monthly_limit }));
+    const fixed = Math.round(stats.recurringMonthly);
+    const variable = Math.round(Math.max(0, curr - fixed));
+
+    res.json({
+      month: stats.thisMonth,
+      monthly: series,                 // [{ ym, total }] oldest -> newest
+      byCategory: stats.byCategory,    // [{ category, spent }] current month, desc
+      budgetVsActual,                  // [{ category, monthly_limit, color, spent }]
+      currentTotal: Math.round(curr),
+      previousTotal: Math.round(prev),
+      momPct,
+      trailingAvg: Math.round(avg),
+      projectedMonthEnd,
+      recurringMonthly: fixed,
+      variableThisMonth: variable,
+      overBudget,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
 app.get('/api/budget/:month', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
     const groupId = await db.getUserHouseholdId(req.session.user?.id);
     const budget = await db.getBudgetSummary(req.params.month, groupId);
     res.json(budget);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+// Recurring payments CRUD (household-scoped, track-only)
+app.get('/api/recurring-payments', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const groupId = await db.getUserHouseholdId(req.session.user?.id);
+    const items = await db.getRecurringPayments(groupId);
+    res.json(items);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+app.post('/api/recurring-payments', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const groupId = await db.getUserHouseholdId(req.session.user?.id);
+    const result = await db.addRecurringPayment({
+      ...req.body,
+      created_by: req.session.user?.username || req.session.user?.name,
+      group_id: groupId,
+    });
+    res.json({ success: true, id: result.id });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+app.put('/api/recurring-payments/:id', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    if (!(await requireHouseholdRow(db, 'recurring_payments', req.params.id, req, res))) return;
+    await db.updateRecurringPayment(req.params.id, req.body);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+app.delete('/api/recurring-payments/:id', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    if (!(await requireHouseholdRow(db, 'recurring_payments', req.params.id, req, res))) return;
+    await db.deleteRecurringPayment(req.params.id);
+    res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
   } finally {

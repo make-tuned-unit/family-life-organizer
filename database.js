@@ -1662,6 +1662,97 @@ class FamilyDB {
   }
 
   // ============================================
+  // Recurring payments (rent, mortgage, subscriptions, ...) — track-only
+  // ============================================
+
+  // Normalize any cadence to a comparable monthly figure.
+  static monthlyEquivalent(amount, frequency) {
+    const a = Number(amount) || 0;
+    switch (frequency) {
+      case 'weekly': return a * 52 / 12;
+      case 'yearly': return a / 12;
+      default: return a; // monthly
+    }
+  }
+
+  getRecurringPayments(groupId = null) {
+    return new Promise((resolve, reject) => {
+      const sql = groupId != null
+        ? 'SELECT * FROM recurring_payments WHERE group_id = ? AND active = 1 ORDER BY due_day IS NULL, due_day, name'
+        : 'SELECT * FROM recurring_payments WHERE active = 1 ORDER BY due_day IS NULL, due_day, name';
+      this.db.all(sql, groupId != null ? [groupId] : [], (err, rows) => err ? reject(err) : resolve(rows || []));
+    });
+  }
+
+  addRecurringPayment(p) {
+    return new Promise((resolve, reject) => {
+      this.db.run(
+        `INSERT INTO recurring_payments (name, amount, category, frequency, due_day, due_date, autopay, icon, notes, created_by, group_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [p.name, p.amount, p.category || null, p.frequency || 'monthly', p.due_day || null, p.due_date || null,
+         p.autopay ? 1 : 0, p.icon || null, p.notes || null, p.created_by || null, p.group_id || null],
+        function (err) { err ? reject(err) : resolve({ id: this.lastID, ...p }); }
+      );
+    });
+  }
+
+  updateRecurringPayment(id, updates) {
+    const ALLOWED = new Set(['name', 'amount', 'category', 'frequency', 'due_day', 'due_date', 'autopay', 'icon', 'notes', 'active']);
+    return new Promise((resolve, reject) => {
+      const fields = [], params = [];
+      for (const [k, v] of Object.entries(updates)) {
+        if (!ALLOWED.has(k)) continue;
+        fields.push(`${k} = ?`);
+        params.push(k === 'autopay' || k === 'active' ? (v ? 1 : 0) : v);
+      }
+      if (!fields.length) return resolve({ id });
+      params.push(id);
+      this.db.run(`UPDATE recurring_payments SET ${fields.join(', ')} WHERE id = ?`, params, (err) => err ? reject(err) : resolve({ id, ...updates }));
+    });
+  }
+
+  deleteRecurringPayment(id) {
+    return new Promise((resolve, reject) => {
+      this.db.run('DELETE FROM recurring_payments WHERE id = ?', [id], (err) => err ? reject(err) : resolve({ id, deleted: true }));
+    });
+  }
+
+  // ============================================
+  // Spending statistics / trends (for the Budget > Stats view)
+  // ============================================
+
+  // One round-trip-ish aggregate: monthly totals, current-month category
+  // breakdown, recurring fixed total, and a few derived figures. All scoped to
+  // the caller's household. itinerary receipts (trip expenses) are excluded.
+  getSpendingStats(groupId, months = 6) {
+    return new Promise((resolve, reject) => {
+      const all = (sql, p = []) => new Promise((r, j) => this.db.all(sql, p, (e, x) => e ? j(e) : r(x || [])));
+      const gFilter = groupId != null ? 'AND group_id = ?' : '';
+      const gp = groupId != null ? [groupId] : [];
+      (async () => {
+        const n = Math.max(1, Math.min(24, parseInt(months) || 6));
+        // Monthly totals for the trailing window (oldest -> newest).
+        const monthly = await all(
+          `SELECT strftime('%Y-%m', date) AS ym, COALESCE(SUM(amount), 0) AS total
+           FROM receipts WHERE itinerary_id IS NULL ${gFilter}
+             AND date >= date('now', 'start of month', '-${n - 1} months')
+           GROUP BY ym ORDER BY ym`, gp);
+        // Current-month category breakdown (largest first).
+        const thisMonth = new Date().toLocaleDateString('en-CA').slice(0, 7);
+        const byCategory = await all(
+          `SELECT COALESCE(category, 'Other') AS category, COALESCE(SUM(amount), 0) AS spent
+           FROM receipts WHERE itinerary_id IS NULL AND strftime('%Y-%m', date) = ? ${gFilter}
+           GROUP BY category ORDER BY spent DESC`, [thisMonth, ...gp]);
+        // Recurring fixed monthly commitment.
+        const recurring = await all(
+          `SELECT amount, frequency FROM recurring_payments WHERE active = 1 ${gFilter}`, gp);
+        const recurringMonthly = recurring.reduce((sum, r) => sum + FamilyDB.monthlyEquivalent(r.amount, r.frequency), 0);
+        resolve({ thisMonth, monthly, byCategory, recurringMonthly });
+      })().catch(reject);
+    });
+  }
+
+  // ============================================
   // Users
   // ============================================
 
@@ -1813,7 +1904,7 @@ class FamilyDB {
       'budget_categories', 'budget_projects', 'project_expenses', 'pantry', 'trips',
       'gift_people', 'gift_ideas', 'special_events', 'family_addresses', 'feed_posts',
       'itineraries', 'itinerary_stays', 'subscriptions', 'concierge_memory', 'concierge_nudges',
-      'concierge_conversations'];
+      'concierge_conversations', 'recurring_payments'];
   }
 
   // Merge one household into another: re-point all household-scoped data and
