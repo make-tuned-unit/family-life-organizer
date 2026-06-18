@@ -39,11 +39,16 @@ struct FeedCard: View {
             if let title = item.title, !title.isEmpty {
                 let isPlainTextPost = prepared.isPost && (item.status == nil || item.status == "text")
                 if !isPlainTextPost {
+                    // If nothing follows the title (a bare event with no date/body and
+                    // no counts row), give it real bottom room so it isn't cramped —
+                    // matching the 14pt top inset from the header.
+                    let bodyFollows = prepared.body != nil || (item.body.map { !$0.isEmpty } ?? false)
+                    let countsFollow = prepared.isPost && !isExpanded
                     Text(title)
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundStyle(WarmPalette.ink1)
                         .padding(.horizontal, 14)
-                        .padding(.bottom, 4)
+                        .padding(.bottom, (bodyFollows || countsFollow) ? 4 : 14)
                 }
             }
 
