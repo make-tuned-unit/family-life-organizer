@@ -173,7 +173,7 @@ const TOOLS = [
     },
     async run(ctx, input) {
       const month = input.month || ctx.today.slice(0, 7);
-      const rows = await ctx.db.getBudgetSummary(month);
+      const rows = await ctx.db.getBudgetSummary(month, ctx.groupId);
       const result = rows.map(b => ({
         category: b.category, spent: b.spent, limit: b.monthly_limit,
         pct: b.monthly_limit > 0 ? Math.round((b.spent / b.monthly_limit) * 100) : null,
@@ -187,7 +187,7 @@ const TOOLS = [
     write: false,
     input_schema: { type: 'object', properties: {} },
     async run(ctx) {
-      const rows = await ctx.db.getPantry();
+      const rows = await ctx.db.getPantry({}, ctx.groupId);
       const result = rows.slice(0, 60).map(p => ({
         id: p.id, item: p.item, quantity: p.quantity, unit: p.unit, expiry: p.expiry_date,
       }));
@@ -262,6 +262,7 @@ const TOOLS = [
         item: input.item, quantity: input.quantity || '1', unit: input.unit || null,
         category: input.category || null, location: input.location || 'pantry',
         expiry_date: input.expiry_date || null, added_by: ctx.userName,
+        group_id: ctx.groupId,
       });
       const summary = `Added ${input.item} to the pantry`;
       return { result: { ok: true, summary }, action: { tool: 'add_pantry_item', summary } };
@@ -319,7 +320,7 @@ const TOOLS = [
       const filters = {};
       if (input.status) filters.status = input.status;
       if (input.traveler) filters.traveler = input.traveler;
-      const rows = await ctx.db.getTrips(filters);
+      const rows = await ctx.db.getTrips(filters, ctx.groupId);
       return { result: rows.slice(0, 30).map(t => ({
         id: t.id, traveler: t.traveler, origin: t.origin, destination: t.destination,
         purpose: t.purpose, status: t.status, eta_minutes: t.eta_minutes, arrived_at: t.arrived_at,
@@ -345,6 +346,7 @@ const TOOLS = [
       await ctx.db.createTrip({
         traveler: input.traveler, origin: input.origin || null, destination: input.destination,
         purpose: input.purpose || null, eta_minutes: input.eta_minutes || null,
+        group_id: ctx.groupId,
       });
       const summary = `Started ${input.traveler}'s trip to ${input.destination}`;
       return { result: { ok: true, summary }, action: { tool: 'add_trip', summary } };
@@ -549,7 +551,7 @@ const TOOLS = [
     write: false,
     input_schema: { type: 'object', properties: {} },
     async run(ctx) {
-      const rows = await ctx.db.getGiftPeople();
+      const rows = await ctx.db.getGiftPeople(ctx.groupId);
       return { result: rows.map(p => ({
         id: p.id, name: p.name, relationship: p.relationship, birthday: p.birthday, anniversary: p.anniversary,
       })) };
@@ -576,6 +578,7 @@ const TOOLS = [
       await ctx.db.addGiftPerson({
         name: input.name, relationship: input.relationship || null,
         birthday: input.birthday || null, anniversary: input.anniversary || null, notes: input.notes || null,
+        group_id: ctx.groupId,
       });
       const summary = `Now tracking ${input.name} for gifts`;
       return { result: { ok: true, summary }, action: { tool: 'add_gift_person', summary } };
@@ -590,7 +593,7 @@ const TOOLS = [
       properties: { person_id: { type: 'integer' } },
     },
     async run(ctx, input) {
-      const rows = await ctx.db.getGiftIdeas(input.person_id || null);
+      const rows = await ctx.db.getGiftIdeas(input.person_id || null, ctx.groupId);
       return { result: rows.map(g => ({
         id: g.id, person_id: g.person_id, title: g.title, price: g.estimated_price,
         status: g.status, for_event: g.for_event, link: g.link_url,
@@ -618,6 +621,7 @@ const TOOLS = [
         person_id: input.person_id, title: input.title, notes: input.notes || null,
         link_url: input.link_url || null, estimated_price: input.estimated_price || null,
         status: 'idea', for_event: input.for_event || null,
+        group_id: ctx.groupId,
       });
       const summary = `Added gift idea "${input.title}"`;
       return { result: { ok: true, summary }, action: { tool: 'add_gift_idea', summary } };
@@ -643,7 +647,7 @@ const TOOLS = [
     write: false,
     input_schema: { type: 'object', properties: {} },
     async run(ctx) {
-      const rows = await ctx.db.getFamilyAddresses();
+      const rows = await ctx.db.getFamilyAddresses(ctx.groupId);
       return { result: rows.map(a => ({ id: a.id, name: a.name, address: a.address })) };
     },
   },

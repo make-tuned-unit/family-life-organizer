@@ -49,16 +49,17 @@ async function safe(promise, fallback, label) {
 async function buildSnapshot(db, userId) {
   const today = todayISO();
   const month = currentMonth();
+  const groupId = await safe(db.getUserHouseholdId(userId), null, 'household');
 
   const [tasks, appts, decisions, pantry, events, coverage, budget, trips, itineraries] = await Promise.all([
     safe(db.getTasks({ status: 'active' }, userId), [], 'tasks'),
     safe(db.getAppointments({}, userId), [], 'appointments'),
     safe(db.getDecisions({ status: 'active' }, userId), [], 'decisions'),
-    safe(db.getPantry(), [], 'pantry'),
-    safe(db.getSpecialEvents(), [], 'events'),
+    safe(db.getPantry({}, groupId), [], 'pantry'),
+    safe(db.getSpecialEvents(groupId), [], 'events'),
     safe(db.getIncomingCoverageRequests(userId), [], 'coverage'),
-    safe(db.getBudgetSummary(month), [], 'budget'),
-    safe(db.getTrips({ status: 'active' }), [], 'trips'),
+    safe(db.getBudgetSummary(month, groupId), [], 'budget'),
+    safe(db.getTrips({ status: 'active' }, groupId), [], 'trips'),
     safe(db.getItineraries(userId), [], 'itineraries'),
   ]);
 
