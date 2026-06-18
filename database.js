@@ -58,15 +58,11 @@ class FamilyDB {
         this.db.exec(schema, (err) => {
           if (err) console.error('Schema init error:', err.message);
         });
-        // One-time dedup then add unique index
-        this.db.run(`
-          DELETE FROM budget_categories WHERE id NOT IN (
-            SELECT MIN(id) FROM budget_categories GROUP BY name
-          )
-        `, (err) => {
-          if (err) console.error('Dedup error:', err.message);
-        });
-        this.db.run('CREATE UNIQUE INDEX IF NOT EXISTS idx_budget_cat_name ON budget_categories(name)');
+        // Budget categories are unique per household, NOT globally. Drop the
+        // legacy global unique-name index (it would re-impose cross-household
+        // uniqueness and let one household's category collide with another's).
+        // Uniqueness is enforced by the UNIQUE(name, group_id) table constraint.
+        this.db.run('DROP INDEX IF EXISTS idx_budget_cat_name');
         this.db.run('CREATE INDEX IF NOT EXISTS idx_feed_reactions_post ON feed_reactions(post_id)');
         this.db.run('CREATE INDEX IF NOT EXISTS idx_feed_comments_post ON feed_comments(post_id)');
         // Recurring events columns
@@ -105,6 +101,25 @@ class FamilyDB {
         // Multi-player rivalries
         this.db.run('ALTER TABLE rivalries ADD COLUMN participants TEXT', () => {});
         this.db.run('CREATE INDEX IF NOT EXISTS idx_groceries_group ON groceries(group_id)', () => {});
+        // Data isolation (round 2): budgets, pantry, trips, gifts, special events
+        this.db.run('ALTER TABLE receipts ADD COLUMN group_id INTEGER REFERENCES groups(id)', () => {});
+        this.db.run('ALTER TABLE budget_projects ADD COLUMN group_id INTEGER REFERENCES groups(id)', () => {});
+        this.db.run('ALTER TABLE project_expenses ADD COLUMN group_id INTEGER REFERENCES groups(id)', () => {});
+        this.db.run('ALTER TABLE pantry ADD COLUMN group_id INTEGER REFERENCES groups(id)', () => {});
+        this.db.run('ALTER TABLE trips ADD COLUMN group_id INTEGER REFERENCES groups(id)', () => {});
+        this.db.run('ALTER TABLE gift_people ADD COLUMN group_id INTEGER REFERENCES groups(id)', () => {});
+        this.db.run('ALTER TABLE gift_ideas ADD COLUMN group_id INTEGER REFERENCES groups(id)', () => {});
+        this.db.run('ALTER TABLE special_events ADD COLUMN group_id INTEGER REFERENCES groups(id)', () => {});
+        this.db.run('ALTER TABLE family_addresses ADD COLUMN group_id INTEGER REFERENCES groups(id)', () => {});
+        this.db.run('CREATE INDEX IF NOT EXISTS idx_receipts_group ON receipts(group_id)', () => {});
+        this.db.run('CREATE INDEX IF NOT EXISTS idx_budget_projects_group ON budget_projects(group_id)', () => {});
+        this.db.run('CREATE INDEX IF NOT EXISTS idx_project_expenses_group ON project_expenses(group_id)', () => {});
+        this.db.run('CREATE INDEX IF NOT EXISTS idx_pantry_group ON pantry(group_id)', () => {});
+        this.db.run('CREATE INDEX IF NOT EXISTS idx_trips_group ON trips(group_id)', () => {});
+        this.db.run('CREATE INDEX IF NOT EXISTS idx_gift_people_group ON gift_people(group_id)', () => {});
+        this.db.run('CREATE INDEX IF NOT EXISTS idx_gift_ideas_group ON gift_ideas(group_id)', () => {});
+        this.db.run('CREATE INDEX IF NOT EXISTS idx_special_events_group ON special_events(group_id)', () => {});
+        this.db.run('CREATE INDEX IF NOT EXISTS idx_family_addresses_group ON family_addresses(group_id)', () => {});
         // Itinerary travelers column (added after initial table creation)
         this.db.run('ALTER TABLE itineraries ADD COLUMN travelers TEXT', () => {});
         this.db.run('ALTER TABLE receipts ADD COLUMN itinerary_id INTEGER REFERENCES itineraries(id)', () => {});
@@ -115,7 +130,10 @@ class FamilyDB {
           WHERE note = 'Synced from Apple Health'`, () => {});
         this.db.run('ALTER TABLE users ADD COLUMN last_location_at DATETIME', (err) => {
           if (err) console.error('Migration error:', err.message);
-          resolve();
+          // budget_categories: rebuild to drop the global UNIQUE(name) so each
+          // household can have its own same-named categories (e.g. "Groceries").
+          // Must finish before resolve so the backfill sees the new column.
+          this._migrateBudgetCategoriesGroup().then(resolve).catch(() => resolve());
         });
       });
     });
@@ -233,6 +251,42 @@ class FamilyDB {
     });
   }
 
+  // Rebuild budget_categories to add group_id and drop the legacy global
+  // UNIQUE(name) constraint, replacing it with UNIQUE(name, group_id).
+  // Idempotent: only rebuilds if the group_id column is not yet present.
+  _migrateBudgetCategoriesGroup() {
+    return new Promise((resolve) => {
+      this.db.all('PRAGMA table_info(budget_categories)', (err, cols) => {
+        if (err || !cols) return resolve();
+        const hasGroup = cols.some(c => c.name === 'group_id');
+        if (hasGroup) return resolve();
+        this.db.serialize(() => {
+          // Wrap the rebuild in a transaction so a crash can't leave the
+          // canonical table dropped with data stranded in the _new table.
+          this.db.run('BEGIN');
+          this.db.run(`CREATE TABLE IF NOT EXISTS budget_categories_new (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            monthly_limit DECIMAL(10,2),
+            color TEXT,
+            group_id INTEGER REFERENCES groups(id),
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(name, group_id)
+          )`);
+          this.db.run(`INSERT INTO budget_categories_new (id, name, monthly_limit, color, created_at)
+            SELECT id, name, monthly_limit, color, created_at FROM budget_categories`);
+          this.db.run('DROP TABLE budget_categories');
+          this.db.run('ALTER TABLE budget_categories_new RENAME TO budget_categories');
+          this.db.run('COMMIT', (err) => {
+            if (err) { this.db.run('ROLLBACK', () => resolve()); return; }
+            console.log('Migration: rebuilt budget_categories with per-household uniqueness');
+            this.db.run('CREATE INDEX IF NOT EXISTS idx_budget_categories_group ON budget_categories(group_id)', () => resolve());
+          });
+        });
+      });
+    });
+  }
+
   // Backfill group_id — runs EVERY startup, reassigns ALL records to jesse+sophie's household
   _backfillGroupIds() {
     return new Promise((resolve, reject) => {
@@ -249,20 +303,19 @@ class FamilyDB {
         if (!householdId) return resolve();
 
         this.db.serialize(() => {
-          // Assign ALL appointments to the primary household
-          // (This is safe because all appointments were created by household members)
-          this.db.run('UPDATE appointments SET group_id = ? WHERE group_id IS NULL OR group_id != ?',
-            [householdId, householdId], function() {
+          // Assign LEGACY (pre-isolation, NULL) records to the primary household.
+          // NULL-only — must NOT touch rows already assigned to another household,
+          // or every restart would steal other households' records into this one.
+          this.db.run('UPDATE appointments SET group_id = ? WHERE group_id IS NULL',
+            [householdId], function() {
               console.log(`Backfill: updated ${this.changes} appointments to household ${householdId}`);
             });
-          // Assign ALL decisions to the primary household
-          this.db.run('UPDATE decisions SET group_id = ? WHERE group_id IS NULL OR group_id != ?',
-            [householdId, householdId], function() {
+          this.db.run('UPDATE decisions SET group_id = ? WHERE group_id IS NULL',
+            [householdId], function() {
               console.log(`Backfill: updated ${this.changes} decisions to household ${householdId}`);
             });
-          // Assign ALL rivalries to the primary household
-          this.db.run('UPDATE rivalries SET group_id = ? WHERE group_id IS NULL OR group_id != ?',
-            [householdId, householdId], function() {
+          this.db.run('UPDATE rivalries SET group_id = ? WHERE group_id IS NULL',
+            [householdId], function() {
               console.log(`Backfill: updated ${this.changes} rivalries to household ${householdId}`);
             });
           // Assign legacy tasks (no group) to the primary household — NULL-only so
@@ -271,6 +324,16 @@ class FamilyDB {
             [householdId], function() {
               console.log(`Backfill: updated ${this.changes} tasks to household ${householdId}`);
             });
+          // Legacy (pre-isolation) records had no group_id — they were all created
+          // by the primary household, so assign NULL-only rows to it. NULL-only
+          // preserves any per-household assignments made after isolation shipped.
+          for (const t of ['budget_categories', 'receipts', 'budget_projects', 'project_expenses',
+                           'pantry', 'trips', 'gift_people', 'gift_ideas', 'special_events', 'family_addresses']) {
+            this.db.run(`UPDATE ${t} SET group_id = ? WHERE group_id IS NULL`,
+              [householdId], function(uErr) {
+                if (!uErr && this.changes) console.log(`Backfill: updated ${this.changes} ${t} to household ${householdId}`);
+              });
+          }
           // Fix rivalry entries where member_name doesn't match the rivalry's participant name
           // e.g. entry has "Sophie" or "sophie" but rivalry has "Sophie Chiasson"
           this.db.all(`
@@ -404,8 +467,7 @@ class FamilyDB {
       }
 
       if (userId) {
-        sql += ` AND (group_id IN (SELECT group_id FROM group_members WHERE user_id = ?)
-          OR group_id IS NULL)`;
+        sql += ` AND group_id IN (SELECT group_id FROM group_members WHERE user_id = ?)`;
         params.push(parseInt(userId, 10));
       }
 
@@ -522,8 +584,7 @@ class FamilyDB {
 
       if (userId) {
         const uid = parseInt(userId);
-        sql += ` AND (group_id IN (SELECT group_id FROM group_members WHERE user_id = ${uid})
-          OR group_id IS NULL)`;
+        sql += ` AND group_id IN (SELECT group_id FROM group_members WHERE user_id = ${uid})`;
       }
 
       sql += ' ORDER BY appointment_date, appointment_time';
@@ -545,8 +606,7 @@ class FamilyDB {
       let sql = 'SELECT * FROM appointments WHERE appointment_date >= ? AND appointment_date < ?';
       if (userId) {
         const uid = parseInt(userId);
-        sql += ` AND (group_id IN (SELECT group_id FROM group_members WHERE user_id = ${uid})
-          OR group_id IS NULL)`;
+        sql += ` AND group_id IN (SELECT group_id FROM group_members WHERE user_id = ${uid})`;
       }
       sql += ' ORDER BY appointment_date, appointment_time';
 
@@ -562,8 +622,7 @@ class FamilyDB {
       let sql = 'SELECT * FROM appointments WHERE recurrence_rule IS NOT NULL AND recurrence_rule != ""';
       if (userId) {
         const uid = parseInt(userId);
-        sql += ` AND (group_id IN (SELECT group_id FROM group_members WHERE user_id = ${uid})
-          OR group_id IS NULL)`;
+        sql += ` AND group_id IN (SELECT group_id FROM group_members WHERE user_id = ${uid})`;
       }
       this.db.all(sql, (err, rows) => {
         if (err) reject(err);
@@ -586,6 +645,7 @@ class FamilyDB {
       const fields = [];
       const params = [];
       for (const [key, value] of Object.entries(updates)) {
+        if (key === 'id' || key === 'group_id' || key === 'created_at') continue; // never mass-assign these
         fields.push(`${key} = ?`);
         params.push(value);
       }
@@ -601,7 +661,7 @@ class FamilyDB {
   addReceipt(receipt) {
     return new Promise((resolve, reject) => {
       this.db.run(
-        'INSERT INTO receipts (amount, merchant, date, category, payment_method, image_path, notes, processed_by, email_id, added_by, itinerary_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        'INSERT INTO receipts (amount, merchant, date, category, payment_method, image_path, notes, processed_by, email_id, added_by, itinerary_id, group_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
         [
           receipt.amount,
           receipt.merchant,
@@ -613,7 +673,8 @@ class FamilyDB {
           receipt.processed_by || 'manual',
           receipt.email_id || null,
           receipt.added_by || 'jesse',
-          receipt.itinerary_id || null
+          receipt.itinerary_id || null,
+          receipt.group_id || null
         ],
         function(err) {
           if (err) reject(err);
@@ -623,11 +684,15 @@ class FamilyDB {
     });
   }
 
-  getReceipts(filters = {}) {
+  getReceipts(filters = {}, groupId = null) {
     return new Promise((resolve, reject) => {
       let sql = 'SELECT * FROM receipts WHERE 1=1';
       const params = [];
 
+      if (groupId != null) {
+        sql += ' AND group_id = ?';
+        params.push(groupId);
+      }
       if (filters.month) {
         sql += ' AND strftime("%Y-%m", date) = ?';
         params.push(filters.month);
@@ -655,7 +720,7 @@ class FamilyDB {
     });
   }
 
-  getBudgetSummary(month) {
+  getBudgetSummary(month, groupId = null) {
     return new Promise((resolve, reject) => {
       const sql = `
         SELECT
@@ -665,30 +730,36 @@ class FamilyDB {
           COALESCE(SUM(r.amount), 0) as spent
         FROM budget_categories c
         LEFT JOIN receipts r ON LOWER(c.name) = LOWER(r.category) AND strftime('%Y-%m', r.date) = ? AND r.itinerary_id IS NULL
+          ${groupId != null ? 'AND r.group_id = ?' : ''}
+        WHERE ${groupId != null ? 'c.group_id = ?' : '1=1'}
         GROUP BY c.name
         ORDER BY c.name
       `;
-      this.db.all(sql, [month], (err, rows) => {
+      const params = groupId != null ? [month, groupId, groupId] : [month];
+      this.db.all(sql, params, (err, rows) => {
         if (err) reject(err);
         else resolve(rows);
       });
     });
   }
 
-  getBudgetCategories() {
+  getBudgetCategories(groupId = null) {
     return new Promise((resolve, reject) => {
-      this.db.all('SELECT * FROM budget_categories ORDER BY name', (err, rows) => {
+      const sql = groupId != null
+        ? 'SELECT * FROM budget_categories WHERE group_id = ? ORDER BY name'
+        : 'SELECT * FROM budget_categories ORDER BY name';
+      this.db.all(sql, groupId != null ? [groupId] : [], (err, rows) => {
         if (err) reject(err);
         else resolve(rows);
       });
     });
   }
 
-  addBudgetCategory(name, monthlyLimit, color) {
+  addBudgetCategory(name, monthlyLimit, color, groupId = null) {
     return new Promise((resolve, reject) => {
       this.db.run(
-        'INSERT INTO budget_categories (name, monthly_limit, color) VALUES (?, ?, ?)',
-        [name, monthlyLimit || null, color || null],
+        'INSERT INTO budget_categories (name, monthly_limit, color, group_id) VALUES (?, ?, ?, ?)',
+        [name, monthlyLimit || null, color || null, groupId || null],
         function(err) {
           if (err) reject(err);
           else resolve({ id: this.lastID });
@@ -722,12 +793,15 @@ class FamilyDB {
     });
   }
 
-  ensureBudgetCategory(name) {
+  ensureBudgetCategory(name, groupId = null) {
     return new Promise((resolve, reject) => {
-      this.db.get('SELECT id FROM budget_categories WHERE LOWER(name) = LOWER(?)', [name], (err, row) => {
+      const lookupSql = groupId != null
+        ? 'SELECT id FROM budget_categories WHERE LOWER(name) = LOWER(?) AND group_id = ?'
+        : 'SELECT id FROM budget_categories WHERE LOWER(name) = LOWER(?)';
+      this.db.get(lookupSql, groupId != null ? [name, groupId] : [name], (err, row) => {
         if (err) return reject(err);
         if (row) return resolve(row.id);
-        this.db.run('INSERT INTO budget_categories (name) VALUES (?)', [name], function(err2) {
+        this.db.run('INSERT INTO budget_categories (name, group_id) VALUES (?, ?)', [name, groupId || null], function(err2) {
           if (err2) reject(err2);
           else resolve(this.lastID);
         });
@@ -739,8 +813,8 @@ class FamilyDB {
   addPantryItem(item) {
     return new Promise((resolve, reject) => {
       this.db.run(
-        'INSERT INTO pantry (item, category, location, quantity, unit, expiry_date, receipt_id, added_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-        [item.item, item.category || null, item.location || 'pantry', item.quantity || '1', item.unit || null, item.expiry_date || null, item.receipt_id || null, item.added_by || 'jesse'],
+        'INSERT INTO pantry (item, category, location, quantity, unit, expiry_date, receipt_id, added_by, group_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [item.item, item.category || null, item.location || 'pantry', item.quantity || '1', item.unit || null, item.expiry_date || null, item.receipt_id || null, item.added_by || 'jesse', item.group_id || null],
         function(err) {
           if (err) reject(err);
           else resolve({ id: this.lastID, ...item });
@@ -749,10 +823,11 @@ class FamilyDB {
     });
   }
 
-  getPantry(filters = {}) {
+  getPantry(filters = {}, groupId = null) {
     return new Promise((resolve, reject) => {
       let sql = 'SELECT * FROM pantry WHERE 1=1';
       const params = [];
+      if (groupId != null) { sql += ' AND group_id = ?'; params.push(groupId); }
       if (filters.location) { sql += ' AND LOWER(location) = LOWER(?)'; params.push(filters.location); }
       if (filters.category) { sql += ' AND LOWER(category) = LOWER(?)'; params.push(filters.category); }
       sql += ' ORDER BY category, item';
@@ -768,6 +843,7 @@ class FamilyDB {
       const fields = [];
       const params = [];
       for (const [key, value] of Object.entries(updates)) {
+        if (key === 'id' || key === 'group_id' || key === 'created_at') continue; // never mass-assign these
         fields.push(`${key} = ?`);
         params.push(value);
       }
@@ -793,8 +869,8 @@ class FamilyDB {
   createTrip(trip) {
     return new Promise((resolve, reject) => {
       this.db.run(
-        'INSERT INTO trips (traveler, origin, origin_lat, origin_lng, destination, destination_lat, destination_lng, purpose, status, eta_minutes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        [trip.traveler, trip.origin || null, trip.origin_lat || null, trip.origin_lng || null, trip.destination, trip.destination_lat || null, trip.destination_lng || null, trip.purpose || null, 'active', trip.eta_minutes || null],
+        'INSERT INTO trips (traveler, origin, origin_lat, origin_lng, destination, destination_lat, destination_lng, purpose, status, eta_minutes, group_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [trip.traveler, trip.origin || null, trip.origin_lat || null, trip.origin_lng || null, trip.destination, trip.destination_lat || null, trip.destination_lng || null, trip.purpose || null, 'active', trip.eta_minutes || null, trip.group_id || null],
         function(err) {
           if (err) reject(err);
           else resolve({ id: this.lastID, ...trip });
@@ -803,10 +879,11 @@ class FamilyDB {
     });
   }
 
-  getTrips(filters = {}) {
+  getTrips(filters = {}, groupId = null) {
     return new Promise((resolve, reject) => {
       let sql = 'SELECT * FROM trips WHERE 1=1';
       const params = [];
+      if (groupId != null) { sql += ' AND group_id = ?'; params.push(groupId); }
       if (filters.status) { sql += ' AND status = ?'; params.push(filters.status); }
       if (filters.traveler) { sql += ' AND traveler = ?'; params.push(filters.traveler); }
       sql += ' ORDER BY created_at DESC';
@@ -822,6 +899,7 @@ class FamilyDB {
       const fields = [];
       const params = [];
       for (const [key, value] of Object.entries(updates)) {
+        if (key === 'id' || key === 'group_id' || key === 'created_at') continue; // never mass-assign these
         fields.push(`${key} = ?`);
         params.push(value);
       }
@@ -858,8 +936,8 @@ class FamilyDB {
   addFamilyAddress(addr) {
     return new Promise((resolve, reject) => {
       this.db.run(
-        'INSERT INTO family_addresses (name, address, lat, lng, radius_meters, created_by) VALUES (?, ?, ?, ?, ?, ?)',
-        [addr.name, addr.address || null, addr.lat, addr.lng, addr.radius_meters || 500, addr.created_by || 'jesse'],
+        'INSERT INTO family_addresses (name, address, lat, lng, radius_meters, created_by, group_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        [addr.name, addr.address || null, addr.lat, addr.lng, addr.radius_meters || 500, addr.created_by || 'jesse', addr.group_id || null],
         function(err) {
           if (err) reject(err);
           else resolve({ id: this.lastID, ...addr });
@@ -868,9 +946,12 @@ class FamilyDB {
     });
   }
 
-  getFamilyAddresses() {
+  getFamilyAddresses(groupId = null) {
     return new Promise((resolve, reject) => {
-      this.db.all('SELECT * FROM family_addresses ORDER BY name', (err, rows) => {
+      const sql = groupId != null
+        ? 'SELECT * FROM family_addresses WHERE group_id = ? ORDER BY name'
+        : 'SELECT * FROM family_addresses ORDER BY name';
+      this.db.all(sql, groupId != null ? [groupId] : [], (err, rows) => {
         if (err) reject(err);
         else resolve(rows);
       });
@@ -919,12 +1000,7 @@ class FamilyDB {
       if (filters.status) { sql += ' AND status = ?'; params.push(filters.status); }
       if (userId) {
         const uid = parseInt(userId);
-        sql += ` AND (group_id IN (SELECT group_id FROM group_members WHERE user_id = ${uid})
-          OR (group_id IS NULL AND creator_name IN (
-            SELECT u.name FROM users u JOIN group_members gm ON gm.user_id = u.id
-            JOIN groups g ON g.id = gm.group_id AND g.group_type = 'household'
-            WHERE gm.group_id IN (SELECT group_id FROM group_members WHERE user_id = ${uid})
-          )))`;
+        sql += ` AND group_id IN (SELECT group_id FROM group_members WHERE user_id = ${uid})`;
       }
       sql += ' ORDER BY datetime(created_at) DESC';
       this.db.all(sql, params, (err, rows) => {
@@ -948,6 +1024,7 @@ class FamilyDB {
       const fields = [];
       const params = [];
       for (const [key, value] of Object.entries(updates)) {
+        if (key === 'id' || key === 'group_id' || key === 'created_at') continue; // never mass-assign these
         fields.push(`${key} = ?`);
         params.push(key === 'poll_options' ? JSON.stringify(value || []) : value);
       }
@@ -1064,21 +1141,7 @@ class FamilyDB {
       if (filters.status) { sql += ' AND status = ?'; params.push(filters.status); }
       if (userId) {
         const uid = parseInt(userId);
-        sql += ` AND (group_id IN (SELECT group_id FROM group_members WHERE user_id = ${uid})
-          OR initiator_name = (SELECT name FROM users WHERE id = ${uid})
-          OR opponent_name = (SELECT name FROM users WHERE id = ${uid})
-          OR participants LIKE '%"' || (SELECT name FROM users WHERE id = ${uid}) || '"%'
-          OR (group_id IS NULL AND (
-            initiator_name IN (
-              SELECT u.name FROM users u JOIN group_members gm ON gm.user_id = u.id
-              JOIN groups g ON g.id = gm.group_id AND g.group_type = 'household'
-              WHERE gm.group_id IN (SELECT group_id FROM group_members WHERE user_id = ${uid})
-            ) OR opponent_name IN (
-              SELECT u.name FROM users u JOIN group_members gm ON gm.user_id = u.id
-              JOIN groups g ON g.id = gm.group_id AND g.group_type = 'household'
-              WHERE gm.group_id IN (SELECT group_id FROM group_members WHERE user_id = ${uid})
-            )
-          )))`;
+        sql += ` AND group_id IN (SELECT group_id FROM group_members WHERE user_id = ${uid})`;
       }
       sql += ' ORDER BY datetime(created_at) DESC';
       this.db.all(sql, params, (err, rows) => err ? reject(err) : resolve(rows));
@@ -1222,19 +1285,7 @@ class FamilyDB {
   getRivalryLeaderboard(userId = null) {
     return new Promise((resolve, reject) => {
       const groupFilter = userId
-        ? `WHERE (group_id IN (SELECT group_id FROM group_members WHERE user_id = ${parseInt(userId)})
-            OR initiator_name = (SELECT name FROM users WHERE id = ${parseInt(userId)})
-            OR opponent_name = (SELECT name FROM users WHERE id = ${parseInt(userId)})
-            OR participants LIKE '%"' || (SELECT name FROM users WHERE id = ${parseInt(userId)}) || '"%'
-            OR (group_id IS NULL AND (initiator_name IN (
-              SELECT u.name FROM users u JOIN group_members gm ON gm.user_id = u.id
-              JOIN groups g ON g.id = gm.group_id AND g.group_type = 'household'
-              WHERE gm.group_id IN (SELECT group_id FROM group_members WHERE user_id = ${parseInt(userId)})
-            ) OR opponent_name IN (
-              SELECT u.name FROM users u JOIN group_members gm ON gm.user_id = u.id
-              JOIN groups g ON g.id = gm.group_id AND g.group_type = 'household'
-              WHERE gm.group_id IN (SELECT group_id FROM group_members WHERE user_id = ${parseInt(userId)})
-            ))))`
+        ? `WHERE group_id IN (SELECT group_id FROM group_members WHERE user_id = ${parseInt(userId)})`
         : '';
       const sql = `
         WITH scoped_rivalries AS (
@@ -1343,7 +1394,7 @@ class FamilyDB {
     });
   }
 
-  updateItineraryStay(id, updates) {
+  updateItineraryStay(id, updates, itineraryId = null) {
     const ALLOWED = new Set(['check_in', 'check_out', 'host_name', 'host_user_id', 'host_contact_id', 'location_name', 'address', 'lat', 'lng', 'notes', 'status', 'calendar_event_id', 'host_calendar_event_id']);
     return new Promise((resolve, reject) => {
       const fields = [];
@@ -1355,16 +1406,21 @@ class FamilyDB {
       }
       if (!fields.length) return resolve({ id });
       params.push(id);
-      this.db.run(`UPDATE itinerary_stays SET ${fields.join(', ')} WHERE id = ?`, params, (err) => {
+      let where = 'id = ?';
+      if (itineraryId != null) { where += ' AND itinerary_id = ?'; params.push(itineraryId); }
+      this.db.run(`UPDATE itinerary_stays SET ${fields.join(', ')} WHERE ${where}`, params, (err) => {
         if (err) reject(err);
         else resolve({ id, ...updates });
       });
     });
   }
 
-  deleteItineraryStay(id) {
+  deleteItineraryStay(id, itineraryId = null) {
     return new Promise((resolve, reject) => {
-      this.db.run('DELETE FROM itinerary_stays WHERE id = ?', [id], function(err) {
+      const sql = itineraryId != null
+        ? 'DELETE FROM itinerary_stays WHERE id = ? AND itinerary_id = ?'
+        : 'DELETE FROM itinerary_stays WHERE id = ?';
+      this.db.run(sql, itineraryId != null ? [id, itineraryId] : [id], function(err) {
         if (err) reject(err);
         else resolve({ deleted: this.changes });
       });
@@ -1415,8 +1471,8 @@ class FamilyDB {
   addGiftPerson(person) {
     return new Promise((resolve, reject) => {
       this.db.run(
-        'INSERT INTO gift_people (name, relationship, birthday, anniversary, notes) VALUES (?, ?, ?, ?, ?)',
-        [person.name, person.relationship || 'other', person.birthday || null, person.anniversary || null, person.notes || null],
+        'INSERT INTO gift_people (name, relationship, birthday, anniversary, notes, group_id) VALUES (?, ?, ?, ?, ?, ?)',
+        [person.name, person.relationship || 'other', person.birthday || null, person.anniversary || null, person.notes || null, person.group_id || null],
         function(err) {
           if (err) reject(err);
           else resolve({ id: this.lastID, ...person });
@@ -1425,18 +1481,21 @@ class FamilyDB {
     });
   }
 
-  getGiftPeople() {
+  getGiftPeople(groupId = null) {
     return new Promise((resolve, reject) => {
-      this.db.all('SELECT * FROM gift_people ORDER BY name', (err, rows) => err ? reject(err) : resolve(rows));
+      const sql = groupId != null
+        ? 'SELECT * FROM gift_people WHERE group_id = ? ORDER BY name'
+        : 'SELECT * FROM gift_people ORDER BY name';
+      this.db.all(sql, groupId != null ? [groupId] : [], (err, rows) => err ? reject(err) : resolve(rows));
     });
   }
 
   addGiftIdea(idea) {
     return new Promise((resolve, reject) => {
       this.db.run(
-        `INSERT INTO gift_ideas (person_id, title, notes, link_url, estimated_price, status, for_event)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        [idea.person_id, idea.title, idea.notes || null, idea.link_url || null, idea.estimated_price || null, idea.status || 'idea', idea.for_event || null],
+        `INSERT INTO gift_ideas (person_id, title, notes, link_url, estimated_price, status, for_event, group_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [idea.person_id, idea.title, idea.notes || null, idea.link_url || null, idea.estimated_price || null, idea.status || 'idea', idea.for_event || null, idea.group_id || null],
         function(err) {
           if (err) reject(err);
           else resolve({ id: this.lastID, ...idea });
@@ -1445,12 +1504,16 @@ class FamilyDB {
     });
   }
 
-  getGiftIdeas(personId = null) {
+  getGiftIdeas(personId = null, groupId = null) {
     return new Promise((resolve, reject) => {
-      let sql = 'SELECT * FROM gift_ideas';
+      let sql = 'SELECT * FROM gift_ideas WHERE 1=1';
       const params = [];
+      if (groupId != null) {
+        sql += ' AND group_id = ?';
+        params.push(groupId);
+      }
       if (personId != null) {
-        sql += ' WHERE person_id = ?';
+        sql += ' AND person_id = ?';
         params.push(personId);
       }
       sql += ' ORDER BY datetime(created_at) DESC';
@@ -1463,6 +1526,7 @@ class FamilyDB {
       const fields = [];
       const params = [];
       for (const [key, value] of Object.entries(updates)) {
+        if (key === 'id' || key === 'group_id' || key === 'created_at') continue; // never mass-assign these
         fields.push(`${key} = ?`);
         params.push(value);
       }
@@ -1486,9 +1550,9 @@ class FamilyDB {
   addSpecialEvent(event) {
     return new Promise((resolve, reject) => {
       this.db.run(
-        `INSERT INTO special_events (person_id, title, date, is_recurring, event_type, notes)
-         VALUES (?, ?, ?, ?, ?, ?)`,
-        [event.person_id || null, event.title, event.date, event.is_recurring ? 1 : 0, event.event_type || 'custom', event.notes || null],
+        `INSERT INTO special_events (person_id, title, date, is_recurring, event_type, notes, group_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [event.person_id || null, event.title, event.date, event.is_recurring ? 1 : 0, event.event_type || 'custom', event.notes || null, event.group_id || null],
         function(err) {
           if (err) reject(err);
           else resolve({ id: this.lastID, ...event });
@@ -1497,9 +1561,12 @@ class FamilyDB {
     });
   }
 
-  getSpecialEvents() {
+  getSpecialEvents(groupId = null) {
     return new Promise((resolve, reject) => {
-      this.db.all('SELECT * FROM special_events ORDER BY date', (err, rows) => err ? reject(err) : resolve(rows));
+      const sql = groupId != null
+        ? 'SELECT * FROM special_events WHERE group_id = ? ORDER BY date'
+        : 'SELECT * FROM special_events ORDER BY date';
+      this.db.all(sql, groupId != null ? [groupId] : [], (err, rows) => err ? reject(err) : resolve(rows));
     });
   }
 
@@ -1516,8 +1583,8 @@ class FamilyDB {
   addProject(project) {
     return new Promise((resolve, reject) => {
       this.db.run(
-        'INSERT INTO budget_projects (name, budget, created_by) VALUES (?, ?, ?)',
-        [project.name, project.budget || 0, project.created_by || 'jesse'],
+        'INSERT INTO budget_projects (name, budget, created_by, group_id) VALUES (?, ?, ?, ?)',
+        [project.name, project.budget || 0, project.created_by || 'jesse', project.group_id || null],
         function(err) {
           if (err) reject(err);
           else resolve({ id: this.lastID, ...project });
@@ -1526,16 +1593,17 @@ class FamilyDB {
     });
   }
 
-  getProjects() {
+  getProjects(groupId = null) {
     return new Promise((resolve, reject) => {
       const sql = `
         SELECT p.*, COALESCE(SUM(e.amount), 0) as total_spent, COUNT(e.id) as expense_count
         FROM budget_projects p
         LEFT JOIN project_expenses e ON e.project_id = p.id
+        ${groupId != null ? 'WHERE p.group_id = ?' : ''}
         GROUP BY p.id
         ORDER BY p.created_at DESC
       `;
-      this.db.all(sql, [], (err, rows) => err ? reject(err) : resolve(rows));
+      this.db.all(sql, groupId != null ? [groupId] : [], (err, rows) => err ? reject(err) : resolve(rows));
     });
   }
 
@@ -1548,32 +1616,45 @@ class FamilyDB {
     });
   }
 
-  addProjectExpense(projectId, expense) {
+  addProjectExpense(projectId, expense, groupId = null) {
     return new Promise((resolve, reject) => {
-      this.db.run(
-        'INSERT INTO project_expenses (project_id, description, amount, category, notes) VALUES (?, ?, ?, ?, ?)',
-        [projectId, expense.description, expense.amount, expense.category || 'General', expense.notes || null],
-        function(err) {
-          if (err) reject(err);
-          else resolve({ id: this.lastID, ...expense });
+      // Guard: the parent project must belong to the caller's household.
+      this.db.get('SELECT group_id FROM budget_projects WHERE id = ?', [projectId], (gErr, proj) => {
+        if (gErr) return reject(gErr);
+        if (!proj) return reject(new Error('Project not found'));
+        if (groupId != null && proj.group_id != null && proj.group_id !== groupId) {
+          return reject(new Error('Forbidden'));
         }
-      );
+        this.db.run(
+          'INSERT INTO project_expenses (project_id, description, amount, category, notes, group_id) VALUES (?, ?, ?, ?, ?, ?)',
+          [projectId, expense.description, expense.amount, expense.category || 'General', expense.notes || null, proj.group_id || groupId || null],
+          function(err) {
+            if (err) reject(err);
+            else resolve({ id: this.lastID, ...expense });
+          }
+        );
+      });
     });
   }
 
-  getProjectExpenses(projectId) {
+  getProjectExpenses(projectId, groupId = null) {
     return new Promise((resolve, reject) => {
-      this.db.all(
-        'SELECT * FROM project_expenses WHERE project_id = ? ORDER BY created_at DESC',
-        [projectId],
-        (err, rows) => err ? reject(err) : resolve(rows)
-      );
+      const sql = groupId != null
+        ? `SELECT pe.* FROM project_expenses pe
+           JOIN budget_projects p ON p.id = pe.project_id
+           WHERE pe.project_id = ? AND p.group_id = ? ORDER BY pe.created_at DESC`
+        : 'SELECT * FROM project_expenses WHERE project_id = ? ORDER BY created_at DESC';
+      this.db.all(sql, groupId != null ? [projectId, groupId] : [projectId],
+        (err, rows) => err ? reject(err) : resolve(rows));
     });
   }
 
-  deleteProjectExpense(id) {
+  deleteProjectExpense(id, projectId = null) {
     return new Promise((resolve, reject) => {
-      this.db.run('DELETE FROM project_expenses WHERE id = ?', [id], (err) => {
+      const sql = projectId != null
+        ? 'DELETE FROM project_expenses WHERE id = ? AND project_id = ?'
+        : 'DELETE FROM project_expenses WHERE id = ?';
+      this.db.run(sql, projectId != null ? [id, projectId] : [id], (err) => {
         if (err) reject(err);
         else resolve({ id, deleted: true });
       });
@@ -1725,6 +1806,62 @@ class FamilyDB {
     });
   }
 
+  // Household-scoped tables whose group_id must follow a merge. budget_categories
+  // is special-cased (UNIQUE(name, group_id)) so duplicate names collapse.
+  static get HOUSEHOLD_TABLES() {
+    return ['tasks', 'appointments', 'decisions', 'rivalries', 'groceries', 'receipts',
+      'budget_categories', 'budget_projects', 'project_expenses', 'pantry', 'trips',
+      'gift_people', 'gift_ideas', 'special_events', 'family_addresses', 'feed_posts',
+      'itineraries', 'itinerary_stays', 'subscriptions', 'concierge_memory', 'concierge_nudges',
+      'concierge_conversations'];
+  }
+
+  // Merge one household into another: re-point all household-scoped data and
+  // members from sourceId to targetId, then delete the (now empty) source group.
+  // Both must be group_type='household'. Idempotent-ish and transactional.
+  mergeHousehold(sourceId, targetId) {
+    const src = parseInt(sourceId), tgt = parseInt(targetId);
+    return new Promise((resolve, reject) => {
+      if (!src || !tgt || src === tgt) return reject(new Error('Invalid source/target household'));
+      const get = (sql, p = []) => new Promise((r, j) => this.db.get(sql, p, (e, x) => e ? j(e) : r(x)));
+      const run = (sql, p = []) => new Promise((r, j) => this.db.run(sql, p, function (e) { e ? j(e) : r(this); }));
+      (async () => {
+        const a = await get(`SELECT id, group_type FROM groups WHERE id = ?`, [src]);
+        const b = await get(`SELECT id, group_type FROM groups WHERE id = ?`, [tgt]);
+        if (!a || !b) throw new Error('Household not found');
+        if (a.group_type !== 'household' || b.group_type !== 'household') {
+          throw new Error('Both groups must be households to merge');
+        }
+        await run('BEGIN');
+        try {
+          for (const t of FamilyDB.HOUSEHOLD_TABLES) {
+            // Skip tables that don't exist / lack group_id in this DB.
+            const cols = await new Promise((r) => this.db.all(`PRAGMA table_info(${t})`, (e, rows) => r(e ? [] : rows)));
+            if (!cols.some(c => c.name === 'group_id')) continue;
+            // OR IGNORE lets UNIQUE(name, group_id) duplicates fall through; the
+            // leftover source rows are then removed (target already has them).
+            await run(`UPDATE OR IGNORE ${t} SET group_id = ? WHERE group_id = ?`, [tgt, src]);
+            await run(`DELETE FROM ${t} WHERE group_id = ?`, [src]);
+          }
+          // Move members that aren't already in the target, then drop source rows.
+          await run(`UPDATE group_members SET group_id = ? WHERE group_id = ? AND user_id IS NOT NULL
+            AND user_id NOT IN (SELECT user_id FROM group_members WHERE group_id = ? AND user_id IS NOT NULL)`,
+            [tgt, src, tgt]);
+          await run(`UPDATE group_members SET group_id = ? WHERE group_id = ? AND contact_id IS NOT NULL
+            AND contact_id NOT IN (SELECT contact_id FROM group_members WHERE group_id = ? AND contact_id IS NOT NULL)`,
+            [tgt, src, tgt]);
+          await run(`DELETE FROM group_members WHERE group_id = ?`, [src]);
+          await run(`DELETE FROM groups WHERE id = ?`, [src]);
+          await run('COMMIT');
+          resolve({ merged: true, source: src, target: tgt });
+        } catch (e) {
+          await run('ROLLBACK').catch(() => {});
+          reject(e);
+        }
+      })().catch(reject);
+    });
+  }
+
   // ============================================
   // Contacts (non-app family members)
   // ============================================
@@ -1753,6 +1890,7 @@ class FamilyDB {
       const fields = [];
       const params = [];
       for (const [key, value] of Object.entries(updates)) {
+        if (key === 'id' || key === 'group_id' || key === 'created_at') continue; // never mass-assign these
         fields.push(`${key} = ?`);
         params.push(value);
       }
@@ -1963,19 +2101,13 @@ class FamilyDB {
       const myGroups = uid
         ? `SELECT group_id FROM group_members WHERE user_id = ${uid}`
         : `SELECT id FROM groups`;
-      // Subquery for household members (to scope events/decisions)
-      const myHouseholdMembers = uid
-        ? `SELECT u.name FROM users u JOIN group_members gm ON gm.user_id = u.id
-           JOIN groups g ON g.id = gm.group_id WHERE g.group_type = 'household'
-           AND gm.group_id IN (SELECT group_id FROM group_members WHERE user_id = ${uid})`
-        : `SELECT name FROM users`;
       const sql = `
         SELECT 'decision' as feed_type, d.id as ref_id, d.title, NULL as body,
           d.creator_name as author, d.status, d.created_at as created_at,
           0 as reaction_count, 0 as comment_count, NULL as author_id, d.group_id, g.name as group_name
         FROM decisions d LEFT JOIN groups g ON g.id = d.group_id
-        WHERE d.status = 'active'
-          AND d.creator_name IN (${myHouseholdMembers})
+        WHERE d.status = 'active'${uid ? `
+          AND d.group_id IN (${myGroups})` : ''}
         UNION ALL
         SELECT 'event' as feed_type, a.id as ref_id, a.title, a.location as body,
           COALESCE(a.person_tags, 'Family') as author, 'upcoming' as status,
@@ -1994,14 +2126,7 @@ class FamilyDB {
               )
             )
           )${uid ? `
-          AND EXISTS (
-            SELECT 1 FROM users hu
-            JOIN group_members hgm ON hgm.user_id = hu.id
-            JOIN groups hg ON hg.id = hgm.group_id AND hg.group_type = 'household'
-            WHERE hgm.group_id IN (SELECT group_id FROM group_members WHERE user_id = ${uid})
-              AND hg.group_type = 'household'
-              AND (a.person_tags LIKE '%' || hu.name || '%' OR a.person_tags IS NULL)
-          )` : ''}
+          AND a.group_id IN (${myGroups})` : ''}
         UNION ALL
         SELECT 'coverage' as feed_type, cr.id as ref_id, cr.reason as title, cr.note as body,
           COALESCE(u.name, u.username, 'Family') as author, cr.status,
@@ -2023,11 +2148,7 @@ class FamilyDB {
         FROM rivalries r
         LEFT JOIN groups g ON g.id = r.group_id
         WHERE r.status = 'active' AND r.created_at >= datetime('now', '-14 days')${uid ? `
-          AND (r.group_id IN (${myGroups})
-            OR (r.group_id IS NULL AND (
-              r.initiator_name IN (${myHouseholdMembers})
-              OR r.opponent_name IN (${myHouseholdMembers})
-            )))` : ''}
+          AND r.group_id IN (${myGroups})` : ''}
         UNION ALL
         SELECT 'post' as feed_type, fp.id as ref_id, fp.title, fp.body,
           COALESCE(u.name, u.username, 'Family') as author, fp.post_type as status,
@@ -2083,17 +2204,19 @@ class FamilyDB {
 
   getDailySummary(userId = null) {
     return new Promise((resolve, reject) => {
+      // Scope to the user's groups only — no "OR group_id IS NULL" (that leaks
+      // every untagged record from other households into this user's summary).
       const groupFilter = userId
-        ? `AND (group_id IN (SELECT group_id FROM group_members WHERE user_id = ${parseInt(userId)}) OR group_id IS NULL)`
+        ? `AND group_id IN (SELECT group_id FROM group_members WHERE user_id = ${parseInt(userId)})`
         : '';
       const sql = `
         SELECT
-          (SELECT COUNT(*) FROM tasks WHERE status = 'active' AND date(due_date) = date('now')) as tasks_today,
+          (SELECT COUNT(*) FROM tasks WHERE status = 'active' AND date(due_date) = date('now') ${groupFilter}) as tasks_today,
           (SELECT COUNT(*) FROM appointments WHERE date(appointment_date) = date('now') ${groupFilter}) as appointments_today,
           (SELECT COUNT(*) FROM list_items WHERE is_done = 0 AND list_id IN (
             SELECT id FROM lists WHERE pinned = 1 LIMIT 1
           )) as groceries_needed,
-          (SELECT COUNT(*) FROM tasks WHERE status = 'active' AND due_date < date('now')) as overdue_tasks,
+          (SELECT COUNT(*) FROM tasks WHERE status = 'active' AND due_date < date('now') ${groupFilter}) as overdue_tasks,
           (SELECT name FROM lists WHERE pinned = 1 LIMIT 1) as pinned_list_name
       `;
       this.db.get(sql, [], (err, row) => {
@@ -2181,6 +2304,7 @@ class FamilyDB {
       const fields = [];
       const params = [];
       for (const [key, value] of Object.entries(updates)) {
+        if (key === 'id' || key === 'group_id' || key === 'created_at') continue; // never mass-assign these
         fields.push(`${key} = ?`);
         params.push(value);
       }
@@ -2231,6 +2355,7 @@ class FamilyDB {
       const fields = [];
       const params = [];
       for (const [key, value] of Object.entries(updates)) {
+        if (key === 'id' || key === 'group_id' || key === 'created_at') continue; // never mass-assign these
         fields.push(`${key} = ?`);
         params.push(value);
       }
@@ -2524,10 +2649,14 @@ class FamilyDB {
     });
   }
 
-  getMessageImage(messageId) {
+  getMessageImage(messageId, userId = null) {
     return new Promise((resolve, reject) => {
-      this.db.get('SELECT image_data FROM direct_messages WHERE id = ?', [messageId],
-        (err, row) => err ? reject(err) : resolve(row?.image_data || null));
+      // Only the sender or recipient of the message may fetch its image.
+      const sql = userId != null
+        ? 'SELECT image_data FROM direct_messages WHERE id = ? AND (sender_id = ? OR recipient_id = ?)'
+        : 'SELECT image_data FROM direct_messages WHERE id = ?';
+      const params = userId != null ? [messageId, userId, userId] : [messageId];
+      this.db.get(sql, params, (err, row) => err ? reject(err) : resolve(row?.image_data || null));
     });
   }
 

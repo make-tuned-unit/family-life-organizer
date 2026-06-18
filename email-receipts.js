@@ -124,7 +124,15 @@ async function processReceiptEmails() {
     console.log(`Found ${messages.length} potential receipt emails`);
     
     const db = new FamilyDB();
-    
+    // Email receipts have no user session — attribute to the primary household
+    // (the inbox owner's), matching the backfill's default assignment.
+    const householdId = await new Promise((resolve) => {
+      db.db.get(`SELECT g.id FROM groups g
+        JOIN group_members gm ON gm.group_id = g.id
+        JOIN users u ON u.id = gm.user_id AND u.username = 'jesse'
+        WHERE g.group_type = 'household' LIMIT 1`, (e, r) => resolve(r?.id || null));
+    });
+
     for (const message of messages) {
       try {
         const header = message.parts.find(p => p.which === 'HEADER').body;
@@ -154,7 +162,8 @@ async function processReceiptEmails() {
             notes: `From email: ${subject}`,
             processed_by: 'email',
             email_id: emailId.toString(),
-            added_by: 'email'
+            added_by: 'email',
+            group_id: householdId
           });
           
           console.log(`✓ Logged: $${amount} at ${merchant} (${category})`);

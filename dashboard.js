@@ -67,6 +67,80 @@ function requireAuth(req, res, next) {
   }
 }
 
+// Promisified single-row read against the shared connection.
+function dbGet(db, sql, params = []) {
+  return new Promise((resolve, reject) => {
+    db.db.get(sql, params, (err, row) => err ? reject(err) : resolve(row));
+  });
+}
+
+// Authorization guard for household-scoped `:id` routes. Confirms the row in
+// `table` belongs to the caller's household before the handler mutates/reads it.
+// Sends 404 (missing) or 403 (other household) and returns false on failure.
+// Strict: the caller must have a household and the row must match it exactly.
+// (The startup backfill sweeps any legacy NULL group_id, so NULL is anomalous
+// and denied rather than allowed — preventing a null-row cross-household hole.)
+async function requireHouseholdRow(db, table, id, req, res) {
+  const userId = req.session.user?.id;
+  const gid = await db.getUserHouseholdId(userId);
+  const row = await dbGet(db, `SELECT group_id FROM ${table} WHERE id = ?`, [id]);
+  if (!row) { res.status(404).json({ error: 'Not found' }); return false; }
+  if (gid == null || row.group_id == null || row.group_id !== gid) {
+    res.status(403).json({ error: 'Forbidden' }); return false;
+  }
+  return true;
+}
+
+// Authorization guard for feed routes keyed by post id: the caller must belong
+// to the group that owns the post. Sends 404/403 and returns false on failure.
+async function requireFeedPostMember(db, postId, req, res) {
+  const post = await dbGet(db, 'SELECT group_id FROM feed_posts WHERE id = ?', [postId]);
+  if (!post) { res.status(404).json({ error: 'Not found' }); return false; }
+  if (!(await db.isGroupMember(post.group_id, req.session.user?.id))) {
+    res.status(403).json({ error: 'Not a member of this group' }); return false;
+  }
+  return true;
+}
+
+// Authorization guard for list `:id` routes. A list is visible to its creator
+// and to members of the creator's household (mirrors getLists scoping).
+async function requireListAccess(db, listId, req, res) {
+  const userId = req.session.user?.id;
+  const list = await dbGet(db, 'SELECT created_by FROM lists WHERE id = ?', [listId]);
+  if (!list) { res.status(404).json({ error: 'Not found' }); return false; }
+  if (list.created_by === userId) return true;
+  const shared = await dbGet(db, `SELECT 1 AS ok FROM group_members gm2
+    JOIN groups g ON g.id = gm2.group_id AND g.group_type = 'household'
+    WHERE gm2.user_id = ? AND gm2.group_id IN (SELECT group_id FROM group_members WHERE user_id = ?)`,
+    [list.created_by, userId]);
+  if (!shared) { res.status(403).json({ error: 'Forbidden' }); return false; }
+  return true;
+}
+
+// Same, keyed by a list_item id (resolves the parent list first).
+async function requireListItemAccess(db, itemId, req, res) {
+  const item = await dbGet(db, 'SELECT list_id FROM list_items WHERE id = ?', [itemId]);
+  if (!item) { res.status(404).json({ error: 'Not found' }); return false; }
+  return requireListAccess(db, item.list_id, req, res);
+}
+
+// Authorization guard for itinerary `:id` routes: caller must be the traveler
+// or a member of the itinerary's group. Mirrors the inline check on /stays.
+async function requireItineraryAccess(db, id, req, res) {
+  const itinerary = await db.getItineraryById(id);
+  if (!itinerary) { res.status(404).json({ error: 'Not found' }); return false; }
+  const userId = req.session.user?.id;
+  if (itinerary.traveler_id === userId) return true;
+  const groups = await new Promise((resolve, reject) => {
+    db.db.all('SELECT group_id FROM group_members WHERE user_id = ?', [userId], (err, rows) => err ? reject(err) : resolve(rows || []));
+  });
+  const groupIds = groups.map(g => g.group_id);
+  if (!itinerary.group_id || !groupIds.includes(itinerary.group_id)) {
+    res.status(403).json({ error: 'Forbidden' }); return false;
+  }
+  return true;
+}
+
 // Premium gate: requires an active household subscription. Returns 402 otherwise.
 async function requirePremium(req, res, next) {
   const db = new FamilyDB();
@@ -196,16 +270,22 @@ app.post('/api/auth/device-token', requireAuth, async (req, res) => {
 app.put('/api/users/:id/work-address', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
+    if (parseInt(req.params.id) !== req.session.user?.id) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
     await db.updateUserWorkAddress(parseInt(req.params.id), req.body);
     res.json({ success: true });
   } catch (err) { res.status(500).json({ error: err.message }); }
   finally { db.close(); }
 });
 
-// Get work address for a user
+// Get work address for a user (own only)
 app.get('/api/users/:id/work-address', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
+    if (parseInt(req.params.id) !== req.session.user?.id) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
     const data = await db.getUserWorkAddress(parseInt(req.params.id));
     res.json(data || {});
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -220,7 +300,8 @@ app.post('/api/location', requireAuth, async (req, res) => {
     const { lat, lng } = req.body;
 
     // Check against saved addresses to determine location name
-    const addresses = await db.getFamilyAddresses();
+    const groupId = await db.getUserHouseholdId(userId);
+    const addresses = await db.getFamilyAddresses(groupId);
     const user = await db.getUserById(userId);
     let locationName = null;
 
@@ -331,6 +412,9 @@ app.put('/api/groups/:id/avatar', requireAuth, async (req, res) => {
 app.get('/api/groups/:id/avatar', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
+    if (!(await db.isGroupMember(req.params.id, req.session.user?.id))) {
+      return res.status(403).json({ error: 'Not a member of this group' });
+    }
     const image = await db.getGroupAvatar(req.params.id);
     if (!image) return res.status(404).json({ error: 'No avatar' });
     res.json({ image });
@@ -1374,6 +1458,7 @@ app.post('/api/complete', requireAuth, async (req, res) => {
   try {
     const { type, id } = req.body;
     if (type === 'grocery') {
+      if (!(await requireHouseholdRow(db, 'groceries', id, req, res))) return;
       await db.purchaseGrocery(id);
     } else if (type === 'task') {
       const groupId = await db.getUserHouseholdId(req.session.user?.id);
@@ -1529,6 +1614,7 @@ app.get('/api/appointments/:year/:month', requireAuth, async (req, res) => {
 app.delete('/api/appointments/:id', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
+    if (!(await requireHouseholdRow(db, 'appointments', req.params.id, req, res))) return;
     await db.deleteAppointment(req.params.id);
     res.json({ success: true });
   } catch (err) {
@@ -1541,6 +1627,7 @@ app.delete('/api/appointments/:id', requireAuth, async (req, res) => {
 app.put('/api/appointments/:id', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
+    if (!(await requireHouseholdRow(db, 'appointments', req.params.id, req, res))) return;
     const data = { ...req.body };
     if (data.appointment_date) data.appointment_date = normalizeDate(data.appointment_date);
     await db.updateAppointment(req.params.id, data);
@@ -1574,7 +1661,8 @@ app.get('/api/receipts', requireAuth, async (req, res) => {
     const filters = {};
     if (req.query.month) filters.month = req.query.month;
     if (req.query.category) filters.category = req.query.category;
-    const receipts = await db.getReceipts(filters);
+    const groupId = await db.getUserHouseholdId(req.session.user?.id);
+    const receipts = await db.getReceipts(filters, groupId);
     res.json(receipts);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -1587,7 +1675,8 @@ app.get('/api/receipts', requireAuth, async (req, res) => {
 app.get('/api/budget/:month', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
-    const budget = await db.getBudgetSummary(req.params.month);
+    const groupId = await db.getUserHouseholdId(req.session.user?.id);
+    const budget = await db.getBudgetSummary(req.params.month, groupId);
     res.json(budget);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -1600,7 +1689,8 @@ app.get('/api/budget/:month', requireAuth, async (req, res) => {
 app.get('/api/budget-categories', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
-    const categories = await db.getBudgetCategories();
+    const groupId = await db.getUserHouseholdId(req.session.user?.id);
+    const categories = await db.getBudgetCategories(groupId);
     res.json(categories);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -1613,7 +1703,8 @@ app.post('/api/budget-categories', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
     const { name, monthly_limit, color } = req.body;
-    const result = await db.addBudgetCategory(name, monthly_limit, color);
+    const groupId = await db.getUserHouseholdId(req.session.user?.id);
+    const result = await db.addBudgetCategory(name, monthly_limit, color, groupId);
     res.json({ success: true, id: result.id });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -1625,6 +1716,7 @@ app.post('/api/budget-categories', requireAuth, async (req, res) => {
 app.put('/api/budget-categories/:id', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
+    if (!(await requireHouseholdRow(db, 'budget_categories', req.params.id, req, res))) return;
     await db.updateBudgetCategory(req.params.id, req.body);
     res.json({ success: true });
   } catch (err) {
@@ -1637,6 +1729,7 @@ app.put('/api/budget-categories/:id', requireAuth, async (req, res) => {
 app.delete('/api/budget-categories/:id', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
+    if (!(await requireHouseholdRow(db, 'budget_categories', req.params.id, req, res))) return;
     await db.deleteBudgetCategory(req.params.id);
     res.json({ success: true });
   } catch (err) {
@@ -1650,10 +1743,11 @@ app.delete('/api/budget-categories/:id', requireAuth, async (req, res) => {
 app.post('/api/receipts', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
+    const groupId = await db.getUserHouseholdId(req.session.user?.id);
     if (req.body.category) {
-      await db.ensureBudgetCategory(req.body.category);
+      await db.ensureBudgetCategory(req.body.category, groupId);
     }
-    const data = { ...req.body };
+    const data = { ...req.body, group_id: groupId };
     if (data.date) data.date = normalizeDate(data.date);
     if (!data.added_by) data.added_by = req.session.user?.username || 'jesse';
     const result = await db.addReceipt(data);
@@ -1713,6 +1807,7 @@ app.post('/api/receipts/save', requireAuth, async (req, res) => {
   try {
     const { merchant, date, total, category, notes, itinerary_id } = req.body;
     const username = req.session.user?.username || 'jesse';
+    const groupId = await db.getUserHouseholdId(req.session.user?.id);
 
     // Normalize date to YYYY-MM-DD for strftime compatibility
     // If the AI returned a date more than 60 days in the past or in the future, use today
@@ -1727,7 +1822,7 @@ app.post('/api/receipts/save', requireAuth, async (req, res) => {
 
     // Ensure budget category exists (auto-create if new)
     if (category) {
-      await db.ensureBudgetCategory(category);
+      await db.ensureBudgetCategory(category, groupId);
     }
 
     // Save receipt
@@ -1739,7 +1834,8 @@ app.post('/api/receipts/save', requireAuth, async (req, res) => {
       notes: notes || null,
       processed_by: 'scan',
       added_by: username,
-      itinerary_id: itinerary_id || null
+      itinerary_id: itinerary_id || null,
+      group_id: groupId
     });
 
     console.log(`[receipt-save] id=${receipt.id} amount=${total} merchant="${merchant}" date=${normalizedDate} category="${category}" by=${username}`);
@@ -1776,6 +1872,7 @@ function normalizeReceiptCategory(receipt) {
 app.delete('/api/receipts/:id', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
+    if (!(await requireHouseholdRow(db, 'receipts', req.params.id, req, res))) return;
     await db.deleteReceipt(req.params.id);
     res.json({ success: true });
   } catch (err) {
@@ -1854,7 +1951,8 @@ app.get('/api/pantry', requireAuth, async (req, res) => {
     const filters = {};
     if (req.query.location) filters.location = req.query.location;
     if (req.query.category) filters.category = req.query.category;
-    const items = await db.getPantry(filters);
+    const groupId = await db.getUserHouseholdId(req.session.user?.id);
+    const items = await db.getPantry(filters, groupId);
     res.json(items);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -1868,6 +1966,7 @@ app.post('/api/pantry', requireAuth, async (req, res) => {
   try {
     const data = { ...req.body };
     if (data.expiry_date) data.expiry_date = normalizeDate(data.expiry_date);
+    data.group_id = await db.getUserHouseholdId(req.session.user?.id);
     const result = await db.addPantryItem(data);
     res.json({ success: true, id: result.id });
   } catch (err) {
@@ -1880,6 +1979,7 @@ app.post('/api/pantry', requireAuth, async (req, res) => {
 app.put('/api/pantry/:id', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
+    if (!(await requireHouseholdRow(db, 'pantry', req.params.id, req, res))) return;
     const data = { ...req.body };
     if (data.expiry_date) data.expiry_date = normalizeDate(data.expiry_date);
     await db.updatePantryItem(req.params.id, data);
@@ -1894,6 +1994,7 @@ app.put('/api/pantry/:id', requireAuth, async (req, res) => {
 app.delete('/api/pantry/:id', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
+    if (!(await requireHouseholdRow(db, 'pantry', req.params.id, req, res))) return;
     await db.deletePantryItem(req.params.id);
     res.json({ success: true });
   } catch (err) {
@@ -1992,7 +2093,8 @@ app.post('/api/concierge/chat', requireAuth, conciergeLimiter, requirePremium, a
 app.post('/api/cook/suggest', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
-    const pantryItems = await db.getPantry();
+    const groupId = await db.getUserHouseholdId(req.session.user?.id);
+    const pantryItems = await db.getPantry({}, groupId);
     const pantryList = pantryItems.map(i => i.item + ' (' + (i.quantity || 1) + (i.unit ? ' ' + i.unit : '') + ')').join(', ');
     const query = req.body.query || 'What can I make for dinner?';
 
@@ -2060,7 +2162,8 @@ app.post('/api/cook/deduct', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
     const { ingredients } = req.body;
-    const pantryItems = await db.getPantry();
+    const groupId = await db.getUserHouseholdId(req.session.user?.id);
+    const pantryItems = await db.getPantry({}, groupId);
     for (const name of ingredients) {
       const match = pantryItems.find(p => p.item.toLowerCase() === name.toLowerCase());
       if (match) {
@@ -2087,7 +2190,8 @@ app.get('/api/trips', requireAuth, async (req, res) => {
     const filters = {};
     if (req.query.status) filters.status = req.query.status;
     if (req.query.traveler) filters.traveler = req.query.traveler;
-    const trips = await db.getTrips(filters);
+    const groupId = await db.getUserHouseholdId(req.session.user?.id);
+    const trips = await db.getTrips(filters, groupId);
     res.json(trips);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -2099,7 +2203,8 @@ app.get('/api/trips', requireAuth, async (req, res) => {
 app.post('/api/trips', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
-    const result = await db.createTrip(req.body);
+    const groupId = await db.getUserHouseholdId(req.session.user?.id);
+    const result = await db.createTrip({ ...req.body, group_id: groupId });
     res.json({ success: true, id: result.id });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -2111,6 +2216,7 @@ app.post('/api/trips', requireAuth, async (req, res) => {
 app.put('/api/trips/:id', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
+    if (!(await requireHouseholdRow(db, 'trips', req.params.id, req, res))) return;
     await db.updateTrip(req.params.id, req.body);
     res.json({ success: true });
   } catch (err) {
@@ -2123,6 +2229,7 @@ app.put('/api/trips/:id', requireAuth, async (req, res) => {
 app.post('/api/trips/:id/arrive', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
+    if (!(await requireHouseholdRow(db, 'trips', req.params.id, req, res))) return;
     await db.arriveTrip(req.params.id);
     res.json({ success: true });
   } catch (err) {
@@ -2135,6 +2242,7 @@ app.post('/api/trips/:id/arrive', requireAuth, async (req, res) => {
 app.post('/api/trips/:id/cancel', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
+    if (!(await requireHouseholdRow(db, 'trips', req.params.id, req, res))) return;
     await db.cancelTrip(req.params.id);
     res.json({ success: true });
   } catch (err) {
@@ -2148,7 +2256,8 @@ app.post('/api/trips/:id/cancel', requireAuth, async (req, res) => {
 app.get('/api/addresses', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
-    const addresses = await db.getFamilyAddresses();
+    const groupId = await db.getUserHouseholdId(req.session.user?.id);
+    const addresses = await db.getFamilyAddresses(groupId);
     res.json(addresses);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -2160,7 +2269,8 @@ app.get('/api/addresses', requireAuth, async (req, res) => {
 app.post('/api/addresses', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
-    const result = await db.addFamilyAddress(req.body);
+    const groupId = await db.getUserHouseholdId(req.session.user?.id);
+    const result = await db.addFamilyAddress({ ...req.body, group_id: groupId });
     res.json({ success: true, id: result.id });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -2172,6 +2282,7 @@ app.post('/api/addresses', requireAuth, async (req, res) => {
 app.put('/api/addresses/:id', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
+    if (!(await requireHouseholdRow(db, 'family_addresses', req.params.id, req, res))) return;
     const { name, address, lat, lng } = req.body;
     const fields = [];
     const params = [];
@@ -2195,6 +2306,7 @@ app.put('/api/addresses/:id', requireAuth, async (req, res) => {
 app.delete('/api/addresses/:id', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
+    if (!(await requireHouseholdRow(db, 'family_addresses', req.params.id, req, res))) return;
     await db.deleteFamilyAddress(req.params.id);
     res.json({ success: true });
   } catch (err) {
@@ -2220,6 +2332,7 @@ app.get('/api/decisions', requireAuth, async (req, res) => {
 app.get('/api/decisions/:id', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
+    if (!(await requireHouseholdRow(db, 'decisions', req.params.id, req, res))) return;
     const decision = await db.getDecisionById(req.params.id);
     if (!decision) return res.status(404).json({ error: 'Not found' });
     res.json(decision);
@@ -2255,6 +2368,7 @@ app.post('/api/decisions', requireAuth, async (req, res) => {
 app.put('/api/decisions/:id', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
+    if (!(await requireHouseholdRow(db, 'decisions', req.params.id, req, res))) return;
     await db.updateDecision(req.params.id, req.body);
     res.json({ success: true });
   } catch (err) {
@@ -2270,6 +2384,7 @@ app.delete('/api/decisions/:id', requireAuth, async (req, res) => {
     db.db.run(sql, params, (err) => err ? reject(err) : resolve());
   });
   try {
+    if (!(await requireHouseholdRow(db, 'decisions', req.params.id, req, res))) return;
     await run('DELETE FROM decision_reactions WHERE decision_id = ?', [req.params.id]);
     await run('DELETE FROM decision_comments WHERE decision_id = ?', [req.params.id]);
     await run('DELETE FROM decisions WHERE id = ?', [req.params.id]);
@@ -2284,6 +2399,7 @@ app.delete('/api/decisions/:id', requireAuth, async (req, res) => {
 app.get('/api/decisions/:id/reactions', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
+    if (!(await requireHouseholdRow(db, 'decisions', req.params.id, req, res))) return;
     const reactions = await db.getDecisionReactions(req.params.id);
     res.json(reactions);
   } catch (err) {
@@ -2296,6 +2412,7 @@ app.get('/api/decisions/:id/reactions', requireAuth, async (req, res) => {
 app.post('/api/decisions/:id/reactions', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
+    if (!(await requireHouseholdRow(db, 'decisions', req.params.id, req, res))) return;
     const { member_name, reaction_type, poll_choice } = req.body;
     await db.replaceDecisionReaction(req.params.id, member_name, reaction_type, poll_choice);
     res.json({ success: true });
@@ -2309,6 +2426,7 @@ app.post('/api/decisions/:id/reactions', requireAuth, async (req, res) => {
 app.get('/api/decisions/:id/comments', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
+    if (!(await requireHouseholdRow(db, 'decisions', req.params.id, req, res))) return;
     const comments = await db.getDecisionComments(req.params.id);
     res.json(comments);
   } catch (err) {
@@ -2321,6 +2439,7 @@ app.get('/api/decisions/:id/comments', requireAuth, async (req, res) => {
 app.post('/api/decisions/:id/comments', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
+    if (!(await requireHouseholdRow(db, 'decisions', req.params.id, req, res))) return;
     await db.addDecisionComment(req.params.id, req.body.member_name, req.body.text);
     res.json({ success: true });
   } catch (err) {
@@ -2387,6 +2506,7 @@ app.post('/api/rivalries', requireAuth, async (req, res) => {
 app.put('/api/rivalries/:id', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
+    if (!(await requireHouseholdRow(db, 'rivalries', req.params.id, req, res))) return;
     const data = { ...req.body };
     if (data.start_date) data.start_date = normalizeDate(data.start_date);
     if (data.end_date) data.end_date = normalizeDate(data.end_date);
@@ -2402,6 +2522,7 @@ app.put('/api/rivalries/:id', requireAuth, async (req, res) => {
 app.get('/api/rivalries/:id/entries', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
+    if (!(await requireHouseholdRow(db, 'rivalries', req.params.id, req, res))) return;
     const entries = await db.getRivalryEntries(req.params.id);
     res.json(entries);
   } catch (err) {
@@ -2414,6 +2535,7 @@ app.get('/api/rivalries/:id/entries', requireAuth, async (req, res) => {
 app.post('/api/rivalries/:id/entries', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
+    if (!(await requireHouseholdRow(db, 'rivalries', req.params.id, req, res))) return;
     const rivalryId = Number(req.params.id);
     const entry = { ...req.body, rivalry_id: rivalryId };
     await db.addRivalryEntry(entry);
@@ -2528,6 +2650,7 @@ function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
 app.post('/api/rivalries/:id/complete', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
+    if (!(await requireHouseholdRow(db, 'rivalries', req.params.id, req, res))) return;
     const result = await db.completeRivalryWithTotals(Number(req.params.id));
     const { rivalry, initiator_total, opponent_total, winner_name, already_completed } = result;
     const ct = rivalry.challenge_type === 'steps' ? 'steps' : rivalry.challenge_type;
@@ -2664,6 +2787,7 @@ app.delete('/api/itineraries/:id', requireAuth, async (req, res) => {
 app.get('/api/itineraries/:id/expenses', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
+    if (!(await requireItineraryAccess(db, req.params.id, req, res))) return;
     const expenses = await db.getItineraryExpenses(req.params.id);
     const totals = await db.getItineraryExpenseTotal(req.params.id);
     res.json({ expenses, total: totals.total, count: totals.count });
@@ -2723,7 +2847,7 @@ app.put('/api/itineraries/:id/stays/:stayId', requireAuth, async (req, res) => {
     if (!itinerary || itinerary.traveler_id !== req.session.user.id) {
       return res.status(403).json({ error: 'Forbidden' });
     }
-    await db.updateItineraryStay(req.params.stayId, req.body);
+    await db.updateItineraryStay(req.params.stayId, req.body, req.params.id);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -2739,7 +2863,7 @@ app.delete('/api/itineraries/:id/stays/:stayId', requireAuth, async (req, res) =
     if (!itinerary || itinerary.traveler_id !== req.session.user.id) {
       return res.status(403).json({ error: 'Forbidden' });
     }
-    await db.deleteItineraryStay(req.params.stayId);
+    await db.deleteItineraryStay(req.params.stayId, req.params.id);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -2873,7 +2997,8 @@ app.get('/api/stays/pending', requireAuth, async (req, res) => {
 app.get('/api/gifts/people', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
-    const people = await db.getGiftPeople();
+    const groupId = await db.getUserHouseholdId(req.session.user?.id);
+    const people = await db.getGiftPeople(groupId);
     res.json(people);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -2885,7 +3010,8 @@ app.get('/api/gifts/people', requireAuth, async (req, res) => {
 app.post('/api/gifts/people', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
-    const result = await db.addGiftPerson(req.body);
+    const groupId = await db.getUserHouseholdId(req.session.user?.id);
+    const result = await db.addGiftPerson({ ...req.body, group_id: groupId });
     res.json({ success: true, id: result.id });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -2897,7 +3023,8 @@ app.post('/api/gifts/people', requireAuth, async (req, res) => {
 app.get('/api/gifts/ideas', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
-    const ideas = await db.getGiftIdeas(req.query.person_id ? Number(req.query.person_id) : null);
+    const groupId = await db.getUserHouseholdId(req.session.user?.id);
+    const ideas = await db.getGiftIdeas(req.query.person_id ? Number(req.query.person_id) : null, groupId);
     res.json(ideas);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -2909,7 +3036,8 @@ app.get('/api/gifts/ideas', requireAuth, async (req, res) => {
 app.post('/api/gifts/ideas', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
-    const result = await db.addGiftIdea(req.body);
+    const groupId = await db.getUserHouseholdId(req.session.user?.id);
+    const result = await db.addGiftIdea({ ...req.body, group_id: groupId });
     res.json({ success: true, id: result.id });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -2921,6 +3049,7 @@ app.post('/api/gifts/ideas', requireAuth, async (req, res) => {
 app.put('/api/gifts/ideas/:id', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
+    if (!(await requireHouseholdRow(db, 'gift_ideas', req.params.id, req, res))) return;
     await db.updateGiftIdea(req.params.id, req.body);
     res.json({ success: true });
   } catch (err) {
@@ -2933,6 +3062,7 @@ app.put('/api/gifts/ideas/:id', requireAuth, async (req, res) => {
 app.delete('/api/gifts/ideas/:id', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
+    if (!(await requireHouseholdRow(db, 'gift_ideas', req.params.id, req, res))) return;
     await db.deleteGiftIdea(req.params.id);
     res.json({ success: true });
   } catch (err) {
@@ -2945,7 +3075,8 @@ app.delete('/api/gifts/ideas/:id', requireAuth, async (req, res) => {
 app.get('/api/gifts/events', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
-    const events = await db.getSpecialEvents();
+    const groupId = await db.getUserHouseholdId(req.session.user?.id);
+    const events = await db.getSpecialEvents(groupId);
     res.json(events);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -2959,6 +3090,7 @@ app.post('/api/gifts/events', requireAuth, async (req, res) => {
   try {
     const data = { ...req.body };
     if (data.date) data.date = normalizeDate(data.date);
+    data.group_id = await db.getUserHouseholdId(req.session.user?.id);
     const result = await db.addSpecialEvent(data);
     res.json({ success: true, id: result.id });
   } catch (err) {
@@ -2971,6 +3103,7 @@ app.post('/api/gifts/events', requireAuth, async (req, res) => {
 app.delete('/api/gifts/events/:id', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
+    if (!(await requireHouseholdRow(db, 'special_events', req.params.id, req, res))) return;
     await db.deleteSpecialEvent(req.params.id);
     res.json({ success: true });
   } catch (err) {
@@ -3028,6 +3161,44 @@ app.post('/api/groups/join', requireAuth, async (req, res) => {
   }
 });
 
+// Merge one household into another (e.g. each partner created their own at
+// signup). Moves all of `source_id`'s data + members into the target, then
+// deletes the source. Target can be given by id (caller already joined) or by
+// invite_code (caller is joined as part of the merge). Caller must be a member
+// of the source household.
+app.post('/api/households/merge', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const userId = req.session.user?.id;
+    const sourceId = parseInt(req.body.source_id);
+    if (!sourceId) return res.status(400).json({ error: 'source_id required' });
+    if (!(await db.isGroupMember(sourceId, userId))) {
+      return res.status(403).json({ error: 'Not a member of the source household' });
+    }
+    // Resolve target by id or invite code.
+    let targetId = req.body.target_id ? parseInt(req.body.target_id) : null;
+    if (!targetId && req.body.invite_code) {
+      const tgt = await db.getGroupByInviteCode(req.body.invite_code);
+      if (!tgt) return res.status(404).json({ error: 'Invalid invite code' });
+      targetId = tgt.id;
+      if (!(await db.isGroupMember(targetId, userId))) {
+        await db.addGroupMember(targetId, { user_id: userId, role: 'member', added_by: userId });
+      }
+    }
+    if (!targetId) return res.status(400).json({ error: 'target_id or invite_code required' });
+    if (targetId === sourceId) return res.status(400).json({ error: 'Cannot merge a household into itself' });
+    if (!(await db.isGroupMember(targetId, userId))) {
+      return res.status(403).json({ error: 'Not a member of the target household' });
+    }
+    const result = await db.mergeHousehold(sourceId, targetId);
+    res.json({ success: true, ...result });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
 app.post('/api/groups/:id/leave', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
@@ -3052,6 +3223,9 @@ app.post('/api/groups/:id/leave', requireAuth, async (req, res) => {
 app.get('/api/groups/:id/members', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
+    if (!(await db.isGroupMember(req.params.id, req.session.user?.id))) {
+      return res.status(403).json({ error: 'Not a member of this group' });
+    }
     const members = await db.getGroupMembers(req.params.id);
     res.json(members);
   } catch (err) {
@@ -3065,6 +3239,9 @@ app.post('/api/groups/:id/members', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
     const userId = req.session.user?.id;
+    if (!(await db.isGroupMember(req.params.id, userId))) {
+      return res.status(403).json({ error: 'Not a member of this group' });
+    }
     const result = await db.addGroupMember(req.params.id, { ...req.body, added_by: userId });
     res.json({ success: true, id: result.id });
   } catch (err) {
@@ -3077,6 +3254,9 @@ app.post('/api/groups/:id/members', requireAuth, async (req, res) => {
 app.delete('/api/groups/:groupId/members/:memberId', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
+    if (!(await db.isGroupMember(req.params.groupId, req.session.user?.id))) {
+      return res.status(403).json({ error: 'Not a member of this group' });
+    }
     await db.removeGroupMember(req.params.groupId, req.params.memberId);
     res.json({ success: true });
   } catch (err) {
@@ -3089,6 +3269,9 @@ app.delete('/api/groups/:groupId/members/:memberId', requireAuth, async (req, re
 app.put('/api/groups/:id', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
+    if (!(await db.isGroupMember(req.params.id, req.session.user?.id))) {
+      return res.status(403).json({ error: 'Not a member of this group' });
+    }
     const { name, description } = req.body;
     const fields = [];
     const params = [];
@@ -3110,6 +3293,9 @@ app.put('/api/groups/:id', requireAuth, async (req, res) => {
 app.delete('/api/groups/:id', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
+    if (!(await db.isGroupMember(req.params.id, req.session.user?.id))) {
+      return res.status(403).json({ error: 'Not a member of this group' });
+    }
     await db.deleteGroup(req.params.id);
     res.json({ success: true });
   } catch (err) {
@@ -3150,9 +3336,18 @@ app.post('/api/contacts', requireAuth, async (req, res) => {
   }
 });
 
+// Contacts are owner-scoped (added_by); only the creator may edit/delete.
+async function requireContactOwner(db, id, req, res) {
+  const row = await dbGet(db, 'SELECT added_by FROM contacts WHERE id = ?', [id]);
+  if (!row) { res.status(404).json({ error: 'Not found' }); return false; }
+  if (row.added_by !== req.session.user?.id) { res.status(403).json({ error: 'Forbidden' }); return false; }
+  return true;
+}
+
 app.put('/api/contacts/:id', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
+    if (!(await requireContactOwner(db, req.params.id, req, res))) return;
     await db.updateContact(req.params.id, req.body);
     res.json({ success: true });
   } catch (err) {
@@ -3165,6 +3360,7 @@ app.put('/api/contacts/:id', requireAuth, async (req, res) => {
 app.delete('/api/contacts/:id', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
+    if (!(await requireContactOwner(db, req.params.id, req, res))) return;
     await db.deleteContact(req.params.id);
     res.json({ success: true });
   } catch (err) {
@@ -3181,6 +3377,9 @@ app.delete('/api/contacts/:id', requireAuth, async (req, res) => {
 app.get('/api/groups/:id/feed', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
+    if (!(await db.isGroupMember(req.params.id, req.session.user?.id))) {
+      return res.status(403).json({ error: 'Not a member of this group' });
+    }
     const posts = await db.getFeedPosts(req.params.id, {
       limit: parseInt(req.query.limit) || 50,
       before_id: req.query.before_id ? parseInt(req.query.before_id) : undefined
@@ -3199,6 +3398,9 @@ app.post('/api/groups/:id/feed', requireAuth, async (req, res) => {
     const userId = req.session.user?.id;
     const senderName = req.session.user?.name;
     const groupId = parseInt(req.params.id);
+    if (!(await db.isGroupMember(groupId, userId))) {
+      return res.status(403).json({ error: 'Not a member of this group' });
+    }
     const result = await db.addFeedPost({ ...req.body, group_id: groupId, author_id: userId });
     res.json({ success: true, id: result.id });
     // Push to group members (fire-and-forget)
@@ -3214,6 +3416,12 @@ app.post('/api/groups/:id/feed', requireAuth, async (req, res) => {
 app.delete('/api/feed/:id', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
+    // Only the post's author may delete it.
+    const post = await dbGet(db, 'SELECT author_id FROM feed_posts WHERE id = ?', [req.params.id]);
+    if (!post) return res.status(404).json({ error: 'Not found' });
+    if (post.author_id !== req.session.user?.id) {
+      return res.status(403).json({ error: 'Only the author can delete this post' });
+    }
     await db.deleteFeedPost(req.params.id);
     res.json({ success: true });
   } catch (err) {
@@ -3227,6 +3435,7 @@ app.post('/api/feed/:id/reactions', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
     const userId = req.session.user?.id;
+    if (!(await requireFeedPostMember(db, req.params.id, req, res))) return;
     await db.addFeedReaction(req.params.id, userId, req.body.reaction_type);
     res.json({ success: true });
   } catch (err) {
@@ -3240,6 +3449,7 @@ app.delete('/api/feed/:id/reactions', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
     const userId = req.session.user?.id;
+    if (!(await requireFeedPostMember(db, req.params.id, req, res))) return;
     await db.removeFeedReaction(req.params.id, userId);
     res.json({ success: true });
   } catch (err) {
@@ -3252,6 +3462,7 @@ app.delete('/api/feed/:id/reactions', requireAuth, async (req, res) => {
 app.get('/api/feed/:id/reactions', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
+    if (!(await requireFeedPostMember(db, req.params.id, req, res))) return;
     const reactions = await db.getFeedReactions(req.params.id);
     res.json(reactions);
   } catch (err) {
@@ -3264,6 +3475,7 @@ app.get('/api/feed/:id/reactions', requireAuth, async (req, res) => {
 app.get('/api/feed/:id/comments', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
+    if (!(await requireFeedPostMember(db, req.params.id, req, res))) return;
     const comments = await db.getFeedComments(req.params.id);
     res.json(comments);
   } catch (err) {
@@ -3277,6 +3489,7 @@ app.post('/api/feed/:id/comments', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
     const userId = req.session.user?.id;
+    if (!(await requireFeedPostMember(db, req.params.id, req, res))) return;
     const result = await db.addFeedComment(req.params.id, userId, req.body.text);
     res.json({ success: true, id: result.id });
   } catch (err) {
@@ -3290,7 +3503,8 @@ app.post('/api/feed/:id/comments', requireAuth, async (req, res) => {
 app.get('/api/projects', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
-    const projects = await db.getProjects();
+    const groupId = await db.getUserHouseholdId(req.session.user?.id);
+    const projects = await db.getProjects(groupId);
     res.json(projects);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -3302,7 +3516,8 @@ app.get('/api/projects', requireAuth, async (req, res) => {
 app.post('/api/projects', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
-    const result = await db.addProject(req.body);
+    const groupId = await db.getUserHouseholdId(req.session.user?.id);
+    const result = await db.addProject({ ...req.body, group_id: groupId });
     res.json({ success: true, id: result.id });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -3314,6 +3529,7 @@ app.post('/api/projects', requireAuth, async (req, res) => {
 app.delete('/api/projects/:id', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
+    if (!(await requireHouseholdRow(db, 'budget_projects', req.params.id, req, res))) return;
     await db.deleteProject(req.params.id);
     res.json({ success: true });
   } catch (err) {
@@ -3326,7 +3542,9 @@ app.delete('/api/projects/:id', requireAuth, async (req, res) => {
 app.get('/api/projects/:id/expenses', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
-    const expenses = await db.getProjectExpenses(req.params.id);
+    if (!(await requireHouseholdRow(db, 'budget_projects', req.params.id, req, res))) return;
+    const groupId = await db.getUserHouseholdId(req.session.user?.id);
+    const expenses = await db.getProjectExpenses(req.params.id, groupId);
     res.json(expenses);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -3338,7 +3556,9 @@ app.get('/api/projects/:id/expenses', requireAuth, async (req, res) => {
 app.post('/api/projects/:id/expenses', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
-    const result = await db.addProjectExpense(req.params.id, req.body);
+    if (!(await requireHouseholdRow(db, 'budget_projects', req.params.id, req, res))) return;
+    const groupId = await db.getUserHouseholdId(req.session.user?.id);
+    const result = await db.addProjectExpense(req.params.id, req.body, groupId);
     res.json({ success: true, id: result.id });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -3350,7 +3570,8 @@ app.post('/api/projects/:id/expenses', requireAuth, async (req, res) => {
 app.delete('/api/projects/:projectId/expenses/:id', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
-    await db.deleteProjectExpense(req.params.id);
+    if (!(await requireHouseholdRow(db, 'budget_projects', req.params.projectId, req, res))) return;
+    await db.deleteProjectExpense(req.params.id, req.params.projectId);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -3397,7 +3618,7 @@ app.get('/api/messages/:partnerId', requireAuth, async (req, res) => {
 app.get('/api/messages/:partnerId/:messageId/image', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
-    const image = await db.getMessageImage(parseInt(req.params.messageId));
+    const image = await db.getMessageImage(parseInt(req.params.messageId), req.session.user?.id);
     if (!image) return res.status(404).json({ error: 'No image' });
     res.json({ image });
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -3512,6 +3733,7 @@ app.post('/api/lists', requireAuth, async (req, res) => {
 app.put('/api/lists/:id', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
+    if (!(await requireListAccess(db, req.params.id, req, res))) return;
     await db.updateList(req.params.id, req.body);
     res.json({ success: true });
   } catch (err) {
@@ -3525,9 +3747,15 @@ app.put('/api/lists/:id', requireAuth, async (req, res) => {
 app.post('/api/lists/:id/pin', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
-    // Unpin all lists first
+    if (!(await requireListAccess(db, req.params.id, req, res))) return;
+    // Unpin the household's other lists first (NOT every user's lists)
+    const userId = req.session.user?.id;
     await new Promise((resolve, reject) => {
-      db.db.run('UPDATE lists SET pinned = 0 WHERE pinned = 1', (err) => err ? reject(err) : resolve());
+      db.db.run(`UPDATE lists SET pinned = 0 WHERE pinned = 1 AND (created_by = ? OR created_by IN (
+        SELECT gm2.user_id FROM group_members gm2
+        JOIN groups g ON g.id = gm2.group_id AND g.group_type = 'household'
+        WHERE gm2.group_id IN (SELECT group_id FROM group_members WHERE user_id = ?)))`,
+        [userId, userId], (err) => err ? reject(err) : resolve());
     });
     // Pin the selected one
     await db.updateList(req.params.id, { pinned: 1 });
@@ -3542,6 +3770,7 @@ app.post('/api/lists/:id/pin', requireAuth, async (req, res) => {
 app.post('/api/lists/:id/unpin', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
+    if (!(await requireListAccess(db, req.params.id, req, res))) return;
     await db.updateList(req.params.id, { pinned: 0 });
     res.json({ success: true });
   } catch (err) {
@@ -3554,6 +3783,7 @@ app.post('/api/lists/:id/unpin', requireAuth, async (req, res) => {
 app.delete('/api/lists/:id', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
+    if (!(await requireListAccess(db, req.params.id, req, res))) return;
     await db.deleteList(req.params.id);
     res.json({ success: true });
   } catch (err) {
@@ -3566,6 +3796,7 @@ app.delete('/api/lists/:id', requireAuth, async (req, res) => {
 app.get('/api/lists/:id/items', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
+    if (!(await requireListAccess(db, req.params.id, req, res))) return;
     // Check if this is a grocery list and backfill missing categories
     const list = await new Promise((resolve, reject) => {
       db.db.get('SELECT name, list_type FROM lists WHERE id = ?', [req.params.id], (err, row) => err ? reject(err) : resolve(row));
@@ -3594,6 +3825,7 @@ app.get('/api/lists/:id/items', requireAuth, async (req, res) => {
 app.post('/api/lists/:id/items', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
+    if (!(await requireListAccess(db, req.params.id, req, res))) return;
     const userName = req.session.user?.name || req.session.user?.username;
     // Auto-categorize if the parent list is a grocery list
     const list = await new Promise((resolve, reject) => {
@@ -3622,6 +3854,7 @@ app.post('/api/lists/:id/items', requireAuth, async (req, res) => {
 app.post('/api/lists/items/:id/toggle', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
+    if (!(await requireListItemAccess(db, req.params.id, req, res))) return;
     await db.toggleListItem(req.params.id);
     res.json({ success: true });
   } catch (err) {
@@ -3634,6 +3867,7 @@ app.post('/api/lists/items/:id/toggle', requireAuth, async (req, res) => {
 app.put('/api/lists/items/:id', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
+    if (!(await requireListItemAccess(db, req.params.id, req, res))) return;
     const updates = { title: req.body.title };
     // Re-categorize if parent list is grocery type
     if (req.body.title) {
@@ -3661,6 +3895,7 @@ app.put('/api/lists/items/:id', requireAuth, async (req, res) => {
 app.post('/api/lists/:id/reorder', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
+    if (!(await requireListAccess(db, req.params.id, req, res))) return;
     await db.reorderListItems(req.body.ordered_ids);
     res.json({ success: true });
   } catch (err) {
@@ -3673,6 +3908,7 @@ app.post('/api/lists/:id/reorder', requireAuth, async (req, res) => {
 app.delete('/api/lists/items/:id', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
+    if (!(await requireListItemAccess(db, req.params.id, req, res))) return;
     await db.deleteListItem(req.params.id);
     res.json({ success: true });
   } catch (err) {
@@ -3778,6 +4014,12 @@ app.get('/api/coverage/:id', requireAuth, async (req, res) => {
   try {
     const request = await db.getCoverageRequestById(req.params.id);
     if (!request) return res.status(404).json({ error: 'Not found' });
+    // Only the requester or a named recipient (care-team member who is an app user) may view.
+    const userId = req.session.user?.id;
+    const recipient = await db.getRecipientByUserId(req.params.id, userId);
+    if (request.requester_id !== userId && !recipient) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
     const windows = await db.getCoverageWindows(req.params.id);
     const recipients = await db.getCoverageRecipients(req.params.id);
     const approvals = await db.getCoverageApprovals(req.params.id);
@@ -3793,6 +4035,11 @@ app.get('/api/coverage/:id', requireAuth, async (req, res) => {
 app.post('/api/coverage/:id/cancel', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
+    const request = await db.getCoverageRequestById(req.params.id);
+    if (!request) return res.status(404).json({ error: 'Not found' });
+    if (request.requester_id !== req.session.user?.id) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
     await db.cancelCoverageRequest(req.params.id);
     res.json({ success: true });
   } catch (err) {

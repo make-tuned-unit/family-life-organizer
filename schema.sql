@@ -111,16 +111,19 @@ CREATE TABLE IF NOT EXISTS receipts (
   processed_by TEXT, -- 'email' or 'manual'
   email_id TEXT, -- reference to original email if from email
   added_by TEXT DEFAULT 'jesse',
+  group_id INTEGER REFERENCES groups(id),
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
--- Budget categories and limits
+-- Budget categories and limits (unique per household, not globally)
 CREATE TABLE IF NOT EXISTS budget_categories (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  name TEXT NOT NULL UNIQUE,
+  name TEXT NOT NULL,
   monthly_limit DECIMAL(10,2),
   color TEXT,
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  group_id INTEGER REFERENCES groups(id),
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(name, group_id)
 );
 
 -- Default budget categories (inserted at end of schema to avoid blocking table creation)
@@ -136,6 +139,7 @@ CREATE TABLE IF NOT EXISTS pantry (
     expiry_date TEXT,
     receipt_id INTEGER,
     added_by TEXT DEFAULT 'jesse',
+    group_id INTEGER REFERENCES groups(id),
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (receipt_id) REFERENCES receipts(id)
@@ -161,6 +165,7 @@ CREATE TABLE IF NOT EXISTS trips (
     eta_minutes INTEGER,
     started_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     arrived_at DATETIME,
+    group_id INTEGER REFERENCES groups(id),
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -173,6 +178,7 @@ CREATE TABLE IF NOT EXISTS family_addresses (
     lng REAL NOT NULL,
     radius_meters INTEGER DEFAULT 500,
     created_by TEXT DEFAULT 'jesse',
+    group_id INTEGER REFERENCES groups(id),
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -263,6 +269,7 @@ CREATE TABLE IF NOT EXISTS gift_people (
     birthday TEXT,
     anniversary TEXT,
     notes TEXT,
+    group_id INTEGER REFERENCES groups(id),
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -275,6 +282,7 @@ CREATE TABLE IF NOT EXISTS gift_ideas (
     estimated_price REAL,
     status TEXT DEFAULT 'idea',
     for_event TEXT,
+    group_id INTEGER REFERENCES groups(id),
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (person_id) REFERENCES gift_people(id) ON DELETE CASCADE
 );
@@ -287,6 +295,7 @@ CREATE TABLE IF NOT EXISTS special_events (
     is_recurring BOOLEAN DEFAULT 1,
     event_type TEXT DEFAULT 'custom',
     notes TEXT,
+    group_id INTEGER REFERENCES groups(id),
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (person_id) REFERENCES gift_people(id) ON DELETE CASCADE
 );
@@ -294,12 +303,13 @@ CREATE TABLE IF NOT EXISTS special_events (
 CREATE INDEX IF NOT EXISTS idx_gift_ideas_person_id ON gift_ideas(person_id);
 CREATE INDEX IF NOT EXISTS idx_special_events_person_id ON special_events(person_id);
 
--- Budget projects (shared between family members)
+-- Budget projects (shared within a household)
 CREATE TABLE IF NOT EXISTS budget_projects (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
     budget REAL NOT NULL DEFAULT 0,
     created_by TEXT DEFAULT 'jesse',
+    group_id INTEGER REFERENCES groups(id),
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -310,6 +320,7 @@ CREATE TABLE IF NOT EXISTS project_expenses (
     amount REAL NOT NULL,
     category TEXT DEFAULT 'General',
     notes TEXT,
+    group_id INTEGER REFERENCES groups(id),
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (project_id) REFERENCES budget_projects(id) ON DELETE CASCADE
 );
