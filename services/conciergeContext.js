@@ -50,7 +50,7 @@ async function buildSnapshot(db, userId) {
   const today = todayISO();
   const month = currentMonth();
 
-  const [tasks, appts, decisions, pantry, events, coverage, budget] = await Promise.all([
+  const [tasks, appts, decisions, pantry, events, coverage, budget, trips, itineraries] = await Promise.all([
     safe(db.getTasks({ status: 'active' }, userId), [], 'tasks'),
     safe(db.getAppointments({}, userId), [], 'appointments'),
     safe(db.getDecisions({ status: 'active' }, userId), [], 'decisions'),
@@ -58,6 +58,8 @@ async function buildSnapshot(db, userId) {
     safe(db.getSpecialEvents(), [], 'events'),
     safe(db.getIncomingCoverageRequests(userId), [], 'coverage'),
     safe(db.getBudgetSummary(month), [], 'budget'),
+    safe(db.getTrips({ status: 'active' }), [], 'trips'),
+    safe(db.getItineraries(userId), [], 'itineraries'),
   ]);
 
   const overdueTasks = tasks
@@ -101,6 +103,21 @@ async function buildSnapshot(db, userId) {
     }))
     .sort((a, b) => b.pct - a.pct);
 
+  const activeTrips = trips
+    .map(t => ({ id: t.id, traveler: t.traveler, destination: t.destination, eta_minutes: t.eta_minutes }));
+
+  // In-progress or upcoming itineraries (not yet ended, not completed/cancelled).
+  const upcomingItineraries = itineraries
+    .filter(i => i.status !== 'completed' && i.status !== 'cancelled')
+    .map(i => ({ ...i, _end: daysUntil(i.end_date), _start: daysUntil(i.start_date) }))
+    .filter(i => i._end === null || i._end >= 0)
+    .sort((a, b) => (a._start ?? 0) - (b._start ?? 0))
+    .map(i => ({
+      id: i.id, title: i.title, traveler: i.traveler_name,
+      start_date: i.start_date, end_date: i.end_date, status: i.status,
+      daysUntilStart: i._start,
+    }));
+
   return {
     date: today,
     counts: {
@@ -111,6 +128,8 @@ async function buildSnapshot(db, userId) {
       upcomingEvents: upcomingEvents.length,
       pendingCoverage: pendingCoverage.length,
       budgetAlerts: budgetAlerts.length,
+      activeTrips: activeTrips.length,
+      upcomingItineraries: upcomingItineraries.length,
     },
     overdueTasks,
     upcomingAppointments,
@@ -119,6 +138,8 @@ async function buildSnapshot(db, userId) {
     upcomingEvents,
     pendingCoverage,
     budgetAlerts,
+    activeTrips,
+    upcomingItineraries,
   };
 }
 
