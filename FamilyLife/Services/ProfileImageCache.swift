@@ -37,4 +37,47 @@ final class ProfileImageCache {
             }
         }
     }
+
+    // MARK: - Group / household images
+
+    private var groupImages: [Int: UIImage] = [:]
+    private var pendingGroups: Set<Int> = []
+
+    func groupImage(for groupId: Int) -> UIImage? {
+        groupImages[groupId]
+    }
+
+    /// Update the cache right after the user picks a new group image.
+    func setGroupImage(_ image: UIImage, for groupId: Int) {
+        groupImages[groupId] = image
+    }
+
+    /// Pre-load group avatars carried inline in a groups list response.
+    func loadFromGroups(_ groups: [APIService.GroupResponse]) {
+        for group in groups {
+            guard groupImages[group.id] == nil else { continue }
+            if let base64 = group.profile_image,
+               let data = Data(base64Encoded: base64),
+               let img = UIImage(data: data) {
+                groupImages[group.id] = img
+            }
+        }
+    }
+
+    func fetchGroupIfNeeded(groupId: Int, api: APIService) {
+        guard groupImages[groupId] == nil, !pendingGroups.contains(groupId) else { return }
+        pendingGroups.insert(groupId)
+        Task {
+            defer { pendingGroups.remove(groupId) }
+            do {
+                let base64 = try await api.fetchGroupImage(groupId: groupId)
+                if let data = Data(base64Encoded: base64),
+                   let img = UIImage(data: data) {
+                    groupImages[groupId] = img
+                }
+            } catch {
+                // No avatar or network error — silently fall back to initial
+            }
+        }
+    }
 }

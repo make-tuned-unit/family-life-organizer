@@ -308,6 +308,39 @@ app.get('/api/users/:id/avatar', requireAuth, async (req, res) => {
   }
 });
 
+// Group/household profile image — only members may set it.
+app.put('/api/groups/:id/avatar', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const userId = req.session.user?.id;
+    if (!userId) return res.status(401).json({ error: 'Not authenticated' });
+    const { image } = req.body;
+    if (!image) return res.status(400).json({ error: 'No image provided' });
+    if (!(await db.isGroupMember(req.params.id, userId))) {
+      return res.status(403).json({ error: 'Not a member of this group' });
+    }
+    await db.updateGroupAvatar(req.params.id, image);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+app.get('/api/groups/:id/avatar', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const image = await db.getGroupAvatar(req.params.id);
+    if (!image) return res.status(404).json({ error: 'No avatar' });
+    res.json({ image });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
 // Login page - Modern Design
 app.get('/login', (req, res) => {
   res.send(`<!DOCTYPE html>
