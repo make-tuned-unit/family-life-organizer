@@ -1718,6 +1718,89 @@ class FamilyDB {
   }
 
   // ============================================
+  // Notes (private by default; owner can share to household or a group)
+  // ============================================
+
+  // Notes the user owns OR that have been shared to a group they belong to.
+  getNotes(userId) {
+    return new Promise((resolve, reject) => {
+      const uid = parseInt(userId);
+      this.db.all(
+        `SELECT * FROM notes
+         WHERE user_id = ?
+            OR (shared_scope != 'private' AND group_id IN (SELECT group_id FROM group_members WHERE user_id = ?))
+         ORDER BY pinned DESC, datetime(updated_at) DESC`,
+        [uid, uid], (err, rows) => err ? reject(err) : resolve(rows || []));
+    });
+  }
+
+  addNote(note) {
+    return new Promise((resolve, reject) => {
+      this.db.run(
+        `INSERT INTO notes (title, body, color, pinned, user_id, shared_scope, group_id, can_collaborate)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [note.title || null, note.body || null, note.color || null, note.pinned ? 1 : 0,
+         note.user_id || null, note.shared_scope || 'private', note.group_id || null, note.can_collaborate ? 1 : 0],
+        function (err) { err ? reject(err) : resolve({ id: this.lastID, ...note }); }
+      );
+    });
+  }
+
+  getNoteById(id) {
+    return new Promise((resolve, reject) => {
+      this.db.get('SELECT * FROM notes WHERE id = ?', [id], (err, row) => err ? reject(err) : resolve(row));
+    });
+  }
+
+  // Owner update — full control incl. sharing + collaboration settings.
+  updateNote(id, updates, userId) {
+    const ALLOWED = new Set(['title', 'body', 'color', 'pinned', 'shared_scope', 'group_id', 'can_collaborate']);
+    return new Promise((resolve, reject) => {
+      const fields = [], params = [];
+      for (const [k, v] of Object.entries(updates)) {
+        if (!ALLOWED.has(k)) continue;
+        fields.push(`${k} = ?`);
+        params.push((k === 'pinned' || k === 'can_collaborate') ? (v ? 1 : 0) : v);
+      }
+      fields.push("updated_at = CURRENT_TIMESTAMP");
+      params.push(id, parseInt(userId));
+      this.db.run(`UPDATE notes SET ${fields.join(', ')} WHERE id = ? AND user_id = ?`, params,
+        function (err) { err ? reject(err) : resolve({ changed: this.changes }); });
+    });
+  }
+
+  // Collaborator update — CONTENT ONLY, and only when the note is shared with a
+  // group the user belongs to AND collaboration is enabled. Cannot touch
+  // sharing/ownership. Enforced atomically in the WHERE clause.
+  updateNoteAsCollaborator(id, updates, userId) {
+    const ALLOWED = new Set(['title', 'body', 'color']);
+    return new Promise((resolve, reject) => {
+      const fields = [], params = [];
+      for (const [k, v] of Object.entries(updates)) {
+        if (!ALLOWED.has(k)) continue;
+        fields.push(`${k} = ?`);
+        params.push(v);
+      }
+      if (!fields.length) return resolve({ changed: 0 });
+      fields.push("updated_at = CURRENT_TIMESTAMP");
+      const uid = parseInt(userId);
+      params.push(id, uid);
+      this.db.run(
+        `UPDATE notes SET ${fields.join(', ')}
+         WHERE id = ? AND can_collaborate = 1 AND shared_scope != 'private'
+           AND group_id IN (SELECT group_id FROM group_members WHERE user_id = ?)`,
+        params, function (err) { err ? reject(err) : resolve({ changed: this.changes }); });
+    });
+  }
+
+  deleteNote(id, userId) {
+    return new Promise((resolve, reject) => {
+      this.db.run('DELETE FROM notes WHERE id = ? AND user_id = ?', [id, parseInt(userId)],
+        function (err) { err ? reject(err) : resolve({ changed: this.changes }); });
+    });
+  }
+
+  // ============================================
   // Spending statistics / trends (for the Budget > Stats view)
   // ============================================
 
@@ -1904,7 +1987,7 @@ class FamilyDB {
       'budget_categories', 'budget_projects', 'project_expenses', 'pantry', 'trips',
       'gift_people', 'gift_ideas', 'special_events', 'family_addresses', 'feed_posts',
       'itineraries', 'itinerary_stays', 'subscriptions', 'concierge_memory', 'concierge_nudges',
-      'concierge_conversations', 'recurring_payments'];
+      'concierge_conversations', 'recurring_payments', 'notes'];
   }
 
   // Merge one household into another: re-point all household-scoped data and
