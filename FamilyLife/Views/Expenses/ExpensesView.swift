@@ -8,14 +8,27 @@ struct ExpensesView: View {
     @State private var showingAddReceipt = false
     @State private var showingScanner = false
     @State private var projectStore = BudgetProjectStore()
+    @State private var recurringStore = RecurringPaymentsStore()
+    @State private var mode: BudgetMode = .overview
+
+    enum BudgetMode: String, CaseIterable, Identifiable {
+        case overview = "Overview", stats = "Stats"
+        var id: String { rawValue }
+    }
 
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(spacing: 0) {
                 headerSection
-                heroSummary
-                categoriesSection
-                projectsPreview
+                modePicker
+                if mode == .overview {
+                    heroSummary
+                    categoriesSection
+                    recurringEntry
+                    projectsPreview
+                } else {
+                    BudgetStatsView()
+                }
             }
             .padding(.bottom, DesignTokens.Spacing.bottomBuffer)
         }
@@ -69,7 +82,8 @@ struct ExpensesView: View {
         } message: {
             Text(viewModel.error ?? "An unexpected error occurred.")
         }
-        .refreshable { await viewModel.loadAll(api: api); await projectStore.loadAll(api: api) }
+        .refreshable { await viewModel.loadAll(api: api); await projectStore.loadAll(api: api); await recurringStore.load(api: api) }
+        .task { await recurringStore.load(api: api) }
         .task(id: showingScanner) { await viewModel.loadAll(api: api); await projectStore.loadAll(api: api) }
         .task(id: showingAddReceipt) { await viewModel.loadAll(api: api) }
         .onChange(of: viewModel.displayedMonth) {
@@ -165,6 +179,53 @@ struct ExpensesView: View {
             .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
             .padding(.bottom, 14)
         }
+    }
+
+    // MARK: - Mode toggle
+
+    private var modePicker: some View {
+        Picker("View", selection: $mode.animation(.easeInOut(duration: 0.2))) {
+            ForEach(BudgetMode.allCases) { Text($0.rawValue).tag($0) }
+        }
+        .pickerStyle(.segmented)
+        .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
+        .padding(.bottom, 14)
+    }
+
+    // MARK: - Recurring entry
+
+    private var recurringEntry: some View {
+        NavigationLink {
+            RecurringPaymentsView()
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "arrow.triangle.2.circlepath")
+                    .font(.system(size: 16))
+                    .foregroundStyle(AccentTheme.ocean.color)
+                    .frame(width: 36, height: 36)
+                    .background(AccentTheme.ocean.color.opacity(0.15))
+                    .clipShape(Circle())
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Recurring payments")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(WarmPalette.ink1)
+                    Text(recurringStore.items.isEmpty
+                         ? "Rent, subscriptions, insurance & more"
+                         : "$\(Int(recurringStore.monthlyTotal).formatted())/mo \u{00B7} \(recurringStore.items.count) payment\(recurringStore.items.count == 1 ? "" : "s")")
+                        .font(.system(size: 13))
+                        .foregroundStyle(WarmPalette.ink3)
+                }
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(WarmPalette.ink4)
+            }
+            .padding(14)
+            .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
+        }
+        .buttonStyle(.plain)
+        .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
+        .padding(.bottom, 14)
     }
 
     // MARK: - Header
