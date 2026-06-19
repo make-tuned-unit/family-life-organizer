@@ -31,15 +31,6 @@
 		AA000017 /* AddPantryItemView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000017 /* AddPantryItemView.swift */; };
 		AA000018 /* CookView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000018 /* CookView.swift */; };
 		AA000019 /* CookViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000019 /* CookViewModel.swift */; };
-		AA000087 /* ConciergeModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000087 /* ConciergeModels.swift */; };
-		AA000088 /* ConciergeViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000088 /* ConciergeViewModel.swift */; };
-		AA000089 /* ConciergeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000089 /* ConciergeView.swift */; };
-		AA000090 /* ConciergeChatViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000090 /* ConciergeChatViewModel.swift */; };
-		AA000091 /* ConciergeChatView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000091 /* ConciergeChatView.swift */; };
-		AA000092 /* SubscriptionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000092 /* SubscriptionService.swift */; };
-		AA000093 /* PaywallView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000093 /* PaywallView.swift */; };
-		AA000094 /* AskButlerButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000094 /* AskButlerButton.swift */; };
-		AA000095 /* OnDeviceSummarizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000095 /* OnDeviceSummarizer.swift */; };
 		AA00001A /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00001A /* SettingsView.swift */; };
 		AA00001B /* AddTaskView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00001B /* AddTaskView.swift */; };
 		AA00001C /* AddReceiptView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00001C /* AddReceiptView.swift */; };
@@ -85,6 +76,8 @@
 		AA00004A /* FamilyListsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00004A /* FamilyListsView.swift */; };
 		AA00004B /* AskAIButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00004B /* AskAIButton.swift */; };
 		AA00004C /* BudgetProjectsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00004C /* BudgetProjectsView.swift */; };
+		AA000096 /* BudgetStatsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000096 /* BudgetStatsView.swift */; };
+		AA000097 /* RecurringPaymentsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000097 /* RecurringPaymentsView.swift */; };
 		AA00004D /* SignUpView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00004D /* SignUpView.swift */; };
 		AA00004E /* FamilyGroupsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00004E /* FamilyGroupsView.swift */; };
 		AA00004F /* EventDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00004F /* EventDetailView.swift */; };
@@ -110,6 +103,15 @@
 		AA000084 /* ItineraryListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000084 /* ItineraryListView.swift */; };
 		AA000085 /* ItineraryDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000085 /* ItineraryDetailView.swift */; };
 		AA000086 /* AddStayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000086 /* AddStayView.swift */; };
+		AA000087 /* ConciergeModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000087 /* ConciergeModels.swift */; };
+		AA000088 /* ConciergeViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000088 /* ConciergeViewModel.swift */; };
+		AA000089 /* ConciergeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000089 /* ConciergeView.swift */; };
+		AA000090 /* ConciergeChatViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000090 /* ConciergeChatViewModel.swift */; };
+		AA000091 /* ConciergeChatView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000091 /* ConciergeChatView.swift */; };
+		AA000092 /* SubscriptionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000092 /* SubscriptionService.swift */; };
+		AA000093 /* PaywallView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000093 /* PaywallView.swift */; };
+		AA000094 /* AskButlerButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000094 /* AskButlerButton.swift */; };
+		AA000095 /* OnDeviceSummarizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000095 /* OnDeviceSummarizer.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -137,15 +139,6 @@
 		BB000017 /* AddPantryItemView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddPantryItemView.swift; sourceTree = "<group>"; };
 		BB000018 /* CookView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CookView.swift; sourceTree = "<group>"; };
 		BB000019 /* CookViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CookViewModel.swift; sourceTree = "<group>"; };
-		BB000087 /* ConciergeModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConciergeModels.swift; sourceTree = "<group>"; };
-		BB000088 /* ConciergeViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConciergeViewModel.swift; sourceTree = "<group>"; };
-		BB000089 /* ConciergeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConciergeView.swift; sourceTree = "<group>"; };
-		BB000090 /* ConciergeChatViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConciergeChatViewModel.swift; sourceTree = "<group>"; };
-		BB000091 /* ConciergeChatView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConciergeChatView.swift; sourceTree = "<group>"; };
-		BB000092 /* SubscriptionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubscriptionService.swift; sourceTree = "<group>"; };
-		BB000093 /* PaywallView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaywallView.swift; sourceTree = "<group>"; };
-		BB000094 /* AskButlerButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AskButlerButton.swift; sourceTree = "<group>"; };
-		BB000095 /* OnDeviceSummarizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnDeviceSummarizer.swift; sourceTree = "<group>"; };
 		BB00001A /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		BB00001B /* AddTaskView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddTaskView.swift; sourceTree = "<group>"; };
 		BB00001C /* AddReceiptView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddReceiptView.swift; sourceTree = "<group>"; };
@@ -191,6 +184,8 @@
 		BB00004A /* FamilyListsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FamilyListsView.swift; sourceTree = "<group>"; };
 		BB00004B /* AskAIButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AskAIButton.swift; sourceTree = "<group>"; };
 		BB00004C /* BudgetProjectsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BudgetProjectsView.swift; sourceTree = "<group>"; };
+		BB000096 /* BudgetStatsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BudgetStatsView.swift; sourceTree = "<group>"; };
+		BB000097 /* RecurringPaymentsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecurringPaymentsView.swift; sourceTree = "<group>"; };
 		BB00004D /* SignUpView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignUpView.swift; sourceTree = "<group>"; };
 		BB00004E /* FamilyGroupsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FamilyGroupsView.swift; sourceTree = "<group>"; };
 		BB00004F /* EventDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventDetailView.swift; sourceTree = "<group>"; };
@@ -216,6 +211,15 @@
 		BB000084 /* ItineraryListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ItineraryListView.swift; sourceTree = "<group>"; };
 		BB000085 /* ItineraryDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ItineraryDetailView.swift; sourceTree = "<group>"; };
 		BB000086 /* AddStayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddStayView.swift; sourceTree = "<group>"; };
+		BB000087 /* ConciergeModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConciergeModels.swift; sourceTree = "<group>"; };
+		BB000088 /* ConciergeViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConciergeViewModel.swift; sourceTree = "<group>"; };
+		BB000089 /* ConciergeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConciergeView.swift; sourceTree = "<group>"; };
+		BB000090 /* ConciergeChatViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConciergeChatViewModel.swift; sourceTree = "<group>"; };
+		BB000091 /* ConciergeChatView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConciergeChatView.swift; sourceTree = "<group>"; };
+		BB000092 /* SubscriptionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubscriptionService.swift; sourceTree = "<group>"; };
+		BB000093 /* PaywallView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaywallView.swift; sourceTree = "<group>"; };
+		BB000094 /* AskButlerButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AskButlerButton.swift; sourceTree = "<group>"; };
+		BB000095 /* OnDeviceSummarizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnDeviceSummarizer.swift; sourceTree = "<group>"; };
 		CC000001 /* FamilyLife.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = FamilyLife.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -373,6 +377,8 @@
 				BB00004C /* BudgetProjectsView.swift */,
 				BB000052 /* BudgetSettingsView.swift */,
 				BB000053 /* BudgetCategoryDetailView.swift */,
+				BB000096 /* BudgetStatsView.swift */,
+				BB000097 /* RecurringPaymentsView.swift */,
 			);
 			path = Expenses;
 			sourceTree = "<group>";
@@ -396,21 +402,6 @@
 				BB000046 /* AIDisclosureView.swift */,
 			);
 			path = Cook;
-			sourceTree = "<group>";
-		};
-		EE000021 /* Concierge */ = {
-			isa = PBXGroup;
-			children = (
-				BB000087 /* ConciergeModels.swift */,
-				BB000088 /* ConciergeViewModel.swift */,
-				BB000089 /* ConciergeView.swift */,
-				BB000090 /* ConciergeChatViewModel.swift */,
-				BB000091 /* ConciergeChatView.swift */,
-				BB000093 /* PaywallView.swift */,
-				BB000094 /* AskButlerButton.swift */,
-				BB000095 /* OnDeviceSummarizer.swift */,
-			);
-			path = Concierge;
 			sourceTree = "<group>";
 		};
 		EE00000E /* Trips */ = {
@@ -488,6 +479,21 @@
 				BB000076 /* SendToSheet.swift */,
 			);
 			path = Messages;
+			sourceTree = "<group>";
+		};
+		EE000021 /* Concierge */ = {
+			isa = PBXGroup;
+			children = (
+				BB000087 /* ConciergeModels.swift */,
+				BB000088 /* ConciergeViewModel.swift */,
+				BB000089 /* ConciergeView.swift */,
+				BB000090 /* ConciergeChatViewModel.swift */,
+				BB000091 /* ConciergeChatView.swift */,
+				BB000093 /* PaywallView.swift */,
+				BB000094 /* AskButlerButton.swift */,
+				BB000095 /* OnDeviceSummarizer.swift */,
+			);
+			path = Concierge;
 			sourceTree = "<group>";
 		};
 		GG000001 /* Care */ = {
@@ -677,6 +683,8 @@
 				AA00004A /* FamilyListsView.swift in Sources */,
 				AA00004B /* AskAIButton.swift in Sources */,
 				AA00004C /* BudgetProjectsView.swift in Sources */,
+				AA000096 /* BudgetStatsView.swift in Sources */,
+				AA000097 /* RecurringPaymentsView.swift in Sources */,
 				AA000043 /* MoreView.swift in Sources */,
 				AA00004D /* SignUpView.swift in Sources */,
 				AA00004E /* FamilyGroupsView.swift in Sources */,
@@ -702,7 +710,7 @@
 				CODE_SIGN_ENTITLEMENTS = FamilyLife/FamilyLife.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 106;
+				CURRENT_PROJECT_VERSION = 112;
 				DEVELOPMENT_ASSET_PATHS = "";
 				DEVELOPMENT_TEAM = GANM22MFCH;
 				ENABLE_PREVIEWS = YES;
@@ -743,7 +751,7 @@
 				CODE_SIGN_ENTITLEMENTS = FamilyLife/FamilyLife.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 106;
+				CURRENT_PROJECT_VERSION = 112;
 				DEVELOPMENT_ASSET_PATHS = "";
 				DEVELOPMENT_TEAM = GANM22MFCH;
 				ENABLE_PREVIEWS = YES;
