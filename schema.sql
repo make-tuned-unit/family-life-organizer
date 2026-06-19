@@ -347,6 +347,25 @@ CREATE TABLE IF NOT EXISTS recurring_payments (
 );
 CREATE INDEX IF NOT EXISTS idx_recurring_payments_group ON recurring_payments(group_id);
 
+-- Notes. Private to the owner by default; the owner can SHARE a note to their
+-- household or to a specific group (shared_scope + group_id).
+CREATE TABLE IF NOT EXISTS notes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT,
+    body TEXT,
+    color TEXT,
+    pinned INTEGER DEFAULT 0,
+    user_id INTEGER,                       -- owner (always can edit/delete)
+    shared_scope TEXT DEFAULT 'private',   -- private | household | group
+    group_id INTEGER REFERENCES groups(id),-- target group when shared (NULL if private)
+    can_collaborate INTEGER DEFAULT 0,     -- if 1 + shared, members can edit the content too
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id)
+);
+CREATE INDEX IF NOT EXISTS idx_notes_user ON notes(user_id);
+CREATE INDEX IF NOT EXISTS idx_notes_group ON notes(group_id);
+
 -- ============================================
 -- Family Graph: Users, Groups, Contacts, Feed
 -- ============================================

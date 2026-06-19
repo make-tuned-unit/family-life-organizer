@@ -1793,6 +1793,100 @@ app.delete('/api/recurring-payments/:id', requireAuth, async (req, res) => {
   }
 });
 
+// ============================================
+// Notes (private by default; owner can share to household / a group)
+// ============================================
+
+// Resolve the share target group_id from a requested scope. 'household' maps to
+// the caller's household; 'group' requires membership in the given group.
+async function resolveNoteShare(db, userId, scope, requestedGroupId) {
+  if (scope === 'household') return await db.getUserHouseholdId(userId);
+  if (scope === 'group') {
+    const gid = parseInt(requestedGroupId);
+    if (gid && await db.isGroupMember(gid, userId)) return gid;
+    return null;
+  }
+  return null; // private
+}
+
+app.get('/api/notes', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const notes = await db.getNotes(req.session.user?.id);
+    res.json(notes);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+app.post('/api/notes', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const userId = req.session.user?.id;
+    const scope = req.body.shared_scope || 'private';
+    const groupId = await resolveNoteShare(db, userId, scope, req.body.group_id);
+    const result = await db.addNote({
+      title: req.body.title, body: req.body.body, color: req.body.color,
+      pinned: req.body.pinned, user_id: userId,
+      shared_scope: groupId ? scope : 'private',
+      group_id: groupId,
+    });
+    res.json({ success: true, id: result.id });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+app.put('/api/notes/:id', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const userId = req.session.user?.id;
+    const note = await db.getNoteById(req.params.id);
+    if (!note) return res.status(404).json({ error: 'Not found' });
+
+    if (note.user_id === userId) {
+      // Owner — full update including sharing + collaboration settings.
+      const updates = { ...req.body };
+      if (updates.shared_scope !== undefined) {
+        const groupId = await resolveNoteShare(db, userId, updates.shared_scope, updates.group_id);
+        updates.shared_scope = groupId ? updates.shared_scope : 'private';
+        updates.group_id = groupId;
+      }
+      await db.updateNote(req.params.id, updates, userId);
+      return res.json({ success: true, role: 'owner' });
+    }
+
+    // Non-owner — allowed only if the note is shared to a group they belong to
+    // AND collaboration is enabled. Content fields only.
+    const result = await db.updateNoteAsCollaborator(req.params.id, {
+      title: req.body.title, body: req.body.body, color: req.body.color,
+    }, userId);
+    if (!result.changed) return res.status(403).json({ error: 'You cannot edit this note' });
+    res.json({ success: true, role: 'collaborator' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+app.delete('/api/notes/:id', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const result = await db.deleteNote(req.params.id, req.session.user?.id);
+    if (!result.changed) return res.status(403).json({ error: 'Not your note' });
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
 // Budget categories CRUD
 app.get('/api/budget-categories', requireAuth, async (req, res) => {
   const db = new FamilyDB();

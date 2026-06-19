@@ -39,6 +39,7 @@
 		AA00001F /* LocationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00001F /* LocationService.swift */; };
 		AA000020 /* NotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000020 /* NotificationService.swift */; };
 		AA000021 /* TripsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000021 /* TripsView.swift */; };
+		AA000099 /* TravelHubView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000099 /* TravelHubView.swift */; };
 		AA000022 /* TripsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000022 /* TripsViewModel.swift */; };
 		AA000023 /* NewTripView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000023 /* NewTripView.swift */; };
 		AA000024 /* FamilyAddressesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000024 /* FamilyAddressesView.swift */; };
@@ -68,6 +69,7 @@
 		AA000041 /* ButtonStyles.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000041 /* ButtonStyles.swift */; };
 		AA000042 /* DateFormatters.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000042 /* DateFormatters.swift */; };
 		AA000043 /* MoreView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000043 /* MoreView.swift */; };
+		AA000098 /* NotesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000098 /* NotesView.swift */; };
 		AA000044 /* LiquidGlassComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000044 /* LiquidGlassComponents.swift */; };
 		AA000045 /* CareCascadeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000045 /* CareCascadeView.swift */; };
 		AA000046 /* AIDisclosureView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000046 /* AIDisclosureView.swift */; };
@@ -147,6 +149,7 @@
 		BB00001F /* LocationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocationService.swift; sourceTree = "<group>"; };
 		BB000020 /* NotificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationService.swift; sourceTree = "<group>"; };
 		BB000021 /* TripsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripsView.swift; sourceTree = "<group>"; };
+		BB000099 /* TravelHubView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TravelHubView.swift; sourceTree = "<group>"; };
 		BB000022 /* TripsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripsViewModel.swift; sourceTree = "<group>"; };
 		BB000023 /* NewTripView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewTripView.swift; sourceTree = "<group>"; };
 		BB000024 /* FamilyAddressesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FamilyAddressesView.swift; sourceTree = "<group>"; };
@@ -176,6 +179,7 @@
 		BB000041 /* ButtonStyles.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ButtonStyles.swift; sourceTree = "<group>"; };
 		BB000042 /* DateFormatters.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DateFormatters.swift; sourceTree = "<group>"; };
 		BB000043 /* MoreView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoreView.swift; sourceTree = "<group>"; };
+		BB000098 /* NotesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotesView.swift; sourceTree = "<group>"; };
 		BB000044 /* LiquidGlassComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiquidGlassComponents.swift; sourceTree = "<group>"; };
 		BB000045 /* CareCascadeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CareCascadeView.swift; sourceTree = "<group>"; };
 		BB000046 /* AIDisclosureView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIDisclosureView.swift; sourceTree = "<group>"; };
@@ -347,6 +351,7 @@
 				BB00001A /* SettingsView.swift */,
 				BB00001B /* AddTaskView.swift */,
 				BB000043 /* MoreView.swift */,
+				BB000098 /* NotesView.swift */,
 				BB000051 /* HouseholdView.swift */,
 				BB000054 /* NewPostView.swift */,
 				BB000055 /* FeedCardView.swift */,
@@ -408,6 +413,7 @@
 			isa = PBXGroup;
 			children = (
 				BB000021 /* TripsView.swift */,
+				BB000099 /* TravelHubView.swift */,
 				BB000022 /* TripsViewModel.swift */,
 				BB000023 /* NewTripView.swift */,
 				BB000024 /* FamilyAddressesView.swift */,
@@ -633,6 +639,7 @@
 				AA00001F /* LocationService.swift in Sources */,
 				AA000020 /* NotificationService.swift in Sources */,
 				AA000021 /* TripsView.swift in Sources */,
+				AA000099 /* TravelHubView.swift in Sources */,
 				AA000022 /* TripsViewModel.swift in Sources */,
 				AA000023 /* NewTripView.swift in Sources */,
 				AA000024 /* FamilyAddressesView.swift in Sources */,
@@ -686,6 +693,7 @@
 				AA000096 /* BudgetStatsView.swift in Sources */,
 				AA000097 /* RecurringPaymentsView.swift in Sources */,
 				AA000043 /* MoreView.swift in Sources */,
+				AA000098 /* NotesView.swift in Sources */,
 				AA00004D /* SignUpView.swift in Sources */,
 				AA00004E /* FamilyGroupsView.swift in Sources */,
 				AA00004F /* EventDetailView.swift in Sources */,
