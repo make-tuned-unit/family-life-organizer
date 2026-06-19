@@ -1726,10 +1726,13 @@ class FamilyDB {
     return new Promise((resolve, reject) => {
       const uid = parseInt(userId);
       this.db.all(
-        `SELECT * FROM notes
-         WHERE user_id = ?
-            OR (shared_scope != 'private' AND group_id IN (SELECT group_id FROM group_members WHERE user_id = ?))
-         ORDER BY pinned DESC, datetime(updated_at) DESC`,
+        `SELECT n.*, u.name AS author_name, g.name AS shared_group_name
+         FROM notes n
+         LEFT JOIN users u ON u.id = n.user_id
+         LEFT JOIN groups g ON g.id = n.group_id
+         WHERE n.user_id = ?
+            OR (n.shared_scope != 'private' AND n.group_id IN (SELECT group_id FROM group_members WHERE user_id = ?))
+         ORDER BY n.pinned DESC, datetime(n.updated_at) DESC`,
         [uid, uid], (err, rows) => err ? reject(err) : resolve(rows || []));
     });
   }

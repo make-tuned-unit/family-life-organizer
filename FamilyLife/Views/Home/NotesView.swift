@@ -12,6 +12,8 @@ struct Note: Codable, Identifiable {
     var shared_scope: String?
     var group_id: Int?
     var can_collaborate: Int?
+    var author_name: String?
+    var shared_group_name: String?
     var updated_at: String?
 
     var isPinned: Bool { (pinned ?? 0) == 1 }
@@ -149,9 +151,13 @@ private struct NoteCard: View {
             }
             HStack(spacing: 5) {
                 Image(systemName: shareLabel.0).font(.system(size: 10))
-                Text(shareLabel.1).font(.system(size: 11, weight: .medium))
-                if !isOwner {
-                    Text("\u{00B7} shared with you").font(.system(size: 11))
+                if !isOwner, let author = note.author_name, !author.isEmpty {
+                    Text("Shared by \(author)").font(.system(size: 11, weight: .medium))
+                    if note.canCollaborate {
+                        Text("\u{00B7} you can edit").font(.system(size: 11))
+                    }
+                } else {
+                    Text(shareLabel.1).font(.system(size: 11, weight: .medium))
                 }
             }
             .foregroundStyle(note.isShared ? AccentTheme.sage.color : WarmPalette.ink4)
