@@ -179,6 +179,26 @@ final class APIService {
         let _: SuccessResponse = try await delete("/api/recurring-payments/\(id)")
     }
 
+    // MARK: - Notes
+
+    func fetchNotes() async throws -> [Note] {
+        try await get("/api/notes")
+    }
+
+    @discardableResult
+    func addNote(_ data: [String: Any]) async throws -> Int {
+        let r: IDResponse = try await post("/api/notes", body: data)
+        return r.id
+    }
+
+    func updateNote(id: Int, data: [String: Any]) async throws {
+        let _: SuccessResponse = try await put("/api/notes/\(id)", body: data)
+    }
+
+    func deleteNote(id: Int) async throws {
+        let _: SuccessResponse = try await delete("/api/notes/\(id)")
+    }
+
     // MARK: - Receipts
 
     func fetchReceipts(month: String? = nil, category: String? = nil) async throws -> [ReceiptResponse] {
