@@ -155,6 +155,30 @@ final class APIService {
         let _: SuccessResponse = try await delete("/api/budget-categories/\(id)")
     }
 
+    // MARK: - Budget Stats
+
+    func fetchBudgetStats(months: Int = 6) async throws -> BudgetStats {
+        try await get("/api/budget/stats", queryParams: ["months": String(months)])
+    }
+
+    // MARK: - Recurring Payments
+
+    func fetchRecurringPayments() async throws -> [RecurringPayment] {
+        try await get("/api/recurring-payments")
+    }
+
+    func addRecurringPayment(_ data: [String: Any]) async throws {
+        let _: SuccessResponse = try await post("/api/recurring-payments", body: data)
+    }
+
+    func updateRecurringPayment(id: Int, data: [String: Any]) async throws {
+        let _: SuccessResponse = try await put("/api/recurring-payments/\(id)", body: data)
+    }
+
+    func deleteRecurringPayment(id: Int) async throws {
+        let _: SuccessResponse = try await delete("/api/recurring-payments/\(id)")
+    }
+
     // MARK: - Receipts
 
     func fetchReceipts(month: String? = nil, category: String? = nil) async throws -> [ReceiptResponse] {
