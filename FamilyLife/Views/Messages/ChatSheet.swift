@@ -13,6 +13,7 @@ struct ChatSheet: View {
     @State private var conversations: [APIService.ConversationResponse] = []
     @State private var groups: [APIService.GroupResponse] = []
     @State private var selectedThread: ChatThread?
+    @State private var showingNewGroup = false
 
     enum ChatThread: Equatable {
         case dm(partnerId: Int, name: String)
@@ -33,7 +34,24 @@ struct ChatSheet: View {
                 // Thread picker — groups first, then DMs
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 10) {
-                        // Group threads
+                        // Create a new family/clan group chat
+                        Button { showingNewGroup = true } label: {
+                            VStack(spacing: 4) {
+                                Image(systemName: "plus")
+                                    .font(.system(size: 18, weight: .semibold))
+                                    .foregroundStyle(AccentTheme.mauve.color)
+                                    .frame(width: 44, height: 44)
+                                    .background(AccentTheme.mauve.color.opacity(0.12), in: Circle())
+                                    .overlay(Circle().strokeBorder(AccentTheme.mauve.color.opacity(0.35), style: StrokeStyle(lineWidth: 1, dash: [3])))
+                                Text("New")
+                                    .font(.system(size: 11))
+                                    .foregroundStyle(WarmPalette.ink3)
+                            }
+                            .frame(width: 60)
+                        }
+                        .buttonStyle(.plain)
+
+                        // Group threads (family / tribe — households chat via DM)
                         ForEach(groups) { group in
                             let isSelected = selectedThread == .group(groupId: group.id, name: group.name)
                             Button {
@@ -146,9 +164,20 @@ struct ChatSheet: View {
                         .foregroundStyle(WarmPalette.ink2)
                 }
             }
+            .sheet(isPresented: $showingNewGroup) {
+                NewGroupSheet {
+                    groups = ((try? await api.fetchGroups()) ?? []).filter { $0.group_type != "household" }
+                    if let newest = groups.last {
+                        selectedThread = .group(groupId: newest.id, name: newest.name)
+                    }
+                }
+            }
             .task {
                 conversations = (try? await api.fetchConversations()) ?? []
-                groups = (try? await api.fetchGroups()) ?? []
+                // Only multi-person family/clan groups get a group chat. A
+                // household is just the two parents — they chat via DM, which
+                // already lists household members below.
+                groups = ((try? await api.fetchGroups()) ?? []).filter { $0.group_type != "household" }
                 if selectedThread == nil {
                     if let initial = initialThread {
                         selectedThread = initial
