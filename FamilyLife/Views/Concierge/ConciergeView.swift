@@ -158,14 +158,52 @@ struct ConciergeView: View {
             }
             .foregroundStyle(accent)
 
-            Text(summaryText)
-                .font(.system(size: 17, weight: .regular))
-                .foregroundStyle(WarmPalette.ink1)
-                .fixedSize(horizontal: false, vertical: true)
+            briefBody(summaryText)
         }
         .padding(DesignTokens.Spacing.cardPadding)
         .frame(maxWidth: .infinity, alignment: .leading)
         .flCard(tint: accent)
+    }
+
+    // Renders the brief as an optional preamble paragraph followed by bullet
+    // rows with hanging indentation (wrapped lines align under the text, not
+    // the bullet). Falls back to a plain paragraph when there are no bullets
+    // (e.g. the on-device summary).
+    @ViewBuilder
+    private func briefBody(_ text: String) -> some View {
+        let lines = text
+            .split(separator: "\n", omittingEmptySubsequences: true)
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+        let preamble = lines.filter { !$0.hasPrefix("•") }
+        let bullets = lines
+            .filter { $0.hasPrefix("•") }
+            .map { $0.dropFirst().trimmingCharacters(in: .whitespaces) }
+
+        VStack(alignment: .leading, spacing: 10) {
+            if !preamble.isEmpty {
+                Text(preamble.joined(separator: " "))
+                    .font(.system(size: 17, weight: .regular))
+                    .foregroundStyle(WarmPalette.ink1)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if !bullets.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    ForEach(Array(bullets.enumerated()), id: \.offset) { _, bullet in
+                        HStack(alignment: .firstTextBaseline, spacing: 8) {
+                            Text("•")
+                                .font(.system(size: 16, weight: .bold))
+                                .foregroundStyle(accent)
+                            Text(bullet)
+                                .font(.system(size: 16, weight: .regular))
+                                .foregroundStyle(WarmPalette.ink1)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                    }
+                }
+            }
+        }
     }
 
     private func cardRow(_ card: ConciergeCard) -> some View {

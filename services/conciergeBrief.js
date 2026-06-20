@@ -90,8 +90,9 @@ function fallbackSummary(s) {
   if (c.upcomingEvents) bits.push(`${c.upcomingEvents} upcoming occasion${c.upcomingEvents === 1 ? '' : 's'}`);
   if (c.expiringPantry) bits.push(`${c.expiringPantry} item${c.expiringPantry === 1 ? '' : 's'} expiring soon`);
 
-  if (!bits.length) return "• You're all caught up — nothing needs your attention.";
-  return bits.map(b => `• ${b.charAt(0).toUpperCase()}${b.slice(1)}`).join('\n');
+  if (!bits.length) return "You're all caught up — nothing needs your attention right now.";
+  const bullets = bits.map(b => `• ${b.charAt(0).toUpperCase()}${b.slice(1)}`).join('\n');
+  return `Here's where things stand:\n${bullets}`;
 }
 
 // Warm butler-voiced summary via Claude, falling back to the deterministic line.
@@ -102,8 +103,8 @@ async function generateSummary(s, userName) {
       upcomingAppointments: s.upcomingAppointments.slice(0, 3), upcomingEvents: s.upcomingEvents.slice(0, 3),
       budgetAlerts: s.budgetAlerts.slice(0, 3), openDecisions: s.openDecisions.slice(0, 3) });
     const text = await ai.callClaude({
-      maxTokens: 200,
-      system: `You are a warm, concise family life concierge for ${userName || 'the user'}. Summarize what needs attention today as 3-5 short bullet points in priority order. Rules: each bullet starts with "• "; keep each to ~8 words, scannable, no fluff or preamble; plain text only (no markdown, no bold, no headers). If nothing needs attention, return exactly one line: "• You're all caught up.".`,
+      maxTokens: 220,
+      system: `You are a warm, concise family life concierge for ${userName || 'the user'}. Format the reply as: ONE short friendly preamble sentence on the first line (no bullet, e.g. "Here's your evening, ${userName || 'there'}."), then 3-5 bullet points in priority order. Rules: each bullet on its own line starting with "• "; keep each bullet to ~8 words, scannable; plain text only (no markdown, no bold, no headers). If nothing needs attention, write a single warm sentence with no bullets.`,
       messages: [{ role: 'user', content: `Today's snapshot:\n${facts}` }],
     });
     return text.trim();
