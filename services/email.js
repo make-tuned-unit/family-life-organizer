@@ -187,7 +187,8 @@ function waitlistWelcomeEmail() {
 
           <!-- Footer -->
           <tr>
-            <td class="px" style="padding:24px 48px 8px;" align="center">
+            <td class="px" style="padding:26px 48px 8px;" align="center">
+              <img src="${site}/assets/logo.png" width="44" height="44" alt="Kinrows" style="display:block; margin:0 auto 14px; border-radius:11px;">
               <p class="ink3" style="margin:0; font-family:'Helvetica Neue',Arial,sans-serif; font-size:12px; line-height:1.6; color:${BRAND.ink3};">
                 You're getting this because you joined the waitlist at <a href="${site}" style="color:${BRAND.ink3};">kinrows.com</a>.<br>
                 Not you, or changed your mind? Just reply &mdash; we'll take you off the list, no hard feelings.
