@@ -9,7 +9,9 @@ struct ConciergeChatView: View {
     var initialPrompt: String? = nil
 
     @State private var viewModel = ConciergeChatViewModel()
+    @State private var speech = ConciergeSpeechRecognizer()
     @State private var draft = ""
+    @State private var micBase = ""
     @State private var showingHistory = false
     @FocusState private var inputFocused: Bool
 
@@ -67,6 +69,7 @@ struct ConciergeChatView: View {
                     Task { await viewModel.resume(conversationId: id, api: api) }
                 }
             }
+            .onDisappear { speech.stop() }
         }
     }
 
@@ -158,30 +161,66 @@ struct ConciergeChatView: View {
     // MARK: - Input
 
     private var inputBar: some View {
-        HStack(spacing: 10) {
-            TextField("Message your concierge…", text: $draft, axis: .vertical)
-                .font(.system(size: 16))
-                .lineLimit(1...4)
-                .focused($inputFocused)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 10)
-                .background(WarmPalette.cardSurface, in: Capsule())
-                .onSubmit { Task { await submit() } }
-
-            Button {
-                Task { await submit() }
-            } label: {
-                Image(systemName: "arrow.up")
-                    .font(.system(size: 17, weight: .bold))
-                    .foregroundStyle(.white)
-                    .frame(width: 40, height: 40)
-                    .background(canSend ? accent : WarmPalette.ink3.opacity(0.4), in: Circle())
+        VStack(spacing: 6) {
+            if let err = speech.errorMessage {
+                Text(err)
+                    .font(.system(size: 12))
+                    .foregroundStyle(WarmPalette.bad)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .disabled(!canSend)
+            HStack(spacing: 10) {
+                micButton
+
+                TextField(speech.isRecording ? "Listening…" : "Message your concierge…", text: $draft, axis: .vertical)
+                    .font(.system(size: 16))
+                    .lineLimit(1...4)
+                    .focused($inputFocused)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 10)
+                    .background(WarmPalette.cardSurface, in: Capsule())
+                    .onSubmit { Task { await submit() } }
+
+                Button {
+                    Task { await submit() }
+                } label: {
+                    Image(systemName: "arrow.up")
+                        .font(.system(size: 17, weight: .bold))
+                        .foregroundStyle(.white)
+                        .frame(width: 40, height: 40)
+                        .background(canSend ? accent : WarmPalette.ink3.opacity(0.4), in: Circle())
+                }
+                .disabled(!canSend)
+            }
         }
         .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
         .padding(.vertical, 10)
         .background(.ultraThinMaterial)
+    }
+
+    // Hold-free toggle: tap to start dictation, tap again to stop. The live
+    // transcript streams into the composer (appended after any typed text), so
+    // the user can review or edit before sending.
+    private var micButton: some View {
+        Button {
+            Task {
+                if speech.isRecording {
+                    speech.stop()
+                } else {
+                    micBase = draft.isEmpty ? "" : draft.trimmingCharacters(in: .whitespaces) + " "
+                    inputFocused = false
+                    await speech.start { transcript in draft = micBase + transcript }
+                }
+            }
+        } label: {
+            Image(systemName: speech.isRecording ? "mic.fill" : "mic")
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(speech.isRecording ? .white : accent)
+                .frame(width: 40, height: 40)
+                .background(speech.isRecording ? WarmPalette.bad : WarmPalette.cardSurface, in: Circle())
+                .scaleEffect(speech.isRecording ? 1.06 : 1.0)
+                .animation(.easeInOut(duration: 0.5).repeatForever(autoreverses: true), value: speech.isRecording)
+        }
+        .accessibilityLabel(speech.isRecording ? "Stop dictation" : "Dictate a message")
     }
 
     private var canSend: Bool {
@@ -189,6 +228,7 @@ struct ConciergeChatView: View {
     }
 
     private func submit() async {
+        if speech.isRecording { speech.stop() }
         let text = draft
         draft = ""
         await viewModel.send(text, api: api)
