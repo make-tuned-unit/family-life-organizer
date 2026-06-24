@@ -1,0 +1,37 @@
+# Kinrows — robots.txt
+# Public marketing site, blog, and comparison content are open to everyone,
+# including AI / LLM crawlers. Only the authenticated app and API are blocked.
+
+# AI / LLM crawlers — explicitly welcomed
+User-agent: GPTBot
+User-agent: ChatGPT-User
+User-agent: OAI-SearchBot
+User-agent: Google-Extended
+User-agent: PerplexityBot
+User-agent: ClaudeBot
+User-agent: anthropic-ai
+User-agent: Claude-Web
+User-agent: Applebot
+User-agent: Applebot-Extended
+User-agent: Bytespider
+User-agent: CCBot
+User-agent: cohere-ai
+User-agent: Meta-ExternalAgent
+User-agent: Meta-ExternalFetcher
+User-agent: Amazonbot
+User-agent: DuckAssistBot
+User-agent: YouBot
+User-agent: MistralAI-User
+Allow: /
+Disallow: /app
+Disallow: /login
+Disallow: /api/
+
+# Everyone else (search engines, etc.)
+User-agent: *
+Allow: /
+Disallow: /app
+Disallow: /login
+Disallow: /api/
+
+Sitemap: https://kinrows.com/sitemap.xml
