@@ -758,3 +758,15 @@ CREATE TABLE IF NOT EXISTS event_attachments (
 
 CREATE INDEX IF NOT EXISTS idx_event_attachments_appt ON event_attachments(appointment_id);
 CREATE INDEX IF NOT EXISTS idx_event_attachments_group ON event_attachments(group_id);
+
+-- Marketing waitlist (public signups from kinrows.com) — not household data.
+CREATE TABLE IF NOT EXISTS waitlist (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    email TEXT NOT NULL UNIQUE,
+    source TEXT,
+    referrer TEXT,
+    user_agent TEXT,
+    welcomed INTEGER DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_waitlist_created ON waitlist(created_at DESC);

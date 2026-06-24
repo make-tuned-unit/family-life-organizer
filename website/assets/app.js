@@ -203,16 +203,62 @@ if ('IntersectionObserver' in window && jsOn && !reduceMotion) {
   briefParas.forEach((p, i) => { p.innerHTML = briefHTML[i]; });
 }
 
-// Notify form — placeholder until a real endpoint is wired.
+// Waitlist form — posts to /api/waitlist (same origin as the marketing site).
 const form = document.querySelector('.notify-form');
 if (form) {
-  form.addEventListener('submit', () => {
-    const input = form.querySelector('input');
-    const btn = form.querySelector('button');
-    if (input.value && input.checkValidity()) {
-      btn.textContent = "You're on the list ✓";
-      btn.disabled = true;
-      input.disabled = true;
+  const input = form.querySelector('input');
+  const btn = form.querySelector('button');
+
+  // Inline status line for success / error, announced to screen readers.
+  const status = document.createElement('p');
+  status.className = 'notify-status';
+  status.setAttribute('role', 'status');
+  status.setAttribute('aria-live', 'polite');
+  form.insertAdjacentElement('afterend', status);
+
+  const setStatus = (msg, kind) => {
+    status.textContent = msg;
+    status.dataset.kind = kind || '';
+  };
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (!input.value || !input.checkValidity()) {
+      setStatus('Please enter a valid email.', 'error');
+      input.focus();
+      return;
+    }
+
+    const original = btn.textContent;
+    btn.disabled = true;
+    input.disabled = true;
+    btn.textContent = 'Joining…';
+    setStatus('', '');
+
+    try {
+      const res = await fetch('/api/waitlist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: input.value.trim(), source: 'site' }),
+      });
+      const data = await res.json().catch(() => ({}));
+
+      if (res.ok && data.success) {
+        btn.textContent = "You're on the list ✓";
+        setStatus(
+          data.already
+            ? "You're already on the list — we'll be in touch."
+            : 'Check your inbox — a little welcome is on its way.',
+          'success'
+        );
+      } else {
+        throw new Error(data.error || 'Request failed');
+      }
+    } catch (err) {
+      btn.textContent = original;
+      btn.disabled = false;
+      input.disabled = false;
+      setStatus("Hmm, that didn't go through. Please try again.", 'error');
     }
   });
 }

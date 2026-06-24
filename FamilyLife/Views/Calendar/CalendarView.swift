@@ -79,6 +79,9 @@ struct CalendarView: View {
         .sheet(isPresented: $showingCareCascade) {
             NavigationStack { CareCascadeView() }
         }
+        #if DEBUG
+        .onAppear { if ScreenshotHarness.openCare { showingCareCascade = true } }
+        #endif
         .sheet(isPresented: $showingMyRequests) {
             NavigationStack { MyCoverageRequestsView() }
         }

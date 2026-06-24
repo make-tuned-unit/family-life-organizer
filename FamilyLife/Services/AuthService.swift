@@ -27,6 +27,13 @@ final class AuthService {
     private let api = APIService()
 
     init() {
+        #if DEBUG
+        // Screenshot harness drives a fresh login itself — skip persisted restore so
+        // FamilyLifeApp's validateSession path can't race/clobber it (→ login screen).
+        if ProcessInfo.processInfo.environment["UITEST_AUTOLOGIN"] != nil {
+            return
+        }
+        #endif
         if let username = UserDefaults.standard.string(forKey: "auth_username"),
            let name = UserDefaults.standard.string(forKey: "auth_name") {
             let id = UserDefaults.standard.integer(forKey: "auth_user_id")

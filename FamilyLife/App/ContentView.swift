@@ -25,6 +25,14 @@ struct ContentView: View {
     @Environment(AuthService.self) private var authService
 
     var body: some View {
+        content
+        #if DEBUG
+            .task { await ScreenshotHarness.autoLoginIfNeeded(authService) }
+        #endif
+    }
+
+    @ViewBuilder
+    private var content: some View {
         if authService.isRestoringSession {
             ZStack {
                 AmbientBackground(style: .home)
@@ -39,15 +47,68 @@ struct ContentView: View {
     }
 }
 
+#if DEBUG
+/// DEBUG-only hooks for capturing marketing screenshots without manual taps.
+/// Driven by launch env vars (set via `simctl launch ... SIMCTL_CHILD_UITEST_*`).
+enum ScreenshotHarness {
+    static var env: [String: String] { ProcessInfo.processInfo.environment }
+
+    static var initialTab: MainTab {
+        switch env["UITEST_TAB"] {
+        case "calendar":  return .calendar
+        case "lists":     return .lists
+        case "concierge": return .concierge
+        case "budget":    return .budget
+        case "more":      return .more
+        default:          return .home
+        }
+    }
+
+    static var initialChat: Bool { env["UITEST_SHEET"] == "chat" }
+
+    static var initialChatThread: ChatSheet.ChatThread? {
+        guard let v = env["UITEST_CHAT_DM"] else { return nil }
+        let parts = v.split(separator: ":", maxSplits: 1)
+        guard parts.count == 2, let id = Int(parts[0]) else { return nil }
+        return .dm(partnerId: id, name: String(parts[1]))
+    }
+
+    static var openCare: Bool { env["UITEST_SHEET"] == "care" }
+
+    /// Full-screen view to present for screenshots that live deeper than a tab.
+    static var screen: String? { env["UITEST_SCREEN"] }
+
+    @MainActor
+    static func autoLoginIfNeeded(_ auth: AuthService) async {
+        guard let creds = env["UITEST_AUTOLOGIN"] else { return }
+        let parts = creds.split(separator: ":", maxSplits: 1)
+        guard parts.count == 2 else { return }
+        // Force a deterministic fresh login (skip the racy optimistic-restore path).
+        auth.isRestoringSession = false
+        try? await auth.login(username: String(parts[0]), password: String(parts[1]))
+    }
+}
+#endif
+
 struct MainTabView: View {
     @Environment(APIService.self) private var api
     @Environment(AuthService.self) private var auth
     @Environment(DeepLinkRouter.self) private var deepLinkRouter
+    #if DEBUG
+    @State private var selectedTab: MainTab = ScreenshotHarness.initialTab
+    @State private var loadedTabs: Set<MainTab> = [ScreenshotHarness.initialTab, .home]
+    @State private var showingChat = ScreenshotHarness.initialChat
+    #else
     @State private var selectedTab: MainTab = .home
-    @State private var pendingListName: String?
     @State private var loadedTabs: Set<MainTab> = [.home]
     @State private var showingChat = false
+    #endif
+    @State private var pendingListName: String?
+    #if DEBUG
+    @State private var chatInitialThread: ChatSheet.ChatThread? = ScreenshotHarness.initialChatThread
+    #else
     @State private var chatInitialThread: ChatSheet.ChatThread?
+    #endif
     @State private var unreadCount = 0
     @Environment(LocationService.self) private var locationService
     @Environment(ConciergeLaunch.self) private var conciergeLaunch
@@ -144,6 +205,17 @@ struct MainTabView: View {
         .sheet(item: $deepEvent) { event in
             NavigationStack { EventDetailView(appointment: event) }
         }
+        #if DEBUG
+        .fullScreenCover(isPresented: .constant(ScreenshotHarness.screen != nil)) {
+            NavigationStack {
+                switch ScreenshotHarness.screen {
+                case "rivalries": RivalriesView()
+                case "travel":    TravelHubView()
+                default:          EmptyView()
+                }
+            }
+        }
+        #endif
         .onChange(of: deepLinkRouter.pendingType) {
             guard let type = deepLinkRouter.pendingType else { return }
             Task { await handleDeepLink(type: type) }

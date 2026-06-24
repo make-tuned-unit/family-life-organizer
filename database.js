@@ -2319,6 +2319,32 @@ class FamilyDB {
     });
   }
 
+  // Marketing waitlist (public, not household data).
+  // Resolves { created: bool, total: int } — created=false when already present.
+  addWaitlistEntry({ email, source, referrer, user_agent }) {
+    return new Promise((resolve, reject) => {
+      const db = this.db;
+      db.run(
+        'INSERT OR IGNORE INTO waitlist (email, source, referrer, user_agent) VALUES (?, ?, ?, ?)',
+        [email, source || null, referrer || null, user_agent || null],
+        function (err) {
+          if (err) return reject(err);
+          const created = this.changes > 0;
+          db.get('SELECT COUNT(*) AS n FROM waitlist', [], (e, row) => {
+            if (e) return reject(e);
+            resolve({ created, total: row ? row.n : 0 });
+          });
+        }
+      );
+    });
+  }
+
+  markWaitlistWelcomed(email) {
+    return new Promise((resolve) => {
+      this.db.run('UPDATE waitlist SET welcomed = 1 WHERE email = ?', [email], () => resolve());
+    });
+  }
+
   updateContact(id, updates) {
     return new Promise((resolve, reject) => {
       const fields = [];
@@ -2649,6 +2675,7 @@ class FamilyDB {
       const sql = `
         SELECT
           (SELECT COUNT(*) FROM tasks WHERE status = 'active' AND date(due_date) = date('now') ${groupFilter}) as tasks_today,
+          (SELECT COUNT(*) FROM tasks WHERE status = 'active' ${groupFilter}) as active_tasks,
           (SELECT COUNT(*) FROM appointments WHERE date(appointment_date) = date('now') ${groupFilter}) as appointments_today,
           (SELECT COUNT(*) FROM list_items WHERE is_done = 0 AND list_id IN (
             SELECT id FROM lists WHERE pinned = 1 LIMIT 1

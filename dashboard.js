@@ -14,6 +14,7 @@ const { handleChat } = require('./services/conciergeChat');
 const subscription = require('./services/subscription');
 const { runProactiveSweep } = require('./services/conciergeNudge');
 const { createRateLimiter } = require('./services/rateLimit');
+const email = require('./services/email');
 
 // Per-user rate limit for the (AI-backed, costly) concierge endpoints.
 const conciergeLimiter = createRateLimiter({ windowMs: 60000, max: 30, keyFn: req => req.session.user.id });
@@ -371,6 +372,51 @@ app.post('/api/auth/device-token', requireAuth, async (req, res) => {
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+// ── Public marketing waitlist (kinrows.com) ──────────────────────────────────
+const clientIp = (req) => (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.ip || 'unknown';
+const waitlistLimiter = createRateLimiter({ windowMs: 60000, max: 8, keyFn: clientIp });
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+app.post('/api/waitlist', waitlistLimiter, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const raw = typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : '';
+    if (!raw || raw.length > 254 || !EMAIL_RE.test(raw)) {
+      return res.status(400).json({ error: 'Please enter a valid email.' });
+    }
+
+    const { created, total } = await db.addWaitlistEntry({
+      email: raw,
+      source: typeof req.body?.source === 'string' ? req.body.source.slice(0, 80) : 'site',
+      referrer: (req.get('referer') || '').slice(0, 300) || null,
+      user_agent: (req.get('user-agent') || '').slice(0, 300) || null,
+    });
+
+    // Respond immediately; email send is best-effort and must not block/fail the signup.
+    res.json({ success: true, already: !created });
+
+    if (created && email.isEmailEnabled()) {
+      const welcome = email.waitlistWelcomeEmail();
+      const r = await email.sendEmail({ to: raw, subject: welcome.subject, html: welcome.html, text: welcome.text });
+      if (r.ok) await db.markWaitlistWelcomed(raw);
+      else console.error('[waitlist] welcome send failed:', r.error);
+
+      if (email.emailConfig.notify) {
+        const note = email.waitlistNotifyEmail(raw, total);
+        email.sendEmail({ to: email.emailConfig.notify, subject: note.subject, html: note.html, text: note.text })
+          .catch(() => {});
+      }
+    } else if (created) {
+      console.warn('[waitlist] new signup but email disabled (no RESEND_API_KEY):', raw);
+    }
+  } catch (err) {
+    if (!res.headersSent) res.status(500).json({ error: 'Something went wrong. Please try again.' });
+    console.error('[waitlist] error:', err.message);
   } finally {
     db.close();
   }
