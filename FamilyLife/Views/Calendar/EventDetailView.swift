@@ -133,6 +133,9 @@ struct EventDetailView: View {
                     .padding(.bottom, 14)
                 }
 
+                // Attached items
+                EventAttachmentsSection(appointmentId: appointment.id)
+
                 // Actions
                 VStack(spacing: 10) {
                     // Share / Invite

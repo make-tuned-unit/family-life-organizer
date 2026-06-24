@@ -16,11 +16,12 @@ function buildSystem(userName, today, memories) {
     : '';
   return `You are a warm, capable family life concierge — a personal butler for ${userName || 'the user'} and their household. Today is ${today}.
 
-You help manage the household's calendar, tasks, groceries, budget, pantry, and decisions. Use the provided tools to read real data and take actions on the user's behalf. When the user asks you to add or change something, do it with the tools rather than just describing it.
+You help manage the household's calendar, tasks, lists, notes, groceries, budget, pantry, trips, itineraries, gifts, and decisions. Use the provided tools to read real data and take actions on the user's behalf. You can create, edit, AND delete items when asked — do it with the tools rather than just describing it.
 
 Guidelines:
 - All dates you pass to tools must be YYYY-MM-DD. Resolve relative dates ("tomorrow", "next Tuesday") against today's date above.
-- Before completing a task, look it up with list_tasks to get its id.
+- Before editing, completing, or deleting anything, first look it up with the matching list/get tool to find the correct id. Never guess an id.
+- Deletes are permanent. When a request to delete is clear, just do it and confirm; if it's ambiguous which item is meant, ask a brief clarifying question first.
 - Be concise and friendly. Confirm what you did in one short sentence. Don't dump raw data or JSON.
 - If a request is ambiguous, ask a brief clarifying question instead of guessing.
 - Only use 'remember' for genuinely durable facts, not one-off details.${memoryBlock}`;
@@ -32,6 +33,7 @@ async function handleChat(db, { userId, userName, message, conversationId }) {
 
   // Resolve or create the conversation. A supplied id must belong to this user;
   // otherwise reject rather than silently starting a fresh conversation.
+  let isNewConversation = false;
   if (conversationId) {
     const convo = await db.getConciergeConversation(conversationId);
     if (!convo || convo.user_id !== userId) {
@@ -42,6 +44,7 @@ async function handleChat(db, { userId, userName, message, conversationId }) {
   } else {
     const created = await db.createConciergeConversation(userId, groupId);
     conversationId = created.id;
+    isNewConversation = true;
   }
 
   // Graceful degradation when AI is unavailable.
@@ -95,6 +98,12 @@ async function handleChat(db, { userId, userName, message, conversationId }) {
 
   await db.addConciergeMessage(conversationId, 'assistant', reply);
   await db.touchConciergeConversation(conversationId);
+  // Title a brand-new conversation from its opening message so the history list
+  // is readable. setConciergeConversationTitle only writes when title IS NULL.
+  if (isNewConversation) {
+    const title = message.length > 60 ? message.slice(0, 57).trimEnd() + '…' : message;
+    await db.setConciergeConversationTitle(conversationId, title);
+  }
 
   return { conversation_id: conversationId, reply, actions };
 }

@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<script>document.documentElement.classList.add('js')</script>
+<title>Kinrows — One calm place for the whole household</title>
+<meta name="description" content="Kinrows keeps your family's calendar, lists, trips, decisions and milestones in one private place — and gets everyone rowing together. Free on iPhone this fall, with an optional Life Assist add-on." />
+<meta name="theme-color" content="#fdf5e0" />
+
+<meta property="og:title" content="Kinrows — One calm place for the whole household" />
+<meta property="og:description" content="Calendar, lists, trips, decisions and milestones — together, and private to your family. Free on iPhone this fall." />
+<meta property="og:type" content="website" />
+<!-- TODO at deploy: make og:image an absolute URL (https://kinrows.app/assets/heroimage.jpg) and use a dedicated 1200×630 image -->
+<meta property="og:image" content="assets/heroimage.jpg" />
+<meta name="twitter:card" content="summary_large_image" />
+
+<link rel="icon" href="assets/logo.png" />
+<link rel="apple-touch-icon" href="assets/logo.png" />
+
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,400&family=Inter:wght@400;450;500;600&display=swap" rel="stylesheet" />
+
+<link rel="stylesheet" href="assets/style.css" />
+</head>
+<body>
+
+<!-- ───────── SVG icon sprite (real line icons, no emoji) ───────── -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <symbol id="i-cal" viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="17" rx="2.5"/><path d="M16 2.5v4M8 2.5v4M3 9.5h18"/></symbol>
+    <symbol id="i-care" viewBox="0 0 24 24"><path d="M19 13.5c1.3-1.4 3-3 3-5.4A4.4 4.4 0 0 0 12 5.2 4.4 4.4 0 0 0 2 8.1c0 2.4 1.7 4 3 5.4l7 6.8Z"/></symbol>
+    <symbol id="i-receipt" viewBox="0 0 24 24"><path d="M5 2.5v19l2-1 2 1 2-1 2 1 2-1 2 1v-19l-2 1-2-1-2 1-2-1-2 1-2-1Z"/><path d="M9 8h6M9 12h6M9 16h4"/></symbol>
+    <symbol id="i-cook" viewBox="0 0 24 24"><path d="M3.5 11h17a8.5 8.5 0 0 1-17 0Z"/><path d="M12 7.5V4M9 7.5 8 4M15 7.5 16 4M5 21h14"/></symbol>
+    <symbol id="i-chart" viewBox="0 0 24 24"><path d="M3 21h18"/><path d="M6 21V13M12 21V7M18 21v-6"/></symbol>
+    <symbol id="i-list" viewBox="0 0 24 24"><path d="M9 6h12M9 12h12M9 18h12"/><path d="M3.5 6 4.5 7 6 5M3.5 12l1 1L6 11M3.5 18l1 1L6 17"/></symbol>
+    <symbol id="i-vote" viewBox="0 0 24 24"><path d="m9 11 2 2 4-4"/><path d="M5.5 7.5A1.5 1.5 0 0 1 7 6h10a1.5 1.5 0 0 1 1.5 1.5v0A1.5 1.5 0 0 1 17 9H7a1.5 1.5 0 0 1-1.5-1.5Z"/><path d="M3 19 5.5 12.5h13L21 19Z"/></symbol>
+    <symbol id="i-message" viewBox="0 0 24 24"><path d="M21 14.5a2 2 0 0 1-2 2H8l-4 4V5.5a2 2 0 0 1 2-2h13a2 2 0 0 1 2 2Z"/></symbol>
+    <symbol id="i-note" viewBox="0 0 24 24"><path d="M14 2.5H6.5a2 2 0 0 0-2 2v15a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V8Z"/><path d="M14 2.5V8h5.5M9 13h6M9 17h6"/></symbol>
+    <symbol id="i-car" viewBox="0 0 24 24"><path d="M5 13.5 6.6 8.7A2 2 0 0 1 8.5 7.3h7a2 2 0 0 1 1.9 1.4L19 13.5"/><path d="M4 13.5h16v5H4z"/><circle cx="7.5" cy="18.5" r="1.4"/><circle cx="16.5" cy="18.5" r="1.4"/></symbol>
+    <symbol id="i-map" viewBox="0 0 24 24"><path d="M9 4 3.5 6v14L9 18l6 2 5.5-2V4L15 6 9 4Z"/><path d="M9 4v14M15 6v14"/></symbol>
+    <symbol id="i-trophy" viewBox="0 0 24 24"><path d="M8 21h8M12 17v4M7 4h10v4.5a5 5 0 0 1-10 0Z"/><path d="M7 6.5H4v1.5a3 3 0 0 0 3 3M17 6.5h3v1.5a3 3 0 0 1-3 3"/></symbol>
+    <symbol id="i-gift" viewBox="0 0 24 24"><rect x="3.5" y="8" width="17" height="13" rx="1.5"/><path d="M3.5 12.5h17M12 8v13"/><path d="M12 8S11 3 7.8 3a2.4 2.4 0 0 0 0 5M12 8s1-5 4.2-5a2.4 2.4 0 0 1 0 5"/></symbol>
+    <symbol id="i-home" viewBox="0 0 24 24"><path d="M3 11 12 3l9 8"/><path d="M5.5 9.5V21h13V9.5"/></symbol>
+    <symbol id="i-feed" viewBox="0 0 24 24"><path d="M3 10.5v3a1 1 0 0 0 1 1h2.5l5 4V5.5l-5 4H4a1 1 0 0 0-1 1Z"/><path d="M16 8.5a4 4 0 0 1 0 7"/></symbol>
+    <symbol id="i-lock" viewBox="0 0 24 24"><rect x="4" y="11" width="16" height="10.5" rx="2.5"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></symbol>
+    <symbol id="i-ban" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M5.6 5.6 18.4 18.4"/></symbol>
+    <symbol id="i-users" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2"/><circle cx="9.5" cy="7" r="4"/><path d="M21 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></symbol>
+    <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2.5M12 19v2.5M4.6 4.6l1.7 1.7M17.7 17.7l1.7 1.7M2.5 12H5M19 12h2.5M4.6 19.4l1.7-1.7M17.7 6.3l1.7-1.7"/></symbol>
+    <symbol id="i-spark" viewBox="0 0 24 24"><path d="M13 3l2.4 6.6L22 12l-6.6 2.4L13 21l-2.4-6.6L4 12l6.6-2.4Z"/><path d="M5 3.5v3M3.5 5h3"/></symbol>
+    <symbol id="i-bell" viewBox="0 0 24 24"><path d="M18 8.5a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></symbol>
+    <symbol id="i-phone" viewBox="0 0 24 24"><rect x="6.5" y="2.5" width="11" height="19" rx="2.5"/><path d="M10.5 18.5h3"/></symbol>
+    <symbol id="i-heart" viewBox="0 0 24 24"><path d="M19 13.5c1.3-1.4 3-3 3-5.4A4.4 4.4 0 0 0 12 5.2 4.4 4.4 0 0 0 2 8.1c0 2.4 1.7 4 3 5.4l7 6.8Z"/></symbol>
+    <symbol id="i-thumb" viewBox="0 0 24 24"><path d="M7 10.5v11"/><path d="M15 5.9 14 10h5.8a2 2 0 0 1 2 2.3l-1.4 7a2 2 0 0 1-2 1.7H4a1.5 1.5 0 0 1-1.5-1.5v-7A1.5 1.5 0 0 1 4 11h2.8a2 2 0 0 0 1.8-1.1L12 3a2.8 2.8 0 0 1 3 2.9Z"/></symbol>
+    <symbol id="i-bubble" viewBox="0 0 24 24"><path d="M21 11.5a8 8 0 0 1-11.7 7L3 21l2.5-6.3A8 8 0 1 1 21 11.5Z"/></symbol>
+    <symbol id="i-arrow-up" viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7"/></symbol>
+    <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
+    <symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></symbol>
+    <symbol id="i-apple" viewBox="0 0 24 24"><path d="M17.05 12.04c-.03-2.6 2.13-3.84 2.22-3.9-1.21-1.78-3.1-2.02-3.78-2.04-1.6-.16-3.13.94-3.94.94-.81 0-2.06-.92-3.4-.9-1.74.03-3.35 1.02-4.25 2.58-1.82 3.16-.47 7.83 1.3 10.4.86 1.25 1.89 2.66 3.24 2.61 1.3-.05 1.79-.84 3.36-.84 1.57 0 2.01.84 3.39.81 1.4-.02 2.28-1.27 3.14-2.53.99-1.46 1.4-2.87 1.42-2.94-.03-.02-2.72-1.05-2.75-4.13Z" fill="currentColor" stroke="none"/><path d="M14.6 4.5c.72-.87 1.2-2.08 1.07-3.28-1.03.04-2.28.69-3.02 1.56-.66.77-1.24 2-1.08 3.18 1.15.09 2.32-.59 3.03-1.46Z" fill="currentColor" stroke="none"/></symbol>
+  </defs>
+</svg>
+
+<!-- ───────────────────────────── Nav ───────────────────────────── -->
+<header class="nav" id="nav">
+  <div class="nav-inner">
+    <a class="brand" href="#top" aria-label="Kinrows home">
+      <span class="brand-name">Kinrows</span>
+    </a>
+    <nav class="nav-links" id="primary-nav" aria-label="Primary">
+      <a href="#plan">The app</a>
+      <a href="#everything">Everything inside</a>
+      <a href="#privacy">Privacy</a>
+      <a href="#assist">Life Assist</a>
+    </nav>
+    <a href="#notify" class="btn btn-pill">Get notified</a>
+    <button class="nav-toggle" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="primary-nav">
+      <svg class="ic ic-menu" aria-hidden="true"><use href="#i-menu"/></svg>
+      <svg class="ic ic-close" aria-hidden="true"><use href="#i-close"/></svg>
+    </button>
+  </div>
+</header>
+
+<main id="top">
+
+  <!-- ───────────────────────────── Hero ───────────────────────────── -->
+  <section class="hero">
+    <div class="hero-ambient" aria-hidden="true"></div>
+    <div class="container hero-grid">
+      <div class="hero-copy reveal">
+        <p class="eyebrow">iPhone&nbsp;·&nbsp;Coming this fall</p>
+        <h1>Family life,<br />moving together.</h1>
+        <p class="lede">
+          Your week, your lists, your trips and the small decisions — gathered into a single,
+          quiet home that everyone in the household can see. No more scattered group chats,
+          sticky notes and screenshots.
+        </p>
+        <div class="hero-actions">
+          <a href="#notify" class="btn btn-primary">Get notified at launch</a>
+          <a href="#plan" class="btn btn-ghost">See how it works</a>
+        </div>
+        <div class="hero-meta">
+          <a href="#notify" class="store-badge" aria-label="Coming soon to the App Store">
+            <svg class="ic store-apple" aria-hidden="true"><use href="#i-apple"/></svg>
+            <span><small>Coming this fall on the</small><strong>App Store</strong></span>
+          </a>
+          <p class="hero-trust"><span class="dot"></span> Free · Private to your family · No ads</p>
+        </div>
+      </div>
+
+      <div class="hero-stage reveal" aria-hidden="true">
+        <div class="phone phone-hero">
+          <div class="phone-screen">
+            <div class="app app-home">
+              <div class="app-statusbar"><span>9:41</span><span class="sb-icons">●●● ⌁ ▮</span></div>
+              <div class="app-head">
+                <div>
+                  <p class="app-greet">Good morning, Maya</p>
+                  <p class="app-sub">Sunday, the Hayes household</p>
+                </div>
+                <div class="avatars">
+                  <span class="av av-a">M</span><span class="av av-b">D</span><span class="av av-c">A</span><span class="av av-d">L</span>
+                </div>
+              </div>
+              <div class="tiles">
+                <div class="tile"><span class="t-num">2</span><span class="t-lbl">today's events</span></div>
+                <div class="tile"><span class="t-num">5</span><span class="t-lbl">on the list</span></div>
+                <div class="tile"><span class="t-num" data-tile="vote">3</span><span class="t-lbl">need a vote</span></div>
+              </div>
+              <p class="app-section">Up next</p>
+              <div class="row"><span class="row-dot d-rose"></span><div class="row-body"><b>Leo — dentist</b><span>10:30 · Bedford Dental</span></div></div>
+              <div class="row"><span class="row-dot d-sage"></span><div class="row-body"><b>Groceries with Daniel</b><span>2:00 · Superstore</span></div></div>
+              <p class="app-section">From the family</p>
+              <div class="feed-card">
+                <div class="feed-top"><span class="av av-a sm">M</span><b>Maya</b><span class="feed-time">9:12</span></div>
+                <p>Paint colour for the nursery — which one?</p>
+                <div class="feed-vote"><span class="chip chip-sage vote-opt"><span class="vo-name">Sage</span> · <span class="vo-n">3</span></span><span class="chip vote-opt vote-clay"><span class="vo-name">Clay</span> · <span class="vo-n">1</span></span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="phone-glow"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ───────────────────────── Tension / intro ───────────────────────── -->
+  <section class="band band-quiet">
+    <div class="container narrow center reveal">
+      <p class="band-kicker">Running a household is a lot</p>
+      <h2 class="display">
+        Everyone keeps the family in their head a little differently.
+        Kinrows gives you one place to keep it together.
+      </h2>
+      <p class="muted">
+        It's built for real homes — two parents, kids, the grandparents who help out, the
+        sister across town. Everyone sees what matters, and nothing important slips through.
+      </p>
+    </div>
+  </section>
+
+  <!-- ───────────────────────── Pillar 1: Plan ───────────────────────── -->
+  <section class="feature" id="plan">
+    <div class="container feature-grid">
+      <div class="feature-copy reveal">
+        <p class="eyebrow eyebrow-accent" style="--ac:var(--rose)">Plan the week together</p>
+        <h2>A calendar the whole house actually keeps up.</h2>
+        <p class="muted">
+          Month, week and day views with everyone's events colour-coded by person. Add an
+          appointment in seconds, see who's attending, and never double-book a Saturday again.
+        </p>
+        <ul class="checks">
+          <li>Shared family calendar with per-person colours</li>
+          <li>Appointments with place, time, notes and who's going</li>
+          <li><b>Care Cascade</b> — need someone to cover school pickup? Ask your trusted contacts in a tap, see who said yes, and book it.</li>
+          <li>Birthdays and anniversaries that recur on their own</li>
+        </ul>
+      </div>
+      <div class="feature-stage reveal" aria-hidden="true">
+        <div class="phone-pair">
+          <div class="phone back">
+            <div class="phone-screen">
+              <div class="app app-care">
+                <div class="app-statusbar"><span>9:41</span><span class="sb-icons">●●● ⌁ ▮</span></div>
+                <p class="app-greet">Care Cascade</p>
+                <p class="app-sub">School pickup · Thursday 3:00</p>
+                <p class="app-section">Asked your circle</p>
+                <div class="row"><span class="av av-c sm">G</span><div class="row-body"><b>Grace</b><span>Available · can cover</span></div><span class="chip chip-sage">Yes</span></div>
+                <div class="row"><span class="av av-d sm">P</span><div class="row-body"><b>Paul</b><span>Asked · waiting</span></div><span class="chip">Pending</span></div>
+                <div class="row"><span class="av av-a sm">D</span><div class="row-body"><b>Dana · neighbour</b><span>Can't this week</span></div><span class="chip chip-mute">No</span></div>
+                <div class="m-banner banner-sage">
+                  <svg class="ic" aria-hidden="true"><use href="#i-care"/></svg>
+                  <div><b>Grace will cover Thursday</b><span>Confirm &amp; add to calendar</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="phone front">
+            <div class="phone-screen">
+              <div class="app app-cal">
+                <div class="app-statusbar"><span>9:41</span><span class="sb-icons">●●● ⌁ ▮</span></div>
+                <p class="cal-month">June 2026</p>
+                <div class="cal-grid">
+                  <span class="cd dim">M</span><span class="cd dim">T</span><span class="cd dim">W</span><span class="cd dim">T</span><span class="cd dim">F</span><span class="cd dim">S</span><span class="cd dim">S</span>
+                  <span class="cd">1</span><span class="cd">2</span><span class="cd has"><i class="ev-rose"></i>3</span><span class="cd">4</span><span class="cd has"><i class="ev-sage"></i>5</span><span class="cd">6</span><span class="cd">7</span>
+                  <span class="cd">8</span><span class="cd today has"><i class="ev-rose"></i><i class="ev-sage"></i>9</span><span class="cd">10</span><span class="cd has"><i class="ev-ocean"></i>11</span><span class="cd">12</span><span class="cd has"><i class="ev-saffron"></i>13</span><span class="cd">14</span>
+                  <span class="cd">15</span><span class="cd">16</span><span class="cd has"><i class="ev-mauve"></i>17</span><span class="cd">18</span><span class="cd">19</span><span class="cd">20</span><span class="cd">21</span>
+                </div>
+                <p class="app-section">Tuesday, June 9</p>
+                <div class="row"><span class="row-dot d-rose"></span><div class="row-body"><b>Leo — dentist</b><span>10:30 · with Maya</span></div></div>
+                <div class="row"><span class="row-dot d-sage"></span><div class="row-body"><b>Ava — swim lessons</b><span>4:00 · with Daniel</span></div></div>
+                <div class="row"><span class="row-dot d-ocean"></span><div class="row-body"><b>Dinner · Grace &amp; Paul</b><span>6:30 · home</span></div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ───────────────────────── Pillar 2: Household ───────────────────────── -->
+  <section class="feature feature-alt">
+    <div class="container feature-grid reverse">
+      <div class="feature-copy reveal">
+        <p class="eyebrow eyebrow-accent" style="--ac:var(--sage)">Lists &amp; decisions</p>
+        <h2>Make the call together — lists and all.</h2>
+        <p class="muted">
+          Keep the shared lists everyone can tick off, then settle the little debates with a quick poll.
+          No more "did anyone grab…?" or "wait, what did we decide?"
+        </p>
+        <ul class="checks">
+          <li><b>Shared lists</b> the whole house can edit and tick off</li>
+          <li>Assign an item to a person so nothing's just assumed</li>
+          <li><b>Decisions</b> — share a link, photo or 2–4 option poll and vote</li>
+          <li>React and comment, so a choice actually gets made</li>
+        </ul>
+      </div>
+      <div class="feature-stage reveal" aria-hidden="true">
+        <div class="phone">
+          <div class="phone-screen">
+            <div class="app app-lists">
+              <div class="app-statusbar"><span>9:41</span><span class="sb-icons">●●● ⌁ ▮</span></div>
+              <p class="app-greet">Weekend list</p>
+              <p class="app-sub">Shared · everyone can edit</p>
+              <div class="chk done"><span class="chk-box"></span><b>Book the campsite</b><span class="av av-b sm">D</span></div>
+              <div class="chk done"><span class="chk-box"></span><b>Pack the cooler</b><span class="av av-a sm">M</span></div>
+              <div class="chk"><span class="chk-box"></span><b>Sunscreen &amp; bug spray</b><span class="av av-c sm">G</span></div>
+              <div class="chk"><span class="chk-box"></span><b>Pick up Leo's cleats</b><span class="av av-a sm">M</span></div>
+              <p class="app-section">Quick decision</p>
+              <div class="decision-card">
+                <p class="dc-q">Leave Friday night or Saturday am?</p>
+                <div class="dc-opt"><span>Friday pm</span><span class="dc-bar"><i style="width:75%"></i></span><b>75%</b></div>
+                <div class="dc-opt"><span>Saturday am</span><span class="dc-bar"><i style="width:25%"></i></span><b>25%</b></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ───────────────────────── Pillar 3: Decide ───────────────────────── -->
+  <section class="feature">
+    <div class="container feature-grid">
+      <div class="feature-copy reveal">
+        <p class="eyebrow eyebrow-accent" style="--ac:var(--rose)">Stay in touch</p>
+        <h2>The family chat that isn't buried in your phone.</h2>
+        <p class="muted">
+          Household and group chats in one calm place — and you can pull any item, a trip, a decision,
+          an event, straight into the conversation. Keep private notes, and a feed for the moments worth saving.
+        </p>
+        <ul class="checks">
+          <li><b>Messages</b> — household and group chats</li>
+          <li>Quote any item — a trip, poll or event — right into a chat</li>
+          <li><b>Notes</b> — private by default, shared when you choose</li>
+          <li><b>Family feed</b> for the photos and everyday wins</li>
+        </ul>
+      </div>
+      <div class="feature-stage reveal" aria-hidden="true">
+        <div class="phone">
+          <div class="phone-screen">
+            <div class="app app-chat">
+              <div class="app-statusbar"><span>9:41</span><span class="sb-icons">●●● ⌁ ▮</span></div>
+              <div class="chat-head">
+                <div class="avatars"><span class="av av-a">M</span><span class="av av-b">D</span><span class="av av-c">G</span></div>
+                <div class="chat-meta"><b>Hayes household</b><span>4 people</span></div>
+              </div>
+              <div class="chat">
+                <div class="bub in"><span class="bub-name">Daniel</span>On my way — 10 minutes out</div>
+                <div class="bub out">Perfect, Leo's ready to go</div>
+                <div class="quoted"><span class="q-tag">Trip · shared</span><b>Cape Breton · Aug 14–18</b><span class="q-sub">Itinerary added</span></div>
+                <div class="bub in"><span class="bub-name">Grace</span>Want me to grab anything on the way?</div>
+                <div class="bub out">We're good — thank you!</div>
+              </div>
+              <div class="chat-composer"><span>Message the household…</span><i><svg class="ic" aria-hidden="true"><use href="#i-arrow-up"/></svg></i></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ───────────────────────── Pillar 4: Close ───────────────────────── -->
+  <section class="feature feature-alt">
+    <div class="container feature-grid reverse">
+      <div class="feature-copy reveal">
+        <p class="eyebrow eyebrow-accent" style="--ac:var(--ocean)">Stay close, even apart</p>
+        <h2>Trips, arrivals, friendly rivalries and the dates that matter.</h2>
+        <p class="muted">
+          Know when the grandparents are on their way. Plan a trip with stays and an itinerary.
+          Keep a little fitness rivalry going. And never miss a birthday with a gift idea ready.
+        </p>
+        <ul class="checks">
+          <li><b>Trips &amp; arrivals</b> — share a trip, see "30 minutes away" and "arrived safely"</li>
+          <li><b>Itineraries</b> with stays, places and plans for the whole household</li>
+          <li><b>Rivalries</b> — step challenges with levels and a leaderboard, via Apple Health</li>
+          <li><b>Gifts &amp; dates</b> — track ideas per person and get a nudge before the day</li>
+        </ul>
+      </div>
+      <div class="feature-stage reveal" aria-hidden="true">
+        <div class="phone-pair">
+          <div class="phone back">
+            <div class="phone-screen">
+              <div class="app app-rival">
+                <div class="app-statusbar"><span>9:41</span><span class="sb-icons">●●● ⌁ ▮</span></div>
+                <p class="app-greet">Rivalries</p>
+                <div class="rival-hero">
+                  <div class="rival-top"><b>October Steps</b><span class="chip chip-mini">4 days left</span></div>
+                  <div class="rival-vs">
+                    <div class="vs-side"><span class="av av-b">D</span><b>Daniel</b><small>312k</small></div>
+                    <span class="vs-x">vs</span>
+                    <div class="vs-side"><span class="av av-a">M</span><b>You</b><small>298k</small></div>
+                  </div>
+                  <div class="bar"><i style="width:62%"></i></div>
+                </div>
+                <p class="app-section">Leaderboard · this week</p>
+                <div class="lb">
+                  <div class="lb-row lead"><span class="lb-rank">1</span><span class="av av-b sm">D</span><b>Daniel</b><span class="lb-lvl">Lv 7</span><span class="lb-xp">58,210</span></div>
+                  <div class="lb-row"><span class="lb-rank">2</span><span class="av av-a sm">M</span><b>You</b><span class="lb-lvl">Lv 6</span><span class="lb-xp">56,040</span></div>
+                  <div class="lb-row"><span class="lb-rank">3</span><span class="av av-c sm">G</span><b>Grace</b><span class="lb-lvl">Lv 4</span><span class="lb-xp">41,930</span></div>
+                </div>
+                <div class="rival-cta">Log today's progress</div>
+              </div>
+            </div>
+          </div>
+          <div class="phone front">
+            <div class="phone-screen">
+              <div class="app app-travel">
+                <div class="app-statusbar"><span>9:41</span><span class="sb-icons">●●● ⌁ ▮</span></div>
+                <p class="app-greet">Travel</p>
+                <div class="seg"><span class="seg-on">Trips</span><span>Itineraries</span><span>Places</span></div>
+                <div class="trip-head">
+                  <div><b>Cape Breton</b><span>Aug 14 – 18 · 4 nights</span></div>
+                  <span class="chip chip-mini">In 3 weeks</span>
+                </div>
+                <p class="app-section">Itinerary</p>
+                <div class="itin">
+                  <div class="itin-row"><span class="itin-day">FRI 14</span><div class="row-body"><b>Drive up &amp; check in</b><span>Keltic Lodge · 3 nights</span></div><svg class="ic" aria-hidden="true"><use href="#i-map"/></svg></div>
+                  <div class="itin-row"><span class="itin-day">SAT 15</span><div class="row-body"><b>Skyline Trail hike</b><span>10:00 · Cabot Highlands</span></div></div>
+                  <div class="itin-row"><span class="itin-day">SUN 16</span><div class="row-body"><b>Whale watching</b><span>1:00 · Pleasant Bay</span></div></div>
+                  <div class="itin-row"><span class="itin-day">MON 17</span><div class="row-body"><b>Beach day</b><span>Ingonish</span></div></div>
+                </div>
+                <div class="m-banner banner-sage">
+                  <svg class="ic" aria-hidden="true"><use href="#i-car"/></svg>
+                  <div><b>Stays booked · shared</b><span>Everyone sees the plan</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ───────────────────────── Why / Rowing together ───────────────────────── -->
+  <section class="rowing" id="why">
+    <div class="rowing-glow" aria-hidden="true"></div>
+    <div class="container">
+      <div class="center reveal section-head">
+        <p class="band-kicker">The idea behind Kinrows</p>
+        <h2 class="display">A family does better when it rows together.</h2>
+        <p class="muted narrow center">
+          Kin, pulling in the same direction — that's the whole name. When everyone can see what needs
+          doing, takes an oar, and cheers the others on, a household stops feeling like a juggling act
+          and starts feeling like a team.
+        </p>
+      </div>
+      <div class="rowing-grid reveal">
+        <div class="rw">
+          <span class="rw-ico" style="--ac:var(--sage)"><svg class="ic" aria-hidden="true"><use href="#i-users"/></svg></span>
+          <b>Share the load</b>
+          <p>So much of family life is invisible — the remembering, the planning, the "did anyone…?".
+            Research on the household mental load is blunt: when that work is made visible and shared,
+            stress falls and partnership grows. Kinrows brings it into the open, so no one carries it alone.</p>
+        </div>
+        <div class="rw">
+          <span class="rw-ico" style="--ac:var(--ocean)"><svg class="ic" aria-hidden="true"><use href="#i-map"/></svg></span>
+          <b>Pull in the same direction</b>
+          <p>Children who know their family's story — its plans, its rhythms, its in-jokes — are measurably
+            more resilient and secure. One shared space for the calendar, the trips and the everyday keeps
+            everyone in the same boat, not five separate ones.</p>
+        </div>
+        <div class="rw">
+          <span class="rw-ico" style="--ac:var(--rose)"><svg class="ic" aria-hidden="true"><use href="#i-trophy"/></svg></span>
+          <b>Celebrate every win</b>
+          <p>Decades of relationship research land on the same finding: a win that's shared and cheered is
+            worth far more than one kept quiet. Kinrows surfaces the milestones — a first goal, a finished
+            challenge, a small victory — so the whole family gets to celebrate together.</p>
+        </div>
+      </div>
+      <div class="moment reveal">
+        <span class="moment-ico"><svg class="ic" aria-hidden="true"><use href="#i-trophy"/></svg></span>
+        <div class="moment-body">
+          <b>Leo scored his first goal</b>
+          <span>Maya shared it with the household · the family cheered</span>
+        </div>
+        <div class="moment-react">
+          <span class="chip chip-mini"><svg class="ic ic-xs" aria-hidden="true"><use href="#i-thumb"/></svg> 6</span>
+          <span class="chip chip-mini"><svg class="ic ic-xs" aria-hidden="true"><use href="#i-heart"/></svg> 4</span>
+        </div>
+      </div>
+      <p class="rowing-note center reveal">
+        Informed by research on sharing the household's mental load, on family narratives and resilience,
+        and on how celebrating each other's good news strengthens our closest bonds.
+      </p>
+    </div>
+  </section>
+
+  <!-- ───────────────────────── Everything inside ───────────────────────── -->
+  <section class="band" id="everything">
+    <div class="container">
+      <div class="center reveal section-head">
+        <p class="band-kicker">All of it, in the free app</p>
+        <h2 class="display">Everything your household needs — included.</h2>
+        <p class="muted narrow center">
+          No tiers on the basics. Every family that downloads Kinrows gets the whole toolkit.
+        </p>
+      </div>
+      <div class="grid-features reveal">
+        <div class="gf"><span class="gf-ico" style="--ac:var(--rose)"><svg class="ic" aria-hidden="true"><use href="#i-cal"/></svg></span><b>Shared calendar</b><p>Month, week &amp; day, per-person colours</p></div>
+        <div class="gf"><span class="gf-ico" style="--ac:var(--sage)"><svg class="ic" aria-hidden="true"><use href="#i-list"/></svg></span><b>Shared lists</b><p>Plan &amp; tick off, together</p></div>
+        <div class="gf"><span class="gf-ico" style="--ac:var(--mauve)"><svg class="ic" aria-hidden="true"><use href="#i-vote"/></svg></span><b>Decisions</b><p>Polls, links &amp; photos to vote on</p></div>
+        <div class="gf"><span class="gf-ico" style="--ac:var(--rose)"><svg class="ic" aria-hidden="true"><use href="#i-message"/></svg></span><b>Messages</b><p>Household &amp; group chats</p></div>
+        <div class="gf"><span class="gf-ico" style="--ac:var(--rose)"><svg class="ic" aria-hidden="true"><use href="#i-trophy"/></svg></span><b>Challenges</b><p>Step rivalries via Apple Health</p></div>
+        <div class="gf"><span class="gf-ico" style="--ac:var(--ocean)"><svg class="ic" aria-hidden="true"><use href="#i-car"/></svg></span><b>Trips &amp; arrivals</b><p>ETA and "arrived safely" pings</p></div>
+        <div class="gf"><span class="gf-ico" style="--ac:var(--ocean)"><svg class="ic" aria-hidden="true"><use href="#i-map"/></svg></span><b>Itineraries</b><p>Stays, places &amp; plans</p></div>
+        <div class="gf"><span class="gf-ico" style="--ac:var(--sage)"><svg class="ic" aria-hidden="true"><use href="#i-care"/></svg></span><b>Care Cascade</b><p>Ask trusted contacts to cover, fast</p></div>
+        <div class="gf"><span class="gf-ico" style="--ac:var(--ink-2)"><svg class="ic" aria-hidden="true"><use href="#i-note"/></svg></span><b>Notes</b><p>Private, or shared when you choose</p></div>
+        <div class="gf"><span class="gf-ico" style="--ac:var(--ink-2)"><svg class="ic" aria-hidden="true"><use href="#i-feed"/></svg></span><b>Family feed</b><p>The everyday moments, saved</p></div>
+        <div class="gf"><span class="gf-ico" style="--ac:var(--sage)"><svg class="ic" aria-hidden="true"><use href="#i-home"/></svg></span><b>Households &amp; clans</b><p>Share within, and across, families</p></div>
+        <div class="gf"><span class="gf-ico" style="--ac:var(--saffron)"><svg class="ic" aria-hidden="true"><use href="#i-gift"/></svg></span><b>Gifts &amp; dates</b><p>Ideas per person, reminded in time</p></div>
+        <div class="gf"><span class="gf-ico" style="--ac:var(--saffron)"><svg class="ic" aria-hidden="true"><use href="#i-chart"/></svg></span><b>Budget</b><p>Limits, projects, bills &amp; charts</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ───────────────────────── Privacy ───────────────────────── -->
+  <section class="privacy" id="privacy">
+    <div class="container privacy-grid">
+      <div class="reveal">
+        <p class="eyebrow eyebrow-accent" style="--ac:var(--sage)">Private by design</p>
+        <h2>Your family's life stays your family's.</h2>
+        <p class="muted">
+          Kinrows is built around households. Your home's calendar, money, lists and
+          messages are walled off to the people you've actually invited — enforced at the
+          data layer, not just hidden in the interface.
+        </p>
+        <p class="muted">
+          We don't sell data and we don't run ads. There's nothing to mine, because the app
+          isn't built to mine it.
+        </p>
+      </div>
+      <div class="privacy-cards reveal">
+        <div class="pc"><span class="pc-ico"><svg class="ic" aria-hidden="true"><use href="#i-lock"/></svg></span><div><b>Household isolation</b><p>Each home's data is scoped to its members. Other families can't see it — by design, in the database.</p></div></div>
+        <div class="pc"><span class="pc-ico"><svg class="ic" aria-hidden="true"><use href="#i-ban"/></svg></span><div><b>No ads, no data sale</b><p>The app is free because it's simple and honest — not because you're the product.</p></div></div>
+        <div class="pc"><span class="pc-ico"><svg class="ic" aria-hidden="true"><use href="#i-users"/></svg></span><div><b>You choose who's in</b><p>Invite people you trust. Share across families with clans only when you want to.</p></div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ───────────────────────── Life Assist (AI) ───────────────────────── -->
+  <section class="assist" id="assist">
+    <div class="assist-ambient" aria-hidden="true"></div>
+    <div class="container assist-grid">
+      <div class="assist-copy reveal">
+        <p class="eyebrow">Optional add-on · Life Assist</p>
+        <h2 class="display">A quiet hand, only if you want one.</h2>
+        <p class="lede-sm">
+          The app is complete on its own. <b>Life Assist</b> is an optional helper that reads
+          across your household — calendar, lists, budget, birthdays — and gently keeps
+          you ahead of it. Turn it on if it helps. Leave it off and nothing changes.
+        </p>
+        <div class="assist-points">
+          <div class="ap">
+            <span class="ap-ico"><svg class="ic" aria-hidden="true"><use href="#i-sun"/></svg></span>
+            <div><b>A morning brief</b><p>One warm, prioritised read on your family right now — what's today, what's slipping, what needs a decision.</p></div>
+          </div>
+          <div class="ap">
+            <span class="ap-ico"><svg class="ic" aria-hidden="true"><use href="#i-spark"/></svg></span>
+            <div><b>Does the busywork</b><p>Ask in plain words — "move Leo's dentist to Thursday," "what did we spend on dining?" — and it sets it up for you to confirm.</p></div>
+          </div>
+          <div class="ap">
+            <span class="ap-ico"><svg class="ic" aria-hidden="true"><use href="#i-bell"/></svg></span>
+            <div><b>Gentle nudges</b><p>"Trip in 14 days, no stay booked yet." "Leo's birthday is close." Helpful, throttled, never naggy.</p></div>
+          </div>
+          <div class="ap">
+            <span class="ap-ico"><svg class="ic" aria-hidden="true"><use href="#i-phone"/></svg></span>
+            <div><b>Private where it counts</b><p>Quick summaries run on-device. You control what it's allowed to read, and you can clear what it remembers.</p></div>
+          </div>
+          <div class="ap">
+            <span class="ap-ico"><svg class="ic" aria-hidden="true"><use href="#i-receipt"/></svg></span>
+            <div><b>Receipts &amp; meal ideas</b><p>Snap a receipt and it logs the spend for you; ask what's for dinner and get real ideas from a few ingredients. The features that lean on AI live here.</p></div>
+          </div>
+        </div>
+        <p class="assist-foot">
+          <b>$9.99 / month, per household</b> — one seat unlocks Life Assist for everyone at home.
+          It's the home for everything that uses AI to keep your family on track — from the daily brief
+          to receipt scanning and meal ideas. Always optional; the core app is, and stays, free.
+        </p>
+      </div>
+      <div class="assist-stage reveal" aria-hidden="true">
+        <div class="phone phone-dark">
+          <div class="phone-screen">
+            <div class="app app-assist">
+              <div class="app-statusbar"><span>9:41</span><span class="sb-icons">●●● ⌁ ▮</span></div>
+              <p class="assist-greet">Your morning, in one read</p>
+              <div class="assist-brief">
+                <p>Morning, Maya. It's a fuller day than usual — here's what I'd keep an eye on.</p>
+                <p><b>Leo's dentist is at 10:30</b>, and you're down to bring him. That overlaps Daniel's work block, so he can't.</p>
+                <p>You're <b>80% through the grocery budget</b> with 10 days left. I lined up two dinners that lean on what's already in the kitchen.</p>
+                <p><b>Leo turns 6 in 9 days</b> and there's no gift idea logged yet.</p>
+              </div>
+              <div class="assist-cards">
+                <div class="acard"><svg class="ic ic-sm" aria-hidden="true"><use href="#i-cook"/></svg> Plan tonight's dinner</div>
+                <div class="acard"><svg class="ic ic-sm" aria-hidden="true"><use href="#i-gift"/></svg> Add a gift idea for Leo</div>
+              </div>
+              <div class="assist-composer"><span>Ask Life Assist…</span><i><svg class="ic ic-sm" aria-hidden="true"><use href="#i-arrow-up"/></svg></i></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ───────────────────────── Pricing clarity ───────────────────────── -->
+  <section class="band band-quiet">
+    <div class="container center section-head reveal">
+      <p class="band-kicker">Simple and honest</p>
+      <h2 class="display">Free to use. Optional to extend.</h2>
+    </div>
+    <div class="container price-grid reveal">
+      <div class="price-card">
+        <p class="pc-tag">The app</p>
+        <p class="pc-price">Free</p>
+        <p class="pc-sub">Everything above, for the whole household.</p>
+        <ul class="pc-list">
+          <li>Calendar, lists &amp; decisions</li>
+          <li>Budget &amp; projects</li>
+          <li>Messages, notes &amp; feed</li>
+          <li>Trips, challenges &amp; gifts</li>
+          <li>Private to your family · no ads</li>
+        </ul>
+      </div>
+      <div class="price-card price-feature">
+        <p class="pc-tag">+ Life Assist</p>
+        <p class="pc-price">$9.99<span class="pc-small"> / month · per household</span></p>
+        <p class="pc-sub">A helper that keeps you ahead of it all.</p>
+        <ul class="pc-list">
+          <li>A daily family brief</li>
+          <li>Ask in plain words — it sets things up</li>
+          <li>Proactive, gentle nudges</li>
+          <li>Receipt scanning &amp; AI meal ideas</li>
+          <li>One seat unlocks it for everyone home</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ───────────────────────── Final CTA / Notify ───────────────────────── -->
+  <section class="cta" id="notify">
+    <div class="cta-ambient" aria-hidden="true"></div>
+    <div class="container center reveal">
+      <img class="cta-logo" src="assets/logo.png" alt="Kinrows" width="72" height="72" />
+      <h2 class="display">Coming to iPhone this fall.</h2>
+      <p class="muted narrow center">
+        Leave your email and we'll let you know the day it's on the App Store. One message, no list-selling.
+      </p>
+      <form class="notify-form" onsubmit="return false;" aria-label="Get notified at launch">
+        <input type="email" name="email" placeholder="you@email.com" aria-label="Email address" autocomplete="email" inputmode="email" required />
+        <button type="submit" class="btn btn-primary">Notify me</button>
+      </form>
+      <a href="#notify" class="store-badge store-badge-lg" aria-label="Coming soon to the App Store">
+        <svg class="ic store-apple" aria-hidden="true"><use href="#i-apple"/></svg>
+        <span><small>Coming this fall on the</small><strong>App Store</strong></span>
+      </a>
+      <p class="cta-fine">Free on the App Store · Requires iPhone · iOS 18+</p>
+    </div>
+  </section>
+
+</main>
+
+<!-- ───────────────────────────── Footer ───────────────────────────── -->
+<footer class="footer">
+  <div class="container footer-inner">
+    <div class="footer-brand">
+      <a class="brand" href="#top">
+        <img class="brand-logo" src="assets/logo.png" alt="" width="26" height="26" />
+        <span class="brand-name">Kinrows</span>
+      </a>
+      <p class="footer-tag">One calm place for the whole household.</p>
+    </div>
+    <nav class="footer-cols" aria-label="Footer">
+      <div><p class="fc-head">App</p><a href="#plan">The app</a><a href="#everything">Everything inside</a><a href="#assist">Life Assist</a></div>
+      <div><p class="fc-head">Company</p><a href="#notify">Get notified</a><a href="mailto:kinrows@atlasatlantic.co">Contact</a></div>
+      <div><p class="fc-head">Legal</p><a href="privacy.html">Privacy Policy</a><a href="terms.html">Terms of Use</a></div>
+    </nav>
+  </div>
+  <div class="container footer-bottom">
+    <span>© 2026 Atlas Atlantic. Made for families.</span>
+    <span>iPhone · iOS 18+ · Fall 2026</span>
+  </div>
+</footer>
+
+<script src="assets/app.js"></script>
+</body>
+</html>

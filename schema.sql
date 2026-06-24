@@ -739,3 +739,22 @@ CREATE TABLE IF NOT EXISTS concierge_nudges (
 );
 
 CREATE INDEX IF NOT EXISTS idx_concierge_nudges_group ON concierge_nudges(group_id, sent_at);
+
+-- Polymorphic attachments: link a calendar appointment to any other entity
+-- (list | note | decision | receipt | trip | itinerary | ...). group_id mirrors
+-- the appointment's household for isolation; visibility flows through the event.
+CREATE TABLE IF NOT EXISTS event_attachments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    appointment_id INTEGER NOT NULL,
+    attachment_type TEXT NOT NULL,          -- 'list','note','decision','receipt','trip','itinerary'
+    attachment_id INTEGER NOT NULL,
+    group_id INTEGER,
+    added_by INTEGER,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(appointment_id, attachment_type, attachment_id),
+    FOREIGN KEY (appointment_id) REFERENCES appointments(id) ON DELETE CASCADE,
+    FOREIGN KEY (group_id) REFERENCES groups(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_event_attachments_appt ON event_attachments(appointment_id);
+CREATE INDEX IF NOT EXISTS idx_event_attachments_group ON event_attachments(group_id);

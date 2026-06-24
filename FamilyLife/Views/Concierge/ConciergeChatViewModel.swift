@@ -13,9 +13,31 @@ final class ConciergeChatViewModel {
 
     private(set) var messages: [Message] = []
     private(set) var isSending = false
+    private(set) var isLoading = false
     var errorMessage: String?
 
-    private var conversationId: Int?
+    private(set) var conversationId: Int?
+
+    /// Start a fresh thread, discarding the current one.
+    func startNew() {
+        conversationId = nil
+        messages = []
+        errorMessage = nil
+    }
+
+    /// Load a past conversation's history so the user can pick up where they left off.
+    func resume(conversationId id: Int, api: APIService) async {
+        conversationId = id
+        errorMessage = nil
+        isLoading = true
+        defer { isLoading = false }
+        do {
+            let history = try await api.fetchConciergeMessages(conversationId: id)
+            messages = history.map { Message(role: $0.role == "user" ? .user : .assistant, text: $0.content) }
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
 
     func send(_ text: String, api: APIService) async {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)

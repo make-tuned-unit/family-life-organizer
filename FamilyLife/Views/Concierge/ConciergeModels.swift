@@ -57,6 +57,34 @@ struct ConciergeAction: Codable, Hashable {
     let summary: String
 }
 
+/// Summary row for a past conversation (from `GET /api/concierge/conversations`).
+struct ConciergeConversationSummary: Codable, Identifiable {
+    let id: Int
+    let title: String?
+    let updatedAt: String?
+    let lastMessage: String?
+    let messageCount: Int?
+
+    enum CodingKeys: String, CodingKey {
+        case id, title
+        case updatedAt = "updated_at"
+        case lastMessage = "last_message"
+        case messageCount = "message_count"
+    }
+
+    var displayTitle: String {
+        if let t = title, !t.isEmpty { return t }
+        if let m = lastMessage, !m.isEmpty { return m }
+        return "Conversation"
+    }
+}
+
+/// One stored message in a conversation (from `GET /api/concierge/conversations/:id/messages`).
+struct ConciergeStoredMessage: Codable {
+    let role: String
+    let content: String
+}
+
 /// One "needs you" item. `kind` and `route` are stable strings from the server;
 /// the view maps them to icon tint and navigation target.
 struct ConciergeCard: Codable, Identifiable {

@@ -2,9 +2,12 @@
 // Each tool exposes an Anthropic tool schema plus a `run(ctx, input)` handler
 // that calls existing FamilyDB methods. ctx = { db, userId, userName, groupId, push }.
 //
-// SAFETY BOUNDARY: tools read, add, edit, and change status across every
-// domain — but never DELETE. The butler can manage the whole app without ever
-// losing data (the worst case is an edit, which is recoverable).
+// SAFETY BOUNDARY: tools provide full CRUD — read, add, edit, AND delete — across
+// every domain so the butler can manage the app on the user's behalf. The DB
+// delete/update methods are NOT all household-scoped, so every mutate/delete that
+// targets a row by id FIRST verifies the row belongs to the caller's household
+// (assertHousehold / assertListAccess). Notes are owner-scoped at the DB layer.
+// This prevents the model from being talked into touching another household's data.
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -13,6 +16,37 @@ function requireDate(value, field) {
     throw new Error(`${field} must be in YYYY-MM-DD format`);
   }
   return value;
+}
+
+// Promise wrapper over the raw sqlite handle for ownership checks.
+function dbGet(ctx, sql, params) {
+  return new Promise((resolve, reject) => {
+    ctx.db.db.get(sql, params, (err, row) => err ? reject(err) : resolve(row));
+  });
+}
+
+// Guard for group_id-scoped tables (appointments, itineraries, trips, pantry,
+// decisions, receipts, gift_people, gift_ideas, …). Throws unless the row exists
+// and belongs to the caller's household. `table` is always an internal literal.
+async function assertHousehold(ctx, table, id) {
+  const row = await dbGet(ctx, `SELECT group_id FROM ${table} WHERE id = ?`, [id]);
+  if (!row) throw new Error(`No ${table} #${id} found`);
+  if (ctx.groupId == null || row.group_id !== ctx.groupId) {
+    throw new Error(`#${id} is not in your household`);
+  }
+}
+
+// Guard for lists (no group_id column — visible to creator + household members).
+async function assertListAccess(ctx, listId) {
+  const row = await dbGet(ctx,
+    `SELECT 1 AS ok FROM lists l WHERE l.id = ? AND (
+       l.created_by = ?
+       OR EXISTS (SELECT 1 FROM group_members gm JOIN groups g ON g.id = gm.group_id
+                  AND g.group_type = 'household'
+                  WHERE gm.user_id = l.created_by AND gm.group_id IN (
+                    SELECT group_id FROM group_members WHERE user_id = ?)))`,
+    [listId, ctx.userId, ctx.userId]);
+  if (!row) throw new Error(`No list #${listId} in your household`);
 }
 
 const TOOLS = [
@@ -233,6 +267,7 @@ const TOOLS = [
     write: true,
     input_schema: { type: 'object', properties: { id: { type: 'integer' } }, required: ['id'] },
     async run(ctx, input) {
+      await assertHousehold(ctx, 'groceries', input.id);
       await ctx.db.purchaseGrocery(input.id);
       const summary = `Marked grocery #${input.id} as purchased`;
       return { result: { ok: true, summary }, action: { tool: 'purchase_grocery', summary } };
@@ -283,6 +318,7 @@ const TOOLS = [
       required: ['id', 'choice'],
     },
     async run(ctx, input) {
+      await assertHousehold(ctx, 'decisions', input.id);
       await ctx.db.replaceDecisionReaction(input.id, ctx.userName, 'vote', input.choice);
       const summary = `Voted "${input.choice}" on decision #${input.id}`;
       return { result: { ok: true, summary }, action: { tool: 'vote_decision', summary } };
@@ -298,6 +334,7 @@ const TOOLS = [
       required: ['id', 'text'],
     },
     async run(ctx, input) {
+      await assertHousehold(ctx, 'decisions', input.id);
       await ctx.db.addDecisionComment(input.id, ctx.userName, input.text);
       const summary = `Commented on decision #${input.id}`;
       return { result: { ok: true, summary }, action: { tool: 'comment_decision', summary } };
@@ -358,6 +395,7 @@ const TOOLS = [
     write: true,
     input_schema: { type: 'object', properties: { id: { type: 'integer' } }, required: ['id'] },
     async run(ctx, input) {
+      await assertHousehold(ctx, 'trips', input.id);
       await ctx.db.arriveTrip(input.id);
       const summary = `Marked trip #${input.id} as arrived`;
       return { result: { ok: true, summary }, action: { tool: 'arrive_trip', summary } };
@@ -369,6 +407,7 @@ const TOOLS = [
     write: true,
     input_schema: { type: 'object', properties: { id: { type: 'integer' } }, required: ['id'] },
     async run(ctx, input) {
+      await assertHousehold(ctx, 'trips', input.id);
       await ctx.db.cancelTrip(input.id);
       const summary = `Cancelled trip #${input.id}`;
       return { result: { ok: true, summary }, action: { tool: 'cancel_trip', summary } };
@@ -452,6 +491,7 @@ const TOOLS = [
       required: ['id'],
     },
     async run(ctx, input) {
+      await assertHousehold(ctx, 'itineraries', input.id);
       const updates = {};
       for (const k of ['title', 'start_date', 'end_date', 'travelers', 'notes', 'status']) {
         if (input[k] != null) updates[k] = input[k];
@@ -482,6 +522,7 @@ const TOOLS = [
       required: ['itinerary_id', 'check_in', 'check_out'],
     },
     async run(ctx, input) {
+      await assertHousehold(ctx, 'itineraries', input.itinerary_id);
       requireDate(input.check_in, 'check_in');
       requireDate(input.check_out, 'check_out');
       await ctx.db.addItineraryStay({
@@ -535,6 +576,7 @@ const TOOLS = [
       required: ['rivalry_id', 'value'],
     },
     async run(ctx, input) {
+      await assertHousehold(ctx, 'rivalries', input.rivalry_id);
       const member = input.member_name || ctx.userName;
       await ctx.db.addRivalryEntry({
         rivalry_id: input.rivalry_id, member_name: member, value: input.value, note: input.note || null,
@@ -666,6 +708,364 @@ const TOOLS = [
       await ctx.db.addConciergeMemory(ctx.userId, ctx.groupId, input.fact);
       const summary = `Noted: ${input.fact}`;
       return { result: { ok: true, summary }, action: { tool: 'remember', summary } };
+    },
+  },
+
+  // ---- Calendar (edit / delete) ----
+  {
+    name: 'update_appointment',
+    description: 'Edit an existing calendar event. Use get_calendar first to get the id. Only pass the fields you want to change.',
+    write: true,
+    input_schema: {
+      type: 'object',
+      properties: {
+        id: { type: 'integer' },
+        title: { type: 'string' },
+        appointment_date: { type: 'string', description: 'YYYY-MM-DD' },
+        appointment_time: { type: 'string', description: 'HH:MM 24h' },
+        location: { type: 'string' },
+        with_person: { type: 'string' },
+      },
+      required: ['id'],
+    },
+    async run(ctx, input) {
+      await assertHousehold(ctx, 'appointments', input.id);
+      const updates = {};
+      for (const k of ['title', 'appointment_date', 'appointment_time', 'location', 'with_person']) {
+        if (input[k] != null) updates[k] = input[k];
+      }
+      if (updates.appointment_date) requireDate(updates.appointment_date, 'appointment_date');
+      if (Object.keys(updates).length === 0) return { result: { ok: false, error: 'no fields to update' } };
+      await ctx.db.updateAppointment(input.id, updates);
+      const summary = `Updated event #${input.id}`;
+      return { result: { ok: true, summary }, action: { tool: 'update_appointment', summary } };
+    },
+  },
+  {
+    name: 'delete_appointment',
+    description: 'Delete a calendar event permanently. Use get_calendar first to confirm the id.',
+    write: true,
+    input_schema: { type: 'object', properties: { id: { type: 'integer' } }, required: ['id'] },
+    async run(ctx, input) {
+      await assertHousehold(ctx, 'appointments', input.id);
+      await ctx.db.deleteAppointment(input.id);
+      const summary = `Deleted event #${input.id}`;
+      return { result: { ok: true, summary }, action: { tool: 'delete_appointment', summary } };
+    },
+  },
+
+  // ---- Notes ----
+  {
+    name: 'list_notes',
+    description: "List the user's notes (their own + notes shared with the household).",
+    write: false,
+    input_schema: { type: 'object', properties: {} },
+    async run(ctx) {
+      const rows = await ctx.db.getNotes(ctx.userId);
+      return { result: rows.slice(0, 50).map(n => ({
+        id: n.id, title: n.title, preview: (n.body || '').slice(0, 100),
+        shared: n.shared_scope && n.shared_scope !== 'private', author: n.author_name,
+      })) };
+    },
+  },
+  {
+    name: 'add_note',
+    description: 'Create a note. Private by default; set shared=true to share it with the household.',
+    write: true,
+    input_schema: {
+      type: 'object',
+      properties: {
+        title: { type: 'string' },
+        body: { type: 'string' },
+        shared: { type: 'boolean', description: 'Share with the household (default false)' },
+      },
+      required: ['body'],
+    },
+    async run(ctx, input) {
+      const r = await ctx.db.addNote({
+        title: input.title || null, body: input.body, user_id: ctx.userId,
+        shared_scope: input.shared ? 'household' : 'private',
+        group_id: input.shared ? ctx.groupId : null,
+      });
+      const summary = `Added note${input.title ? ` "${input.title}"` : ''}`;
+      return { result: { ok: true, id: r.id, summary }, action: { tool: 'add_note', summary } };
+    },
+  },
+  {
+    name: 'update_note',
+    description: "Edit one of your own notes. Use list_notes for the id. Only pass fields to change.",
+    write: true,
+    input_schema: {
+      type: 'object',
+      properties: {
+        id: { type: 'integer' },
+        title: { type: 'string' },
+        body: { type: 'string' },
+        shared: { type: 'boolean', description: 'Share with household (true) or make private (false)' },
+      },
+      required: ['id'],
+    },
+    async run(ctx, input) {
+      const updates = {};
+      if (input.title != null) updates.title = input.title;
+      if (input.body != null) updates.body = input.body;
+      if (input.shared != null) {
+        updates.shared_scope = input.shared ? 'household' : 'private';
+        updates.group_id = input.shared ? ctx.groupId : null;
+      }
+      if (Object.keys(updates).length === 0) return { result: { ok: false, error: 'no fields to update' } };
+      const res = await ctx.db.updateNote(input.id, updates, ctx.userId);
+      if (!res.changed) return { result: { ok: false, error: `No note #${input.id} you own` } };
+      const summary = `Updated note #${input.id}`;
+      return { result: { ok: true, summary }, action: { tool: 'update_note', summary } };
+    },
+  },
+  {
+    name: 'delete_note',
+    description: 'Delete one of your own notes permanently. Use list_notes for the id.',
+    write: true,
+    input_schema: { type: 'object', properties: { id: { type: 'integer' } }, required: ['id'] },
+    async run(ctx, input) {
+      const res = await ctx.db.deleteNote(input.id, ctx.userId);
+      if (!res.changed) return { result: { ok: false, error: `No note #${input.id} you own` } };
+      const summary = `Deleted note #${input.id}`;
+      return { result: { ok: true, summary }, action: { tool: 'delete_note', summary } };
+    },
+  },
+
+  // ---- Lists & list items ----
+  {
+    name: 'list_lists',
+    description: "List the household's checklists/lists (e.g. groceries, packing, to-buy).",
+    write: false,
+    input_schema: { type: 'object', properties: {} },
+    async run(ctx) {
+      const rows = await ctx.db.getLists(ctx.userId);
+      return { result: rows.map(l => ({
+        id: l.id, name: l.name, type: l.list_type, active_items: l.active_count, total_items: l.total_count,
+      })) };
+    },
+  },
+  {
+    name: 'get_list_items',
+    description: 'List the items in a list. Use list_lists for the id.',
+    write: false,
+    input_schema: { type: 'object', properties: { list_id: { type: 'integer' } }, required: ['list_id'] },
+    async run(ctx, input) {
+      await assertListAccess(ctx, input.list_id);
+      const rows = await ctx.db.getListItems(input.list_id);
+      return { result: rows.map(i => ({ id: i.id, title: i.title, done: !!i.is_done, category: i.category })) };
+    },
+  },
+  {
+    name: 'add_list',
+    description: 'Create a new checklist/list.',
+    write: true,
+    input_schema: {
+      type: 'object',
+      properties: {
+        name: { type: 'string' },
+        list_type: { type: 'string', enum: ['standard', 'grocery'], description: 'default standard' },
+      },
+      required: ['name'],
+    },
+    async run(ctx, input) {
+      const r = await ctx.db.createList({ name: input.name, list_type: input.list_type || 'standard', created_by: ctx.userId });
+      const summary = `Created list "${input.name}"`;
+      return { result: { ok: true, id: r.id, summary }, action: { tool: 'add_list', summary } };
+    },
+  },
+  {
+    name: 'add_list_item',
+    description: 'Add an item to a list. Use list_lists for the id.',
+    write: true,
+    input_schema: {
+      type: 'object',
+      properties: {
+        list_id: { type: 'integer' },
+        title: { type: 'string' },
+        category: { type: 'string' },
+      },
+      required: ['list_id', 'title'],
+    },
+    async run(ctx, input) {
+      await assertListAccess(ctx, input.list_id);
+      await ctx.db.addListItem({ list_id: input.list_id, title: input.title, added_by: ctx.userName, category: input.category || null });
+      const summary = `Added "${input.title}" to list #${input.list_id}`;
+      return { result: { ok: true, summary }, action: { tool: 'add_list_item', summary } };
+    },
+  },
+  {
+    name: 'check_list_item',
+    description: 'Toggle a list item done/undone. Use get_list_items for the id.',
+    write: true,
+    input_schema: { type: 'object', properties: { id: { type: 'integer' } }, required: ['id'] },
+    async run(ctx, input) {
+      const item = await dbGet(ctx, 'SELECT list_id FROM list_items WHERE id = ?', [input.id]);
+      if (!item) return { result: { ok: false, error: `No list item #${input.id}` } };
+      await assertListAccess(ctx, item.list_id);
+      await ctx.db.toggleListItem(input.id);
+      const summary = `Toggled list item #${input.id}`;
+      return { result: { ok: true, summary }, action: { tool: 'check_list_item', summary } };
+    },
+  },
+  {
+    name: 'delete_list_item',
+    description: 'Remove an item from a list. Use get_list_items for the id.',
+    write: true,
+    input_schema: { type: 'object', properties: { id: { type: 'integer' } }, required: ['id'] },
+    async run(ctx, input) {
+      const item = await dbGet(ctx, 'SELECT list_id FROM list_items WHERE id = ?', [input.id]);
+      if (!item) return { result: { ok: false, error: `No list item #${input.id}` } };
+      await assertListAccess(ctx, item.list_id);
+      await ctx.db.deleteListItem(input.id);
+      const summary = `Deleted list item #${input.id}`;
+      return { result: { ok: true, summary }, action: { tool: 'delete_list_item', summary } };
+    },
+  },
+  {
+    name: 'delete_list',
+    description: 'Delete an entire list and its items permanently. Use list_lists for the id.',
+    write: true,
+    input_schema: { type: 'object', properties: { id: { type: 'integer' } }, required: ['id'] },
+    async run(ctx, input) {
+      await assertListAccess(ctx, input.id);
+      await ctx.db.deleteList(input.id);
+      const summary = `Deleted list #${input.id}`;
+      return { result: { ok: true, summary }, action: { tool: 'delete_list', summary } };
+    },
+  },
+
+  // ---- Itineraries (delete + stay edit/delete; create/update already above) ----
+  {
+    name: 'delete_itinerary',
+    description: 'Delete a trip/itinerary permanently. Use get_itineraries for the id.',
+    write: true,
+    input_schema: { type: 'object', properties: { id: { type: 'integer' } }, required: ['id'] },
+    async run(ctx, input) {
+      await assertHousehold(ctx, 'itineraries', input.id);
+      await ctx.db.deleteItinerary(input.id);
+      const summary = `Deleted itinerary #${input.id}`;
+      return { result: { ok: true, summary }, action: { tool: 'delete_itinerary', summary } };
+    },
+  },
+  {
+    name: 'update_itinerary_stay',
+    description: 'Edit a stay within an itinerary. Use get_itinerary_stays for the stay id and pass its itinerary_id.',
+    write: true,
+    input_schema: {
+      type: 'object',
+      properties: {
+        id: { type: 'integer', description: 'Stay id' },
+        itinerary_id: { type: 'integer' },
+        check_in: { type: 'string', description: 'YYYY-MM-DD' },
+        check_out: { type: 'string', description: 'YYYY-MM-DD' },
+        host_name: { type: 'string' },
+        location_name: { type: 'string' },
+        address: { type: 'string' },
+        notes: { type: 'string' },
+      },
+      required: ['id', 'itinerary_id'],
+    },
+    async run(ctx, input) {
+      await assertHousehold(ctx, 'itineraries', input.itinerary_id);
+      const updates = {};
+      for (const k of ['check_in', 'check_out', 'host_name', 'location_name', 'address', 'notes']) {
+        if (input[k] != null) updates[k] = input[k];
+      }
+      if (updates.check_in) requireDate(updates.check_in, 'check_in');
+      if (updates.check_out) requireDate(updates.check_out, 'check_out');
+      if (Object.keys(updates).length === 0) return { result: { ok: false, error: 'no fields to update' } };
+      await ctx.db.updateItineraryStay(input.id, updates, input.itinerary_id);
+      const summary = `Updated stay #${input.id}`;
+      return { result: { ok: true, summary }, action: { tool: 'update_itinerary_stay', summary } };
+    },
+  },
+  {
+    name: 'delete_itinerary_stay',
+    description: 'Delete a stay from an itinerary. Use get_itinerary_stays for the stay id and pass its itinerary_id.',
+    write: true,
+    input_schema: {
+      type: 'object',
+      properties: { id: { type: 'integer' }, itinerary_id: { type: 'integer' } },
+      required: ['id', 'itinerary_id'],
+    },
+    async run(ctx, input) {
+      await assertHousehold(ctx, 'itineraries', input.itinerary_id);
+      await ctx.db.deleteItineraryStay(input.id, input.itinerary_id);
+      const summary = `Deleted stay #${input.id}`;
+      return { result: { ok: true, summary }, action: { tool: 'delete_itinerary_stay', summary } };
+    },
+  },
+
+  // ---- Trips (edit) ----
+  {
+    name: 'update_trip',
+    description: 'Edit a trip (destination, origin, purpose, eta_minutes). Use get_trips for the id.',
+    write: true,
+    input_schema: {
+      type: 'object',
+      properties: {
+        id: { type: 'integer' },
+        destination: { type: 'string' },
+        origin: { type: 'string' },
+        purpose: { type: 'string' },
+        eta_minutes: { type: 'integer' },
+      },
+      required: ['id'],
+    },
+    async run(ctx, input) {
+      await assertHousehold(ctx, 'trips', input.id);
+      const updates = {};
+      for (const k of ['destination', 'origin', 'purpose', 'eta_minutes']) {
+        if (input[k] != null) updates[k] = input[k];
+      }
+      if (Object.keys(updates).length === 0) return { result: { ok: false, error: 'no fields to update' } };
+      await ctx.db.updateTrip(input.id, updates);
+      const summary = `Updated trip #${input.id}`;
+      return { result: { ok: true, summary }, action: { tool: 'update_trip', summary } };
+    },
+  },
+
+  // ---- Pantry (edit / delete) ----
+  {
+    name: 'update_pantry_item',
+    description: 'Edit a pantry item (quantity, unit, location, expiry_date). Use list_pantry for the id.',
+    write: true,
+    input_schema: {
+      type: 'object',
+      properties: {
+        id: { type: 'integer' },
+        quantity: { type: 'string' },
+        unit: { type: 'string' },
+        location: { type: 'string' },
+        expiry_date: { type: 'string', description: 'YYYY-MM-DD' },
+      },
+      required: ['id'],
+    },
+    async run(ctx, input) {
+      await assertHousehold(ctx, 'pantry', input.id);
+      const updates = {};
+      for (const k of ['quantity', 'unit', 'location', 'expiry_date']) {
+        if (input[k] != null) updates[k] = input[k];
+      }
+      if (updates.expiry_date) requireDate(updates.expiry_date, 'expiry_date');
+      if (Object.keys(updates).length === 0) return { result: { ok: false, error: 'no fields to update' } };
+      await ctx.db.updatePantryItem(input.id, updates);
+      const summary = `Updated pantry item #${input.id}`;
+      return { result: { ok: true, summary }, action: { tool: 'update_pantry_item', summary } };
+    },
+  },
+  {
+    name: 'delete_pantry_item',
+    description: 'Remove an item from the pantry. Use list_pantry for the id.',
+    write: true,
+    input_schema: { type: 'object', properties: { id: { type: 'integer' } }, required: ['id'] },
+    async run(ctx, input) {
+      await assertHousehold(ctx, 'pantry', input.id);
+      await ctx.db.deletePantryItem(input.id);
+      const summary = `Deleted pantry item #${input.id}`;
+      return { result: { ok: true, summary }, action: { tool: 'delete_pantry_item', summary } };
     },
   },
 ];

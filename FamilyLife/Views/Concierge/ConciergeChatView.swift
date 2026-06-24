@@ -10,6 +10,7 @@ struct ConciergeChatView: View {
 
     @State private var viewModel = ConciergeChatViewModel()
     @State private var draft = ""
+    @State private var showingHistory = false
     @FocusState private var inputFocused: Bool
 
     private let suggestions = ["What's on today?", "Add a task", "How's our budget?", "What's expiring soon?"]
@@ -24,11 +25,11 @@ struct ConciergeChatView: View {
                     ScrollViewReader { proxy in
                         ScrollView {
                             LazyVStack(alignment: .leading, spacing: 14) {
-                                if viewModel.messages.isEmpty { emptyState }
+                                if viewModel.messages.isEmpty && !viewModel.isLoading { emptyState }
                                 ForEach(viewModel.messages) { message in
                                     messageRow(message).id(message.id)
                                 }
-                                if viewModel.isSending { typingIndicator.id("typing") }
+                                if viewModel.isSending || viewModel.isLoading { typingIndicator.id("typing") }
                                 if let error = viewModel.errorMessage { errorRow(error) }
                             }
                             .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
@@ -47,8 +48,23 @@ struct ConciergeChatView: View {
                 if draft.isEmpty, let initialPrompt, !initialPrompt.isEmpty { draft = initialPrompt }
             }
             .toolbar {
+                ToolbarItemGroup(placement: .topBarLeading) {
+                    Button { showingHistory = true } label: {
+                        Image(systemName: "clock.arrow.circlepath")
+                    }
+                    Button { viewModel.startNew(); draft = "" } label: {
+                        Image(systemName: "square.and.pencil")
+                    }
+                    .disabled(viewModel.messages.isEmpty)
+                }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Done") { dismiss() }
+                }
+            }
+            .sheet(isPresented: $showingHistory) {
+                ConciergeHistoryView(currentId: viewModel.conversationId) { id in
+                    showingHistory = false
+                    Task { await viewModel.resume(conversationId: id, api: api) }
                 }
             }
         }

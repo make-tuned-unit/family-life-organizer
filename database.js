@@ -7,6 +7,7 @@
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
 
 // Use Render disk path if available, otherwise use local path
 const DB_DIR = process.env.RENDER_DISK_PATH 
@@ -407,17 +408,58 @@ class FamilyDB {
     });
   }
 
+  // Primary household — the lowest-id household the user belongs to. Used as the
+  // DEFAULT target when CREATING household-scoped data. A user may belong to more
+  // than one household (e.g. a shared-custody teen), so reads must use
+  // getUserHouseholdIds, not this.
   getUserHouseholdId(userId) {
     return new Promise((resolve, reject) => {
       this.db.get(`
         SELECT g.id FROM groups g
         JOIN group_members gm ON gm.group_id = g.id
         WHERE gm.user_id = ? AND g.group_type = 'household'
-        LIMIT 1
+        ORDER BY g.id LIMIT 1
       `, [userId], (err, row) => {
         if (err) reject(err);
         else resolve(row?.id || null);
       });
+    });
+  }
+
+  // ALL households the user belongs to (usually one, but two for shared-custody
+  // teens / adult kids with divorced parents). Household-scoped reads filter by
+  // this set so a multi-household member sees every household they're in — and
+  // ONLY those (strictly per-membership, so no cross-household leak).
+  getUserHouseholdIds(userId) {
+    return new Promise((resolve, reject) => {
+      this.db.all(`
+        SELECT g.id FROM groups g
+        JOIN group_members gm ON gm.group_id = g.id
+        WHERE gm.user_id = ? AND g.group_type = 'household'
+        ORDER BY g.id
+      `, [userId], (err, rows) => {
+        if (err) reject(err);
+        else resolve((rows || []).map(r => r.id));
+      });
+    });
+  }
+
+  // Is the user an admin of this group? Used to gate destructive/membership ops.
+  isGroupAdmin(groupId, userId) {
+    return new Promise((resolve, reject) => {
+      this.db.get("SELECT 1 FROM group_members WHERE group_id = ? AND user_id = ? AND role = 'admin' LIMIT 1",
+        [groupId, userId], (err, row) => err ? reject(err) : resolve(!!row));
+    });
+  }
+
+  // Is `groupId` a HOUSEHOLD the user belongs to? Used by household-row guards so
+  // they accept any of a multi-household user's households (not just the primary)
+  // while still rejecting clans and other households.
+  isHouseholdMember(groupId, userId) {
+    return new Promise((resolve, reject) => {
+      this.db.get(`SELECT 1 FROM group_members gm JOIN groups g ON g.id = gm.group_id
+         WHERE gm.group_id = ? AND gm.user_id = ? AND g.group_type = 'household' LIMIT 1`,
+        [groupId, userId], (err, row) => err ? reject(err) : resolve(!!row));
     });
   }
 
@@ -467,7 +509,10 @@ class FamilyDB {
       }
 
       if (userId) {
-        sql += ` AND group_id IN (SELECT group_id FROM group_members WHERE user_id = ?)`;
+        // Household-scoped: the user's household(s) only, never their clans.
+        sql += ` AND group_id IN (SELECT gm.group_id FROM group_members gm
+                   JOIN groups g ON g.id = gm.group_id
+                   WHERE gm.user_id = ? AND g.group_type = 'household')`;
         params.push(parseInt(userId, 10));
       }
 
@@ -515,7 +560,9 @@ class FamilyDB {
       let sql = 'SELECT * FROM groceries WHERE status = ?';
       if (userId) {
         const uid = parseInt(userId);
-        sql += ` AND group_id IN (SELECT group_id FROM group_members WHERE user_id = ${uid})`;
+        sql += ` AND group_id IN (SELECT gm.group_id FROM group_members gm
+                   JOIN groups g ON g.id = gm.group_id
+                   WHERE gm.user_id = ${uid} AND g.group_type = 'household')`;
       }
       sql += ' ORDER BY category, item';
       this.db.all(sql, [status], (err, rows) => {
@@ -584,7 +631,9 @@ class FamilyDB {
 
       if (userId) {
         const uid = parseInt(userId);
-        sql += ` AND group_id IN (SELECT group_id FROM group_members WHERE user_id = ${uid})`;
+        sql += ` AND group_id IN (SELECT gm.group_id FROM group_members gm
+                   JOIN groups g ON g.id = gm.group_id
+                   WHERE gm.user_id = ${uid} AND g.group_type = 'household')`;
       }
 
       sql += ' ORDER BY appointment_date, appointment_time';
@@ -606,7 +655,9 @@ class FamilyDB {
       let sql = 'SELECT * FROM appointments WHERE appointment_date >= ? AND appointment_date < ?';
       if (userId) {
         const uid = parseInt(userId);
-        sql += ` AND group_id IN (SELECT group_id FROM group_members WHERE user_id = ${uid})`;
+        sql += ` AND group_id IN (SELECT gm.group_id FROM group_members gm
+                   JOIN groups g ON g.id = gm.group_id
+                   WHERE gm.user_id = ${uid} AND g.group_type = 'household')`;
       }
       sql += ' ORDER BY appointment_date, appointment_time';
 
@@ -622,7 +673,9 @@ class FamilyDB {
       let sql = 'SELECT * FROM appointments WHERE recurrence_rule IS NOT NULL AND recurrence_rule != ""';
       if (userId) {
         const uid = parseInt(userId);
-        sql += ` AND group_id IN (SELECT group_id FROM group_members WHERE user_id = ${uid})`;
+        sql += ` AND group_id IN (SELECT gm.group_id FROM group_members gm
+                   JOIN groups g ON g.id = gm.group_id
+                   WHERE gm.user_id = ${uid} AND g.group_type = 'household')`;
       }
       this.db.all(sql, (err, rows) => {
         if (err) reject(err);
@@ -654,6 +707,89 @@ class FamilyDB {
         if (err) reject(err);
         else resolve({ id, ...updates });
       });
+    });
+  }
+
+  // Event attachments (polymorphic links from an appointment to other entities)
+  // Resolves a display title/subtitle for each attached entity in one pass so the
+  // client can render previews without a fetch per item.
+  getEventAttachments(appointmentId) {
+    return new Promise((resolve, reject) => {
+      this.db.all(
+        'SELECT * FROM event_attachments WHERE appointment_id = ? ORDER BY created_at',
+        [appointmentId],
+        async (err, rows) => {
+          if (err) return reject(err);
+          try {
+            const enriched = await Promise.all((rows || []).map(r => this._resolveAttachment(r)));
+            resolve(enriched);
+          } catch (e) { reject(e); }
+        }
+      );
+    });
+  }
+
+  // Look up the source entity for one attachment row and attach title/subtitle.
+  // If the source was deleted, the attachment still returns with a fallback label.
+  _resolveAttachment(row) {
+    const specs = {
+      list:      { table: 'lists',       title: 'name',        subtitle: 'list_type' },
+      note:      { table: 'notes',       title: 'title',       subtitle: 'body' },
+      decision:  { table: 'decisions',   title: 'title',       subtitle: 'decision_type' },
+      receipt:   { table: 'receipts',    title: 'merchant',    subtitle: 'amount' },
+      trip:      { table: 'trips',       title: 'destination', subtitle: 'traveler' },
+      itinerary: { table: 'itineraries', title: 'title',       subtitle: 'start_date' },
+    };
+    const spec = specs[row.attachment_type];
+    const base = {
+      id: row.id,
+      appointment_id: row.appointment_id,
+      attachment_type: row.attachment_type,
+      attachment_id: row.attachment_id,
+      created_at: row.created_at,
+    };
+    if (!spec) return Promise.resolve({ ...base, title: row.attachment_type, subtitle: null, missing: true });
+    return new Promise((resolve) => {
+      this.db.get(
+        `SELECT ${spec.title} AS _title, ${spec.subtitle} AS _subtitle FROM ${spec.table} WHERE id = ?`,
+        [row.attachment_id],
+        (err, item) => {
+          if (err || !item) return resolve({ ...base, title: `(deleted ${row.attachment_type})`, subtitle: null, missing: true });
+          let subtitle = item._subtitle != null ? String(item._subtitle) : null;
+          if (row.attachment_type === 'receipt' && subtitle != null) subtitle = '$' + subtitle;
+          if (row.attachment_type === 'note' && subtitle) subtitle = subtitle.slice(0, 80);
+          resolve({ ...base, title: item._title || `(${row.attachment_type})`, subtitle });
+        }
+      );
+    });
+  }
+
+  addEventAttachment({ appointment_id, attachment_type, attachment_id, group_id, added_by }) {
+    return new Promise((resolve, reject) => {
+      this.db.run(
+        `INSERT OR IGNORE INTO event_attachments (appointment_id, attachment_type, attachment_id, group_id, added_by)
+         VALUES (?, ?, ?, ?, ?)`,
+        [appointment_id, attachment_type, attachment_id, group_id || null, added_by || null],
+        function(err) {
+          if (err) reject(err);
+          else resolve({ id: this.lastID });
+        }
+      );
+    });
+  }
+
+  // Scope the delete to the appointment so a stray attachment id can't be removed
+  // from another event.
+  deleteEventAttachment(id, appointmentId) {
+    return new Promise((resolve, reject) => {
+      this.db.run(
+        'DELETE FROM event_attachments WHERE id = ? AND appointment_id = ?',
+        [id, appointmentId],
+        function(err) {
+          if (err) reject(err);
+          else resolve({ id, deleted: this.changes > 0 });
+        }
+      );
     });
   }
 
@@ -1877,12 +2013,35 @@ class FamilyDB {
   // Groups
   // ============================================
 
-  createGroup(group) {
+  // Allowed group kinds. 'household' = sensitive, one-or-more per user; the rest
+  // are cross-household "clans". Anything else is rejected so a client can't mint
+  // an unknown type to dodge scoping.
+  static get GROUP_TYPES() { return ['household', 'family', 'tribe', 'friends', 'group']; }
+
+  // Unguessable, collision-checked invite code (replaces the old Math.random one,
+  // which was predictable and could be brute-forced to join a household).
+  _generateInviteCode() {
     return new Promise((resolve, reject) => {
-      const inviteCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+      const tryOnce = (attempt) => {
+        if (attempt > 10) return reject(new Error('Could not generate a unique invite code'));
+        const code = crypto.randomBytes(8).toString('base64url').slice(0, 10).toUpperCase();
+        this.db.get('SELECT 1 FROM groups WHERE invite_code = ?', [code], (err, row) => {
+          if (err) return reject(err);
+          if (row) return tryOnce(attempt + 1); // collision — retry (bounded)
+          resolve(code);
+        });
+      };
+      tryOnce(0);
+    });
+  }
+
+  async createGroup(group) {
+    const groupType = FamilyDB.GROUP_TYPES.includes(group.group_type) ? group.group_type : 'family';
+    const inviteCode = await this._generateInviteCode();
+    return new Promise((resolve, reject) => {
       this.db.run(
         'INSERT INTO groups (name, group_type, description, invite_code, created_by) VALUES (?, ?, ?, ?, ?)',
-        [group.name, group.group_type || 'household', group.description || null, inviteCode, group.created_by],
+        [group.name, groupType, group.description || null, inviteCode, group.created_by],
         function(err) {
           if (err) reject(err);
           else resolve({ id: this.lastID, invite_code: inviteCode });
@@ -1990,7 +2149,7 @@ class FamilyDB {
       'budget_categories', 'budget_projects', 'project_expenses', 'pantry', 'trips',
       'gift_people', 'gift_ideas', 'special_events', 'family_addresses', 'feed_posts',
       'itineraries', 'itinerary_stays', 'subscriptions', 'concierge_memory', 'concierge_nudges',
-      'concierge_conversations', 'recurring_payments', 'notes'];
+      'concierge_conversations', 'recurring_payments', 'notes', 'event_attachments'];
   }
 
   // Merge one household into another: re-point all household-scoped data and
@@ -2479,10 +2638,13 @@ class FamilyDB {
 
   getDailySummary(userId = null) {
     return new Promise((resolve, reject) => {
-      // Scope to the user's groups only — no "OR group_id IS NULL" (that leaks
+      // Scope to the user's HOUSEHOLD(s) only (tasks/appointments are household
+      // data) — never their clans, and no "OR group_id IS NULL" (which would leak
       // every untagged record from other households into this user's summary).
       const groupFilter = userId
-        ? `AND group_id IN (SELECT group_id FROM group_members WHERE user_id = ${parseInt(userId)})`
+        ? `AND group_id IN (SELECT gm.group_id FROM group_members gm
+             JOIN groups g ON g.id = gm.group_id
+             WHERE gm.user_id = ${parseInt(userId)} AND g.group_type = 'household')`
         : '';
       const sql = `
         SELECT
@@ -3081,6 +3243,32 @@ class FamilyDB {
     return new Promise((resolve, reject) => {
       this.db.run('UPDATE concierge_conversations SET updated_at = CURRENT_TIMESTAMP WHERE id = ?',
         [id], (err) => err ? reject(err) : resolve());
+    });
+  }
+
+  // List a user's conversations, newest first, with a preview of the last message
+  // so the client can render a resumable history list.
+  getConciergeConversations(userId, limit = 50) {
+    return new Promise((resolve, reject) => {
+      this.db.all(
+        `SELECT c.id, c.title, c.created_at, c.updated_at,
+                (SELECT content FROM concierge_messages m
+                 WHERE m.conversation_id = c.id ORDER BY m.id DESC LIMIT 1) AS last_message,
+                (SELECT COUNT(*) FROM concierge_messages m WHERE m.conversation_id = c.id) AS message_count
+         FROM concierge_conversations c
+         WHERE c.user_id = ?
+           AND EXISTS (SELECT 1 FROM concierge_messages m WHERE m.conversation_id = c.id)
+         ORDER BY datetime(c.updated_at) DESC, c.id DESC LIMIT ?`,
+        [parseInt(userId), limit],
+        (err, rows) => err ? reject(err) : resolve(rows || [])
+      );
+    });
+  }
+
+  setConciergeConversationTitle(id, title) {
+    return new Promise((resolve, reject) => {
+      this.db.run('UPDATE concierge_conversations SET title = ? WHERE id = ? AND title IS NULL',
+        [title, id], (err) => err ? reject(err) : resolve());
     });
   }
 
