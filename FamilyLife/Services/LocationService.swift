@@ -34,10 +34,16 @@ final class LocationService: NSObject, CLLocationManagerDelegate {
     }
 
     func requestPermission() {
+        #if DEBUG
+        if ProcessInfo.processInfo.environment["UITEST_AUTOLOGIN"] != nil { return }
+        #endif
         manager.requestWhenInUseAuthorization()
     }
 
     func requestTripTrackingPermission() {
+        #if DEBUG
+        if ProcessInfo.processInfo.environment["UITEST_AUTOLOGIN"] != nil { return }
+        #endif
         wantsTripTrackingPermission = true
         switch manager.authorizationStatus {
         case .notDetermined:

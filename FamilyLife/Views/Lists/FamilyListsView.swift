@@ -9,6 +9,15 @@ struct FamilyListsView: View {
     @State private var selectedList: APIService.ListResponse?
     @State private var showingNewList = false
     @State private var isLoading = false
+    // "Tasks" is a reserved, synthetic entry backed by the tasks table (not list_items).
+    #if DEBUG
+    @State private var tasksSelected = ProcessInfo.processInfo.environment["UITEST_LIST"] == "tasks"
+    #else
+    @State private var tasksSelected = false
+    #endif
+    @State private var activeTaskCount = 0
+
+    private static let tasksReservedName = "Tasks"
 
     var body: some View {
         VStack(spacing: 0) {
@@ -18,7 +27,9 @@ struct FamilyListsView: View {
             listPicker
 
             // Selected list content
-            if let selected = selectedList {
+            if tasksSelected {
+                TasksDetailSection(api: api) { count in activeTaskCount = count }
+            } else if let selected = selectedList {
                 ListDetailSection(list: selected, api: api)
             } else if lists.isEmpty && !isLoading {
                 WarmEmptyState(
@@ -57,14 +68,20 @@ struct FamilyListsView: View {
     }
 
     private func navigateToList(named name: String) async {
+        // "Tasks" is reserved for the real tasks store — never create a list_items stub for it.
+        if name.localizedCaseInsensitiveCompare(Self.tasksReservedName) == .orderedSame {
+            tasksSelected = true
+            selectedList = nil
+            pendingListName = nil
+            return
+        }
         if let match = lists.first(where: { $0.name.localizedCaseInsensitiveCompare(name) == .orderedSame }) {
+            tasksSelected = false
             selectedList = match
-        } else {
-            let icon = name == "Tasks" ? "checkmark.circle.fill" : "list.bullet"
-            if let result = try? await api.createList(["name": name, "icon": icon]) {
-                await loadLists()
-                selectedList = lists.first { $0.id == result.id }
-            }
+        } else if let result = try? await api.createList(["name": name, "icon": "list.bullet"]) {
+            await loadLists()
+            tasksSelected = false
+            selectedList = lists.first { $0.id == result.id }
         }
         pendingListName = nil
     }
@@ -72,11 +89,14 @@ struct FamilyListsView: View {
     private func loadLists() async {
         isLoading = true
         do {
+            // Hide any legacy empty "Tasks" list_items stub — the synthetic Tasks chip replaces it.
             lists = try await api.fetchLists()
+                .filter { $0.name.localizedCaseInsensitiveCompare(Self.tasksReservedName) != .orderedSame }
+            activeTaskCount = (try? await api.fetchTasks(status: "active").count) ?? activeTaskCount
             // Deep-link takes priority
             if let name = pendingListName {
                 await navigateToList(named: name)
-            } else if selectedList == nil, let first = lists.first {
+            } else if !tasksSelected, selectedList == nil, let first = lists.first {
                 selectedList = first
             }
             // Update selected list data if it still exists
@@ -114,10 +134,40 @@ struct FamilyListsView: View {
     private var listPicker: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
+                // Synthetic, always-first Tasks chip (real to-dos, not list_items)
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        tasksSelected = true
+                        selectedList = nil
+                    }
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.system(size: 12))
+                        Text("Tasks")
+                            .font(.system(size: 13, weight: .semibold))
+                        if activeTaskCount > 0 {
+                            Text("\(activeTaskCount)")
+                                .font(.system(size: 11, weight: .bold))
+                                .foregroundStyle(tasksSelected ? WarmPalette.cream1.opacity(0.7) : WarmPalette.ink3)
+                        }
+                    }
+                    .foregroundStyle(tasksSelected ? WarmPalette.cream1 : WarmPalette.ink2)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                    .background(tasksSelected ? WarmPalette.ink1 : .clear)
+                    .clipShape(Capsule())
+                    .background(WarmPalette.cardSurface, in: Capsule())
+                }
+                .buttonStyle(.plain)
+
                 ForEach(lists) { list in
-                    let isActive = selectedList?.id == list.id
+                    let isActive = !tasksSelected && selectedList?.id == list.id
                     Button {
-                        withAnimation(.easeInOut(duration: 0.2)) { selectedList = list }
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            tasksSelected = false
+                            selectedList = list
+                        }
                     } label: {
                         HStack(spacing: 6) {
                             Image(systemName: list.isPinned ? "pin.fill" : (list.icon ?? "list.bullet"))
@@ -754,6 +804,230 @@ struct NewListSheet: View {
                 }
             }
         }
+    }
+}
+
+// MARK: - Tasks Detail Section (real to-dos from the tasks table, grouped by category)
+
+struct TasksDetailSection: View {
+    let api: APIService
+    var onCountChange: (Int) -> Void = { _ in }
+
+    @State private var tasks: [TaskResponse] = []
+    @State private var newTask = ""
+    @State private var isLoading = false
+    @State private var showCompleted = false
+    @State private var recentlyToggledIds: Set<Int> = []
+    @FocusState private var isInputFocused: Bool
+
+    private var activeTasks: [TaskResponse] {
+        tasks.filter { $0.status == "active" || recentlyToggledIds.contains($0.id) }
+    }
+
+    private var doneTasks: [TaskResponse] {
+        tasks.filter { $0.status != "active" && !recentlyToggledIds.contains($0.id) }
+    }
+
+    /// Active tasks grouped by category, with "general" rendered as "To-Do" and sorted last.
+    private var groupedActive: [(category: String, items: [TaskResponse])] {
+        let grouped = Dictionary(grouping: activeTasks) { displayCategory($0.category) }
+        return grouped
+            .map { (category: $0.key, items: $0.value) }
+            .sorted { lhs, rhs in
+                if lhs.category == "To-Do" { return false }
+                if rhs.category == "To-Do" { return true }
+                return lhs.category.localizedCaseInsensitiveCompare(rhs.category) == .orderedAscending
+            }
+    }
+
+    private func displayCategory(_ raw: String) -> String {
+        let trimmed = raw.trimmingCharacters(in: .whitespaces)
+        if trimmed.isEmpty || trimmed.lowercased() == "general" { return "To-Do" }
+        return trimmed.prefix(1).uppercased() + trimmed.dropFirst()
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            // Quick add bar
+            HStack(spacing: 12) {
+                HStack(spacing: 10) {
+                    Image(systemName: "plus")
+                        .font(.system(size: 14))
+                        .foregroundStyle(WarmPalette.ink3)
+                    TextField("Add a task...", text: $newTask)
+                        .font(.system(size: 15))
+                        .foregroundStyle(WarmPalette.ink1)
+                        .focused($isInputFocused)
+                        .onSubmit { addTask() }
+                }
+                .padding(12)
+                .background(WarmPalette.cardSurface, in: Capsule())
+
+                if !newTask.isEmpty {
+                    Button { addTask() } label: {
+                        Image(systemName: "arrow.up.circle.fill")
+                            .font(.system(size: 28))
+                            .foregroundStyle(TabAccent.home.color)
+                    }
+                }
+            }
+            .padding(.horizontal, 22)
+            .padding(.bottom, 14)
+
+            ScrollView(showsIndicators: false) {
+                VStack(spacing: 0) {
+                    if activeTasks.isEmpty && doneTasks.isEmpty && !isLoading {
+                        WarmEmptyState(
+                            title: "No tasks yet",
+                            systemImage: "checkmark.circle",
+                            description: "Add one above, or ask the concierge to."
+                        )
+                        .padding(.top, 40)
+                    }
+
+                    ForEach(groupedActive, id: \.category) { group in
+                        VStack(spacing: 0) {
+                            HStack(spacing: 8) {
+                                Text(group.category)
+                                    .font(.system(size: 13, weight: .bold))
+                                    .foregroundStyle(WarmPalette.ink2)
+                                Text("\(group.items.count)")
+                                    .font(.system(size: 11, weight: .semibold))
+                                    .foregroundStyle(WarmPalette.ink4)
+                                Spacer()
+                            }
+                            .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
+                            .padding(.top, 10)
+                            .padding(.bottom, 4)
+
+                            VStack(spacing: 0) {
+                                ForEach(Array(group.items.enumerated()), id: \.element.id) { index, task in
+                                    if index > 0 { GlassDivider() }
+                                    taskRow(task)
+                                }
+                            }
+                            .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
+                            .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
+                            .padding(.bottom, 8)
+                        }
+                    }
+
+                    if !doneTasks.isEmpty {
+                        Button {
+                            withAnimation(.easeInOut(duration: 0.2)) { showCompleted.toggle() }
+                        } label: {
+                            HStack {
+                                Text("Completed")
+                                    .font(.system(size: 13, weight: .semibold))
+                                    .foregroundStyle(WarmPalette.ink3)
+                                Text("\(doneTasks.count)")
+                                    .font(.system(size: 12, weight: .bold))
+                                    .foregroundStyle(WarmPalette.ink4)
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundStyle(WarmPalette.ink4)
+                                    .rotationEffect(.degrees(showCompleted ? 90 : 0))
+                            }
+                            .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
+                            .padding(.vertical, 10)
+                        }
+
+                        if showCompleted {
+                            VStack(spacing: 0) {
+                                ForEach(Array(doneTasks.enumerated()), id: \.element.id) { index, task in
+                                    if index > 0 { GlassDivider() }
+                                    taskRow(task)
+                                }
+                            }
+                            .background(WarmPalette.cardSurface.opacity(0.6), in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
+                            .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
+                        }
+                    }
+                }
+                .padding(.bottom, DesignTokens.Spacing.bottomBuffer)
+            }
+        }
+        .task { await loadTasks() }
+    }
+
+    private func taskRow(_ task: TaskResponse) -> some View {
+        let isDone = task.status != "active"
+        return HStack(spacing: 12) {
+            Button { toggleComplete(task) } label: {
+                Image(systemName: isDone ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 20))
+                    .foregroundStyle(isDone ? TabAccent.home.color : WarmPalette.ink3)
+            }
+            .buttonStyle(.plain)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(task.title)
+                    .font(.system(size: 15))
+                    .foregroundStyle(isDone ? WarmPalette.ink4 : WarmPalette.ink1)
+                    .strikethrough(isDone, color: WarmPalette.ink4)
+                if let due = dueLabel(task) {
+                    Text(due.text)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(due.overdue ? WarmPalette.bad : WarmPalette.ink3)
+                }
+            }
+            Spacer()
+            if task.priority == "high" && !isDone {
+                Circle().fill(WarmPalette.bad).frame(width: 7, height: 7)
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .contentShape(Rectangle())
+    }
+
+    private func dueLabel(_ task: TaskResponse) -> (text: String, overdue: Bool)? {
+        guard let raw = task.due_date, !raw.isEmpty,
+              let date = DateFormatter.isoDate.date(from: raw) else { return nil }
+        let cal = Calendar.current
+        let today = cal.startOfDay(for: Date())
+        let day = cal.startOfDay(for: date)
+        let fmt = DateFormatter(); fmt.dateFormat = "MMM d"
+        if day < today { return ("Overdue · \(fmt.string(from: date))", true) }
+        if cal.isDateInToday(date) { return ("Due today", false) }
+        if cal.isDateInTomorrow(date) { return ("Due tomorrow", false) }
+        return ("Due \(fmt.string(from: date))", false)
+    }
+
+    private func addTask() {
+        let title = newTask.trimmingCharacters(in: .whitespaces)
+        guard !title.isEmpty else { return }
+        newTask = ""
+        Task {
+            try? await api.addTask(["title": title, "category": "general", "priority": "medium"])
+            await loadTasks()
+        }
+    }
+
+    private func toggleComplete(_ task: TaskResponse) {
+        guard task.status == "active" else { return }
+        withAnimation { recentlyToggledIds.insert(task.id) }
+        Task {
+            try? await api.completeTask(id: task.id)
+            try? await Task.sleep(for: .seconds(0.4))
+            await loadTasks()
+            recentlyToggledIds.remove(task.id)
+        }
+    }
+
+    private func loadTasks() async {
+        isLoading = true
+        do {
+            async let active = api.fetchTasks(status: "active")
+            async let done = api.fetchTasks(status: "completed")
+            let (a, d) = try await (active, done)
+            tasks = a + d
+            onCountChange(a.count)
+        } catch {
+            guard !error.isCancellation else { return }
+        }
+        isLoading = false
     }
 }
 

@@ -190,6 +190,10 @@ a:focus-visible, button:focus-visible{outline:2px solid var(--terracotta);outlin
 }
 .phone-dark .phone-screen{background:#1d1712}
 
+/* Real app screenshots inside the phone frames */
+.phone-shot::after{display:none}            /* the screenshot has its own status bar + island */
+.app-shot{display:block;width:100%;height:100%;object-fit:cover;object-position:top center}
+
 .app{padding:14px 14px 18px;height:100%;display:flex;flex-direction:column;gap:11px;
   font-size:13px;overflow:hidden}
 .app-statusbar{display:flex;justify-content:space-between;font-size:11px;font-weight:600;
@@ -449,6 +453,10 @@ a:focus-visible, button:focus-visible{outline:2px solid var(--terracotta);outlin
 .notify-form input{flex:1;padding:.9em 1.2em;border-radius:999px;border:1px solid var(--line);
   background:#fff;font-family:var(--sans);font-size:1rem;color:var(--ink-1);box-shadow:var(--shadow-sm)}
 .notify-form input:focus{outline:none;border-color:var(--terracotta);box-shadow:0 0 0 4px rgba(196,106,74,.12)}
+.notify-status{min-height:1.2em;margin:14px auto 0;max-width:440px;font-family:var(--sans);
+  font-size:.92rem;font-weight:500;text-align:center}
+.notify-status[data-kind="success"]{color:var(--sage)}
+.notify-status[data-kind="error"]{color:var(--terracotta)}
 .cta-fine{margin-top:18px;color:var(--ink-3);font-size:.86rem}
 
 /* ============================================================

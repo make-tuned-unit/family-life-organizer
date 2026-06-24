@@ -434,7 +434,7 @@ struct HomeView: View {
 
     private var statsGrid: some View {
         HStack(spacing: 8) {
-            WarmStatTile(label: "Tasks", value: "\(viewModel.summary?.tasks_today ?? 0)", sub: "today")
+            WarmStatTile(label: "Tasks", value: "\(viewModel.summary?.active_tasks ?? viewModel.summary?.tasks_today ?? 0)", sub: "to do")
                 .onTapGesture { pendingListName = "Tasks"; selectedTab = .lists }
             WarmStatTile(label: "Events", value: "\(eventCount)", sub: eventSub)
                 .onTapGesture { withAnimation { eventRange = (eventRange + 1) % 3 } }

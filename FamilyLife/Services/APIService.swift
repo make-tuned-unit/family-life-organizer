@@ -54,6 +54,7 @@ final class APIService {
 
     struct DailySummary: Codable {
         let tasks_today: Int
+        let active_tasks: Int?
         let appointments_today: Int
         let groceries_needed: Int
         let overdue_tasks: Int
