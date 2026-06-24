@@ -1,0 +1,218 @@
+// Kinrows site — light progressive enhancement only.
+// Mark JS active so reveal-on-scroll hiding only applies when JS can un-hide it.
+document.documentElement.classList.add('js');
+
+// Sticky nav: add backdrop once the hero starts scrolling away.
+const nav = document.getElementById('nav');
+const onScroll = () => nav.classList.toggle('scrolled', window.scrollY > 24);
+onScroll();
+window.addEventListener('scroll', onScroll, { passive: true });
+
+// Mobile menu toggle.
+const navToggle = document.querySelector('.nav-toggle');
+if (navToggle) {
+  const setOpen = (open) => {
+    nav.classList.toggle('nav-open', open);
+    navToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+  };
+  navToggle.addEventListener('click', () => setOpen(!nav.classList.contains('nav-open')));
+  // Close after tapping a link.
+  document.querySelectorAll('#primary-nav a').forEach((a) =>
+    a.addEventListener('click', () => setOpen(false)));
+  // Close on Escape and return focus to the toggle.
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && nav.classList.contains('nav-open')) {
+      setOpen(false);
+      navToggle.focus();
+    }
+  });
+}
+
+// Scroll-reveal via IntersectionObserver (graceful if unsupported).
+const revealEls = document.querySelectorAll('.reveal');
+if ('IntersectionObserver' in window) {
+  const io = new IntersectionObserver((entries) => {
+    for (const e of entries) {
+      if (e.isIntersecting) {
+        e.target.classList.add('in');
+        io.unobserve(e.target);
+      }
+    }
+  }, { rootMargin: '0px 0px -10% 0px', threshold: 0.08 });
+  revealEls.forEach((el, i) => {
+    // tiny stagger for elements that share a row
+    el.style.transitionDelay = `${Math.min(i % 4, 3) * 60}ms`;
+    io.observe(el);
+  });
+} else {
+  revealEls.forEach((el) => el.classList.add('in'));
+}
+
+// App-screen choreography: build each mock screen in on scroll; type the Life Assist brief.
+const jsOn = document.documentElement.classList.contains('js');
+const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const briefParas = Array.from(document.querySelectorAll('.assist-brief p'));
+const briefHTML = briefParas.map((p) => p.innerHTML);
+// Empty the brief up front so it can type out (only when we'll actually animate it).
+if (jsOn && !reduceMotion) briefParas.forEach((p) => { p.textContent = ''; });
+
+function typeBrief() {
+  let pi = 0;
+  const nextPara = () => {
+    if (pi >= briefParas.length) return;
+    const p = briefParas[pi];
+    const tmp = document.createElement('div');
+    tmp.innerHTML = briefHTML[pi];
+    const text = tmp.textContent; // plain text; bold is restored when the line finishes
+    p.textContent = '';
+    p.classList.add('typing');
+    let c = 0;
+    const tick = () => {
+      p.textContent = text.slice(0, (c += 1));
+      if (c < text.length) {
+        setTimeout(tick, 16);
+      } else {
+        p.classList.remove('typing');
+        p.innerHTML = briefHTML[pi]; // restore <b> emphasis
+        pi += 1;
+        setTimeout(nextPara, 220);
+      }
+    };
+    tick();
+  };
+  nextPara();
+}
+
+// Chat screen: type a message into the composer and "send" it as a new bubble.
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+function typeInto(el, text, speed) {
+  return new Promise((res) => {
+    el.textContent = '';
+    let c = 0;
+    const t = () => {
+      el.textContent = text.slice(0, (c += 1));
+      if (c < text.length) setTimeout(t, speed);
+      else res();
+    };
+    t();
+  });
+}
+async function runChatDemo() {
+  const chat = document.querySelector('.app-chat .chat');
+  const composer = document.querySelector('.app-chat .chat-composer');
+  if (!chat || !composer) return;
+  const span = composer.querySelector('span');
+  const sendBtn = composer.querySelector('i');
+  const placeholder = (span.textContent || '').trim() || 'Message the household…';
+
+  // Keep the thread within the phone frame by dropping the oldest message.
+  const trim = () => { while (chat.children.length > 5) chat.firstElementChild.remove(); };
+
+  // A looping back-and-forth: you type & send, the household types back & replies.
+  const convo = [
+    { who: 'out', text: 'Sounds good — see you soon!' },
+    { who: 'in', name: 'Grace', text: 'Perfect — see you at 3.' },
+    { who: 'out', text: 'Grabbing milk on the way back.' },
+    { who: 'in', name: 'Daniel', text: 'Legend, thank you.' },
+  ];
+
+  for (let i = 0; ; i += 1) {
+    const turn = convo[i % convo.length];
+
+    if (turn.who === 'out') {
+      composer.classList.add('typing');
+      await typeInto(span, turn.text, 46);
+      await wait(360);
+      if (sendBtn) {
+        sendBtn.classList.add('sent');
+        setTimeout(() => sendBtn.classList.remove('sent'), 170);
+      }
+      const bub = document.createElement('div');
+      bub.className = 'bub out bub-new';
+      bub.textContent = turn.text;
+      chat.appendChild(bub);
+      trim();
+      composer.classList.remove('typing');
+      span.textContent = placeholder;
+      await wait(900);
+    } else {
+      // Show a "typing…" indicator, then swap it for the reply.
+      const dots = document.createElement('div');
+      dots.className = 'bub in typing-dots bub-new';
+      dots.innerHTML = '<span></span><span></span><span></span>';
+      chat.appendChild(dots);
+      trim();
+      await wait(1300);
+      dots.remove();
+      const bub = document.createElement('div');
+      bub.className = 'bub in bub-new';
+      bub.innerHTML = `<span class="bub-name">${turn.name}</span>${turn.text}`;
+      chat.appendChild(bub);
+      trim();
+      await wait(1600);
+    }
+  }
+}
+
+// Hero: a live vote lands on the Clay paint option, with subtle nods to the action.
+async function runHomeVote() {
+  const clay = document.querySelector('.app-home .vote-clay');
+  if (!clay) return;
+  const n = clay.querySelector('.vo-n');
+  const tile = document.querySelector('.app-home [data-tile="vote"]');
+  await wait(200);
+  clay.classList.add('tapped');           // the option is tapped
+  await wait(170);
+  clay.classList.remove('tapped');
+  clay.classList.add('voted');            // it selects
+  if (n) {
+    const pop = document.createElement('span');
+    pop.className = 'vote-pop';
+    pop.textContent = '+1';
+    clay.appendChild(pop);
+    setTimeout(() => pop.remove(), 1000);
+    n.textContent = String((parseInt(n.textContent, 10) || 1) + 1); // count ticks up
+    n.classList.add('bump');
+    setTimeout(() => n.classList.remove('bump'), 520);
+  }
+  await wait(440);
+  if (tile) {                              // "need a vote" quietly drops by one
+    tile.textContent = String(Math.max(0, (parseInt(tile.textContent, 10) || 3) - 1));
+    tile.classList.add('bump');
+    setTimeout(() => tile.classList.remove('bump'), 520);
+  }
+}
+
+const appScreens = document.querySelectorAll('.app');
+if ('IntersectionObserver' in window && jsOn && !reduceMotion) {
+  const appIO = new IntersectionObserver((entries) => {
+    for (const e of entries) {
+      if (!e.isIntersecting) continue;
+      e.target.classList.add('played');
+      if (e.target.classList.contains('app-assist')) setTimeout(typeBrief, 520);
+      if (e.target.classList.contains('app-chat')) setTimeout(runChatDemo, 900);
+      if (e.target.classList.contains('app-home')) setTimeout(runHomeVote, 1400);
+      appIO.unobserve(e.target);
+    }
+  }, { threshold: 0.35 });
+  appScreens.forEach((a) => appIO.observe(a));
+} else {
+  // No observer / reduced motion: show everything statically.
+  appScreens.forEach((a) => a.classList.add('played'));
+  briefParas.forEach((p, i) => { p.innerHTML = briefHTML[i]; });
+}
+
+// Notify form — placeholder until a real endpoint is wired.
+const form = document.querySelector('.notify-form');
+if (form) {
+  form.addEventListener('submit', () => {
+    const input = form.querySelector('input');
+    const btn = form.querySelector('button');
+    if (input.value && input.checkValidity()) {
+      btn.textContent = "You're on the list ✓";
+      btn.disabled = true;
+      input.disabled = true;
+    }
+  });
+}

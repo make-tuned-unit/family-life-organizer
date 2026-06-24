@@ -50,6 +50,10 @@ app.use(session({
   saveUninitialized: false,
   cookie: { secure: false }
 }));
+// Public marketing site (kinrows.com) — served at the root. Registered BEFORE
+// `public` so `/`, `/privacy.html`, `/terms.html`, and `/assets/*` resolve to the
+// Kinrows landing site. The iOS app + browser dashboard live under /api and /app.
+app.use(express.static(path.join(__dirname, 'website')));
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Auth middleware
@@ -82,10 +86,11 @@ function dbGet(db, sql, params = []) {
 // and denied rather than allowed — preventing a null-row cross-household hole.)
 async function requireHouseholdRow(db, table, id, req, res) {
   const userId = req.session.user?.id;
-  const gid = await db.getUserHouseholdId(userId);
   const row = await dbGet(db, `SELECT group_id FROM ${table} WHERE id = ?`, [id]);
   if (!row) { res.status(404).json({ error: 'Not found' }); return false; }
-  if (gid == null || row.group_id == null || row.group_id !== gid) {
+  // Accept the row if its group is ANY household the caller belongs to (a user may
+  // be in more than one — shared-custody teens), and reject clans/other households.
+  if (row.group_id == null || !(await db.isHouseholdMember(row.group_id, userId))) {
     res.status(403).json({ error: 'Forbidden' }); return false;
   }
   return true;
@@ -100,6 +105,78 @@ async function requireFeedPostMember(db, postId, req, res) {
     res.status(403).json({ error: 'Not a member of this group' }); return false;
   }
   return true;
+}
+
+// Authorization guard for CLAN-SHAREABLE rows (decisions, rivalries) keyed by id:
+// the caller must be a member of the row's group. Unlike requireHouseholdRow this
+// accepts ANY group the caller belongs to (a clan, not just their household), so
+// content shared to a clan is editable by that clan's members — and no one else.
+const GROUP_ROW_TABLES = new Set(['decisions', 'rivalries']);
+async function requireGroupRow(db, table, id, req, res) {
+  if (!GROUP_ROW_TABLES.has(table)) throw new Error(`requireGroupRow: unsupported table ${table}`);
+  const row = await dbGet(db, `SELECT group_id FROM ${table} WHERE id = ?`, [id]);
+  if (!row) { res.status(404).json({ error: 'Not found' }); return false; }
+  if (row.group_id == null || !(await db.isGroupMember(row.group_id, req.session.user?.id))) {
+    res.status(403).json({ error: 'Forbidden' }); return false;
+  }
+  return true;
+}
+
+// Authorization guard for destructive/membership group ops. Households are small
+// trusted units (partners co-manage), so any household member may manage. Clans
+// can be large/loose, so adding/removing members, renaming, or deleting requires
+// ADMIN — this is what stops a clan member quietly adding an outsider (who would
+// then see the whole clan's content) or kicking the owner.
+async function requireGroupManage(db, groupId, req, res) {
+  const userId = req.session.user?.id;
+  const g = await dbGet(db, 'SELECT group_type FROM groups WHERE id = ?', [groupId]);
+  if (!g) { res.status(404).json({ error: 'Group not found' }); return false; }
+  const ok = g.group_type === 'household'
+    ? await db.isGroupMember(groupId, userId)
+    : await db.isGroupAdmin(groupId, userId);
+  if (!ok) {
+    res.status(403).json({ error: g.group_type === 'household' ? 'Not a member of this household' : 'Admin privileges required for this group' });
+    return false;
+  }
+  return true;
+}
+
+// Site-admin gate for /api/admin/* (global, cross-household diagnostics + repair).
+// Allowed user ids come from ADMIN_USER_IDS (comma-separated). If unset, NO ONE
+// is an admin — the endpoints fail closed rather than leaking every household.
+function requireAdmin(req, res, next) {
+  const allowed = (process.env.ADMIN_USER_IDS || '').split(',').map(s => s.trim()).filter(Boolean);
+  const uid = req.session.user?.id;
+  if (uid != null && allowed.includes(String(uid))) return next();
+  return res.status(403).json({ error: 'Forbidden' });
+}
+
+// Resolve the group_id a new row should be tagged with. If the client supplied
+// one, the caller MUST be a member of it (and for household-only features it must
+// be a household) — this blocks injecting content into a clan/household the
+// caller doesn't belong to. With no supplied id, default to the primary
+// household. Returns the resolved id, or null if the supplied group is not
+// permitted (caller should respond 403).
+async function resolveCreateGroupId(db, userId, requested, { householdOnly = false } = {}) {
+  if (requested == null || requested === '') return await db.getUserHouseholdId(userId);
+  const gid = parseInt(requested);
+  if (!Number.isInteger(gid) || !(await db.isGroupMember(gid, userId))) return null;
+  if (householdOnly) {
+    const g = await dbGet(db, 'SELECT group_type FROM groups WHERE id = ?', [gid]);
+    if (!g || g.group_type !== 'household') return null;
+  }
+  return gid;
+}
+
+// May the caller view this user's avatar? Only if they share a household or any
+// group (so a clan member sees clan co-members, but strangers don't), or it's
+// themselves. Mirrors the per-membership visibility model.
+async function canViewUser(db, targetId, viewerId) {
+  if (parseInt(targetId) === parseInt(viewerId)) return true;
+  const row = await dbGet(db, `SELECT 1 AS ok FROM group_members a
+    JOIN group_members b ON a.group_id = b.group_id
+    WHERE a.user_id = ? AND b.user_id = ? LIMIT 1`, [viewerId, targetId]);
+  return !!row;
 }
 
 // Authorization guard for list `:id` routes. A list is visible to its creator
@@ -139,6 +216,39 @@ async function requireItineraryAccess(db, id, req, res) {
     res.status(403).json({ error: 'Forbidden' }); return false;
   }
   return true;
+}
+
+// Can the caller attach this entity to an event? Mirrors each entity's own read
+// scoping so a user can't link (and thereby reveal the title of) something they
+// can't already see. Returns true/false; does NOT write a response.
+async function canAttachEntity(db, type, id, userId) {
+  if (type === 'list') {
+    // Visible to creator or to members of the creator's household(s).
+    const row = await dbGet(db, `SELECT 1 AS ok FROM lists l WHERE l.id = ? AND (
+        l.created_by = ?
+        OR EXISTS (SELECT 1 FROM group_members gm JOIN groups g ON g.id = gm.group_id
+                   AND g.group_type = 'household'
+                   WHERE gm.user_id = l.created_by AND gm.group_id IN (
+                     SELECT group_id FROM group_members WHERE user_id = ?)))`,
+      [id, userId, userId]);
+    return !!row;
+  }
+  if (type === 'note') {
+    // Owner, or shared (household/group) to a group the caller belongs to.
+    const row = await dbGet(db, `SELECT 1 AS ok FROM notes n WHERE n.id = ? AND (
+        n.user_id = ?
+        OR (n.shared_scope != 'private' AND n.group_id IN (SELECT group_id FROM group_members WHERE user_id = ?)))`,
+      [id, userId, userId]);
+    return !!row;
+  }
+  // decision | receipt | trip | itinerary: the caller must be a member of the
+  // row's group (a household OR a clan it was shared to — multi-household safe).
+  const tables = { decision: 'decisions', receipt: 'receipts', trip: 'trips', itinerary: 'itineraries' };
+  const table = tables[type];
+  if (!table) return false;
+  const row = await dbGet(db, `SELECT group_id FROM ${table} WHERE id = ?`, [id]);
+  if (!row || row.group_id == null) return false;
+  return await db.isGroupMember(row.group_id, userId);
 }
 
 // Premium gate: requires an active household subscription. Returns 402 otherwise.
@@ -377,8 +487,12 @@ app.put('/api/users/me/avatar', requireAuth, async (req, res) => {
 app.get('/api/users/:id/avatar', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
+    const targetId = parseInt(req.params.id);
+    if (!(await canViewUser(db, targetId, req.session.user?.id))) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
     const row = await new Promise((resolve, reject) => {
-      db.db.get('SELECT profile_image FROM users WHERE id = ?', [req.params.id], (err, row) => err ? reject(err) : resolve(row));
+      db.db.get('SELECT profile_image FROM users WHERE id = ?', [targetId], (err, row) => err ? reject(err) : resolve(row));
     });
     if (!row?.profile_image) return res.status(404).json({ error: 'No avatar' });
     res.json({ image: row.profile_image });
@@ -606,7 +720,7 @@ app.post('/login', async (req, res) => {
       const valid = await bcrypt.compare(password, dbUser.password_hash);
       if (valid) {
         req.session.user = { username: dbUser.username, name: dbUser.name, avatar: dbUser.avatar, id: dbUser.id };
-        return res.redirect('/');
+        return res.redirect('/app');
       }
     }
 
@@ -614,7 +728,7 @@ app.post('/login', async (req, res) => {
     const legacy = LEGACY_USERS[username];
     if (legacy && legacy.password === password) {
       req.session.user = { username, name: legacy.name, avatar: legacy.avatar };
-      return res.redirect('/');
+      return res.redirect('/app');
     }
 
     res.redirect('/login?error=1');
@@ -632,7 +746,9 @@ app.get('/logout', (req, res) => {
 });
 
 // Dashboard
-app.get('/', requireAuth, async (req, res) => {
+// Legacy server-rendered browser dashboard. Moved off `/` (now the marketing
+// site) to `/app` so it still works for anyone using the web app directly.
+app.get('/app', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
     const userId = req.session.user?.id;
@@ -1493,9 +1609,11 @@ app.post('/api/appointments', requireAuth, async (req, res) => {
     const userId = req.session.user.id;
     const senderName = req.session.user.name;
     if (data.appointment_date) data.appointment_date = normalizeDate(data.appointment_date);
-    if (!data.group_id) {
-      data.group_id = await db.getUserHouseholdId(userId);
-    }
+    // Events are household-only: a supplied group_id must be one of the caller's
+    // households; otherwise default to their primary household. Never a clan.
+    const apptGid = await resolveCreateGroupId(db, userId, data.group_id, { householdOnly: true });
+    if (apptGid == null) return res.status(403).json({ error: 'Cannot create an event in that group' });
+    data.group_id = apptGid;
     await db.addAppointment(data);
     res.json({ success: true });
     // Notify household members about the new event
@@ -1566,6 +1684,68 @@ app.get('/api/appointments', requireAuth, async (req, res) => {
     }
 
     res.json(appointments);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+// Event attachments — list items attached to an appointment.
+// NOTE: defined BEFORE `/:year/:month` so "123/attachments" isn't parsed as a month.
+app.get('/api/appointments/:id/attachments', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    if (!(await requireHouseholdRow(db, 'appointments', req.params.id, req, res))) return;
+    const attachments = await db.getEventAttachments(req.params.id);
+    res.json(attachments);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+// Event attachments — attach an item to an appointment
+app.post('/api/appointments/:id/attachments', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    if (!(await requireHouseholdRow(db, 'appointments', req.params.id, req, res))) return;
+    const { attachment_type, attachment_id } = req.body || {};
+    const allowed = ['list', 'note', 'decision', 'receipt', 'trip', 'itinerary'];
+    if (!allowed.includes(attachment_type) || !attachment_id) {
+      return res.status(400).json({ error: 'Invalid attachment_type or attachment_id' });
+    }
+    const userId = req.session.user.id;
+    if (!(await canAttachEntity(db, attachment_type, attachment_id, userId))) {
+      return res.status(403).json({ error: 'Cannot attach an item you do not have access to' });
+    }
+    // Tag the attachment with the event's own household (the appointment already
+    // passed requireHouseholdRow), so it follows the event's household, not the
+    // caller's primary one (which may differ for a multi-household user).
+    const apptRow = await dbGet(db, 'SELECT group_id FROM appointments WHERE id = ?', [req.params.id]);
+    await db.addEventAttachment({
+      appointment_id: req.params.id,
+      attachment_type,
+      attachment_id,
+      group_id: apptRow?.group_id || null,
+      added_by: userId,
+    });
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+// Event attachments — remove an attachment from an appointment
+app.delete('/api/appointments/:id/attachments/:attachmentId', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    if (!(await requireHouseholdRow(db, 'appointments', req.params.id, req, res))) return;
+    await db.deleteEventAttachment(req.params.attachmentId, req.params.id);
+    res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
   } finally {
@@ -2291,6 +2471,36 @@ app.post('/api/concierge/chat', requireAuth, conciergeLimiter, requirePremium, a
   }
 });
 
+// Concierge - list the user's past conversations (premium, resumable history)
+app.get('/api/concierge/conversations', requireAuth, conciergeLimiter, requirePremium, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const rows = await db.getConciergeConversations(req.session.user.id);
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
+// Concierge - messages for one conversation (must belong to the caller)
+app.get('/api/concierge/conversations/:id/messages', requireAuth, conciergeLimiter, requirePremium, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const convo = await db.getConciergeConversation(req.params.id);
+    if (!convo || convo.user_id !== req.session.user.id) {
+      return res.status(404).json({ error: 'Conversation not found' });
+    }
+    const messages = await db.getConciergeMessages(req.params.id, 100);
+    res.json(messages);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
 // Cook - recipe suggestions (requires ANTHROPIC_API_KEY env var)
 app.post('/api/cook/suggest', requireAuth, async (req, res) => {
   const db = new FamilyDB();
@@ -2534,7 +2744,7 @@ app.get('/api/decisions', requireAuth, async (req, res) => {
 app.get('/api/decisions/:id', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
-    if (!(await requireHouseholdRow(db, 'decisions', req.params.id, req, res))) return;
+    if (!(await requireGroupRow(db, 'decisions', req.params.id, req, res))) return;
     const decision = await db.getDecisionById(req.params.id);
     if (!decision) return res.status(404).json({ error: 'Not found' });
     res.json(decision);
@@ -2551,9 +2761,11 @@ app.post('/api/decisions', requireAuth, async (req, res) => {
     const data = { ...req.body };
     const userId = req.session.user.id;
     const senderName = req.session.user.name;
-    if (!data.group_id) {
-      data.group_id = await db.getUserHouseholdId(userId);
-    }
+    // Decisions are clan-shareable: a supplied group_id must be a group the caller
+    // belongs to (clan or household); otherwise default to their household.
+    const decisionGid = await resolveCreateGroupId(db, userId, data.group_id, { householdOnly: false });
+    if (decisionGid == null) return res.status(403).json({ error: 'Cannot create a decision in that group' });
+    data.group_id = decisionGid;
     const result = await db.addDecision(data);
     res.json({ success: true, id: result.id });
     // Push to household members
@@ -2570,7 +2782,7 @@ app.post('/api/decisions', requireAuth, async (req, res) => {
 app.put('/api/decisions/:id', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
-    if (!(await requireHouseholdRow(db, 'decisions', req.params.id, req, res))) return;
+    if (!(await requireGroupRow(db, 'decisions', req.params.id, req, res))) return;
     await db.updateDecision(req.params.id, req.body);
     res.json({ success: true });
   } catch (err) {
@@ -2586,7 +2798,7 @@ app.delete('/api/decisions/:id', requireAuth, async (req, res) => {
     db.db.run(sql, params, (err) => err ? reject(err) : resolve());
   });
   try {
-    if (!(await requireHouseholdRow(db, 'decisions', req.params.id, req, res))) return;
+    if (!(await requireGroupRow(db, 'decisions', req.params.id, req, res))) return;
     await run('DELETE FROM decision_reactions WHERE decision_id = ?', [req.params.id]);
     await run('DELETE FROM decision_comments WHERE decision_id = ?', [req.params.id]);
     await run('DELETE FROM decisions WHERE id = ?', [req.params.id]);
@@ -2601,7 +2813,7 @@ app.delete('/api/decisions/:id', requireAuth, async (req, res) => {
 app.get('/api/decisions/:id/reactions', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
-    if (!(await requireHouseholdRow(db, 'decisions', req.params.id, req, res))) return;
+    if (!(await requireGroupRow(db, 'decisions', req.params.id, req, res))) return;
     const reactions = await db.getDecisionReactions(req.params.id);
     res.json(reactions);
   } catch (err) {
@@ -2614,7 +2826,7 @@ app.get('/api/decisions/:id/reactions', requireAuth, async (req, res) => {
 app.post('/api/decisions/:id/reactions', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
-    if (!(await requireHouseholdRow(db, 'decisions', req.params.id, req, res))) return;
+    if (!(await requireGroupRow(db, 'decisions', req.params.id, req, res))) return;
     const { member_name, reaction_type, poll_choice } = req.body;
     await db.replaceDecisionReaction(req.params.id, member_name, reaction_type, poll_choice);
     res.json({ success: true });
@@ -2628,7 +2840,7 @@ app.post('/api/decisions/:id/reactions', requireAuth, async (req, res) => {
 app.get('/api/decisions/:id/comments', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
-    if (!(await requireHouseholdRow(db, 'decisions', req.params.id, req, res))) return;
+    if (!(await requireGroupRow(db, 'decisions', req.params.id, req, res))) return;
     const comments = await db.getDecisionComments(req.params.id);
     res.json(comments);
   } catch (err) {
@@ -2641,7 +2853,7 @@ app.get('/api/decisions/:id/comments', requireAuth, async (req, res) => {
 app.post('/api/decisions/:id/comments', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
-    if (!(await requireHouseholdRow(db, 'decisions', req.params.id, req, res))) return;
+    if (!(await requireGroupRow(db, 'decisions', req.params.id, req, res))) return;
     await db.addDecisionComment(req.params.id, req.body.member_name, req.body.text);
     res.json({ success: true });
   } catch (err) {
@@ -2670,8 +2882,16 @@ app.post('/api/rivalries', requireAuth, async (req, res) => {
     const data = { ...req.body };
     if (data.start_date) data.start_date = normalizeDate(data.start_date);
     if (data.end_date) data.end_date = normalizeDate(data.end_date);
-    if (!data.group_id) {
-      // For 1v1 rivalries, find the shared group between participants
+    if (data.group_id != null && data.group_id !== '') {
+      // A supplied group_id must be a valid group the caller belongs to (no
+      // injecting a rivalry into someone else's clan/household).
+      const gid = parseInt(data.group_id);
+      if (!Number.isInteger(gid) || !(await db.isGroupMember(gid, req.session.user.id))) {
+        return res.status(403).json({ error: 'Cannot create a rivalry in that group' });
+      }
+      data.group_id = gid;
+    } else {
+      // For 1v1 rivalries, find the shared group between participants (server-derived).
       if (data.initiator_name && data.opponent_name) {
         data.group_id = await db.getSharedGroupByNames(data.initiator_name, data.opponent_name);
       }
@@ -2708,7 +2928,7 @@ app.post('/api/rivalries', requireAuth, async (req, res) => {
 app.put('/api/rivalries/:id', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
-    if (!(await requireHouseholdRow(db, 'rivalries', req.params.id, req, res))) return;
+    if (!(await requireGroupRow(db, 'rivalries', req.params.id, req, res))) return;
     const data = { ...req.body };
     if (data.start_date) data.start_date = normalizeDate(data.start_date);
     if (data.end_date) data.end_date = normalizeDate(data.end_date);
@@ -2724,7 +2944,7 @@ app.put('/api/rivalries/:id', requireAuth, async (req, res) => {
 app.get('/api/rivalries/:id/entries', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
-    if (!(await requireHouseholdRow(db, 'rivalries', req.params.id, req, res))) return;
+    if (!(await requireGroupRow(db, 'rivalries', req.params.id, req, res))) return;
     const entries = await db.getRivalryEntries(req.params.id);
     res.json(entries);
   } catch (err) {
@@ -2737,7 +2957,7 @@ app.get('/api/rivalries/:id/entries', requireAuth, async (req, res) => {
 app.post('/api/rivalries/:id/entries', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
-    if (!(await requireHouseholdRow(db, 'rivalries', req.params.id, req, res))) return;
+    if (!(await requireGroupRow(db, 'rivalries', req.params.id, req, res))) return;
     const rivalryId = Number(req.params.id);
     const entry = { ...req.body, rivalry_id: rivalryId };
     await db.addRivalryEntry(entry);
@@ -2852,7 +3072,7 @@ function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
 app.post('/api/rivalries/:id/complete', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
-    if (!(await requireHouseholdRow(db, 'rivalries', req.params.id, req, res))) return;
+    if (!(await requireGroupRow(db, 'rivalries', req.params.id, req, res))) return;
     const result = await db.completeRivalryWithTotals(Number(req.params.id));
     const { rivalry, initiator_total, opponent_total, winner_name, already_completed } = result;
     const ct = rivalry.challenge_type === 'steps' ? 'steps' : rivalry.challenge_type;
@@ -3352,8 +3572,14 @@ app.post('/api/groups/join', requireAuth, async (req, res) => {
   try {
     const userId = req.session.user?.id;
     const { invite_code } = req.body;
+    if (!invite_code) return res.status(400).json({ error: 'invite_code required' });
     const group = await db.getGroupByInviteCode(invite_code);
     if (!group) return res.status(404).json({ error: 'Invalid invite code' });
+    if (await db.isGroupMember(group.id, userId)) {
+      return res.json({ success: true, group, already_member: true });
+    }
+    // Joiners are plain members. Households are co-managed by any member; clans
+    // require an admin to add/remove/rename/delete, so a clan joiner can't manage.
     await db.addGroupMember(group.id, { user_id: userId, role: 'member', added_by: userId });
     res.json({ success: true, group });
   } catch (err) {
@@ -3374,9 +3600,8 @@ app.post('/api/households/merge', requireAuth, async (req, res) => {
     const userId = req.session.user?.id;
     const sourceId = parseInt(req.body.source_id);
     if (!sourceId) return res.status(400).json({ error: 'source_id required' });
-    if (!(await db.isGroupMember(sourceId, userId))) {
-      return res.status(403).json({ error: 'Not a member of the source household' });
-    }
+    // Merging deletes the source household — require admin of it (not just member).
+    if (!(await requireGroupManage(db, sourceId, req, res))) return;
     // Resolve target by id or invite code.
     let targetId = req.body.target_id ? parseInt(req.body.target_id) : null;
     if (!targetId && req.body.invite_code) {
@@ -3441,10 +3666,12 @@ app.post('/api/groups/:id/members', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
     const userId = req.session.user?.id;
-    if (!(await db.isGroupMember(req.params.id, userId))) {
-      return res.status(403).json({ error: 'Not a member of this group' });
-    }
-    const result = await db.addGroupMember(req.params.id, { ...req.body, added_by: userId });
+    // Admin-only: adding an outsider to a household exposes its sensitive data.
+    // New members are forced to 'member' — no self-promotion to admin.
+    if (!(await requireGroupManage(db, req.params.id, req, res))) return;
+    const result = await db.addGroupMember(req.params.id, {
+      user_id: req.body.user_id, contact_id: req.body.contact_id, role: 'member', added_by: userId,
+    });
     res.json({ success: true, id: result.id });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -3456,9 +3683,16 @@ app.post('/api/groups/:id/members', requireAuth, async (req, res) => {
 app.delete('/api/groups/:groupId/members/:memberId', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
-    if (!(await db.isGroupMember(req.params.groupId, req.session.user?.id))) {
+    const userId = req.session.user?.id;
+    if (!(await db.isGroupMember(req.params.groupId, userId))) {
       return res.status(403).json({ error: 'Not a member of this group' });
     }
+    // Anyone may remove themselves (leave); only admins may remove others.
+    const target = await dbGet(db, 'SELECT user_id FROM group_members WHERE id = ? AND group_id = ?',
+      [req.params.memberId, req.params.groupId]);
+    if (!target) return res.status(404).json({ error: 'Member not found' });
+    const isSelf = target.user_id != null && target.user_id === userId;
+    if (!isSelf && !(await requireGroupManage(db, req.params.groupId, req, res))) return;
     await db.removeGroupMember(req.params.groupId, req.params.memberId);
     res.json({ success: true });
   } catch (err) {
@@ -3471,9 +3705,8 @@ app.delete('/api/groups/:groupId/members/:memberId', requireAuth, async (req, re
 app.put('/api/groups/:id', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
-    if (!(await db.isGroupMember(req.params.id, req.session.user?.id))) {
-      return res.status(403).json({ error: 'Not a member of this group' });
-    }
+    // Renaming/redescribing a group is an admin action.
+    if (!(await requireGroupManage(db, req.params.id, req, res))) return;
     const { name, description } = req.body;
     const fields = [];
     const params = [];
@@ -3495,9 +3728,8 @@ app.put('/api/groups/:id', requireAuth, async (req, res) => {
 app.delete('/api/groups/:id', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
-    if (!(await db.isGroupMember(req.params.id, req.session.user?.id))) {
-      return res.status(403).json({ error: 'Not a member of this group' });
-    }
+    // Deleting a whole group/household is destructive — admins only.
+    if (!(await requireGroupManage(db, req.params.id, req, res))) return;
     await db.deleteGroup(req.params.id);
     res.json({ success: true });
   } catch (err) {
@@ -3875,7 +4107,7 @@ app.get('/api/activity', requireAuth, async (req, res) => {
 // Admin diagnostic + manual fix
 // ============================================
 
-app.get('/api/admin/diagnostic', requireAuth, async (req, res) => {
+app.get('/api/admin/diagnostic', requireAuth, requireAdmin, async (req, res) => {
   const db = new FamilyDB();
   try {
     const query = (sql, params = []) => new Promise((resolve, reject) => {
@@ -3893,7 +4125,7 @@ app.get('/api/admin/diagnostic', requireAuth, async (req, res) => {
   finally { db.close(); }
 });
 
-app.post('/api/admin/fix-household', requireAuth, async (req, res) => {
+app.post('/api/admin/fix-household', requireAuth, requireAdmin, async (req, res) => {
   const db = new FamilyDB();
   try {
     await db.runHouseholdMigrations();

@@ -126,6 +126,21 @@ final class APIService {
         let _: SuccessResponse = try await put("/api/appointments/\(id)", body: data)
     }
 
+    // MARK: - Event Attachments
+
+    func fetchEventAttachments(appointmentId: Int) async throws -> [EventAttachmentResponse] {
+        try await get("/api/appointments/\(appointmentId)/attachments")
+    }
+
+    func addEventAttachment(appointmentId: Int, type: String, attachmentId: Int) async throws {
+        let body: [String: Any] = ["attachment_type": type, "attachment_id": attachmentId]
+        let _: SuccessResponse = try await post("/api/appointments/\(appointmentId)/attachments", body: body)
+    }
+
+    func deleteEventAttachment(appointmentId: Int, attachmentId: Int) async throws {
+        let _: SuccessResponse = try await delete("/api/appointments/\(appointmentId)/attachments/\(attachmentId)")
+    }
+
     // MARK: - Budget
 
     func fetchBudget(month: String) async throws -> [BudgetSummaryResponse] {
@@ -294,6 +309,14 @@ final class APIService {
         if let conversationId { body["conversation_id"] = conversationId }
         // Tool-calling loop can take a while — generous timeout.
         return try await post("/api/concierge/chat", body: body, timeout: 60)
+    }
+
+    func fetchConciergeConversations() async throws -> [ConciergeConversationSummary] {
+        try await get("/api/concierge/conversations")
+    }
+
+    func fetchConciergeMessages(conversationId: Int) async throws -> [ConciergeStoredMessage] {
+        try await get("/api/concierge/conversations/\(conversationId)/messages")
     }
 
     // MARK: - Trips
