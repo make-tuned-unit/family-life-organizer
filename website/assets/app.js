@@ -49,7 +49,7 @@ if ('IntersectionObserver' in window) {
   revealEls.forEach((el) => el.classList.add('in'));
 }
 
-// App-screen choreography: build each mock screen in on scroll; type the Life Assist brief.
+// App-screen choreography: build each mock screen in on scroll; type the Concierge brief.
 const jsOn = document.documentElement.classList.contains('js');
 const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const briefParas = Array.from(document.querySelectorAll('.assist-brief p'));
