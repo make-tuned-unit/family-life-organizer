@@ -32,23 +32,26 @@
   .badge .bt span{font-size:25px;font-weight:600;letter-spacing:-.3px;margin-top:1px}
 
   /* Right: Concierge phone showing the morning brief */
-  .phone{position:relative;width:336px;height:520px;border-radius:48px;background:#241810;
-     padding:12px;box-shadow:0 30px 70px rgba(20,12,4,.55), inset 0 0 0 2px rgba(255,255,255,.06)}
-  .screen{position:relative;height:100%;border-radius:38px;overflow:hidden;
-     background:linear-gradient(180deg,#fffaf0 0%, #fdf2dc 100%);padding:30px 24px 22px}
-  .sb{display:flex;justify-content:space-between;font-size:13px;font-weight:600;color:var(--ink3);margin-bottom:18px}
-  .ey{display:inline-flex;align-items:center;gap:7px;font-size:13px;font-weight:600;color:var(--saffron);
-     text-transform:uppercase;letter-spacing:.6px;margin-bottom:9px}
-  .ey svg{width:16px;height:16px;stroke:var(--saffron);fill:none;stroke-width:2}
-  .greet{font-family:Fraunces,Georgia,serif;font-weight:600;font-size:29px;line-height:1.08;color:var(--ink1);margin-bottom:16px;letter-spacing:-.5px}
-  .brief p{font-size:15.5px;line-height:1.5;color:var(--ink2);margin-bottom:12px}
+  /* iPhone proportions: ~9:19.5 (262 x 566 ≈ 0.463) */
+  .phone{position:relative;width:262px;height:566px;border-radius:50px;background:#241810;
+     padding:10px;box-shadow:0 30px 70px rgba(20,12,4,.55), inset 0 0 0 2px rgba(255,255,255,.06)}
+  .screen{position:relative;height:100%;border-radius:42px;overflow:hidden;
+     background:linear-gradient(180deg,#fffaf0 0%, #fdf2dc 100%);padding:24px 19px 18px}
+  .island{position:absolute;top:11px;left:50%;transform:translateX(-50%);width:82px;height:25px;
+     background:#0e0a06;border-radius:14px;z-index:6}
+  .sb{display:flex;justify-content:space-between;font-size:12px;font-weight:600;color:var(--ink3);margin-bottom:15px}
+  .ey{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:600;color:var(--saffron);
+     text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px}
+  .ey svg{width:15px;height:15px;stroke:var(--saffron);fill:none;stroke-width:2}
+  .greet{font-family:Fraunces,Georgia,serif;font-weight:600;font-size:25px;line-height:1.1;color:var(--ink1);margin-bottom:13px;letter-spacing:-.5px}
+  .brief p{font-size:14px;line-height:1.46;color:var(--ink2);margin-bottom:10px}
   .brief b{color:var(--ink1);font-weight:600}
-  .composer{position:absolute;left:24px;right:24px;bottom:22px;display:flex;align-items:center;justify-content:space-between;
-     background:#fff;border:1px solid rgba(44,32,23,.1);border-radius:30px;padding:13px 14px 13px 18px;
-     font-size:15px;color:var(--ink3);box-shadow:0 6px 18px rgba(44,32,23,.08)}
-  .composer .send{display:flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:50%;
+  .composer{position:absolute;left:19px;right:19px;bottom:18px;display:flex;align-items:center;justify-content:space-between;
+     background:#fff;border:1px solid rgba(44,32,23,.1);border-radius:26px;padding:11px 11px 11px 16px;
+     font-size:13.5px;color:var(--ink3);box-shadow:0 6px 18px rgba(44,32,23,.08)}
+  .composer .send{display:flex;align-items:center;justify-content:center;width:31px;height:31px;border-radius:50%;
      background:var(--terra)}
-  .composer .send svg{width:18px;height:18px;stroke:#fff;fill:none;stroke-width:2.4}
+  .composer .send svg{width:16px;height:16px;stroke:#fff;fill:none;stroke-width:2.4}
 </style>
 </head>
 <body>
@@ -66,6 +69,7 @@
       </div>
       <div class="phone">
         <div class="screen">
+          <div class="island"></div>
           <div class="sb"><span>9:41</span><span>● ● ●</span></div>
           <div class="ey"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 3v2M12 19v2M5 5l1.5 1.5M17.5 17.5 19 19M3 12h2M19 12h2M5 19l1.5-1.5M17.5 6.5 19 5"/></svg> Concierge</div>
           <div class="greet">Good morning, Maya.</div>
