@@ -192,6 +192,10 @@ struct SettingsView: View {
                     Label("Change Password", systemImage: "lock.fill")
                         .foregroundStyle(TabAccent.home.color)
                 }
+                NavigationLink { SecurityView() } label: {
+                    Label("Security & 2FA", systemImage: "lock.shield.fill")
+                        .foregroundStyle(TabAccent.home.color)
+                }
             }
 
             Section("About") {

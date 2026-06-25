@@ -61,6 +61,7 @@ before(async () => {
       SESSION_SECRET: 'test-secret',
       NODE_ENV: 'test',
       ANTHROPIC_API_KEY: '',
+      // 2FA is off by default; this suite covers password/IDOR (2FA has its own suite).
     },
     stdio: 'ignore',
   });

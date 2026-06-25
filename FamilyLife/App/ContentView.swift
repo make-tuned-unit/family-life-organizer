@@ -88,8 +88,9 @@ enum ScreenshotHarness {
         let parts = creds.split(separator: ":", maxSplits: 1)
         guard parts.count == 2 else { return }
         // Force a deterministic fresh login (skip the racy optimistic-restore path).
+        // Screenshot runs hit a server with 2FA off, so this returns .authenticated.
         auth.isRestoringSession = false
-        try? await auth.login(username: String(parts[0]), password: String(parts[1]))
+        _ = try? await auth.login(username: String(parts[0]), password: String(parts[1]))
     }
 }
 #endif
