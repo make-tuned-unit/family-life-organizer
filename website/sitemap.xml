@@ -13,6 +13,12 @@
     <priority>0.8</priority>
   </url>
   <url>
+    <loc>https://kinrows.com/best-family-organizer-apps.html</loc>
+    <lastmod>2026-06-25</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
     <loc>https://kinrows.com/blog/</loc>
     <lastmod>2026-06-24</lastmod>
     <changefreq>weekly</changefreq>
@@ -21,6 +27,36 @@
   <url>
     <loc>https://kinrows.com/blog/family-calendar-organization.html</loc>
     <lastmod>2026-06-24</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://kinrows.com/blog/what-is-emotional-labour.html</loc>
+    <lastmod>2026-06-25</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://kinrows.com/blog/emotional-labour-vs-mental-load.html</loc>
+    <lastmod>2026-06-25</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://kinrows.com/blog/signs-too-much-emotional-labour.html</loc>
+    <lastmod>2026-06-25</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://kinrows.com/blog/divide-emotional-labour-fairly.html</loc>
+    <lastmod>2026-06-25</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://kinrows.com/blog/emotional-labour-parenting.html</loc>
+    <lastmod>2026-06-25</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.6</priority>
   </url>
