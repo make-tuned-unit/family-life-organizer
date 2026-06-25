@@ -106,8 +106,6 @@
 		AA000089 /* ConciergeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000089 /* ConciergeView.swift */; };
 		AA000090 /* ConciergeChatViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000090 /* ConciergeChatViewModel.swift */; };
 		AA000091 /* ConciergeChatView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000091 /* ConciergeChatView.swift */; };
-		AA000102 /* ConciergeHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000102 /* ConciergeHistoryView.swift */; };
-		AA000103 /* ConciergeSpeechRecognizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000103 /* ConciergeSpeechRecognizer.swift */; };
 		AA000092 /* SubscriptionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000092 /* SubscriptionService.swift */; };
 		AA000093 /* PaywallView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000093 /* PaywallView.swift */; };
 		AA000094 /* AskButlerButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000094 /* AskButlerButton.swift */; };
@@ -118,6 +116,8 @@
 		AA000099 /* TravelHubView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000099 /* TravelHubView.swift */; };
 		AA000100 /* EventAttachment.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000100 /* EventAttachment.swift */; };
 		AA000101 /* EventAttachmentsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000101 /* EventAttachmentsView.swift */; };
+		AA000102 /* ConciergeHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000102 /* ConciergeHistoryView.swift */; };
+		AA000103 /* ConciergeSpeechRecognizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000103 /* ConciergeSpeechRecognizer.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -220,8 +220,6 @@
 		BB000089 /* ConciergeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConciergeView.swift; sourceTree = "<group>"; };
 		BB000090 /* ConciergeChatViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConciergeChatViewModel.swift; sourceTree = "<group>"; };
 		BB000091 /* ConciergeChatView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConciergeChatView.swift; sourceTree = "<group>"; };
-		BB000102 /* ConciergeHistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConciergeHistoryView.swift; sourceTree = "<group>"; };
-		BB000103 /* ConciergeSpeechRecognizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConciergeSpeechRecognizer.swift; sourceTree = "<group>"; };
 		BB000092 /* SubscriptionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubscriptionService.swift; sourceTree = "<group>"; };
 		BB000093 /* PaywallView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaywallView.swift; sourceTree = "<group>"; };
 		BB000094 /* AskButlerButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AskButlerButton.swift; sourceTree = "<group>"; };
@@ -232,6 +230,8 @@
 		BB000099 /* TravelHubView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TravelHubView.swift; sourceTree = "<group>"; };
 		BB000100 /* EventAttachment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventAttachment.swift; sourceTree = "<group>"; };
 		BB000101 /* EventAttachmentsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventAttachmentsView.swift; sourceTree = "<group>"; };
+		BB000102 /* ConciergeHistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConciergeHistoryView.swift; sourceTree = "<group>"; };
+		BB000103 /* ConciergeSpeechRecognizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConciergeSpeechRecognizer.swift; sourceTree = "<group>"; };
 		CC000001 /* FamilyLife.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = FamilyLife.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -734,7 +734,7 @@
 				CODE_SIGN_ENTITLEMENTS = FamilyLife/FamilyLife.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 116;
+				CURRENT_PROJECT_VERSION = 117;
 				DEVELOPMENT_ASSET_PATHS = "";
 				DEVELOPMENT_TEAM = GANM22MFCH;
 				ENABLE_PREVIEWS = YES;
@@ -742,12 +742,12 @@
 				INFOPLIST_KEY_CFBundleDisplayName = Kinrows;
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_NSCameraUsageDescription = "Kinrows uses your camera to scan receipts.";
-				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Kinrows uses the microphone so you can talk to your Concierge instead of typing.";
-				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Kinrows transcribes your voice on your device so you can dictate messages to your Concierge.";
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "Kinrows uses your step count to track fitness rivalries and show daily activity on your dashboard.";
 				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Kinrows records fitness activity for family rivalries and challenges.";
 				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "Kinrows can keep sharing your trip location in the background until you arrive or cancel the trip.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Kinrows uses your location during trips to share ETA with family members.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Kinrows uses the microphone so you can talk to your Concierge instead of typing.";
+				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Kinrows transcribes your voice on your device so you can dictate messages to your Concierge.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UIBackgroundModes = location;
@@ -777,7 +777,7 @@
 				CODE_SIGN_ENTITLEMENTS = FamilyLife/FamilyLife.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 116;
+				CURRENT_PROJECT_VERSION = 117;
 				DEVELOPMENT_ASSET_PATHS = "";
 				DEVELOPMENT_TEAM = GANM22MFCH;
 				ENABLE_PREVIEWS = YES;
@@ -785,12 +785,12 @@
 				INFOPLIST_KEY_CFBundleDisplayName = Kinrows;
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_NSCameraUsageDescription = "Kinrows uses your camera to scan receipts.";
-				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Kinrows uses the microphone so you can talk to your Concierge instead of typing.";
-				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Kinrows transcribes your voice on your device so you can dictate messages to your Concierge.";
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "Kinrows uses your step count to track fitness rivalries and show daily activity on your dashboard.";
 				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Kinrows records fitness activity for family rivalries and challenges.";
 				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "Kinrows can keep sharing your trip location in the background until you arrive or cancel the trip.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Kinrows uses your location during trips to share ETA with family members.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Kinrows uses the microphone so you can talk to your Concierge instead of typing.";
+				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Kinrows transcribes your voice on your device so you can dictate messages to your Concierge.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UIBackgroundModes = location;
