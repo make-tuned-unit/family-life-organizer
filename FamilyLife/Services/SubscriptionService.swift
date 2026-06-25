@@ -1,17 +1,34 @@
 import Foundation
 import StoreKit
 
-/// Manages the Concierge premium subscription via StoreKit 2.
+/// Manages the Concierge subscription via StoreKit 2.
 ///
-/// Entitlement is per-HOUSEHOLD: the backend is authoritative. This device may
-/// have no local transaction yet still be premium because another household
-/// member subscribed — so `refresh` always reconciles with the server.
+/// Two tiers (Lite / Premium), each billed monthly or yearly. Entitlement is
+/// per-HOUSEHOLD and the backend is authoritative: this device may have no local
+/// transaction yet still be entitled because another household member subscribed —
+/// so `refresh` always reconciles with the server, which also reports the tier.
 @Observable
 final class SubscriptionService {
-    static let productID = "com.mylauft.kinrows.concierge.monthly"
+    enum Tier: String { case lite, premium }
+    enum Period: String { case monthly, yearly }
 
-    private(set) var isPremium = false
-    private(set) var product: Product?
+    static let productIDs: [String] = [
+        "com.mylauft.kinrows.concierge.lite.monthly",
+        "com.mylauft.kinrows.concierge.lite.yearly",
+        "com.mylauft.kinrows.concierge.premium.monthly",
+        "com.mylauft.kinrows.concierge.premium.yearly",
+    ]
+    // Legacy single-tier product still counts as an entitlement (maps to premium).
+    static let legacyProductID = "com.mylauft.kinrows.concierge.monthly"
+    private static let entitlementIDs = Set(productIDs + [legacyProductID])
+
+    static func productID(_ tier: Tier, _ period: Period) -> String {
+        "com.mylauft.kinrows.concierge.\(tier.rawValue).\(period.rawValue)"
+    }
+
+    private(set) var isPremium = false           // entitled to ANY paid tier
+    private(set) var tier: Tier?                  // active tier per backend
+    private(set) var products: [Product] = []
     private(set) var isPurchasing = false
     var lastError: String?
 
@@ -27,44 +44,55 @@ final class SubscriptionService {
             }
         }
         Task {
-            await loadProduct()
+            await loadProducts()
             await refresh(api: api)
         }
     }
 
     deinit { updatesTask?.cancel() }
 
-    func loadProduct() async {
+    func loadProducts() async {
         do {
-            product = try await Product.products(for: [Self.productID]).first
+            let loaded = try await Product.products(for: Self.productIDs)
+            // Stable order: Premium before Lite, monthly before yearly.
+            products = loaded.sorted { ($0.price, $0.id) > ($1.price, $1.id) }
         } catch {
             lastError = error.localizedDescription
         }
     }
 
+    func product(_ tier: Tier, _ period: Period) -> Product? {
+        products.first { $0.id == Self.productID(tier, period) }
+    }
+
     /// Reconcile entitlement: sync any local transaction to the backend, then
-    /// trust the backend's household-level answer.
+    /// trust the backend's household-level answer (premium flag + tier).
     @discardableResult
     func refresh(api: APIService) async -> Bool {
         var localJWS: String?
         for await result in Transaction.currentEntitlements {
             if case .verified(let txn) = result,
-               txn.productID == Self.productID,
+               Self.entitlementIDs.contains(txn.productID),
                txn.revocationDate == nil {
                 localJWS = result.jwsRepresentation
             }
         }
 
-        if let localJWS, let status = try? await api.verifySubscription(signedTransaction: localJWS) {
+        var status: SubscriptionStatus?
+        if let localJWS {
+            status = try? await api.verifySubscription(signedTransaction: localJWS)
+        }
+        if status == nil {
+            status = try? await api.fetchSubscriptionStatus()
+        }
+        if let status {
             isPremium = status.premium
-        } else if let status = try? await api.fetchSubscriptionStatus() {
-            isPremium = status.premium
+            tier = status.tier.flatMap(Tier.init(rawValue:))
         }
         return isPremium
     }
 
-    func purchase(api: APIService) async {
-        guard let product else { lastError = "Product unavailable"; return }
+    func purchase(_ product: Product, api: APIService) async {
         isPurchasing = true
         lastError = nil
         defer { isPurchasing = false }

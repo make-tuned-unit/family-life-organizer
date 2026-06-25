@@ -7,8 +7,8 @@ const tools = require('./conciergeTools');
 const push = require('../push');
 const { todayISO } = require('./conciergeContext');
 
-const MAX_TURNS = 6;          // safety cap on tool-use round-trips
-const HISTORY_LIMIT = 20;     // prior turns replayed for context
+const MAX_TURNS = 4;          // safety cap on tool-use round-trips (each = 1 API call)
+const HISTORY_LIMIT = 10;     // prior turns replayed for context (smaller = cheaper input)
 
 // Strip newlines/control chars and cap length so a crafted display name can't
 // inject instructions into the system prompt.
@@ -78,7 +78,7 @@ async function handleChat(db, { userId, userName, message, conversationId }) {
   let reply = '';
 
   for (let turn = 0; turn < MAX_TURNS; turn++) {
-    const resp = await ai.callClaudeRaw({ system, messages, tools: toolDefs, maxTokens: 1500 });
+    const resp = await ai.callClaudeRaw({ system, messages, tools: toolDefs, maxTokens: 600 });
     messages.push({ role: 'assistant', content: resp.content });
 
     if (resp.stop_reason !== 'tool_use') {

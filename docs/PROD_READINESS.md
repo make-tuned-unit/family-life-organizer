@@ -66,6 +66,35 @@ This file is the maintained list of work required before the app should be treat
 - [ ] Add privacy policy, support URL, and account deletion flow.
 - [ ] Confirm secure transport, session handling, and server-side auth protections.
 
+## Subscriptions & Monetization (deferred — wire up ~2 months before launch)
+
+The tiered Concierge subscription is **fully coded** (backend entitlement, tier-aware
+per-household chat caps, StoreKit config, iOS paywall, marketing copy) but is **not
+wired up for real billing yet**. Before this can sell:
+
+- [ ] **Create the four subscription products in App Store Connect** — one subscription
+  group ("Concierge"), exact product IDs and prices matching `Configuration.storekit`:
+  - `com.mylauft.kinrows.concierge.lite.monthly` — $4.99/mo
+  - `com.mylauft.kinrows.concierge.lite.yearly` — $49.99/yr
+  - `com.mylauft.kinrows.concierge.premium.monthly` — $9.99/mo
+  - `com.mylauft.kinrows.concierge.premium.yearly` — $99.99/yr
+  - Tier levels: Premium above Lite (so upgrade/downgrade works); yearly = 2 months free.
+- [ ] Fill in App Store Connect subscription localizations, review screenshot, and the
+  required paid-apps agreement / banking & tax forms.
+- [ ] Configure the **App Store Server Notifications V2** URL → `POST /api/subscription/notifications`
+  (already implemented) in App Store Connect, and set the production `APNS_BUNDLE_ID`.
+- [ ] End-to-end test the purchase → backend verify → entitlement → tier-cap path in
+  sandbox for both tiers and both billing periods (incl. upgrade Lite→Premium and the
+  per-household cap flipping 10→40 immediately after verify).
+- [ ] **Stripe web-subscription flow** (bypass the Apple cut, ~$0.90/sub): Stripe Checkout
+  on the website → webhook → mark household premium in the existing `subscriptions` table
+  (non-Apple `original_transaction_id`) → Universal Link back to the app. The app already
+  reads premium/tier from the backend, so the server side is the main work. Verify current
+  App Store external-link compliance before shipping.
+- [ ] Decide whether to lower the Premium cap from 40/day or keep the per-household cap as
+  the abuse backstop (at the 40/day ceiling a household can exceed the $8.49 net — extreme,
+  but possible). Revisit once real usage data exists.
+
 ## App Store And Operations
 
 - [ ] Create production app icons, launch assets, screenshots, and metadata.

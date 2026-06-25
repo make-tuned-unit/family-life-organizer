@@ -44,7 +44,44 @@ const conciergeLimiter = createRateLimiter({ windowMs: 60000, max: 30, keyFn: re
 // Daily ceiling on the (expensive, tool-looping) chat endpoint to bound API cost
 // even if the per-minute limit is paced. Each message can fan out to several
 // Claude calls, so cap messages/user/day.
-const conciergeChatDailyLimiter = createRateLimiter({ windowMs: 24 * 60 * 60 * 1000, max: 200, keyFn: req => req.session?.user?.id ?? clientIp(req) });
+// Per-tier daily chat allowance per HOUSEHOLD (one sub covers the whole household, so
+// the cap bounds the household's combined spend, not each member's). Lite = 10/day,
+// Premium = 40/day. Null tier (no active sub) defaults to the lite cap, but
+// requirePremium blocks those callers anyway, so it's only a backstop.
+const TIER_DAILY_CAP = { premium: 40, lite: 10 };
+
+// Resolve {household key, tier} for a request, memoized briefly to avoid a DB hit on
+// every call (household membership and tier change rarely). Falls back to a per-user
+// key if the household can't be resolved. Cache is invalidated on subscription verify.
+const _householdEntitlementCache = new Map(); // userId -> { gid, tier, ts }
+const HOUSEHOLD_KEY_TTL_MS = 5 * 60 * 1000;
+async function resolveHouseholdEntitlement(req) {
+  const uid = req.session?.user?.id;
+  if (!uid) return { key: clientIp(req), tier: null };
+  const cached = _householdEntitlementCache.get(uid);
+  if (cached && Date.now() - cached.ts < HOUSEHOLD_KEY_TTL_MS) {
+    return { key: cached.gid ? `hh:${cached.gid}` : `u:${uid}`, tier: cached.tier };
+  }
+  const db = new FamilyDB();
+  try {
+    const gid = await db.getUserHouseholdId(uid);
+    const tier = gid ? await subscription.getHouseholdTier(db, uid) : null;
+    _householdEntitlementCache.set(uid, { gid, tier, ts: Date.now() });
+    return { key: gid ? `hh:${gid}` : `u:${uid}`, tier };
+  } catch {
+    return { key: `u:${uid}`, tier: null };
+  } finally {
+    db.close();
+  }
+}
+async function householdRateKey(req) { return (await resolveHouseholdEntitlement(req)).key; }
+async function householdDailyMax(req) {
+  const { tier } = await resolveHouseholdEntitlement(req); // second call this request hits the cache
+  return TIER_DAILY_CAP[tier] ?? TIER_DAILY_CAP.lite;
+}
+
+// Tier-aware daily cap, bounded per HOUSEHOLD (was a flat 200/user = ~6000/mo, dangerous).
+const conciergeChatDailyLimiter = createRateLimiter({ windowMs: 24 * 60 * 60 * 1000, keyFn: householdRateKey, maxFn: householdDailyMax });
 
 // IP-keyed limiter for the unauthenticated, brute-forceable auth endpoints.
 const clientIp = (req) => (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.ip || 'unknown';
@@ -122,7 +159,7 @@ async function sendLoginCode(to, code) {
 
 // Short-lived per-user cache for the daily brief (regenerated on ?refresh).
 const briefCache = new Map();
-const BRIEF_TTL_MS = 10 * 60 * 1000;
+const BRIEF_TTL_MS = 30 * 60 * 1000; // 30 min: fewer brief regenerations = fewer AI calls
 
 const app = express();
 const PORT = process.env.PORT || 3456;
@@ -2795,6 +2832,7 @@ app.post('/api/subscription/verify', requireAuth, async (req, res) => {
     const signed = req.body.signed_transaction || req.body.transaction;
     if (!signed) return res.status(400).json({ error: 'signed_transaction required' });
     const status = await subscription.verifyAndStore(db, req.session.user.id, signed);
+    _householdEntitlementCache.delete(req.session.user.id); // reflect new/upgraded tier immediately
     res.json(status);
   } catch (err) {
     res.status(400).json({ error: err.message });
