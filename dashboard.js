@@ -437,6 +437,31 @@ app.post('/api/auth/login', loginLimiter, async (req, res) => {
   }
 });
 
+// Change the authenticated user's password. Requires the current password.
+app.post('/api/auth/change-password', requireAuth, loginLimiter, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const { current_password, new_password } = req.body;
+    if (typeof new_password !== 'string' || new_password.length < 8) {
+      return res.status(400).json({ error: 'New password must be at least 8 characters' });
+    }
+    const user = await db.getUserById(req.session.user.id);
+    const full = await db.getUserByUsername(user.username);
+    const valid = await bcrypt.compare(String(current_password || ''), full?.password_hash || DUMMY_BCRYPT_HASH);
+    if (!valid) return res.status(401).json({ error: 'Current password is incorrect' });
+    if (new_password === user.username) {
+      return res.status(400).json({ error: 'Password must not equal the username' });
+    }
+    const password_hash = await bcrypt.hash(new_password, 12);
+    await db.updateUserPassword(req.session.user.id, password_hash);
+    res.json({ success: true });
+  } catch (err) {
+    sendServerError(res, err);
+  } finally {
+    db.close();
+  }
+});
+
 // Register device token for push notifications
 app.post('/api/auth/device-token', requireAuth, async (req, res) => {
   const db = new FamilyDB();

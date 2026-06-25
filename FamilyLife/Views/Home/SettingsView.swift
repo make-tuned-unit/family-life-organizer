@@ -187,6 +187,13 @@ struct SettingsView: View {
                 }
             }
 
+            Section("Account") {
+                NavigationLink { ChangePasswordView() } label: {
+                    Label("Change Password", systemImage: "lock.fill")
+                        .foregroundStyle(TabAccent.home.color)
+                }
+            }
+
             Section("About") {
                 HStack {
                     Text("Version")

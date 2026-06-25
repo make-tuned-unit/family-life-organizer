@@ -867,6 +867,13 @@ final class APIService {
         let _: SuccessResponse = try await put("/api/users/me/name", body: ["name": name])
     }
 
+    func changePassword(currentPassword: String, newPassword: String) async throws {
+        let _: SuccessResponse = try await post("/api/auth/change-password", body: [
+            "current_password": currentPassword,
+            "new_password": newPassword,
+        ])
+    }
+
     func fetchProfileImage(userId: Int) async throws -> String {
         let response: AvatarResponse = try await get("/api/users/\(userId)/avatar")
         return response.image

@@ -2009,6 +2009,13 @@ class FamilyDB {
     });
   }
 
+  updateUserPassword(userId, passwordHash) {
+    return new Promise((resolve, reject) => {
+      this.db.run('UPDATE users SET password_hash = ? WHERE id = ?', [passwordHash, userId],
+        function(err) { err ? reject(err) : resolve({ changed: this.changes }); });
+    });
+  }
+
   getUserByUsername(username) {
     return new Promise((resolve, reject) => {
       this.db.get('SELECT * FROM users WHERE username = ?', [username], (err, row) => {
