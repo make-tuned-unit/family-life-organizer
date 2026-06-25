@@ -19,9 +19,16 @@ struct AddTaskView: View {
     private let categories = ["household", "errands", "kids", "health", "finance", "work"]
     private let priorities = ["low", "medium", "high"]
 
+    // Tasks are household-first: only people in your own household can be assigned.
+    // To involve someone in a clan (e.g. Ariel in the Sharratt Clan), use "Share with" below.
     private var familyMembers: [String] {
-        var names = [auth.currentUser?.name ?? "Me"]
-        names += household.members.map(\.name)
+        let me = auth.currentUser?.name ?? "Me"
+        var seen = Set([me.lowercased()])
+        var names = [me]
+        for member in household.householdMembers where !seen.contains(member.name.lowercased()) {
+            seen.insert(member.name.lowercased())
+            names.append(member.name)
+        }
         return names
     }
 

@@ -244,7 +244,7 @@ async function canAttachEntity(db, type, id, userId) {
   }
   // decision | receipt | trip | itinerary: the caller must be a member of the
   // row's group (a household OR a clan it was shared to — multi-household safe).
-  const tables = { decision: 'decisions', receipt: 'receipts', trip: 'trips', itinerary: 'itineraries' };
+  const tables = { decision: 'decisions', receipt: 'receipts', trip: 'trips', itinerary: 'itineraries', task: 'tasks' };
   const table = tables[type];
   if (!table) return false;
   const row = await dbGet(db, `SELECT group_id FROM ${table} WHERE id = ?`, [id]);
@@ -1779,7 +1779,7 @@ app.post('/api/appointments/:id/attachments', requireAuth, async (req, res) => {
   try {
     if (!(await requireHouseholdRow(db, 'appointments', req.params.id, req, res))) return;
     const { attachment_type, attachment_id } = req.body || {};
-    const allowed = ['list', 'note', 'decision', 'receipt', 'trip', 'itinerary'];
+    const allowed = ['list', 'note', 'decision', 'receipt', 'trip', 'itinerary', 'task'];
     if (!allowed.includes(attachment_type) || !attachment_id) {
       return res.status(400).json({ error: 'Invalid attachment_type or attachment_id' });
     }
