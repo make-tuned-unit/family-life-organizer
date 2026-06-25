@@ -113,6 +113,7 @@
 		AA000096 /* BudgetStatsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000096 /* BudgetStatsView.swift */; };
 		AA000097 /* RecurringPaymentsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000097 /* RecurringPaymentsView.swift */; };
 		AA000098 /* NotesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000098 /* NotesView.swift */; };
+		AA000200 /* ChangePasswordView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000200 /* ChangePasswordView.swift */; };
 		AA000099 /* TravelHubView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000099 /* TravelHubView.swift */; };
 		AA000100 /* EventAttachment.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000100 /* EventAttachment.swift */; };
 		AA000101 /* EventAttachmentsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000101 /* EventAttachmentsView.swift */; };
@@ -227,6 +228,7 @@
 		BB000096 /* BudgetStatsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BudgetStatsView.swift; sourceTree = "<group>"; };
 		BB000097 /* RecurringPaymentsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecurringPaymentsView.swift; sourceTree = "<group>"; };
 		BB000098 /* NotesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotesView.swift; sourceTree = "<group>"; };
+		BB000200 /* ChangePasswordView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChangePasswordView.swift; sourceTree = "<group>"; };
 		BB000099 /* TravelHubView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TravelHubView.swift; sourceTree = "<group>"; };
 		BB000100 /* EventAttachment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventAttachment.swift; sourceTree = "<group>"; };
 		BB000101 /* EventAttachmentsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventAttachmentsView.swift; sourceTree = "<group>"; };
@@ -361,6 +363,7 @@
 				BB00001B /* AddTaskView.swift */,
 				BB000043 /* MoreView.swift */,
 				BB000098 /* NotesView.swift */,
+				BB000200 /* ChangePasswordView.swift */,
 				BB000051 /* HouseholdView.swift */,
 				BB000054 /* NewPostView.swift */,
 				BB000055 /* FeedCardView.swift */,
@@ -710,6 +713,7 @@
 				AA000097 /* RecurringPaymentsView.swift in Sources */,
 				AA000043 /* MoreView.swift in Sources */,
 				AA000098 /* NotesView.swift in Sources */,
+				AA000200 /* ChangePasswordView.swift in Sources */,
 				AA00004D /* SignUpView.swift in Sources */,
 				AA00004E /* FamilyGroupsView.swift in Sources */,
 				AA00004F /* EventDetailView.swift in Sources */,
@@ -734,7 +738,7 @@
 				CODE_SIGN_ENTITLEMENTS = FamilyLife/FamilyLife.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 118;
+				CURRENT_PROJECT_VERSION = 119;
 				DEVELOPMENT_ASSET_PATHS = "";
 				DEVELOPMENT_TEAM = GANM22MFCH;
 				ENABLE_PREVIEWS = YES;
@@ -777,7 +781,7 @@
 				CODE_SIGN_ENTITLEMENTS = FamilyLife/FamilyLife.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 118;
+				CURRENT_PROJECT_VERSION = 119;
 				DEVELOPMENT_ASSET_PATHS = "";
 				DEVELOPMENT_TEAM = GANM22MFCH;
 				ENABLE_PREVIEWS = YES;

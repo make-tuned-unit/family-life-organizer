@@ -134,6 +134,30 @@ test('unauthenticated API requests are rejected', async () => {
   assert.equal(res.status, 401);
 });
 
+test('change-password: rejects wrong current password, then rotates and re-logins', async () => {
+  const c = makeClient();
+  const reg = await c('POST', '/api/auth/register', { username: 'carol_t', password: 'password123', name: 'Carol' });
+  assert.equal(reg.status, 200);
+
+  // Wrong current password → 401.
+  const bad = await c('POST', '/api/auth/change-password', { current_password: 'nope', new_password: 'newpassword456' });
+  assert.equal(bad.status, 401);
+
+  // Too-short new password → 400.
+  const short = await c('POST', '/api/auth/change-password', { current_password: 'password123', new_password: 'short' });
+  assert.equal(short.status, 400);
+
+  // Correct change → 200.
+  const ok = await c('POST', '/api/auth/change-password', { current_password: 'password123', new_password: 'newpassword456' });
+  assert.equal(ok.status, 200);
+
+  // Old password no longer works; new one does.
+  const oldLogin = await makeClient()('POST', '/api/auth/login', { username: 'carol_t', password: 'password123' });
+  assert.equal(oldLogin.status, 401);
+  const newLogin = await makeClient()('POST', '/api/auth/login', { username: 'carol_t', password: 'newpassword456' });
+  assert.equal(newLogin.status, 200);
+});
+
 test('DM to a non-shared user is forbidden', async () => {
   const a = makeClient();
   const b = makeClient();

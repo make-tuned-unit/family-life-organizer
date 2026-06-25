@@ -69,6 +69,14 @@ final class AuthService {
         UserDefaults.standard.set(trimmed, forKey: "auth_name")
     }
 
+    /// Changes the user's password on the server, then updates the Keychain copy
+    /// so silent re-login (Face ID / saved Passwords) keeps working with the new one.
+    func changePassword(current: String, new: String) async throws {
+        guard let username = currentUser?.username else { throw APIError.unauthorized }
+        try await api.changePassword(currentPassword: current, newPassword: new)
+        Self.savePassword(new, for: username)
+    }
+
     /// Pre-renders a circular thumbnail at 128x128. The circular crop is baked into the
     /// UIImage so ProfileAvatar needs NO .clipShape or .mask (zero offscreen render passes).
     private static func thumbnail(from data: Data) -> UIImage? {
