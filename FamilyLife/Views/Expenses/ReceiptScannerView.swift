@@ -12,6 +12,7 @@ struct ReceiptScannerView: View {
     var onProjectExpenseSaved: (() async -> Void)?
     var onReceiptSaved: (() async -> Void)?
 
+    @AppStorage("cloudAIEnabled") private var cloudAIEnabled = true
     @State private var selectedPhoto: PhotosPickerItem?
     @State private var imageData: Data?
     @State private var scanResult: ScanResult?
@@ -442,6 +443,11 @@ struct ReceiptScannerView: View {
     }
 
     private func scanImage(_ data: Data) {
+        // Receipt scanning sends the image to cloud vision AI — respect the toggle.
+        guard cloudAIEnabled else {
+            error = "Cloud AI is off. Turn it on in Settings → Privacy to scan receipts, or enter the receipt manually."
+            return
+        }
         isScanning = true
         error = nil
         currentScanSaved = false
