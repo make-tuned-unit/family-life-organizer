@@ -2,6 +2,8 @@ process.env.TZ = process.env.TZ || 'America/Halifax';
 
 const express = require('express');
 const session = require('express-session');
+const helmet = require('helmet');
+const SQLiteStore = require('connect-sqlite3')(session);
 const bodyParser = require('body-parser');
 const bcrypt = require('bcryptjs');
 const path = require('path');
@@ -16,8 +18,49 @@ const { runProactiveSweep } = require('./services/conciergeNudge');
 const { createRateLimiter } = require('./services/rateLimit');
 const email = require('./services/email');
 
+const IS_PROD = process.env.NODE_ENV === 'production';
+
+// Session signing key. MUST be provided via env in production — a committed/static
+// secret lets anyone forge session cookies for any user. Fail fast rather than
+// silently fall back to a known value in prod.
+const SESSION_SECRET = process.env.SESSION_SECRET;
+if (IS_PROD && !SESSION_SECRET) {
+  console.error('FATAL: SESSION_SECRET must be set in production.');
+  process.exit(1);
+}
+if (!SESSION_SECRET) {
+  console.warn('⚠️  SESSION_SECRET not set — using an ephemeral dev key (sessions reset on restart).');
+}
+// Ephemeral random key in dev when unset (still better than a committed constant).
+const RESOLVED_SESSION_SECRET = SESSION_SECRET || require('crypto').randomBytes(32).toString('hex');
+
+// A real (cost-12) bcrypt hash of a random value, used to equalize login timing
+// when the supplied username doesn't exist (anti–user-enumeration). Never matches.
+const DUMMY_BCRYPT_HASH = '$2b$12$w84BxL/MRATPauz/o3aSHOL.GRebIAjAMNDXftZxWFzHoU1yo6TW6';
+
 // Per-user rate limit for the (AI-backed, costly) concierge endpoints.
-const conciergeLimiter = createRateLimiter({ windowMs: 60000, max: 30, keyFn: req => req.session.user.id });
+const conciergeLimiter = createRateLimiter({ windowMs: 60000, max: 30, keyFn: req => req.session?.user?.id ?? clientIp(req) });
+// Daily ceiling on the (expensive, tool-looping) chat endpoint to bound API cost
+// even if the per-minute limit is paced. Each message can fan out to several
+// Claude calls, so cap messages/user/day.
+const conciergeChatDailyLimiter = createRateLimiter({ windowMs: 24 * 60 * 60 * 1000, max: 200, keyFn: req => req.session?.user?.id ?? clientIp(req) });
+
+// IP-keyed limiter for the unauthenticated, brute-forceable auth endpoints.
+const clientIp = (req) => (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.ip || 'unknown';
+const loginLimiter = createRateLimiter({ windowMs: 60000, max: 10, keyFn: clientIp });
+const registerLimiter = createRateLimiter({ windowMs: 60 * 60 * 1000, max: 5, keyFn: clientIp });
+
+// Regenerate the session to a fresh id and persist the authenticated user on it.
+// Prevents session fixation (an attacker-planted pre-auth session id surviving login).
+function establishSession(req, user) {
+  return new Promise((resolve, reject) => {
+    req.session.regenerate((err) => {
+      if (err) return reject(err);
+      req.session.user = user;
+      req.session.save((err2) => err2 ? reject(err2) : resolve());
+    });
+  });
+}
 
 // Short-lived per-user cache for the daily brief (regenerated on ?refresh).
 const briefCache = new Map();
@@ -36,26 +79,60 @@ function haversineDistance(lat1, lng1, lat2, lng2) {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
 }
 
-// Legacy hardcoded users — only used as fallback during migration
-const LEGACY_USERS = {
-  'jesse': { password: 'REDACTED-PASSWORD', name: 'Jesse', avatar: '👨‍💼' },
-  'sophie': { password: 'REDACTED-PASSWORD', name: 'Sophie', avatar: '👩‍⚕️' }
-};
-
 // Middleware
-app.use(bodyParser.json({ limit: '10mb' }));
-app.use(bodyParser.urlencoded({ extended: true, limit: '10mb' }));
+// Behind Render/Railway's TLS-terminating proxy: trust X-Forwarded-* so secure
+// cookies and req.ip work correctly.
+app.set('trust proxy', 1);
+app.use(helmet({
+  // The API + a few server-rendered pages; CSP is enforced on the static
+  // marketing site via its own meta tags. Keep HSTS/no-sniff/frame-guard.
+  contentSecurityPolicy: false,
+}));
+// Small default cap to blunt memory-exhaustion via large bodies (the body is
+// parsed before auth). Routes that legitimately carry a base64 image opt into a
+// larger cap by path. Everything else — including the unauthenticated auth
+// endpoints — is held to 1mb.
+const jsonSmall = bodyParser.json({ limit: '1mb' });
+const jsonLarge = bodyParser.json({ limit: '8mb' });
+const LARGE_BODY_PATHS = [
+  /^\/api\/users\/me\/avatar$/,
+  /^\/api\/groups\/[^/]+\/avatar$/,
+  /^\/api\/receipts(\/(scan|save))?$/,
+  /^\/api\/decisions$/,
+  /^\/api\/messages$/,
+];
+app.use((req, res, next) => {
+  const parser = LARGE_BODY_PATHS.some(re => re.test(req.path)) ? jsonLarge : jsonSmall;
+  parser(req, res, next);
+});
+app.use(bodyParser.urlencoded({ extended: true, limit: '1mb' }));
 app.use(session({
-  secret: 'REDACTED-SESSION-SECRET',
+  store: new SQLiteStore({ dir: FamilyDB.DB_DIR, db: 'sessions.db', concurrentDB: true }),
+  secret: RESOLVED_SESSION_SECRET,
   resave: false,
   saveUninitialized: false,
-  cookie: { secure: false }
+  cookie: {
+    secure: IS_PROD,          // HTTPS-only in production
+    httpOnly: true,           // not readable from JS
+    sameSite: 'lax',          // blocks cross-site cookie sends (CSRF)
+    maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+  },
 }));
 // Public marketing site (kinrows.com) — served at the root. Registered BEFORE
 // `public` so `/`, `/privacy.html`, `/terms.html`, and `/assets/*` resolve to the
 // Kinrows landing site. The iOS app + browser dashboard live under /api and /app.
 app.use(express.static(path.join(__dirname, 'website')));
 app.use(express.static(path.join(__dirname, 'public')));
+
+// Liveness/readiness probe (used by the host's health check). Pings the DB.
+app.get('/healthz', (req, res) => {
+  const db = new FamilyDB();
+  db.db.get('SELECT 1', (err) => {
+    db.close();
+    if (err) return res.status(503).json({ ok: false });
+    res.json({ ok: true });
+  });
+});
 
 // Auth middleware
 function requireAuth(req, res, next) {
@@ -70,6 +147,13 @@ function requireAuth(req, res, next) {
       res.redirect('/login');
     }
   }
+}
+
+// Log the real error server-side; return an opaque 500 to the client so SQL/
+// schema/stack details never leak. Used by every route's terminal catch.
+function sendServerError(res, err) {
+  console.error('[error]', err && err.stack ? err.stack : err);
+  if (!res.headersSent) res.status(500).json({ error: 'Internal server error' });
 }
 
 // Promisified single-row read against the shared connection.
@@ -262,19 +346,25 @@ async function requirePremium(req, res, next) {
       res.status(402).json({ error: 'Premium required', premium: false });
     }
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
 }
 
 // JSON API registration
-app.post('/api/auth/register', async (req, res) => {
+app.post('/api/auth/register', registerLimiter, async (req, res) => {
   const db = new FamilyDB();
   try {
     const { username, password, name, invite_code } = req.body;
     if (!username || !password || !name) {
       return res.status(400).json({ error: 'Username, password, and name are required' });
+    }
+    if (typeof password !== 'string' || password.length < 8) {
+      return res.status(400).json({ error: 'Password must be at least 8 characters' });
+    }
+    if (password === username) {
+      return res.status(400).json({ error: 'Password must not equal the username' });
     }
 
     // Check if username exists
@@ -284,7 +374,7 @@ app.post('/api/auth/register', async (req, res) => {
     }
 
     // Hash password and create user
-    const password_hash = await bcrypt.hash(password, 10);
+    const password_hash = await bcrypt.hash(password, 12);
     const user = await db.createUser({ username, password_hash, name });
 
     // If invite code provided, join that household
@@ -308,55 +398,40 @@ app.post('/api/auth/register', async (req, res) => {
       household = { id: newHousehold.id, invite_code: newHousehold.invite_code };
     }
 
-    // Set session
-    req.session.user = { username, name: user.name, id: user.id };
+    // Set session (regenerated to avoid fixation)
+    await establishSession(req, { username, name: user.name, id: user.id });
     res.json({
       success: true,
       user: { id: user.id, username, name, avatar: null },
       household: { id: household.id, invite_code: household.invite_code }
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
 });
 
-// JSON API login — checks users table first, falls back to legacy
-app.post('/api/auth/login', async (req, res) => {
+// JSON API login — database-backed bcrypt auth only.
+app.post('/api/auth/login', loginLimiter, async (req, res) => {
   const db = new FamilyDB();
   try {
     const { username, password } = req.body;
 
-    // Try database user first
     const dbUser = await db.getUserByUsername(username);
-    if (dbUser) {
-      const valid = await bcrypt.compare(password, dbUser.password_hash);
-      if (valid) {
-        req.session.user = { username: dbUser.username, name: dbUser.name, id: dbUser.id };
-        return res.json({ success: true, user: { id: dbUser.id, username: dbUser.username, name: dbUser.name, avatar: dbUser.avatar } });
-      }
-    }
+    // Always run a bcrypt compare (against a dummy hash when the user is absent)
+    // so response time doesn't reveal whether a username exists.
+    const hash = dbUser?.password_hash || DUMMY_BCRYPT_HASH;
+    const valid = await bcrypt.compare(String(password || ''), hash);
 
-    // Fallback to legacy hardcoded users (auto-migrate to DB)
-    const legacy = LEGACY_USERS[username];
-    if (legacy && legacy.password === password) {
-      // Migrate legacy user to database
-      let user = dbUser;
-      if (!user) {
-        const password_hash = await bcrypt.hash(password, 10);
-        user = await db.createUser({ username, password_hash, name: legacy.name, avatar: legacy.avatar });
-        // Auto-create household for migrated user
-        const household = await db.createGroup({ name: legacy.name + "'s Home", group_type: 'household', created_by: user.id });
-        await db.addGroupMember(household.id, { user_id: user.id, role: 'admin', added_by: user.id });
-      }
-      req.session.user = { username, name: legacy.name, id: user.id };
-      return res.json({ success: true, user: { id: user.id, username, name: legacy.name, avatar: legacy.avatar } });
+    if (dbUser && valid) {
+      await establishSession(req, { username: dbUser.username, name: dbUser.name, id: dbUser.id });
+      return res.json({ success: true, user: { id: dbUser.id, username: dbUser.username, name: dbUser.name, avatar: dbUser.avatar } });
     }
 
     res.status(401).json({ error: 'Invalid credentials' });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -371,14 +446,13 @@ app.post('/api/auth/device-token', requireAuth, async (req, res) => {
     await db.saveDeviceToken(req.session.user.id, token);
     res.json({ success: true });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
 });
 
 // ── Public marketing waitlist (kinrows.com) ──────────────────────────────────
-const clientIp = (req) => (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.ip || 'unknown';
 const waitlistLimiter = createRateLimiter({ windowMs: 60000, max: 8, keyFn: clientIp });
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -431,7 +505,7 @@ app.put('/api/users/:id/work-address', requireAuth, async (req, res) => {
     }
     await db.updateUserWorkAddress(parseInt(req.params.id), req.body);
     res.json({ success: true });
-  } catch (err) { res.status(500).json({ error: err.message }); }
+  } catch (err) { sendServerError(res, err); }
   finally { db.close(); }
 });
 
@@ -444,7 +518,7 @@ app.get('/api/users/:id/work-address', requireAuth, async (req, res) => {
     }
     const data = await db.getUserWorkAddress(parseInt(req.params.id));
     res.json(data || {});
-  } catch (err) { res.status(500).json({ error: err.message }); }
+  } catch (err) { sendServerError(res, err); }
   finally { db.close(); }
 });
 
@@ -480,7 +554,7 @@ app.post('/api/location', requireAuth, async (req, res) => {
 
     await db.updateUserLocation(userId, { lat, lng, location_name: locationName });
     res.json({ success: true, location_name: locationName });
-  } catch (err) { res.status(500).json({ error: err.message }); }
+  } catch (err) { sendServerError(res, err); }
   finally { db.close(); }
 });
 
@@ -490,7 +564,7 @@ app.get('/api/household/presence', requireAuth, async (req, res) => {
   try {
     const presence = await db.getHouseholdPresence(req.session.user.id);
     res.json(presence);
-  } catch (err) { res.status(500).json({ error: err.message }); }
+  } catch (err) { sendServerError(res, err); }
   finally { db.close(); }
 });
 
@@ -504,7 +578,7 @@ app.get('/api/auth/me', requireAuth, async (req, res) => {
     const groups = await db.getGroupsByUser(userId);
     res.json({ user, groups });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -523,7 +597,7 @@ app.put('/api/users/me/avatar', requireAuth, async (req, res) => {
     });
     res.json({ success: true });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -544,7 +618,7 @@ app.put('/api/users/me/name', requireAuth, async (req, res) => {
     if (req.session.user) req.session.user.name = name;
     res.json({ success: true, name });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -564,7 +638,7 @@ app.get('/api/users/:id/avatar', requireAuth, async (req, res) => {
     if (!row?.profile_image) return res.status(404).json({ error: 'No avatar' });
     res.json({ image: row.profile_image });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -584,7 +658,7 @@ app.put('/api/groups/:id/avatar', requireAuth, async (req, res) => {
     await db.updateGroupAvatar(req.params.id, image);
     res.json({ success: true });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -600,7 +674,7 @@ app.get('/api/groups/:id/avatar', requireAuth, async (req, res) => {
     if (!image) return res.status(404).json({ error: 'No avatar' });
     res.json({ image });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -776,25 +850,16 @@ app.get('/login', (req, res) => {
 });
 
 // Login POST (web)
-app.post('/login', async (req, res) => {
+app.post('/login', loginLimiter, async (req, res) => {
   const db = new FamilyDB();
   try {
     const { username, password } = req.body;
 
-    // Try DB user
     const dbUser = await db.getUserByUsername(username);
-    if (dbUser) {
-      const valid = await bcrypt.compare(password, dbUser.password_hash);
-      if (valid) {
-        req.session.user = { username: dbUser.username, name: dbUser.name, avatar: dbUser.avatar, id: dbUser.id };
-        return res.redirect('/app');
-      }
-    }
-
-    // Legacy fallback
-    const legacy = LEGACY_USERS[username];
-    if (legacy && legacy.password === password) {
-      req.session.user = { username, name: legacy.name, avatar: legacy.avatar };
+    const hash = dbUser?.password_hash || DUMMY_BCRYPT_HASH;
+    const valid = await bcrypt.compare(String(password || ''), hash);
+    if (dbUser && valid) {
+      await establishSession(req, { username: dbUser.username, name: dbUser.name, avatar: dbUser.avatar, id: dbUser.id });
       return res.redirect('/app');
     }
 
@@ -830,7 +895,8 @@ app.get('/app', requireAuth, async (req, res) => {
     });
     res.send(renderDashboard(req.session.user, summary, groceries, tasksByCategory, appointments));
   } catch (err) {
-    res.status(500).send('Error: ' + err.message);
+    console.error('[error]', err && err.stack ? err.stack : err);
+    res.status(500).send('Something went wrong. Please try again.');
   } finally {
     db.close();
   }
@@ -1630,7 +1696,7 @@ app.post('/api/add', requireAuth, async (req, res) => {
     }
     res.json({ success: true });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -1649,7 +1715,7 @@ app.post('/api/complete', requireAuth, async (req, res) => {
     }
     res.json({ success: true });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -1663,7 +1729,7 @@ app.get('/api/data', requireAuth, async (req, res) => {
     const groceries = await db.getGroceries('needed', userId);
     res.json({ summary, groceries });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -1691,7 +1757,7 @@ app.post('/api/appointments', requireAuth, async (req, res) => {
       push.pushToGroup(db, data.group_id, userId, `${senderName} added an event`, body, { type: 'event' });
     }
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -1710,7 +1776,7 @@ app.get('/api/tasks', requireAuth, async (req, res) => {
     const tasks = await db.getTasks(filters, req.session.user.id);
     res.json(tasks);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -1752,7 +1818,7 @@ app.get('/api/appointments', requireAuth, async (req, res) => {
 
     res.json(appointments);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -1767,7 +1833,7 @@ app.get('/api/appointments/:id/attachments', requireAuth, async (req, res) => {
     const attachments = await db.getEventAttachments(req.params.id);
     res.json(attachments);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -1800,7 +1866,7 @@ app.post('/api/appointments/:id/attachments', requireAuth, async (req, res) => {
     });
     res.json({ success: true });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -1814,7 +1880,7 @@ app.delete('/api/appointments/:id/attachments/:attachmentId', requireAuth, async
     await db.deleteEventAttachment(req.params.attachmentId, req.params.id);
     res.json({ success: true });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -1851,7 +1917,7 @@ app.get('/api/appointments/:year/:month', requireAuth, async (req, res) => {
     appointments.sort((a, b) => (a.appointment_date + (a.appointment_time || '')).localeCompare(b.appointment_date + (b.appointment_time || '')));
     res.json(appointments);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -1865,7 +1931,7 @@ app.delete('/api/appointments/:id', requireAuth, async (req, res) => {
     await db.deleteAppointment(req.params.id);
     res.json({ success: true });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -1880,7 +1946,7 @@ app.put('/api/appointments/:id', requireAuth, async (req, res) => {
     await db.updateAppointment(req.params.id, data);
     res.json({ success: true });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -1895,7 +1961,7 @@ app.get('/api/groceries', requireAuth, async (req, res) => {
     const groceries = await db.getGroceries(status, userId);
     res.json(groceries);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -1912,7 +1978,7 @@ app.get('/api/receipts', requireAuth, async (req, res) => {
     const receipts = await db.getReceipts(filters, groupId);
     res.json(receipts);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -1964,7 +2030,7 @@ app.get('/api/budget/stats', requireAuth, async (req, res) => {
       overBudget,
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -1977,7 +2043,7 @@ app.get('/api/budget/:month', requireAuth, async (req, res) => {
     const budget = await db.getBudgetSummary(req.params.month, groupId);
     res.json(budget);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -1991,7 +2057,7 @@ app.get('/api/recurring-payments', requireAuth, async (req, res) => {
     const items = await db.getRecurringPayments(groupId);
     res.json(items);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -2008,7 +2074,7 @@ app.post('/api/recurring-payments', requireAuth, async (req, res) => {
     });
     res.json({ success: true, id: result.id });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -2021,7 +2087,7 @@ app.put('/api/recurring-payments/:id', requireAuth, async (req, res) => {
     await db.updateRecurringPayment(req.params.id, req.body);
     res.json({ success: true });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -2034,7 +2100,7 @@ app.delete('/api/recurring-payments/:id', requireAuth, async (req, res) => {
     await db.deleteRecurringPayment(req.params.id);
     res.json({ success: true });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -2062,7 +2128,7 @@ app.get('/api/notes', requireAuth, async (req, res) => {
     const notes = await db.getNotes(req.session.user?.id);
     res.json(notes);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -2082,7 +2148,7 @@ app.post('/api/notes', requireAuth, async (req, res) => {
     });
     res.json({ success: true, id: result.id });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -2115,7 +2181,7 @@ app.put('/api/notes/:id', requireAuth, async (req, res) => {
     if (!result.changed) return res.status(403).json({ error: 'You cannot edit this note' });
     res.json({ success: true, role: 'collaborator' });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -2128,7 +2194,7 @@ app.delete('/api/notes/:id', requireAuth, async (req, res) => {
     if (!result.changed) return res.status(403).json({ error: 'Not your note' });
     res.json({ success: true });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -2142,7 +2208,7 @@ app.get('/api/budget-categories', requireAuth, async (req, res) => {
     const categories = await db.getBudgetCategories(groupId);
     res.json(categories);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -2156,7 +2222,7 @@ app.post('/api/budget-categories', requireAuth, async (req, res) => {
     const result = await db.addBudgetCategory(name, monthly_limit, color, groupId);
     res.json({ success: true, id: result.id });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -2169,7 +2235,7 @@ app.put('/api/budget-categories/:id', requireAuth, async (req, res) => {
     await db.updateBudgetCategory(req.params.id, req.body);
     res.json({ success: true });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -2182,7 +2248,7 @@ app.delete('/api/budget-categories/:id', requireAuth, async (req, res) => {
     await db.deleteBudgetCategory(req.params.id);
     res.json({ success: true });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -2202,7 +2268,7 @@ app.post('/api/receipts', requireAuth, async (req, res) => {
     const result = await db.addReceipt(data);
     res.json({ success: true, id: result.id });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -2246,7 +2312,7 @@ app.post('/api/receipts/scan', requireAuth, async (req, res) => {
     receipt.category = normalizeReceiptCategory(receipt);
     res.json(receipt);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   }
 });
 
@@ -2300,7 +2366,7 @@ app.post('/api/receipts/save', requireAuth, async (req, res) => {
 
     res.json({ success: true, id: receipt.id, receipt_id: receipt.id });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -2325,7 +2391,7 @@ app.delete('/api/receipts/:id', requireAuth, async (req, res) => {
     await db.deleteReceipt(req.params.id);
     res.json({ success: true });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -2404,7 +2470,7 @@ app.get('/api/pantry', requireAuth, async (req, res) => {
     const items = await db.getPantry(filters, groupId);
     res.json(items);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -2419,7 +2485,7 @@ app.post('/api/pantry', requireAuth, async (req, res) => {
     const result = await db.addPantryItem(data);
     res.json({ success: true, id: result.id });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -2434,7 +2500,7 @@ app.put('/api/pantry/:id', requireAuth, async (req, res) => {
     await db.updatePantryItem(req.params.id, data);
     res.json({ success: true });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -2447,7 +2513,7 @@ app.delete('/api/pantry/:id', requireAuth, async (req, res) => {
     await db.deletePantryItem(req.params.id);
     res.json({ success: true });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -2469,7 +2535,7 @@ app.get('/api/concierge/brief', requireAuth, conciergeLimiter, async (req, res) 
     briefCache.set(userId, { brief, ts: now });
     res.json(brief);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -2511,14 +2577,14 @@ app.get('/api/subscription/status', requireAuth, async (req, res) => {
   try {
     res.json(await subscription.getStatus(db, req.session.user.id));
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
 });
 
 // Concierge - conversational chat with tool-calling (premium)
-app.post('/api/concierge/chat', requireAuth, conciergeLimiter, requirePremium, async (req, res) => {
+app.post('/api/concierge/chat', requireAuth, conciergeLimiter, conciergeChatDailyLimiter, requirePremium, async (req, res) => {
   const db = new FamilyDB();
   try {
     const message = (req.body.message || '').trim();
@@ -2532,7 +2598,9 @@ app.post('/api/concierge/chat', requireAuth, conciergeLimiter, requirePremium, a
     });
     res.json(result);
   } catch (err) {
-    res.status(err.status || 500).json({ error: err.message });
+    // Surface intentional, client-safe errors (err.status set); keep unexpected 500s opaque.
+    if (err.status) { res.status(err.status).json({ error: err.message }); }
+    else { sendServerError(res, err); }
   } finally {
     db.close();
   }
@@ -2545,7 +2613,7 @@ app.get('/api/concierge/conversations', requireAuth, conciergeLimiter, requirePr
     const rows = await db.getConciergeConversations(req.session.user.id);
     res.json(rows);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -2562,7 +2630,7 @@ app.get('/api/concierge/conversations/:id/messages', requireAuth, conciergeLimit
     const messages = await db.getConciergeMessages(req.params.id, 100);
     res.json(messages);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -2630,7 +2698,7 @@ Mark ingredients as available:true if they're in the pantry list, available:fals
     });
     res.json(ai.extractJSON(text));
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -2656,7 +2724,7 @@ app.post('/api/cook/deduct', requireAuth, async (req, res) => {
     }
     res.json({ success: true });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -2673,7 +2741,7 @@ app.get('/api/trips', requireAuth, async (req, res) => {
     const trips = await db.getTrips(filters, groupId);
     res.json(trips);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -2686,7 +2754,7 @@ app.post('/api/trips', requireAuth, async (req, res) => {
     const result = await db.createTrip({ ...req.body, group_id: groupId });
     res.json({ success: true, id: result.id });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -2699,7 +2767,7 @@ app.put('/api/trips/:id', requireAuth, async (req, res) => {
     await db.updateTrip(req.params.id, req.body);
     res.json({ success: true });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -2712,7 +2780,7 @@ app.post('/api/trips/:id/arrive', requireAuth, async (req, res) => {
     await db.arriveTrip(req.params.id);
     res.json({ success: true });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -2725,7 +2793,7 @@ app.post('/api/trips/:id/cancel', requireAuth, async (req, res) => {
     await db.cancelTrip(req.params.id);
     res.json({ success: true });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -2739,7 +2807,7 @@ app.get('/api/addresses', requireAuth, async (req, res) => {
     const addresses = await db.getFamilyAddresses(groupId);
     res.json(addresses);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -2752,7 +2820,7 @@ app.post('/api/addresses', requireAuth, async (req, res) => {
     const result = await db.addFamilyAddress({ ...req.body, group_id: groupId });
     res.json({ success: true, id: result.id });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -2776,7 +2844,7 @@ app.put('/api/addresses/:id', requireAuth, async (req, res) => {
     });
     res.json({ success: true });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -2789,7 +2857,7 @@ app.delete('/api/addresses/:id', requireAuth, async (req, res) => {
     await db.deleteFamilyAddress(req.params.id);
     res.json({ success: true });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -2802,7 +2870,7 @@ app.get('/api/decisions', requireAuth, async (req, res) => {
     const decisions = await db.getDecisions({ status: req.query.status }, req.session.user.id);
     res.json(decisions);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -2816,7 +2884,7 @@ app.get('/api/decisions/:id', requireAuth, async (req, res) => {
     if (!decision) return res.status(404).json({ error: 'Not found' });
     res.json(decision);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -2840,7 +2908,7 @@ app.post('/api/decisions', requireAuth, async (req, res) => {
       push.pushToGroup(db, data.group_id, userId, `${senderName} needs your input`, data.title || 'New decision', { type: 'decision', ref_id: result.id });
     }
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -2853,7 +2921,7 @@ app.put('/api/decisions/:id', requireAuth, async (req, res) => {
     await db.updateDecision(req.params.id, req.body);
     res.json({ success: true });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -2871,7 +2939,7 @@ app.delete('/api/decisions/:id', requireAuth, async (req, res) => {
     await run('DELETE FROM decisions WHERE id = ?', [req.params.id]);
     res.json({ success: true });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -2884,7 +2952,7 @@ app.get('/api/decisions/:id/reactions', requireAuth, async (req, res) => {
     const reactions = await db.getDecisionReactions(req.params.id);
     res.json(reactions);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -2894,11 +2962,13 @@ app.post('/api/decisions/:id/reactions', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
     if (!(await requireGroupRow(db, 'decisions', req.params.id, req, res))) return;
-    const { member_name, reaction_type, poll_choice } = req.body;
-    await db.replaceDecisionReaction(req.params.id, member_name, reaction_type, poll_choice);
+    const { reaction_type, poll_choice } = req.body;
+    // Attribute to the authenticated user — never trust a client-supplied name
+    // (prevents voting/commenting as someone else).
+    await db.replaceDecisionReaction(req.params.id, req.session.user.name, reaction_type, poll_choice);
     res.json({ success: true });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -2911,7 +2981,7 @@ app.get('/api/decisions/:id/comments', requireAuth, async (req, res) => {
     const comments = await db.getDecisionComments(req.params.id);
     res.json(comments);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -2921,10 +2991,10 @@ app.post('/api/decisions/:id/comments', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
     if (!(await requireGroupRow(db, 'decisions', req.params.id, req, res))) return;
-    await db.addDecisionComment(req.params.id, req.body.member_name, req.body.text);
+    await db.addDecisionComment(req.params.id, req.session.user.name, req.body.text);
     res.json({ success: true });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -2937,7 +3007,7 @@ app.get('/api/rivalries', requireAuth, async (req, res) => {
     const rivalries = await db.getRivalries({ status: req.query.status }, req.session.user.id);
     res.json(rivalries);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -2986,7 +3056,7 @@ app.post('/api/rivalries', requireAuth, async (req, res) => {
       }
     }
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -3002,7 +3072,7 @@ app.put('/api/rivalries/:id', requireAuth, async (req, res) => {
     await db.updateRivalry(req.params.id, data);
     res.json({ success: true });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -3015,7 +3085,7 @@ app.get('/api/rivalries/:id/entries', requireAuth, async (req, res) => {
     const entries = await db.getRivalryEntries(req.params.id);
     res.json(entries);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -3076,7 +3146,7 @@ app.post('/api/rivalries/:id/entries', requireAuth, async (req, res) => {
       console.error('Rivalry entry push error:', pushErr.message);
     }
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -3192,7 +3262,7 @@ app.post('/api/rivalries/:id/complete', requireAuth, async (req, res) => {
     const scores = result.scores || [];
     res.json({ success: true, winner_name, initiator_total, opponent_total, scores, message, is_tie: !winner_name });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -3204,7 +3274,7 @@ app.get('/api/rivalries/leaderboard', requireAuth, async (req, res) => {
     const rows = await db.getRivalryLeaderboard(req.session.user.id);
     res.json(rows);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -3217,7 +3287,7 @@ app.get('/api/itineraries', requireAuth, async (req, res) => {
     const itineraries = await db.getItineraries(req.session.user.id);
     res.json(itineraries);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -3229,13 +3299,14 @@ app.post('/api/itineraries', requireAuth, async (req, res) => {
     const data = { ...req.body };
     data.traveler_id = req.session.user.id;
     data.traveler_name = req.session.user.name;
-    if (!data.group_id) {
-      data.group_id = await db.getUserHouseholdId(req.session.user.id);
-    }
+    // Validate any caller-supplied group_id against membership (don't trust the body).
+    const groupId = await resolveCreateGroupId(db, req.session.user.id, req.body.group_id);
+    if (groupId == null) return res.status(403).json({ error: 'Forbidden' });
+    data.group_id = groupId;
     const result = await db.createItinerary(data);
     res.json({ success: true, id: result.id });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -3251,7 +3322,7 @@ app.put('/api/itineraries/:id', requireAuth, async (req, res) => {
     await db.updateItinerary(req.params.id, req.body);
     res.json({ success: true });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -3267,7 +3338,7 @@ app.delete('/api/itineraries/:id', requireAuth, async (req, res) => {
     await db.deleteItinerary(req.params.id);
     res.json({ success: true });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -3281,7 +3352,7 @@ app.get('/api/itineraries/:id/expenses', requireAuth, async (req, res) => {
     const totals = await db.getItineraryExpenseTotal(req.params.id);
     res.json({ expenses, total: totals.total, count: totals.count });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -3306,7 +3377,7 @@ app.get('/api/itineraries/:id/stays', requireAuth, async (req, res) => {
     const stays = await db.getItineraryStays(req.params.id);
     res.json(stays);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -3323,7 +3394,7 @@ app.post('/api/itineraries/:id/stays', requireAuth, async (req, res) => {
     const result = await db.addItineraryStay(stay);
     res.json({ success: true, id: result.id });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -3339,7 +3410,7 @@ app.put('/api/itineraries/:id/stays/:stayId', requireAuth, async (req, res) => {
     await db.updateItineraryStay(req.params.stayId, req.body, req.params.id);
     res.json({ success: true });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -3355,7 +3426,7 @@ app.delete('/api/itineraries/:id/stays/:stayId', requireAuth, async (req, res) =
     await db.deleteItineraryStay(req.params.stayId, req.params.id);
     res.json({ success: true });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -3388,7 +3459,7 @@ app.post('/api/stays/:stayId/request', requireAuth, async (req, res) => {
 
     res.json({ success: true });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -3463,7 +3534,7 @@ app.post('/api/stays/:stayId/respond', requireAuth, async (req, res) => {
 
     res.json({ success: true });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -3476,7 +3547,7 @@ app.get('/api/stays/pending', requireAuth, async (req, res) => {
     const pending = await db.getPendingStayRequests(req.session.user.id);
     res.json(pending);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -3490,7 +3561,7 @@ app.get('/api/gifts/people', requireAuth, async (req, res) => {
     const people = await db.getGiftPeople(groupId);
     res.json(people);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -3503,7 +3574,7 @@ app.post('/api/gifts/people', requireAuth, async (req, res) => {
     const result = await db.addGiftPerson({ ...req.body, group_id: groupId });
     res.json({ success: true, id: result.id });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -3516,7 +3587,7 @@ app.get('/api/gifts/ideas', requireAuth, async (req, res) => {
     const ideas = await db.getGiftIdeas(req.query.person_id ? Number(req.query.person_id) : null, groupId);
     res.json(ideas);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -3529,7 +3600,7 @@ app.post('/api/gifts/ideas', requireAuth, async (req, res) => {
     const result = await db.addGiftIdea({ ...req.body, group_id: groupId });
     res.json({ success: true, id: result.id });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -3542,7 +3613,7 @@ app.put('/api/gifts/ideas/:id', requireAuth, async (req, res) => {
     await db.updateGiftIdea(req.params.id, req.body);
     res.json({ success: true });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -3555,7 +3626,7 @@ app.delete('/api/gifts/ideas/:id', requireAuth, async (req, res) => {
     await db.deleteGiftIdea(req.params.id);
     res.json({ success: true });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -3568,7 +3639,7 @@ app.get('/api/gifts/events', requireAuth, async (req, res) => {
     const events = await db.getSpecialEvents(groupId);
     res.json(events);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -3583,7 +3654,7 @@ app.post('/api/gifts/events', requireAuth, async (req, res) => {
     const result = await db.addSpecialEvent(data);
     res.json({ success: true, id: result.id });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -3596,7 +3667,7 @@ app.delete('/api/gifts/events/:id', requireAuth, async (req, res) => {
     await db.deleteSpecialEvent(req.params.id);
     res.json({ success: true });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -3614,7 +3685,7 @@ app.get('/api/groups', requireAuth, async (req, res) => {
     const groups = await db.getGroupsByUser(userId);
     res.json(groups);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -3628,7 +3699,7 @@ app.post('/api/groups', requireAuth, async (req, res) => {
     await db.addGroupMember(group.id, { user_id: userId, role: 'admin', added_by: userId });
     res.json({ success: true, id: group.id, invite_code: group.invite_code });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -3650,7 +3721,7 @@ app.post('/api/groups/join', requireAuth, async (req, res) => {
     await db.addGroupMember(group.id, { user_id: userId, role: 'member', added_by: userId });
     res.json({ success: true, group });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -3687,7 +3758,7 @@ app.post('/api/households/merge', requireAuth, async (req, res) => {
     const result = await db.mergeHousehold(sourceId, targetId);
     res.json({ success: true, ...result });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -3708,7 +3779,7 @@ app.post('/api/groups/:id/leave', requireAuth, async (req, res) => {
     }
     res.json({ success: true });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -3723,7 +3794,7 @@ app.get('/api/groups/:id/members', requireAuth, async (req, res) => {
     const members = await db.getGroupMembers(req.params.id);
     res.json(members);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -3741,7 +3812,7 @@ app.post('/api/groups/:id/members', requireAuth, async (req, res) => {
     });
     res.json({ success: true, id: result.id });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -3763,7 +3834,7 @@ app.delete('/api/groups/:groupId/members/:memberId', requireAuth, async (req, re
     await db.removeGroupMember(req.params.groupId, req.params.memberId);
     res.json({ success: true });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -3786,7 +3857,7 @@ app.put('/api/groups/:id', requireAuth, async (req, res) => {
     });
     res.json({ success: true });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -3800,7 +3871,7 @@ app.delete('/api/groups/:id', requireAuth, async (req, res) => {
     await db.deleteGroup(req.params.id);
     res.json({ success: true });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -3818,7 +3889,7 @@ app.get('/api/contacts', requireAuth, async (req, res) => {
     const contacts = await db.getContactsByUser(userId);
     res.json(contacts);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -3831,7 +3902,7 @@ app.post('/api/contacts', requireAuth, async (req, res) => {
     const result = await db.addContact({ ...req.body, added_by: userId });
     res.json({ success: true, id: result.id });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -3852,7 +3923,7 @@ app.put('/api/contacts/:id', requireAuth, async (req, res) => {
     await db.updateContact(req.params.id, req.body);
     res.json({ success: true });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -3865,7 +3936,7 @@ app.delete('/api/contacts/:id', requireAuth, async (req, res) => {
     await db.deleteContact(req.params.id);
     res.json({ success: true });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -3887,7 +3958,7 @@ app.get('/api/groups/:id/feed', requireAuth, async (req, res) => {
     });
     res.json(posts);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -3908,7 +3979,7 @@ app.post('/api/groups/:id/feed', requireAuth, async (req, res) => {
     const preview = req.body.title || req.body.body || 'New post';
     push.pushToGroup(db, groupId, userId, `New from ${senderName}`, preview, { type: 'group_message', ref_id: groupId });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -3926,7 +3997,7 @@ app.delete('/api/feed/:id', requireAuth, async (req, res) => {
     await db.deleteFeedPost(req.params.id);
     res.json({ success: true });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -3940,7 +4011,7 @@ app.post('/api/feed/:id/reactions', requireAuth, async (req, res) => {
     await db.addFeedReaction(req.params.id, userId, req.body.reaction_type);
     res.json({ success: true });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -3954,7 +4025,7 @@ app.delete('/api/feed/:id/reactions', requireAuth, async (req, res) => {
     await db.removeFeedReaction(req.params.id, userId);
     res.json({ success: true });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -3967,7 +4038,7 @@ app.get('/api/feed/:id/reactions', requireAuth, async (req, res) => {
     const reactions = await db.getFeedReactions(req.params.id);
     res.json(reactions);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -3980,7 +4051,7 @@ app.get('/api/feed/:id/comments', requireAuth, async (req, res) => {
     const comments = await db.getFeedComments(req.params.id);
     res.json(comments);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -3994,7 +4065,7 @@ app.post('/api/feed/:id/comments', requireAuth, async (req, res) => {
     const result = await db.addFeedComment(req.params.id, userId, req.body.text);
     res.json({ success: true, id: result.id });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -4008,7 +4079,7 @@ app.get('/api/projects', requireAuth, async (req, res) => {
     const projects = await db.getProjects(groupId);
     res.json(projects);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -4021,7 +4092,7 @@ app.post('/api/projects', requireAuth, async (req, res) => {
     const result = await db.addProject({ ...req.body, group_id: groupId });
     res.json({ success: true, id: result.id });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -4034,7 +4105,7 @@ app.delete('/api/projects/:id', requireAuth, async (req, res) => {
     await db.deleteProject(req.params.id);
     res.json({ success: true });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -4048,7 +4119,7 @@ app.get('/api/projects/:id/expenses', requireAuth, async (req, res) => {
     const expenses = await db.getProjectExpenses(req.params.id, groupId);
     res.json(expenses);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -4062,7 +4133,7 @@ app.post('/api/projects/:id/expenses', requireAuth, async (req, res) => {
     const result = await db.addProjectExpense(req.params.id, req.body, groupId);
     res.json({ success: true, id: result.id });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -4075,7 +4146,7 @@ app.delete('/api/projects/:projectId/expenses/:id', requireAuth, async (req, res
     await db.deleteProjectExpense(req.params.id, req.params.projectId);
     res.json({ success: true });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -4091,7 +4162,7 @@ app.get('/api/messages/unread-count', requireAuth, async (req, res) => {
   try {
     const count = await db.getUnreadCount(req.session.user.id);
     res.json({ count });
-  } catch (err) { res.status(500).json({ error: err.message }); }
+  } catch (err) { sendServerError(res, err); }
   finally { db.close(); }
 });
 
@@ -4100,7 +4171,7 @@ app.get('/api/messages', requireAuth, async (req, res) => {
   try {
     const conversations = await db.getConversations(req.session.user.id);
     res.json(conversations);
-  } catch (err) { res.status(500).json({ error: err.message }); }
+  } catch (err) { sendServerError(res, err); }
   finally { db.close(); }
 });
 
@@ -4112,7 +4183,7 @@ app.get('/api/messages/:partnerId', requireAuth, async (req, res) => {
       before_id: req.query.before_id ? parseInt(req.query.before_id) : undefined
     });
     res.json(messages);
-  } catch (err) { res.status(500).json({ error: err.message }); }
+  } catch (err) { sendServerError(res, err); }
   finally { db.close(); }
 });
 
@@ -4122,7 +4193,7 @@ app.get('/api/messages/:partnerId/:messageId/image', requireAuth, async (req, re
     const image = await db.getMessageImage(parseInt(req.params.messageId), req.session.user?.id);
     if (!image) return res.status(404).json({ error: 'No image' });
     res.json({ image });
-  } catch (err) { res.status(500).json({ error: err.message }); }
+  } catch (err) { sendServerError(res, err); }
   finally { db.close(); }
 });
 
@@ -4131,6 +4202,10 @@ app.post('/api/messages', requireAuth, async (req, res) => {
   try {
     const senderId = req.session.user.id;
     const senderName = req.session.user.name;
+    // Only message users you share a group with (no DMing arbitrary user ids).
+    if (!(await canViewUser(db, req.body.recipient_id, senderId))) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
     const result = await db.sendMessage({
       sender_id: senderId,
       recipient_id: req.body.recipient_id,
@@ -4144,7 +4219,7 @@ app.post('/api/messages', requireAuth, async (req, res) => {
     // Push notification to recipient (fire-and-forget)
     const text = req.body.image_data ? 'Sent you a photo' : (req.body.text || '');
     push.pushToUser(db, req.body.recipient_id, `Message from ${senderName}`, text, { type: 'message', ref_id: senderId, name: senderName });
-  } catch (err) { res.status(500).json({ error: err.message }); }
+  } catch (err) { sendServerError(res, err); }
   finally { db.close(); }
 });
 
@@ -4153,7 +4228,7 @@ app.post('/api/messages/:partnerId/read', requireAuth, async (req, res) => {
   try {
     await db.markRead(req.session.user.id, parseInt(req.params.partnerId));
     res.json({ success: true });
-  } catch (err) { res.status(500).json({ error: err.message }); }
+  } catch (err) { sendServerError(res, err); }
   finally { db.close(); }
 });
 
@@ -4164,7 +4239,7 @@ app.get('/api/activity', requireAuth, async (req, res) => {
     const feed = await db.getActivityFeed(parseInt(req.query.limit) || 20, userId);
     res.json(feed);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -4188,7 +4263,7 @@ app.get('/api/admin/diagnostic', requireAuth, requireAdmin, async (req, res) => 
     const decisionStats = await query(`SELECT group_id, COUNT(*) as count FROM decisions GROUP BY group_id`);
     const totalAppts = await query('SELECT COUNT(*) as count FROM appointments');
     res.json({ users, groups, members, apptStats, decisionStats, totalAppts: totalAppts[0]?.count });
-  } catch (err) { res.status(500).json({ error: err.message }); }
+  } catch (err) { sendServerError(res, err); }
   finally { db.close(); }
 });
 
@@ -4197,7 +4272,24 @@ app.post('/api/admin/fix-household', requireAuth, requireAdmin, async (req, res)
   try {
     await db.runHouseholdMigrations();
     res.json({ success: true, message: 'Household migration completed' });
-  } catch (err) { res.status(500).json({ error: err.message }); }
+  } catch (err) { sendServerError(res, err); }
+  finally { db.close(); }
+});
+
+// Grant or revoke a comp (non-billed) premium entitlement for a household.
+// Body: { group_id, action: 'grant' | 'revoke' }. Admin-only.
+app.post('/api/admin/comp', requireAuth, requireAdmin, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const groupId = parseInt(req.body.group_id);
+    if (!Number.isInteger(groupId)) return res.status(400).json({ error: 'group_id required' });
+    if (req.body.action === 'revoke') {
+      await subscription.revokeCompForGroup(db, groupId);
+    } else {
+      await subscription.grantCompForGroup(db, groupId, req.session.user.id);
+    }
+    res.json({ success: true });
+  } catch (err) { sendServerError(res, err); }
   finally { db.close(); }
 });
 
@@ -4212,7 +4304,7 @@ app.get('/api/lists', requireAuth, async (req, res) => {
     const lists = await db.getLists(userId);
     res.json(lists);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -4225,7 +4317,7 @@ app.post('/api/lists', requireAuth, async (req, res) => {
     const result = await db.createList({ ...req.body, created_by: userId });
     res.json({ success: true, id: result.id });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -4238,7 +4330,7 @@ app.put('/api/lists/:id', requireAuth, async (req, res) => {
     await db.updateList(req.params.id, req.body);
     res.json({ success: true });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -4262,7 +4354,7 @@ app.post('/api/lists/:id/pin', requireAuth, async (req, res) => {
     await db.updateList(req.params.id, { pinned: 1 });
     res.json({ success: true });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -4275,7 +4367,7 @@ app.post('/api/lists/:id/unpin', requireAuth, async (req, res) => {
     await db.updateList(req.params.id, { pinned: 0 });
     res.json({ success: true });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -4288,7 +4380,7 @@ app.delete('/api/lists/:id', requireAuth, async (req, res) => {
     await db.deleteList(req.params.id);
     res.json({ success: true });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -4317,7 +4409,7 @@ app.get('/api/lists/:id/items', requireAuth, async (req, res) => {
     }
     res.json(items);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -4346,7 +4438,7 @@ app.post('/api/lists/:id/items', requireAuth, async (req, res) => {
     const result = await db.addListItem({ list_id: req.params.id, title: req.body.title, added_by: userName, category });
     res.json({ success: true, id: result.id, category });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -4359,7 +4451,7 @@ app.post('/api/lists/items/:id/toggle', requireAuth, async (req, res) => {
     await db.toggleListItem(req.params.id);
     res.json({ success: true });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -4387,7 +4479,7 @@ app.put('/api/lists/items/:id', requireAuth, async (req, res) => {
     await db.updateListItem(req.params.id, updates);
     res.json({ success: true, category: updates.category || null });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -4397,10 +4489,10 @@ app.post('/api/lists/:id/reorder', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
     if (!(await requireListAccess(db, req.params.id, req, res))) return;
-    await db.reorderListItems(req.body.ordered_ids);
+    await db.reorderListItems(req.params.id, req.body.ordered_ids);
     res.json({ success: true });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -4413,7 +4505,7 @@ app.delete('/api/lists/items/:id', requireAuth, async (req, res) => {
     await db.deleteListItem(req.params.id);
     res.json({ success: true });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -4460,7 +4552,7 @@ app.post('/api/coverage', requireAuth, async (req, res) => {
       }
     }
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -4474,7 +4566,7 @@ app.get('/api/coverage/incoming', requireAuth, async (req, res) => {
     const requests = await db.getIncomingCoverageRequests(userId);
     res.json(requests);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -4488,7 +4580,7 @@ app.get('/api/coverage', requireAuth, async (req, res) => {
     const requests = await db.getCoverageRequests(userId);
     res.json(requests);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -4503,7 +4595,7 @@ app.get('/api/coverage/blocks', requireAuth, async (req, res) => {
     const blocks = await db.getCoverageBlocks(userId, date_from, date_to);
     res.json(blocks);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -4526,7 +4618,7 @@ app.get('/api/coverage/:id', requireAuth, async (req, res) => {
     const approvals = await db.getCoverageApprovals(req.params.id);
     res.json({ ...request, windows, recipients, approvals });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -4544,7 +4636,7 @@ app.post('/api/coverage/:id/cancel', requireAuth, async (req, res) => {
     await db.cancelCoverageRequest(req.params.id);
     res.json({ success: true });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -4568,7 +4660,7 @@ app.get('/api/coverage/approve/:token', async (req, res) => {
       windows
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -4622,7 +4714,7 @@ app.post('/api/coverage/approve/:token', async (req, res) => {
 
     res.json({ success: true, message: 'Coverage confirmed' });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -4676,7 +4768,7 @@ app.post('/api/coverage/incoming/:id/approve', requireAuth, async (req, res) => 
 
     res.json({ success: true, message: 'Coverage confirmed' });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   } finally {
     db.close();
   }
@@ -4697,6 +4789,20 @@ async function initializeDatabase() {
     db.close();
   }
 }
+
+// 404 for unmatched API routes (avoids falling through to static/HTML).
+app.use('/api', (req, res) => res.status(404).json({ error: 'Not found' }));
+
+// Centralized error handler — last line of defense. Express 5 forwards rejected
+// async handlers here. Logs server-side, returns an opaque message to clients.
+// eslint-disable-next-line no-unused-vars
+app.use((err, req, res, next) => {
+  console.error('[unhandled]', err && err.stack ? err.stack : err);
+  if (res.headersSent) return next(err);
+  const isApi = req.path.startsWith('/api/');
+  if (isApi) res.status(500).json({ error: 'Internal server error' });
+  else res.status(500).send('Something went wrong. Please try again.');
+});
 
 // Start server after DB init
 initializeDatabase().then(() => {

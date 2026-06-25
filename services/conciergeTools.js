@@ -438,6 +438,9 @@ const TOOLS = [
       required: ['itinerary_id'],
     },
     async run(ctx, input) {
+      // Scope to the caller's household — the parent itinerary must belong to it
+      // before its stays (host addresses, dates) can be read.
+      await assertHousehold(ctx, 'itineraries', input.itinerary_id);
       const rows = await ctx.db.getItineraryStays(input.itinerary_id);
       return { result: rows.map(s => ({
         id: s.id, check_in: s.check_in, check_out: s.check_out, host: s.host_name,
@@ -705,8 +708,12 @@ const TOOLS = [
       required: ['fact'],
     },
     async run(ctx, input) {
-      await ctx.db.addConciergeMemory(ctx.userId, ctx.groupId, input.fact);
-      const summary = `Noted: ${input.fact}`;
+      // Cap length and strip control chars — stored notes are replayed into the
+      // system prompt of every future session, so bound what can be persisted.
+      const fact = String(input.fact || '').replace(/[\x00-\x1f]/g, ' ').trim().slice(0, 500);
+      if (!fact) return { result: { ok: false, summary: 'Nothing to remember.' } };
+      await ctx.db.addConciergeMemory(ctx.userId, ctx.groupId, fact);
+      const summary = `Noted: ${fact}`;
       return { result: { ok: true, summary }, action: { tool: 'remember', summary } };
     },
   },

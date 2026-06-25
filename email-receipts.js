@@ -9,9 +9,18 @@ const path = require('path');
 const fs = require('fs');
 const FamilyDB = require('./database');
 
-// Gmail credentials (from env)
-const GMAIL_USER = process.env.GMAIL_USER || 'redacted@example.com';
+// Gmail credentials (from env — no hardcoded fallback)
+const GMAIL_USER = process.env.GMAIL_USER;
 const GMAIL_PASS = process.env.GMAIL_APP_PASSWORD;
+
+// Only ingest receipts from trusted senders. Comma-separated substrings matched
+// against the email's From header (e.g. "receipts@amazon.com,@apple.com").
+// If unset, NOTHING is ingested — anyone can email the inbox, so an allowlist is
+// required to stop forged receipts being written into the family's budget.
+const SENDER_ALLOWLIST = (process.env.RECEIPT_SENDER_ALLOWLIST || '')
+  .split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+
+const MAX_RECEIPT_AMOUNT = 100000; // reject implausible amounts
 
 // IMAP config
 const imapConfig = {
@@ -21,7 +30,8 @@ const imapConfig = {
     host: 'imap.gmail.com',
     port: 993,
     tls: true,
-    tlsOptions: { rejectUnauthorized: false },
+    // Verify Gmail's TLS certificate (Node trusts public CAs by default).
+    tlsOptions: { rejectUnauthorized: true, servername: 'imap.gmail.com' },
     authTimeout: 3000
   }
 };
@@ -76,7 +86,10 @@ function extractDate(text) {
         const year = parts[2].length === 2 ? '20' + parts[2] : parts[2];
         const month = parts[0].padStart(2, '0');
         const day = parts[1].padStart(2, '0');
-        return `${year}-${month}-${day}`;
+        const mNum = parseInt(month, 10), dNum = parseInt(day, 10);
+        if (mNum >= 1 && mNum <= 12 && dNum >= 1 && dNum <= 31) {
+          return `${year}-${month}-${day}`;
+        }
       }
     } catch (e) {}
   }
@@ -95,12 +108,25 @@ function extractMerchant(text, subject) {
   return subject.split('\n')[0].substring(0, 50);
 }
 
+// Strip control characters and cap length before the merchant string is stored
+// and later rendered (defense against stored-XSS / log injection).
+function sanitizeMerchant(name) {
+  return String(name || 'Unknown')
+    .replace(/[\x00-\x1f<>]/g, ' ')
+    .trim()
+    .slice(0, 80) || 'Unknown';
+}
+
 async function processReceiptEmails() {
-  if (!GMAIL_PASS) {
-    console.error('GMAIL_APP_PASSWORD not set');
+  if (!GMAIL_USER || !GMAIL_PASS) {
+    console.error('GMAIL_USER and GMAIL_APP_PASSWORD must be set');
     return;
   }
-  
+  if (SENDER_ALLOWLIST.length === 0) {
+    console.error('RECEIPT_SENDER_ALLOWLIST not set — refusing to ingest unverified email. Aborting.');
+    return;
+  }
+
   try {
     const connection = await imaps.connect(imapConfig);
     await connection.openBox('INBOX');
@@ -141,17 +167,26 @@ async function processReceiptEmails() {
         const subject = header.subject?.[0] || 'Unknown';
         const from = header.from?.[0] || 'Unknown';
         const emailId = message.attributes.uid;
-        
-        console.log(`Processing: ${subject}`);
-        
+
+        // Reject senders not on the allowlist — the From header is the only thing
+        // standing between a forged email and a fabricated budget entry.
+        const fromLower = from.toLowerCase();
+        if (!SENDER_ALLOWLIST.some(s => fromLower.includes(s))) {
+          console.log(`✗ Skipping untrusted sender (uid ${emailId})`);
+          await connection.addFlags(emailId, ['\\Seen']);
+          continue;
+        }
+
+        console.log(`Processing uid ${emailId}`);
+
         // Extract receipt data
         const fullText = subject + ' ' + text;
         const amount = extractAmount(fullText);
-        const merchant = extractMerchant(text, subject);
+        const merchant = sanitizeMerchant(extractMerchant(text, subject));
         const date = extractDate(fullText);
         const category = guessCategory(fullText);
-        
-        if (amount && amount > 0) {
+
+        if (amount && amount > 0 && amount < MAX_RECEIPT_AMOUNT) {
           // Save to database
           await db.addReceipt({
             amount,
@@ -166,12 +201,12 @@ async function processReceiptEmails() {
             group_id: householdId
           });
           
-          console.log(`✓ Logged: $${amount} at ${merchant} (${category})`);
-          
+          console.log(`✓ Logged receipt (uid ${emailId}, ${category})`);
+
           // Mark as read
           await connection.addFlags(emailId, ['\\Seen']);
         } else {
-          console.log(`✗ Could not extract amount from: ${subject}`);
+          console.log(`✗ Could not extract a valid amount (uid ${emailId})`);
         }
       } catch (err) {
         console.error('Error processing message:', err.message);

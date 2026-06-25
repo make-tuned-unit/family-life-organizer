@@ -206,7 +206,7 @@ final class AuthService {
 
     // MARK: - Keychain
 
-    private static let keychainService = "com.atlasatlantic.familylife"
+    private static let keychainService = "com.mylauft.kinrows"
 
     private static func savePassword(_ password: String, for username: String) {
         let data = Data(password.utf8)
@@ -218,6 +218,9 @@ final class AuthService {
         SecItemDelete(query as CFDictionary)
         var add = query
         add[kSecValueData as String] = data
+        // Device-only, available after first unlock: never synced to iCloud
+        // Keychain and not present in device backups.
+        add[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
         SecItemAdd(add as CFDictionary, nil)
     }
 

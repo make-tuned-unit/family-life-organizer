@@ -28,10 +28,22 @@ function certFromX5c(b64der) {
   return new crypto.X509Certificate(Buffer.from(b64der, 'base64'));
 }
 
-// Verify each cert in the chain is signed by the next, and the top is the root.
+// Reject a cert that is not currently within its validity window.
+function assertNotExpired(cert) {
+  const now = Date.now();
+  const from = Date.parse(cert.validFrom);
+  const to = Date.parse(cert.validTo);
+  if (!Number.isNaN(from) && now < from) throw new Error('Certificate not yet valid');
+  if (!Number.isNaN(to) && now > to) throw new Error('Certificate has expired');
+}
+
+// Verify each cert in the chain is signed by the next, the top is the root, and
+// every cert is within its validity window (Node's verify() checks signatures
+// only, not expiry).
 function verifyChain(x5c, rootCertBase64) {
   const root = certFromX5c(rootCertBase64);
   const chain = x5c.map(certFromX5c);
+  for (const cert of chain) assertNotExpired(cert);
   for (let i = 0; i < chain.length - 1; i++) {
     if (!chain[i].verify(chain[i + 1].publicKey)) {
       throw new Error('Certificate chain verification failed');

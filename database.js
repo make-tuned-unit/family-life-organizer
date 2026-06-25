@@ -9,8 +9,10 @@ const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
 
-// Use Render disk path if available, otherwise use local path
-const DB_DIR = process.env.RENDER_DISK_PATH 
+// Use an explicit override (tests), else the Render disk path, else local path.
+const DB_DIR = process.env.FAMILY_DB_DIR
+  ? process.env.FAMILY_DB_DIR
+  : process.env.RENDER_DISK_PATH
   ? '/opt/render/project/src/vault/family-life'
   : path.join(process.env.HOME || '/tmp', '.openclaw/workspace/vault/family-life');
 const DB_PATH = path.join(DB_DIR, 'family.db');
@@ -19,6 +21,16 @@ const DB_PATH = path.join(DB_DIR, 'family.db');
 if (!fs.existsSync(DB_DIR)) {
   fs.mkdirSync(DB_DIR, { recursive: true });
 }
+
+// Columns that must never be set from a client-supplied update body. Blocks
+// mass-assignment of ownership/isolation/identity fields in the dynamic update*
+// helpers (a future sensitive column is protected by default, not exposed).
+const PROTECTED_UPDATE_COLUMNS = new Set([
+  'id', 'group_id', 'created_at', 'updated_at',
+  'user_id', 'created_by', 'added_by', 'owner_id',
+  'traveler_id', 'traveler_name', 'sender_id', 'recipient_id', 'author_id',
+  'processed_by', 'email_id',
+]);
 
 // Shared connection for concurrent access
 let _sharedDb = null;
@@ -29,6 +41,9 @@ function getSharedDb() {
     _sharedDb.configure('busyTimeout', 10000);
     _sharedDb.run('PRAGMA journal_mode = WAL');
     _sharedDb.run('PRAGMA synchronous = NORMAL');
+    // Enforce declared FOREIGN KEY constraints (off by default in SQLite) so the
+    // schema's ON DELETE CASCADE clauses actually fire and orphans can't accrue.
+    _sharedDb.run('PRAGMA foreign_keys = ON');
   }
   return _sharedDb;
 }
@@ -205,7 +220,7 @@ class FamilyDB {
               // Neither has a household — create one
               console.log('Creating new Fairbanks household');
               this.db.run("INSERT INTO groups (name, group_type, invite_code, created_by) VALUES ('Fairbanks', 'household', ?, ?)",
-                [Math.random().toString(36).substring(2, 8).toUpperCase(), jesse?.id || userIds[0]], function() {
+                [crypto.randomBytes(6).toString('hex').toUpperCase(), jesse?.id || userIds[0]], function() {
                   const newId = this.lastID;
                   for (const uid of userIds) {
                     this.db.run(`INSERT INTO group_members (group_id, user_id, role, added_by) VALUES (?, ?, 'admin', ?)`,
@@ -698,7 +713,7 @@ class FamilyDB {
       const fields = [];
       const params = [];
       for (const [key, value] of Object.entries(updates)) {
-        if (key === 'id' || key === 'group_id' || key === 'created_at') continue; // never mass-assign these
+        if (PROTECTED_UPDATE_COLUMNS.has(key)) continue; // never mass-assign ownership/identity columns
         fields.push(`${key} = ?`);
         params.push(value);
       }
@@ -980,7 +995,7 @@ class FamilyDB {
       const fields = [];
       const params = [];
       for (const [key, value] of Object.entries(updates)) {
-        if (key === 'id' || key === 'group_id' || key === 'created_at') continue; // never mass-assign these
+        if (PROTECTED_UPDATE_COLUMNS.has(key)) continue; // never mass-assign ownership/identity columns
         fields.push(`${key} = ?`);
         params.push(value);
       }
@@ -1036,7 +1051,7 @@ class FamilyDB {
       const fields = [];
       const params = [];
       for (const [key, value] of Object.entries(updates)) {
-        if (key === 'id' || key === 'group_id' || key === 'created_at') continue; // never mass-assign these
+        if (PROTECTED_UPDATE_COLUMNS.has(key)) continue; // never mass-assign ownership/identity columns
         fields.push(`${key} = ?`);
         params.push(value);
       }
@@ -1161,7 +1176,7 @@ class FamilyDB {
       const fields = [];
       const params = [];
       for (const [key, value] of Object.entries(updates)) {
-        if (key === 'id' || key === 'group_id' || key === 'created_at') continue; // never mass-assign these
+        if (PROTECTED_UPDATE_COLUMNS.has(key)) continue; // never mass-assign ownership/identity columns
         fields.push(`${key} = ?`);
         params.push(key === 'poll_options' ? JSON.stringify(value || []) : value);
       }
@@ -1480,7 +1495,9 @@ class FamilyDB {
   }
 
   updateItinerary(id, updates) {
-    const ALLOWED = new Set(['title', 'start_date', 'end_date', 'travelers', 'notes', 'status', 'group_id']);
+    // group_id deliberately NOT updatable — re-homing an itinerary to another
+    // group is an isolation escape; ownership is fixed at creation.
+    const ALLOWED = new Set(['title', 'start_date', 'end_date', 'travelers', 'notes', 'status']);
     return new Promise((resolve, reject) => {
       const fields = [];
       const params = [];
@@ -1663,7 +1680,7 @@ class FamilyDB {
       const fields = [];
       const params = [];
       for (const [key, value] of Object.entries(updates)) {
-        if (key === 'id' || key === 'group_id' || key === 'created_at') continue; // never mass-assign these
+        if (PROTECTED_UPDATE_COLUMNS.has(key)) continue; // never mass-assign ownership/identity columns
         fields.push(`${key} = ?`);
         params.push(value);
       }
@@ -2351,7 +2368,7 @@ class FamilyDB {
       const fields = [];
       const params = [];
       for (const [key, value] of Object.entries(updates)) {
-        if (key === 'id' || key === 'group_id' || key === 'created_at') continue; // never mass-assign these
+        if (PROTECTED_UPDATE_COLUMNS.has(key)) continue; // never mass-assign ownership/identity columns
         fields.push(`${key} = ?`);
         params.push(value);
       }
@@ -2769,7 +2786,7 @@ class FamilyDB {
       const fields = [];
       const params = [];
       for (const [key, value] of Object.entries(updates)) {
-        if (key === 'id' || key === 'group_id' || key === 'created_at') continue; // never mass-assign these
+        if (PROTECTED_UPDATE_COLUMNS.has(key)) continue; // never mass-assign ownership/identity columns
         fields.push(`${key} = ?`);
         params.push(value);
       }
@@ -2820,7 +2837,7 @@ class FamilyDB {
       const fields = [];
       const params = [];
       for (const [key, value] of Object.entries(updates)) {
-        if (key === 'id' || key === 'group_id' || key === 'created_at') continue; // never mass-assign these
+        if (PROTECTED_UPDATE_COLUMNS.has(key)) continue; // never mass-assign ownership/identity columns
         fields.push(`${key} = ?`);
         params.push(value);
       }
@@ -2832,11 +2849,13 @@ class FamilyDB {
     });
   }
 
-  reorderListItems(orderedIds) {
+  reorderListItems(listId, orderedIds) {
     return new Promise((resolve, reject) => {
-      const stmt = this.db.prepare('UPDATE list_items SET sort_order = ? WHERE id = ?');
+      // Scope every update to the owning list so a caller can't reorder (touch)
+      // items belonging to another list / household by passing foreign ids.
+      const stmt = this.db.prepare('UPDATE list_items SET sort_order = ? WHERE id = ? AND list_id = ?');
       for (let i = 0; i < orderedIds.length; i++) {
-        stmt.run(i, orderedIds[i]);
+        stmt.run(i, orderedIds[i], listId);
       }
       stmt.finalize((err) => {
         if (err) reject(err);
@@ -2956,24 +2975,20 @@ class FamilyDB {
 
   approveCoverage(approval) {
     return new Promise((resolve, reject) => {
-      this.db.serialize(() => {
-        // Insert approval
-        this.db.run(
+      const db = this.db;
+      db.serialize(() => {
+        db.run('BEGIN');
+        db.run(
           `INSERT INTO coverage_approvals (request_id, recipient_id, window_id, approved_date, approved_start, approved_end, helper_note)
            VALUES (?, ?, ?, ?, ?, ?, ?)`,
           [approval.request_id, approval.recipient_id, approval.window_id, approval.approved_date, approval.approved_start, approval.approved_end, approval.helper_note || null],
           function(err) {
-            if (err) return reject(err);
+            if (err) { db.run('ROLLBACK'); return reject(err); }
             const approvalId = this.lastID;
-
-            // Update recipient status
-            this.db.run('UPDATE coverage_recipients SET status = ? WHERE id = ?', ['approved', approval.recipient_id]);
-
-            // Update request status
-            this.db.run('UPDATE coverage_requests SET status = ? WHERE id = ?', ['approved', approval.request_id]);
-
-            resolve({ id: approvalId });
-          }.bind(this)
+            db.run('UPDATE coverage_recipients SET status = ? WHERE id = ?', ['approved', approval.recipient_id]);
+            db.run('UPDATE coverage_requests SET status = ? WHERE id = ?', ['approved', approval.request_id]);
+            db.run('COMMIT', (cErr) => cErr ? reject(cErr) : resolve({ id: approvalId }));
+          }
         );
       });
     });
@@ -3432,6 +3447,7 @@ class FamilyDB {
   }
 }
 
+FamilyDB.DB_DIR = DB_DIR;
 module.exports = FamilyDB;
 
 // CLI usage
