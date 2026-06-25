@@ -29,11 +29,13 @@ struct ConciergeCounts: Codable {
 /// Household premium entitlement status from the backend.
 struct SubscriptionStatus: Codable {
     let premium: Bool
+    let tier: String?        // "premium" | "lite" | nil
     let productId: String?
     let expiresAt: String?
 
     enum CodingKeys: String, CodingKey {
         case premium
+        case tier
         case productId = "product_id"
         case expiresAt = "expires_at"
     }

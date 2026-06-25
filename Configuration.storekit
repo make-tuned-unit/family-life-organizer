@@ -15,21 +15,84 @@
         {
           "adHocOffers" : [],
           "codeOffers" : [],
-          "displayPrice" : "4.99",
+          "displayPrice" : "9.99",
           "familyShareable" : false,
           "groupNumber" : 1,
+          "internalID" : "30000003",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "Full concierge — up to 40 chats a day, the daily brief, receipts and meal ideas.",
+              "displayName" : "Premium Monthly",
+              "locale" : "en_US"
+            }
+          ],
+          "productID" : "com.mylauft.kinrows.concierge.premium.monthly",
+          "recurringSubscriptionPeriod" : "P1M",
+          "referenceName" : "Concierge Premium Monthly",
+          "subscriptionGroupID" : "20000001",
+          "type" : "RecurringSubscription"
+        },
+        {
+          "adHocOffers" : [],
+          "codeOffers" : [],
+          "displayPrice" : "99.99",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "30000004",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "Full concierge, billed yearly — two months free versus monthly.",
+              "displayName" : "Premium Yearly",
+              "locale" : "en_US"
+            }
+          ],
+          "productID" : "com.mylauft.kinrows.concierge.premium.yearly",
+          "recurringSubscriptionPeriod" : "P1Y",
+          "referenceName" : "Concierge Premium Yearly",
+          "subscriptionGroupID" : "20000001",
+          "type" : "RecurringSubscription"
+        },
+        {
+          "adHocOffers" : [],
+          "codeOffers" : [],
+          "displayPrice" : "4.99",
+          "familyShareable" : false,
+          "groupNumber" : 2,
           "internalID" : "30000001",
           "introductoryOffer" : null,
           "localizations" : [
             {
-              "description" : "Your AI life concierge — chat with your butler and let it organize your household.",
-              "displayName" : "Concierge Monthly",
+              "description" : "Concierge Lite — up to 10 chats a day, plus the free daily brief.",
+              "displayName" : "Lite Monthly",
               "locale" : "en_US"
             }
           ],
-          "productID" : "com.mylauft.kinrows.concierge.monthly",
+          "productID" : "com.mylauft.kinrows.concierge.lite.monthly",
           "recurringSubscriptionPeriod" : "P1M",
-          "referenceName" : "Concierge Monthly",
+          "referenceName" : "Concierge Lite Monthly",
+          "subscriptionGroupID" : "20000001",
+          "type" : "RecurringSubscription"
+        },
+        {
+          "adHocOffers" : [],
+          "codeOffers" : [],
+          "displayPrice" : "49.99",
+          "familyShareable" : false,
+          "groupNumber" : 2,
+          "internalID" : "30000002",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "Concierge Lite, billed yearly — two months free versus monthly.",
+              "displayName" : "Lite Yearly",
+              "locale" : "en_US"
+            }
+          ],
+          "productID" : "com.mylauft.kinrows.concierge.lite.yearly",
+          "recurringSubscriptionPeriod" : "P1Y",
+          "referenceName" : "Concierge Lite Yearly",
           "subscriptionGroupID" : "20000001",
           "type" : "RecurringSubscription"
         }

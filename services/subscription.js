@@ -5,7 +5,26 @@
 const { verifyTransaction } = require('./appleVerify');
 
 const BUNDLE_ID = process.env.APNS_BUNDLE_ID || 'com.mylauft.kinrows';
-const PRODUCT_ID = process.env.CONCIERGE_PRODUCT_ID || 'com.mylauft.kinrows.concierge.monthly';
+
+// Concierge product catalog. Two tiers (lite/premium) × two billing periods.
+// Tier drives the daily chat allowance (see dashboard TIER_DAILY_CAP); both tiers
+// get the free daily brief and the full feature set — they differ only by volume.
+// The legacy single-tier product maps to premium so existing subs don't regress.
+const PRODUCTS = {
+  'com.mylauft.kinrows.concierge.lite.monthly':    { tier: 'lite',    period: 'monthly' },
+  'com.mylauft.kinrows.concierge.lite.yearly':     { tier: 'lite',    period: 'yearly'  },
+  'com.mylauft.kinrows.concierge.premium.monthly': { tier: 'premium', period: 'monthly' },
+  'com.mylauft.kinrows.concierge.premium.yearly':  { tier: 'premium', period: 'yearly'  },
+  'com.mylauft.kinrows.concierge.monthly':         { tier: 'premium', period: 'monthly' }, // legacy
+};
+// Product used for comped (non-billed) entitlements — grants the premium tier.
+const COMP_PRODUCT_ID = 'com.mylauft.kinrows.concierge.premium.monthly';
+// Back-compat export for any caller still referencing a single product id.
+const PRODUCT_ID = process.env.CONCIERGE_PRODUCT_ID || COMP_PRODUCT_ID;
+
+function tierForProduct(productId) {
+  return PRODUCTS[productId] ? PRODUCTS[productId].tier : null;
+}
 
 // Convert StoreKit epoch-ms to SQLite CURRENT_TIMESTAMP-comparable UTC string.
 function toSqlDate(ms) {
@@ -19,8 +38,8 @@ function toSqlDate(ms) {
 async function verifyAndStore(db, userId, signedTransaction) {
   const payload = verifyTransaction(signedTransaction, { bundleId: BUNDLE_ID });
 
-  // Only our concierge product grants entitlement — never any other IAP.
-  if (payload.productId !== PRODUCT_ID) {
+  // Only a known concierge product grants entitlement — never any other IAP.
+  if (!PRODUCTS[payload.productId]) {
     throw new Error(`Unexpected product: ${payload.productId}`);
   }
 
@@ -99,11 +118,18 @@ async function ensureCompPremium(db) {
   }
 }
 
-// Whether the user's household currently has premium.
+// Whether the user's household currently has ANY paid tier (lite or premium).
 async function isHouseholdPremium(db, userId) {
   const groupId = await db.getUserHouseholdId(userId);
   const sub = await db.getActiveSubscriptionForGroup(groupId);
   return !!sub;
+}
+
+// The household's active tier ('premium' | 'lite' | null). Drives the chat cap.
+async function getHouseholdTier(db, userId) {
+  const groupId = await db.getUserHouseholdId(userId);
+  const sub = await db.getActiveSubscriptionForGroup(groupId);
+  return sub ? tierForProduct(sub.product_id) : null;
 }
 
 // Handle an App Store Server Notification (v2): verify Apple's signed payload,
@@ -140,9 +166,10 @@ async function getStatus(db, userId) {
   const sub = await db.getActiveSubscriptionForGroup(groupId);
   return {
     premium: !!sub,
+    tier: sub ? tierForProduct(sub.product_id) : null,
     product_id: sub ? sub.product_id : null,
     expires_at: sub ? sub.expires_at : null,
   };
 }
 
-module.exports = { verifyAndStore, verifyAndApplyNotification, getStatus, isHouseholdPremium, grantCompForGroup, revokeCompForGroup, ensureCompPremium, PRODUCT_ID, BUNDLE_ID };
+module.exports = { verifyAndStore, verifyAndApplyNotification, getStatus, isHouseholdPremium, getHouseholdTier, tierForProduct, grantCompForGroup, revokeCompForGroup, ensureCompPremium, PRODUCTS, PRODUCT_ID, BUNDLE_ID };

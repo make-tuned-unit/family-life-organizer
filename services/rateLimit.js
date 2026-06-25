@@ -2,13 +2,21 @@
 // Enough to stop a single client from looping an expensive endpoint; not a
 // distributed limiter. keyFn derives the bucket key (e.g. the user id).
 
-function createRateLimiter({ windowMs = 60000, max = 30, keyFn }) {
+// keyFn may be sync or async (e.g. when the bucket key needs a DB lookup such as
+// the caller's household). maxFn, if given, derives the per-request limit (e.g. a
+// tier-dependent daily cap) and overrides the static `max`. Errors deriving either
+// fail open rather than blocking.
+function createRateLimiter({ windowMs = 60000, max = 30, keyFn, maxFn }) {
   const hits = new Map(); // key -> [timestamps]
-  return function rateLimit(req, res, next) {
-    const key = keyFn(req);
+  return async function rateLimit(req, res, next) {
+    let key, limit = max;
+    try {
+      key = await keyFn(req);
+      if (maxFn) limit = await maxFn(req);
+    } catch { return next(); }
     const now = Date.now();
     const recent = (hits.get(key) || []).filter(t => now - t < windowMs);
-    if (recent.length >= max) {
+    if (recent.length >= limit) {
       return res.status(429).json({ error: 'Too many requests, please slow down.' });
     }
     recent.push(now);

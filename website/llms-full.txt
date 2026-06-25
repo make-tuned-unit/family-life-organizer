@@ -19,7 +19,7 @@ Kinrows is a single, private home organizer for the whole household. It brings t
 
 ## Pricing model
 - Core app: Free, for the entire household, with no ads.
-- Concierge add-on: $9.99 USD per month, per household. One subscription unlocks it for everyone in that household. Billed through Apple; auto-renews until cancelled.
+- Concierge add-on: two tiers, per household, one subscription unlocks it for everyone in that household. Lite is $4.99/month (or $49.99/year) with up to 10 concierge chats per day; Premium is $9.99/month (or $99.99/year) with up to 40 chats per day. Both tiers include every Concierge feature and the free daily brief — they differ only in daily chat volume. Yearly plans are priced at two months free versus monthly. Billed through Apple; auto-renews until cancelled.
 
 ## Coverage / scope
 - Platform: iPhone (iOS 18+). A companion web view exists for the app; the primary product is the iOS app.
