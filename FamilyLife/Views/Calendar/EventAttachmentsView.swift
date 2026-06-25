@@ -31,7 +31,7 @@ struct EventAttachmentsSection: View {
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 16)
             } else if attachments.isEmpty {
-                Text("Attach a list, note, decision, receipt, or trip.")
+                Text("Attach a task, list, note, decision, receipt, or trip.")
                     .font(.system(size: 14))
                     .foregroundStyle(WarmPalette.ink3)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -235,6 +235,10 @@ struct AttachmentPickerView: View {
         defer { loading = false }
         do {
             switch kind {
+            case .task:
+                items = try await api.fetchTasks(status: "active").map {
+                    PickItem(id: $0.id, title: $0.title, subtitle: $0.category.capitalized)
+                }
             case .note:
                 items = try await api.fetchNotes().map {
                     PickItem(id: $0.id, title: ($0.title?.isEmpty == false ? $0.title! : "Untitled note"),
@@ -295,6 +299,7 @@ struct AttachmentDestinationView: View {
     @State private var note: Note?
     @State private var trip: TripResponse?
     @State private var list: APIService.ListResponse?
+    @State private var task: TaskResponse?
 
     enum Phase { case loading, ready, notFound }
 
@@ -318,7 +323,9 @@ struct AttachmentDestinationView: View {
 
     @ViewBuilder
     private var wrapped: some View {
-        if let decision {
+        if let task {
+            AttachedTaskDetail(task: task)
+        } else if let decision {
             DecisionDetailView(decision: decision)
         } else if let receipt {
             ReceiptDetailView(receipt: receipt) {
@@ -355,11 +362,69 @@ struct AttachmentDestinationView: View {
             case "note":      note = try await api.fetchNotes().first { $0.id == id }
             case "trip":      trip = try await api.fetchTrips().first { $0.id == id }
             case "list":      list = try await api.fetchLists().first { $0.id == id }
+            case "task":
+                async let active = api.fetchTasks(status: "active")
+                async let done = api.fetchTasks(status: "completed")
+                task = (try await (active + done)).first { $0.id == id }
             default: break
             }
         } catch { }
-        let found = decision != nil || receipt != nil || itinerary != nil || note != nil || trip != nil || list != nil
+        let found = decision != nil || receipt != nil || itinerary != nil || note != nil || trip != nil || list != nil || task != nil
         phase = found ? .ready : .notFound
+    }
+}
+
+// Minimal detail for an attached task (Tasks live in the Lists tab, no standalone screen).
+private struct AttachedTaskDetail: View {
+    let task: TaskResponse
+
+    private var isDone: Bool { task.status != "active" }
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                HStack(spacing: 10) {
+                    Image(systemName: isDone ? "checkmark.circle.fill" : "circle")
+                        .font(.system(size: 24))
+                        .foregroundStyle(isDone ? WarmPalette.good : WarmPalette.ink4)
+                    Text(task.title)
+                        .font(.system(size: 24, weight: .bold))
+                        .foregroundStyle(WarmPalette.ink1)
+                        .strikethrough(isDone, color: WarmPalette.ink4)
+                }
+
+                row("folder", task.category.capitalized)
+                row("flag.fill", task.priority.capitalized + " priority")
+                if let assignee = task.assigned_to, !assignee.isEmpty {
+                    row("person.fill", "Assigned to \(assignee.capitalized)")
+                }
+                if let due = task.due_date, !due.isEmpty {
+                    row("calendar", "Due \(due)")
+                }
+                if let desc = task.description, !desc.isEmpty {
+                    row("text.alignleft", desc)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(22)
+            .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.cardLarge))
+            .padding(DesignTokens.Spacing.horizontalMargin)
+        }
+        .background { AmbientBackground(style: .calendar) }
+        .navigationTitle("Task")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+
+    @ViewBuilder
+    private func row(_ icon: String, _ text: String) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: icon)
+                .foregroundStyle(TabAccent.calendar.color)
+                .frame(width: 22)
+            Text(text)
+                .font(.system(size: 15))
+                .foregroundStyle(WarmPalette.ink2)
+        }
     }
 }
 

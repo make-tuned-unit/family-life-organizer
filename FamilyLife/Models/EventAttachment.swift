@@ -17,12 +17,13 @@ struct EventAttachmentResponse: Codable, Identifiable {
 }
 
 enum AttachmentKind: String, CaseIterable, Identifiable {
-    case list, note, decision, receipt, trip, itinerary
+    case task, list, note, decision, receipt, trip, itinerary
 
     var id: String { rawValue }
 
     var label: String {
         switch self {
+        case .task: "Task"
         case .list: "List"
         case .note: "Note"
         case .decision: "Decision"
@@ -34,6 +35,7 @@ enum AttachmentKind: String, CaseIterable, Identifiable {
 
     var icon: String {
         switch self {
+        case .task: "checkmark.circle"
         case .list: "checklist"
         case .note: "note.text"
         case .decision: "checkmark.seal"
@@ -45,6 +47,7 @@ enum AttachmentKind: String, CaseIterable, Identifiable {
 
     var color: Color {
         switch self {
+        case .task: TabAccent.home.color
         case .list: AccentTheme.ocean.color
         case .note: AccentTheme.saffron.color
         case .decision: AccentTheme.mauve.color

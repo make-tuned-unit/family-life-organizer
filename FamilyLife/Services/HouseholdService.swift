@@ -5,6 +5,8 @@ import SwiftUI
 final class HouseholdService {
     private(set) var members: [APIService.ContactResponse] = []
     private(set) var householdGroup: APIService.GroupResponse?
+    /// Lowercased names of people in the user's own household group (not clans/cross-household circles).
+    private(set) var householdMemberNames: Set<String> = []
     /// Maps member names (lowercased) to their users table ID (for messaging)
     private(set) var userIdsByName: [String: Int] = [:]
     private(set) var isLoaded = false
@@ -32,13 +34,18 @@ final class HouseholdService {
             var nameToUserId: [String: Int] = [:]
             var addedNames = Set(contacts.map { $0.name.lowercased() })
             var addedUserIds = Set<Int>()
+            var householdNames = Set<String>()
             for group in groups {
+                let isHouseholdGroup = group.group_type == "household"
                 if let groupMembers = try? await api.fetchGroupMembers(groupId: group.id) {
                     profileCache?.loadFromHousehold(groupMembers)
 
                     for member in groupMembers {
                         let name = member.displayName
                         let nameLC = name.lowercased()
+                        // Record household membership before any skip logic so the current
+                        // user and existing contacts are still captured as household members.
+                        if isHouseholdGroup { householdNames.insert(nameLC) }
                         // Track user_id for messaging
                         if let uid = member.user_id {
                             nameToUserId[nameLC] = uid
@@ -84,6 +91,7 @@ final class HouseholdService {
 
             members = combined
             userIdsByName = nameToUserId
+            householdMemberNames = householdNames
         } catch {
             guard !error.isCancellation else { isLoading = false; return }
         }
@@ -98,6 +106,16 @@ final class HouseholdService {
 
     func member(named name: String) -> APIService.ContactResponse? {
         members.first { $0.name.localizedCaseInsensitiveCompare(name) == .orderedSame }
+    }
+
+    /// True when `name` belongs to the user's own household (not just a clan/circle).
+    func isHouseholdMember(_ name: String) -> Bool {
+        householdMemberNames.contains(name.lowercased())
+    }
+
+    /// Household-only members (used for assignment — clans are for sharing, not assigning).
+    var householdMembers: [APIService.ContactResponse] {
+        members.filter { isHouseholdMember($0.name) }
     }
 
     func userId(for name: String) -> Int? {

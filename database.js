@@ -739,6 +739,7 @@ class FamilyDB {
       receipt:   { table: 'receipts',    title: 'merchant',    subtitle: 'amount' },
       trip:      { table: 'trips',       title: 'destination', subtitle: 'traveler' },
       itinerary: { table: 'itineraries', title: 'title',       subtitle: 'start_date' },
+      task:      { table: 'tasks',       title: 'title',       subtitle: 'category' },
     };
     const spec = specs[row.attachment_type];
     const base = {
