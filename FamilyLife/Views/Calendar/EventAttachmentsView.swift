@@ -31,13 +31,28 @@ struct EventAttachmentsSection: View {
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 16)
             } else if attachments.isEmpty {
-                Text("Attach a task, list, note, decision, receipt, or trip.")
-                    .font(.system(size: 14))
-                    .foregroundStyle(WarmPalette.ink3)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                Button { showingPicker = true } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: "plus.circle.fill")
+                            .font(.system(size: 22))
+                            .foregroundStyle(TabAccent.calendar.color)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Attach something")
+                                .font(.system(size: 15, weight: .semibold))
+                                .foregroundStyle(WarmPalette.ink1)
+                            Text("Link a task, list, note, decision, receipt, or trip.")
+                                .font(.system(size: 13))
+                                .foregroundStyle(WarmPalette.ink3)
+                                .multilineTextAlignment(.leading)
+                        }
+                        Spacer()
+                    }
                     .padding(.vertical, 14)
                     .padding(.horizontal, 14)
+                    .contentShape(Rectangle())
                     .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
+                }
+                .buttonStyle(.plain)
             } else {
                 VStack(spacing: 0) {
                     ForEach(Array(attachments.enumerated()), id: \.element.id) { index, att in
