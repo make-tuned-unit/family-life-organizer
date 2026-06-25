@@ -64,6 +64,13 @@ async function grantCompForGroup(db, groupId, userId) {
   return true;
 }
 
+// Revoke a previously-granted comp entitlement for a household.
+async function revokeCompForGroup(db, groupId) {
+  if (!groupId) return false;
+  await db.updateSubscriptionStatus(`${COMP_TXN_PREFIX}${groupId}`, 'revoked', null);
+  return true;
+}
+
 // Boot-time seeder. Set COMP_PREMIUM_ALL=1 to comp every household, or
 // COMP_PREMIUM_USERNAMES="jesse,sophie,ariel" to comp specific people's
 // households. Safe no-op when neither is set. Idempotent.
@@ -138,4 +145,4 @@ async function getStatus(db, userId) {
   };
 }
 
-module.exports = { verifyAndStore, verifyAndApplyNotification, getStatus, isHouseholdPremium, grantCompForGroup, ensureCompPremium, PRODUCT_ID, BUNDLE_ID };
+module.exports = { verifyAndStore, verifyAndApplyNotification, getStatus, isHouseholdPremium, grantCompForGroup, revokeCompForGroup, ensureCompPremium, PRODUCT_ID, BUNDLE_ID };

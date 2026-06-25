@@ -4,6 +4,7 @@ services:
     env: node
     buildCommand: npm install
     startCommand: node dashboard.js
+    healthCheckPath: /healthz
     envVars:
       - key: NODE_ENV
         value: production
@@ -13,10 +14,15 @@ services:
         value: /opt/render/project/src/vault/family-life
       - key: TZ
         value: America/Halifax
+      # Secrets — set these in the Render dashboard, never commit values here.
+      - key: SESSION_SECRET
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
       - key: GMAIL_USER
-        value: redacted@example.com
+        sync: false
       - key: GMAIL_APP_PASSWORD
-        value: REDACTED-GMAIL-APP-PASSWORD
+        sync: false
     disk:
       name: family-data
       mountPath: /opt/render/project/src/vault/family-life
