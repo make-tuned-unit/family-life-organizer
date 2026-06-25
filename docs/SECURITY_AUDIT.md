@@ -5,15 +5,15 @@ payments, email, DB, deploy, iOS) followed by remediation of P0/P1 findings.
 
 ## ⚠️ Required human actions (cannot be done in code)
 
-These secrets were committed to git history and **must be rotated** — the code
-now reads them from env, but the exposed values are still in past commits.
+These secrets were committed to git history and **must be rotated/retired** — the
+code no longer uses them, but the exposed values are still in past commits.
 
-1. **Rotate the Gmail App Password** (`REDACTED-GMAIL-APP-PASSWORD`) at
-   myaccount.google.com → Security → App passwords. It was in `render.yaml`.
+1. **Gmail account `redacted@example.com`** — the email-receipt ingestion
+   feature (and its `imap-simple` dependency) has been **removed from the
+   codebase**. Delete the Google account (or at minimum revoke its App Password
+   `REDACTED-GMAIL-APP-PASSWORD`). No rotation needed.
 2. **Set Render dashboard env vars** (now `sync: false` in `render.yaml`):
-   `SESSION_SECRET` (generate: `openssl rand -hex 64`), `ANTHROPIC_API_KEY`,
-   `GMAIL_USER`, `GMAIL_APP_PASSWORD`, and (for email ingestion)
-   `RECEIPT_SENDER_ALLOWLIST`.
+   `SESSION_SECRET` (generate: `openssl rand -hex 64`) and `ANTHROPIC_API_KEY`.
 3. **Reset the jesse / sophie passwords** — their old plaintext values
    (`REDACTED-PASSWORD`, `REDACTED-PASSWORD`) were in source history.
 4. **Purge secrets from git history** (`git filter-repo` / BFG on `render.yaml`
@@ -61,9 +61,9 @@ now reads them from env, but the exposed values are still in past commits.
 - Daily cost ceiling (200 msgs/user/day) on the concierge chat endpoint.
 - `appleVerify` now checks each cert's validity window (validFrom/validTo).
 - Comp entitlements: added `revokeCompForGroup` + admin `POST /api/admin/comp`.
-- email-receipts: TLS cert verification on (`rejectUnauthorized: true`), no hardcoded
-  Gmail fallback, **sender allowlist required**, amount sanity cap, merchant sanitize,
-  date validation, reduced PII logging.
+- email-receipts: **feature removed** (`email-receipts.js` + `imap-simple`
+  deleted) — the Gmail account it polled is being retired, so the IMAP ingestion
+  path and its credentials/dependency vulns are gone entirely.
 
 ### iOS
 - Keychain password now `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly`
@@ -79,10 +79,9 @@ now reads them from env, but the exposed values are still in past commits.
 ## Residual / deferred (documented, lower risk)
 
 - **Dependency advisories** (`npm audit`): remaining highs are **not server-reachable** —
-  `sqlite3 → node-gyp → tar/@tootallnate` is build-time only; `imap-simple → utf7 → semver`
-  (ReDoS) is the standalone email cron. Removed the dead `nodemailer`/`check-email.js`.
-  Follow-up: replace `imap-simple` with `imapflow` if email ingestion is kept; revisit a
-  tested `sqlite3` major bump.
+  all in the `sqlite3 → node-gyp → tar/@tootallnate` build-time toolchain. Removed the
+  dead `nodemailer`/`check-email.js` and the `imap-simple` email chain entirely.
+  Follow-up: revisit a tested `sqlite3` major bump (or migrate to `better-sqlite3`).
 - **Delete/status DB methods** lack a SQL-layer `group_id` clause — currently safe
   (gated by `assertHousehold`); add as defense-in-depth when convenient.
 - **Architecture** (separate effort): `dashboard.js` (~4.7k lines) and `database.js`
