@@ -19,10 +19,6 @@ services:
         sync: false
       - key: ANTHROPIC_API_KEY
         sync: false
-      - key: GMAIL_USER
-        sync: false
-      - key: GMAIL_APP_PASSWORD
-        sync: false
     disk:
       name: family-data
       mountPath: /opt/render/project/src/vault/family-life
