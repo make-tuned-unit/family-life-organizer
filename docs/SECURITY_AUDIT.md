@@ -81,6 +81,21 @@ code no longer uses them, but the exposed values are still in past commits.
   deleted) — the Gmail account it polled is being retired, so the IMAP ingestion
   path and its credentials/dependency vulns are gone entirely.
 
+### AI privacy / data minimization
+- **Brief generates on-device when possible** (Apple FoundationModels, iOS 26+):
+  the client requests `?skipAI=1`, so the server makes **no Anthropic call** and
+  household data never leaves for the daily brief. Older devices fall back to the
+  cloud summary.
+- **Minimized cloud fallback** (`conciergeBrief.minimizedFacts`): the server-AI
+  brief sends titles + counts only — strips assignees, creator names, locations,
+  and exact dollar amounts (percentages only). Full specifics still render in the
+  local deterministic cards (which never touch the cloud).
+- **"Use cloud AI" privacy toggle** (Settings → Privacy, default on): off ⇒ brief
+  stays fully on-device/deterministic and the concierge chat is disabled, so **no**
+  household data goes to Anthropic. The conversational chat is the one feature that
+  inherently needs to send data (tool-calling over live data); the toggle is its
+  off-switch. (Note: Anthropic's API does not train on this data.)
+
 ### iOS
 - Keychain password now `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly`
   (not iCloud-synced / not in backups); keychain service + `AppConfig.bundleID`

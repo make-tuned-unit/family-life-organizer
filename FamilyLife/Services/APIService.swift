@@ -335,9 +335,14 @@ final class APIService {
 
     // MARK: - Concierge
 
-    func fetchConciergeBrief(forceRefresh: Bool = false) async throws -> ConciergeBrief {
+    /// skipAI=true tells the server to make NO Anthropic call (the client will
+    /// summarize on-device, or the user turned cloud AI off) — the household data
+    /// never leaves the server for the brief.
+    func fetchConciergeBrief(forceRefresh: Bool = false, skipAI: Bool = false) async throws -> ConciergeBrief {
         // AI-backed endpoint: allow extra headroom for the Claude round-trip.
-        let params = forceRefresh ? ["refresh": "1"] : [:]
+        var params: [String: String] = [:]
+        if forceRefresh { params["refresh"] = "1" }
+        if skipAI { params["skipAI"] = "1" }
         return try await get("/api/concierge/brief", queryParams: params, timeout: 45)
     }
 

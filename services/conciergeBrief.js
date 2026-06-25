@@ -95,13 +95,27 @@ function fallbackSummary(s) {
   return `Here's where things stand:\n${bullets}`;
 }
 
+// Privacy-minimized facts for the cloud summary. We send only what's needed for
+// warm prose and strip the sensitive specifics: WHO a task/decision belongs to
+// (assigned_to / creator_name), exact LOCATIONS, exact DOLLAR amounts (percentages
+// only), and row ids. Titles are kept (they carry the warmth); the full specifics
+// still render locally in the deterministic cards, which never touch the cloud.
+function minimizedFacts(s) {
+  return {
+    counts: s.counts,
+    overdueTasks: s.overdueTasks.slice(0, 3).map(t => ({ title: t.title, due_date: t.due_date })),
+    upcomingAppointments: s.upcomingAppointments.slice(0, 3).map(a => ({ title: a.title, date: a.date, time: a.time })),
+    upcomingEvents: s.upcomingEvents.slice(0, 3).map(e => ({ title: e.title, daysUntil: e.daysUntil })),
+    budgetAlerts: s.budgetAlerts.slice(0, 3).map(b => ({ category: b.category, pct: b.pct, over: b.over })),
+    openDecisions: s.openDecisions.slice(0, 3).map(d => ({ title: d.title })),
+  };
+}
+
 // Warm butler-voiced summary via Claude, falling back to the deterministic line.
 async function generateSummary(s, userName) {
   if (!ai.isAIEnabled()) return fallbackSummary(s);
   try {
-    const facts = JSON.stringify({ counts: s.counts, overdueTasks: s.overdueTasks.slice(0, 3),
-      upcomingAppointments: s.upcomingAppointments.slice(0, 3), upcomingEvents: s.upcomingEvents.slice(0, 3),
-      budgetAlerts: s.budgetAlerts.slice(0, 3), openDecisions: s.openDecisions.slice(0, 3) });
+    const facts = JSON.stringify(minimizedFacts(s));
     const text = await ai.callClaude({
       maxTokens: 220,
       system: `You are a warm, concise family life concierge for ${userName || 'the user'}. Format the reply as: ONE short friendly preamble sentence on the first line (no bullet, e.g. "Here's your evening, ${userName || 'there'}."), then 3-5 bullet points in priority order. Rules: each bullet on its own line starting with "• "; keep each bullet to ~8 words, scannable; plain text only (no markdown, no bold, no headers). If nothing needs attention, write a single warm sentence with no bullets.`,
@@ -114,15 +128,19 @@ async function generateSummary(s, userName) {
   }
 }
 
-async function generateBrief(snapshot, userName) {
+// skipAI=true returns the deterministic summary only and makes NO cloud call —
+// used when the client will summarize on-device (or the user disabled cloud AI),
+// so household data never reaches Anthropic for the brief.
+async function generateBrief(snapshot, userName, { skipAI = false } = {}) {
   const cards = buildCards(snapshot);                       // deterministic, instant
-  const summary = await generateSummary(snapshot, userName); // AI prose (or fallback)
+  const summary = skipAI ? fallbackSummary(snapshot)
+                         : await generateSummary(snapshot, userName);
   return {
     date: snapshot.date,
     summary,
     counts: snapshot.counts,
     cards,
-    ai_enabled: ai.isAIEnabled(),
+    ai_enabled: ai.isAIEnabled() && !skipAI,
   };
 }
 

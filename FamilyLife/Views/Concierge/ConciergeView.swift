@@ -13,6 +13,7 @@ struct ConciergeView: View {
     @State private var showingChat = false
     @State private var showingPaywall = false
     @State private var chatPrompt: String?
+    @AppStorage("cloudAIEnabled") private var cloudAIEnabled = true
 
     var body: some View {
         ZStack {
@@ -58,6 +59,7 @@ struct ConciergeView: View {
     // Open the chat (premium) or paywall in response to an Ask-the-butler request.
     private func handleLaunchRequest() {
         guard let prompt = launch.consume() else { return }
+        guard cloudAIEnabled else { return }   // chat sends data; respect the privacy toggle
         guard subscription.isPremium else { showingPaywall = true; return }
         if showingChat {
             // A chat is already open — dismiss and re-present seeded with the new prompt.
@@ -72,17 +74,22 @@ struct ConciergeView: View {
 
     private var askBar: some View {
         Button {
+            if !cloudAIEnabled { return }
             if subscription.isPremium { chatPrompt = nil; showingChat = true } else { showingPaywall = true }
         } label: {
             HStack(spacing: 10) {
                 Image(systemName: "sparkles")
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(accent)
-                Text("Ask your concierge…")
+                Text(cloudAIEnabled ? "Ask your concierge…" : "Chat is off (cloud AI disabled)")
                     .font(.system(size: 16))
                     .foregroundStyle(WarmPalette.ink3)
                 Spacer()
-                if subscription.isPremium {
+                if !cloudAIEnabled {
+                    Image(systemName: "cloud.slash")
+                        .font(.system(size: 18))
+                        .foregroundStyle(WarmPalette.ink3)
+                } else if subscription.isPremium {
                     Image(systemName: "arrow.up.circle.fill")
                         .font(.system(size: 22))
                         .foregroundStyle(accent)
