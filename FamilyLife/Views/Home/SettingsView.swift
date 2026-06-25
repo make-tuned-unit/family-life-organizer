@@ -20,6 +20,7 @@ struct SettingsView: View {
     @State private var showingNameEdit = false
     @State private var editingName = ""
     @State private var nameError: String?
+    @AppStorage("cloudAIEnabled") private var cloudAIEnabled = true
 
     var body: some View {
         Form {
@@ -196,6 +197,20 @@ struct SettingsView: View {
                     Label("Security & 2FA", systemImage: "lock.shield.fill")
                         .foregroundStyle(TabAccent.home.color)
                 }
+            }
+
+            Section {
+                Toggle(isOn: $cloudAIEnabled) {
+                    Label("Use cloud AI", systemImage: "cloud")
+                        .foregroundStyle(TabAccent.home.color)
+                }
+                .tint(AccentTheme.sage.color)
+            } header: {
+                Text("Privacy")
+            } footer: {
+                Text(cloudAIEnabled
+                    ? "Your daily brief is summarized privately on-device when your iPhone supports it — nothing is sent. The concierge chat sends what it needs to Anthropic to answer and take actions; Anthropic doesn’t train on it."
+                    : "Cloud AI is off. The brief stays fully on-device/offline and the concierge chat is disabled, so no household data is sent to Anthropic.")
             }
 
             Section("About") {

@@ -2767,15 +2767,19 @@ app.get('/api/concierge/brief', requireAuth, conciergeLimiter, async (req, res) 
   const db = new FamilyDB();
   try {
     const userId = req.session.user.id;
-    const cached = briefCache.get(userId);
+    // skipAI: the client will summarize on-device (or has cloud AI off), so the
+    // server makes NO Anthropic call — household data never leaves for the brief.
+    const skipAI = req.query.skipAI === '1' || req.query.skipAI === 'true';
+    const cacheKey = `${userId}:${skipAI ? 'local' : 'cloud'}`;
+    const cached = briefCache.get(cacheKey);
     if (!req.query.refresh && cached && Date.now() - cached.ts < BRIEF_TTL_MS) {
       return res.json(cached.brief);
     }
     const snapshot = await buildSnapshot(db, userId);
-    const brief = await generateBrief(snapshot, req.session.user.name);
+    const brief = await generateBrief(snapshot, req.session.user.name, { skipAI });
     const now = Date.now();
     for (const [k, v] of briefCache) if (now - v.ts >= BRIEF_TTL_MS) briefCache.delete(k);
-    briefCache.set(userId, { brief, ts: now });
+    briefCache.set(cacheKey, { brief, ts: now });
     res.json(brief);
   } catch (err) {
     sendServerError(res, err);
