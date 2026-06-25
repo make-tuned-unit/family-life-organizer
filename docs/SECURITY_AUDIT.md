@@ -3,6 +3,22 @@
 Date: 2026-06-25. Scope: full-codebase review (auth, authz/isolation, AI/concierge,
 payments, email, DB, deploy, iOS) followed by remediation of P0/P1 findings.
 
+## Email 2FA rollout (go-live sequence — do in order)
+
+Email two-factor login is **deployed but OFF** (`AUTH_2FA_ENABLED` unset) so it
+can't lock out the current app build. To turn it on:
+
+1. Upload the new TestFlight build (has the 2FA + Security UI) and have **every**
+   active user install it. (Required 2FA + an old build = lockout.)
+2. Set **`RESEND_API_KEY`** on Railway (same key as the marketing site) so codes
+   can actually send. Without it, no one can complete login.
+3. Set **`AUTH_2FA_ENABLED=1`** on Railway. 2FA is now required for everyone.
+4. First login per user: enter password → enter email → enter the 6-digit code →
+   done (email is captured + verified in that one flow).
+
+To roll back instantly: remove `AUTH_2FA_ENABLED`. Never set `AUTH_2FA_ECHO_CODE`
+in production (test-only — it echoes the code in the response).
+
 ## ⚠️ Required human actions (cannot be done in code)
 
 These secrets were committed to git history and **must be rotated/retired** — the
