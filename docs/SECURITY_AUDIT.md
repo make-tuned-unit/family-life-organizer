@@ -90,9 +90,11 @@ code no longer uses them, but the exposed values are still in past commits.
   brief sends titles + counts only — strips assignees, creator names, locations,
   and exact dollar amounts (percentages only). Full specifics still render in the
   local deterministic cards (which never touch the cloud).
-- **"Use cloud AI" privacy toggle** (Settings → Privacy, default on): off ⇒ brief
-  stays fully on-device/deterministic and the concierge chat is disabled, so **no**
-  household data goes to Anthropic. The conversational chat is the one feature that
+- **"Use cloud AI" privacy toggle** (Settings → Privacy, default on) gates **every**
+  Anthropic-backed route via a single chokepoint in `APIService` (each AI method
+  checks `cloudAIEnabled`). Off ⇒ the brief stays fully on-device/deterministic and
+  the **concierge chat, recipe suggestions (Cook), and receipt-scan (vision)** are
+  all disabled — so **no** household data goes to Anthropic. The conversational chat
   inherently needs to send data (tool-calling over live data); the toggle is its
   off-switch. (Note: Anthropic's API does not train on this data.)
 

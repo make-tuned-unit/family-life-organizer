@@ -278,7 +278,15 @@ final class APIService {
         let _: SuccessResponse = try await delete("/api/receipts/\(id)")
     }
 
+    /// User's "Use cloud AI" privacy setting (Settings → Privacy). Default ON.
+    /// Single chokepoint: every Anthropic-backed call checks this so no cloud-AI
+    /// route runs when the user has turned it off.
+    var cloudAIEnabled: Bool {
+        (UserDefaults.standard.object(forKey: "cloudAIEnabled") as? Bool) ?? true
+    }
+
     func scanReceipt(imageData: Data) async throws -> ScanResult {
+        guard cloudAIEnabled else { throw APIError.cloudAIDisabled }
         let base64 = imageData.base64EncodedString()
         let body: [String: Any] = ["image": base64]
         return try await post("/api/receipts/scan", body: body)
@@ -323,6 +331,7 @@ final class APIService {
     }
 
     func suggestRecipes(query: String) async throws -> [RecipeSuggestion] {
+        guard cloudAIEnabled else { throw APIError.cloudAIDisabled }
         let body: [String: Any] = ["query": query]
         let response: CookResponse = try await post("/api/cook/suggest", body: body)
         return response.recipes
@@ -357,6 +366,7 @@ final class APIService {
     }
 
     func sendConciergeMessage(_ message: String, conversationId: Int?) async throws -> ConciergeChatResponse {
+        guard cloudAIEnabled else { throw APIError.cloudAIDisabled }
         var body: [String: Any] = ["message": message]
         if let conversationId { body["conversation_id"] = conversationId }
         // Tool-calling loop can take a while — generous timeout.
@@ -1285,12 +1295,14 @@ enum APIError: LocalizedError {
     case invalidResponse
     case unauthorized
     case serverError(Int)
+    case cloudAIDisabled
 
     var errorDescription: String? {
         switch self {
         case .invalidResponse: "Invalid server response"
         case .unauthorized: "Please sign in again"
         case .serverError(let code): "Server error (\(code))"
+        case .cloudAIDisabled: "Cloud AI is off. Turn it on in Settings → Privacy to use this feature."
         }
     }
 }

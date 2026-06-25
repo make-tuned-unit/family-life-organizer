@@ -35,6 +35,9 @@ struct MoreView: View {
 
                     // HOUSEHOLD
                     section("Household") {
+                        NavigationLink { CookView() } label: {
+                            moreRow(icon: "fork.knife", title: "Cook", subtitle: "Recipe ideas from what's in your pantry", color: AccentTheme.terracotta.color)
+                        }
                         NavigationLink { NotesView() } label: {
                             moreRow(icon: "note.text", title: "Notes", subtitle: "Private notes you can share & co-edit", color: AccentTheme.saffron.color)
                         }

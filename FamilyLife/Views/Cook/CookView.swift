@@ -7,12 +7,13 @@ struct CookView: View {
     @State private var viewModel = CookViewModel()
     @State private var showingAIDisclosure = false
     @State private var hasAIConsent = AIConsentManager.hasConsented
+    @AppStorage("cloudAIEnabled") private var cloudAIEnabled = true
 
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(spacing: 0) {
                 headerSection
-                aiInputCard
+                if cloudAIEnabled { aiInputCard } else { cloudOffNote }
                 filterChips
                 heroRecipe
                 moreIdeas
@@ -52,11 +53,29 @@ struct CookView: View {
     }
 
     private func getSuggestions() {
+        guard cloudAIEnabled else { return }   // recipe AI sends your pantry to the cloud
         guard hasAIConsent else {
             showingAIDisclosure = true
             return
         }
         Task { await viewModel.suggest(api: api) }
+    }
+
+    // Shown in place of the AI input when the user has cloud AI off.
+    private var cloudOffNote: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "cloud.slash")
+                .font(.system(size: 16))
+                .foregroundStyle(WarmPalette.ink3)
+            Text("Recipe suggestions are off. Turn on cloud AI in Settings → Privacy to use them.")
+                .font(.system(size: 13))
+                .foregroundStyle(WarmPalette.ink3)
+            Spacer(minLength: 0)
+        }
+        .padding(14)
+        .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
+        .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
+        .padding(.bottom, 14)
     }
 
     // MARK: - Header
