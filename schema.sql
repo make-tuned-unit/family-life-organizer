@@ -387,8 +387,26 @@ CREATE TABLE IF NOT EXISTS users (
     last_lng REAL,
     last_location_name TEXT,
     last_location_at DATETIME,
+    email_verified INTEGER DEFAULT 0,
+    two_factor_enabled INTEGER DEFAULT 0,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Short-lived email-OTP challenges for two-factor login. Created after the
+-- password step and consumed when the emailed 6-digit code verifies.
+CREATE TABLE IF NOT EXISTS login_challenges (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    token TEXT NOT NULL UNIQUE,
+    user_id INTEGER NOT NULL,
+    code_hash TEXT,
+    status TEXT NOT NULL DEFAULT 'enroll_email',  -- 'enroll_email' | 'code_sent'
+    attempts INTEGER DEFAULT 0,
+    consumed INTEGER DEFAULT 0,
+    expires_at DATETIME NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_login_challenges_token ON login_challenges(token);
 
 -- Groups: household (core couple), family (one side), tribe (merged)
 CREATE TABLE IF NOT EXISTS groups (

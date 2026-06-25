@@ -17,6 +17,7 @@ const subscription = require('./services/subscription');
 const { runProactiveSweep } = require('./services/conciergeNudge');
 const { createRateLimiter } = require('./services/rateLimit');
 const email = require('./services/email');
+const crypto = require('crypto');
 
 const IS_PROD = process.env.NODE_ENV === 'production';
 
@@ -47,7 +48,10 @@ const conciergeChatDailyLimiter = createRateLimiter({ windowMs: 24 * 60 * 60 * 1
 
 // IP-keyed limiter for the unauthenticated, brute-forceable auth endpoints.
 const clientIp = (req) => (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.ip || 'unknown';
-const loginLimiter = createRateLimiter({ windowMs: 60000, max: 10, keyFn: clientIp });
+// 20/min/IP: headroom for the multi-step 2FA flow (login → email → verify) and
+// a family behind one NAT, while still throttling brute force (bcrypt cost 12
+// adds ~250ms/attempt server-side on top).
+const loginLimiter = createRateLimiter({ windowMs: 60000, max: 20, keyFn: clientIp });
 const registerLimiter = createRateLimiter({ windowMs: 60 * 60 * 1000, max: 5, keyFn: clientIp });
 
 // Regenerate the session to a fresh id and persist the authenticated user on it.
@@ -60,6 +64,60 @@ function establishSession(req, user) {
       req.session.save((err2) => err2 ? reject(err2) : resolve());
     });
   });
+}
+
+// ── Email two-factor login ───────────────────────────────────────────────────
+// OFF by default so deploying this code can't lock out an older app build that
+// has no 2FA UI. Flip on (AUTH_2FA_ENABLED=1) only once the 2FA-capable build is
+// installed and RESEND_API_KEY is set. Then it's required for everyone.
+const TWO_FA_ENABLED = process.env.AUTH_2FA_ENABLED === '1';
+const TWO_FA_TTL_MS = 10 * 60 * 1000;   // code/challenge lifetime
+const TWO_FA_MAX_ATTEMPTS = 5;          // wrong-code guesses before a challenge dies
+// TEST ONLY: echo the code in the JSON response so automated tests can complete
+// the flow without an inbox. Never enable in production.
+const TWO_FA_ECHO = process.env.AUTH_2FA_ECHO_CODE === '1';
+const echoCode = (code) => (TWO_FA_ECHO ? { dev_code: code } : {});
+
+function genCode() {
+  return String(crypto.randomInt(0, 1_000_000)).padStart(6, '0');
+}
+function hashCode(code) {
+  return crypto.createHash('sha256').update(String(code)).digest('hex');
+}
+function codeMatches(code, hash) {
+  if (!hash) return false;
+  const a = Buffer.from(hashCode(code));
+  const b = Buffer.from(hash);
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
+}
+function challengeExpiry() {
+  return new Date(Date.now() + TWO_FA_TTL_MS).toISOString();
+}
+function challengeExpired(row) {
+  const t = Date.parse(row.expires_at);
+  return Number.isNaN(t) || Date.now() > t;
+}
+function maskEmail(e) {
+  if (!e || !e.includes('@')) return '';
+  const [u, d] = e.split('@');
+  const head = u.slice(0, 1);
+  return `${head}${'•'.repeat(Math.max(1, u.length - 1))}@${d}`;
+}
+// Email the 6-digit code via Resend. Non-fatal: surfaced as a flag to the client.
+async function sendLoginCode(to, code) {
+  // Code in the subject → visible in the notification banner at a glance.
+  const subject = `${code} is your Kinrows code`;
+  // Plain-text line phrased "Your Kinrows verification code is NNNNNN" — the exact
+  // shape iOS scans for to offer one-tap AutoFill above the keyboard (the app's
+  // code field is .oneTimeCode), so the code usually needs no copy/paste at all.
+  const text = `Your Kinrows verification code is ${code}\n\nIt expires in 10 minutes. If you didn't try to sign in, ignore this email.`;
+  const html = `<div style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;max-width:420px;margin:0 auto;padding:24px;color:#2c2017">
+    <h2 style="margin:0 0 8px">Your verification code</h2>
+    <p style="color:#5c4a3a;margin:0 0 16px">Your Kinrows verification code is:</p>
+    <p style="font-size:34px;font-weight:700;letter-spacing:8px;background:#fffaf0;border:1px solid #ece0c8;border-radius:12px;padding:16px;text-align:center;margin:0;font-family:ui-monospace,SFMono-Regular,Menlo,monospace">${code}</p>
+    <p style="color:#8a7460;font-size:13px;margin:16px 0 0">Tap to select the code above to copy it, or let your iPhone fill it in automatically. Expires in 10 minutes. If this wasn't you, ignore this email.</p>
+  </div>`;
+  return email.sendEmail({ to, subject, text, html });
 }
 
 // Short-lived per-user cache for the daily brief (regenerated on ?refresh).
@@ -424,12 +482,103 @@ app.post('/api/auth/login', loginLimiter, async (req, res) => {
     const hash = dbUser?.password_hash || DUMMY_BCRYPT_HASH;
     const valid = await bcrypt.compare(String(password || ''), hash);
 
-    if (dbUser && valid) {
+    if (!dbUser || !valid) {
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+
+    // Password OK. With 2FA off, establish the session immediately.
+    if (!TWO_FA_ENABLED) {
       await establishSession(req, { username: dbUser.username, name: dbUser.name, id: dbUser.id });
       return res.json({ success: true, user: { id: dbUser.id, username: dbUser.username, name: dbUser.name, avatar: dbUser.avatar } });
     }
 
-    res.status(401).json({ error: 'Invalid credentials' });
+    // 2FA required. Issue a challenge; NO session yet. If the user already has a
+    // verified email, send the code now; otherwise they must enroll an email.
+    const token = crypto.randomBytes(32).toString('hex');
+    if (dbUser.email && dbUser.email_verified) {
+      const code = genCode();
+      await db.createLoginChallenge({ token, userId: dbUser.id, status: 'code_sent', codeHash: hashCode(code), expiresAt: challengeExpiry() });
+      const sent = await sendLoginCode(dbUser.email, code);
+      return res.json({ two_factor_required: true, challenge: token, status: 'code_sent', email_hint: maskEmail(dbUser.email), email_sent: sent.ok !== false, ...echoCode(code) });
+    }
+    await db.createLoginChallenge({ token, userId: dbUser.id, status: 'enroll_email', expiresAt: challengeExpiry() });
+    return res.json({ two_factor_required: true, challenge: token, status: 'enroll_email' });
+  } catch (err) {
+    sendServerError(res, err);
+  } finally {
+    db.close();
+  }
+});
+
+// Step 2a (first-time enrollment): set the email a login code should go to.
+app.post('/api/auth/login/email', loginLimiter, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const { challenge, email: addr } = req.body;
+    const ch = challenge && await db.getLoginChallenge(challenge);
+    if (!ch || ch.consumed || challengeExpired(ch) || ch.status !== 'enroll_email') {
+      return res.status(400).json({ error: 'This sign-in attempt expired. Please start again.' });
+    }
+    if (typeof addr !== 'string' || !EMAIL_RE.test(addr.trim())) {
+      return res.status(400).json({ error: 'Please enter a valid email address' });
+    }
+    const clean = addr.trim().toLowerCase();
+    await db.setUserEmail(ch.user_id, clean);
+    const code = genCode();
+    await db.updateLoginChallengeCode(challenge, { codeHash: hashCode(code), status: 'code_sent', expiresAt: challengeExpiry() });
+    const sent = await sendLoginCode(clean, code);
+    res.json({ status: 'code_sent', email_hint: maskEmail(clean), email_sent: sent.ok !== false, ...echoCode(code) });
+  } catch (err) {
+    sendServerError(res, err);
+  } finally {
+    db.close();
+  }
+});
+
+// Step 2b: verify the emailed code and establish the session.
+app.post('/api/auth/login/verify', loginLimiter, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const { challenge, code } = req.body;
+    const ch = challenge && await db.getLoginChallenge(challenge);
+    if (!ch || ch.consumed || ch.status !== 'code_sent' || challengeExpired(ch)) {
+      return res.status(400).json({ error: 'This code expired. Please request a new one.' });
+    }
+    if (ch.attempts >= TWO_FA_MAX_ATTEMPTS) {
+      await db.consumeLoginChallenge(challenge);
+      return res.status(429).json({ error: 'Too many attempts. Please sign in again.' });
+    }
+    if (!codeMatches(String(code || ''), ch.code_hash)) {
+      await db.incrementLoginChallengeAttempts(challenge);
+      return res.status(401).json({ error: 'Incorrect code' });
+    }
+    await db.consumeLoginChallenge(challenge);
+    await db.markEmailVerifiedAndEnable(ch.user_id);
+    const user = await db.getUserById(ch.user_id);
+    await establishSession(req, { username: user.username, name: user.name, id: user.id });
+    res.json({ success: true, user: { id: user.id, username: user.username, name: user.name, avatar: user.avatar } });
+  } catch (err) {
+    sendServerError(res, err);
+  } finally {
+    db.close();
+  }
+});
+
+// Resend a fresh code for an in-flight challenge.
+app.post('/api/auth/login/resend', loginLimiter, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const { challenge } = req.body;
+    const ch = challenge && await db.getLoginChallenge(challenge);
+    if (!ch || ch.consumed || ch.status !== 'code_sent') {
+      return res.status(400).json({ error: 'Nothing to resend. Please start again.' });
+    }
+    const user = await db.getUserById(ch.user_id);
+    if (!user?.email) return res.status(400).json({ error: 'No email on file' });
+    const code = genCode();
+    await db.updateLoginChallengeCode(challenge, { codeHash: hashCode(code), status: 'code_sent', expiresAt: challengeExpiry() });
+    const sent = await sendLoginCode(user.email, code);
+    res.json({ ok: true, email_hint: maskEmail(user.email), email_sent: sent.ok !== false, ...echoCode(code) });
   } catch (err) {
     sendServerError(res, err);
   } finally {
@@ -454,6 +603,70 @@ app.post('/api/auth/change-password', requireAuth, loginLimiter, async (req, res
     }
     const password_hash = await bcrypt.hash(new_password, 12);
     await db.updateUserPassword(req.session.user.id, password_hash);
+    res.json({ success: true });
+  } catch (err) {
+    sendServerError(res, err);
+  } finally {
+    db.close();
+  }
+});
+
+// Security status for the Settings screen.
+app.get('/api/account/security', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const user = await db.getUserByUsername(req.session.user.username);
+    res.json({
+      email: user?.email || null,
+      email_verified: !!user?.email_verified,
+      two_factor_enabled: !!user?.two_factor_enabled,
+    });
+  } catch (err) {
+    sendServerError(res, err);
+  } finally {
+    db.close();
+  }
+});
+
+// Change/confirm the account email (authed). Sends a verification code; the new
+// address only becomes the 2FA destination once verified.
+app.post('/api/account/email', requireAuth, loginLimiter, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const addr = String(req.body.email || '').trim().toLowerCase();
+    if (!EMAIL_RE.test(addr)) return res.status(400).json({ error: 'Please enter a valid email address' });
+    const userId = req.session.user.id;
+    await db.setUserEmail(userId, addr);
+    const token = crypto.randomBytes(32).toString('hex');
+    const code = genCode();
+    await db.createLoginChallenge({ token, userId, status: 'code_sent', codeHash: hashCode(code), expiresAt: challengeExpiry() });
+    const sent = await sendLoginCode(addr, code);
+    res.json({ challenge: token, email_hint: maskEmail(addr), email_sent: sent.ok !== false, ...echoCode(code) });
+  } catch (err) {
+    sendServerError(res, err);
+  } finally {
+    db.close();
+  }
+});
+
+app.post('/api/account/email/verify', requireAuth, loginLimiter, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const { challenge, code } = req.body;
+    const ch = challenge && await db.getLoginChallenge(challenge);
+    if (!ch || ch.consumed || ch.status !== 'code_sent' || challengeExpired(ch) || ch.user_id !== req.session.user.id) {
+      return res.status(400).json({ error: 'This code expired. Please request a new one.' });
+    }
+    if (ch.attempts >= TWO_FA_MAX_ATTEMPTS) {
+      await db.consumeLoginChallenge(challenge);
+      return res.status(429).json({ error: 'Too many attempts. Please try again.' });
+    }
+    if (!codeMatches(String(code || ''), ch.code_hash)) {
+      await db.incrementLoginChallengeAttempts(challenge);
+      return res.status(401).json({ error: 'Incorrect code' });
+    }
+    await db.consumeLoginChallenge(challenge);
+    await db.markEmailVerifiedAndEnable(req.session.user.id);
     res.json({ success: true });
   } catch (err) {
     sendServerError(res, err);
@@ -884,6 +1097,11 @@ app.post('/login', loginLimiter, async (req, res) => {
     const hash = dbUser?.password_hash || DUMMY_BCRYPT_HASH;
     const valid = await bcrypt.compare(String(password || ''), hash);
     if (dbUser && valid) {
+      // The legacy web dashboard can't run the email-2FA flow, so it must NOT
+      // be a way to bypass it. When 2FA is on, require the app for sign-in.
+      if (TWO_FA_ENABLED) {
+        return res.status(403).send('For your security, sign in from the Kinrows app. Two-factor authentication is required.');
+      }
       await establishSession(req, { username: dbUser.username, name: dbUser.name, avatar: dbUser.avatar, id: dbUser.id });
       return res.redirect('/app');
     }

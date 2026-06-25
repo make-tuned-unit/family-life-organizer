@@ -29,8 +29,14 @@ final class APIService {
     // MARK: - Auth
 
     struct LoginResponse: Codable {
-        let success: Bool
+        let success: Bool?
         let user: UserInfo?
+        // Two-factor fields (present when a code challenge is issued)
+        let two_factor_required: Bool?
+        let challenge: String?
+        let status: String?       // "enroll_email" | "code_sent"
+        let email_hint: String?
+        let email_sent: Bool?
     }
 
     struct UserInfo: Codable {
@@ -43,6 +49,46 @@ final class APIService {
     func login(username: String, password: String) async throws -> LoginResponse {
         let body = ["username": username, "password": password]
         return try await post("/api/auth/login", body: body)
+    }
+
+    /// First-login enrollment: set the email a 2FA code should be sent to.
+    func submitLoginEmail(challenge: String, email: String) async throws -> LoginResponse {
+        try await post("/api/auth/login/email", body: ["challenge": challenge, "email": email])
+    }
+
+    /// Verify the emailed 6-digit code and complete sign-in.
+    func verifyLoginCode(challenge: String, code: String) async throws -> LoginResponse {
+        try await post("/api/auth/login/verify", body: ["challenge": challenge, "code": code])
+    }
+
+    /// Resend a fresh code for an in-flight challenge.
+    func resendLoginCode(challenge: String) async throws -> LoginResponse {
+        try await post("/api/auth/login/resend", body: ["challenge": challenge])
+    }
+
+    // MARK: - Account security (Settings)
+
+    struct SecurityStatus: Codable {
+        let email: String?
+        let email_verified: Bool
+        let two_factor_enabled: Bool
+    }
+
+    func fetchSecurityStatus() async throws -> SecurityStatus {
+        try await get("/api/account/security")
+    }
+
+    struct EmailChangeResponse: Codable {
+        let challenge: String
+        let email_hint: String?
+    }
+
+    func changeAccountEmail(_ email: String) async throws -> EmailChangeResponse {
+        try await post("/api/account/email", body: ["email": email])
+    }
+
+    func verifyAccountEmail(challenge: String, code: String) async throws {
+        let _: SuccessResponse = try await post("/api/account/email/verify", body: ["challenge": challenge, "code": code])
     }
 
     // MARK: - Dashboard

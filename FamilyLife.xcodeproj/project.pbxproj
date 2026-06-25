@@ -10,6 +10,8 @@
 		AA000001 /* FamilyLifeApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000001 /* FamilyLifeApp.swift */; };
 		AA000002 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000002 /* ContentView.swift */; };
 		AA000003 /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000003 /* LoginView.swift */; };
+		AA000201 /* TwoFactorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000201 /* TwoFactorView.swift */; };
+		AA000202 /* SecurityView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000202 /* SecurityView.swift */; };
 		AA000004 /* FLTask.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000004 /* FLTask.swift */; };
 		AA000005 /* Grocery.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000005 /* Grocery.swift */; };
 		AA000006 /* Appointment.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000006 /* Appointment.swift */; };
@@ -125,6 +127,8 @@
 		BB000001 /* FamilyLifeApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FamilyLifeApp.swift; sourceTree = "<group>"; };
 		BB000002 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		BB000003 /* LoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
+		BB000201 /* TwoFactorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TwoFactorView.swift; sourceTree = "<group>"; };
+		BB000202 /* SecurityView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecurityView.swift; sourceTree = "<group>"; };
 		BB000004 /* FLTask.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FLTask.swift; sourceTree = "<group>"; };
 		BB000005 /* Grocery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Grocery.swift; sourceTree = "<group>"; };
 		BB000006 /* Appointment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Appointment.swift; sourceTree = "<group>"; };
@@ -282,6 +286,7 @@
 				BB000001 /* FamilyLifeApp.swift */,
 				BB000002 /* ContentView.swift */,
 				BB000003 /* LoginView.swift */,
+				BB000201 /* TwoFactorView.swift */,
 				BB00004D /* SignUpView.swift */,
 				BB000048 /* AppConfig.swift */,
 			);
@@ -364,6 +369,7 @@
 				BB000043 /* MoreView.swift */,
 				BB000098 /* NotesView.swift */,
 				BB000200 /* ChangePasswordView.swift */,
+				BB000202 /* SecurityView.swift */,
 				BB000051 /* HouseholdView.swift */,
 				BB000054 /* NewPostView.swift */,
 				BB000055 /* FeedCardView.swift */,
@@ -617,6 +623,7 @@
 				AA000001 /* FamilyLifeApp.swift in Sources */,
 				AA000002 /* ContentView.swift in Sources */,
 				AA000003 /* LoginView.swift in Sources */,
+				AA000201 /* TwoFactorView.swift in Sources */,
 				AA000004 /* FLTask.swift in Sources */,
 				AA000005 /* Grocery.swift in Sources */,
 				AA000006 /* Appointment.swift in Sources */,
@@ -714,6 +721,7 @@
 				AA000043 /* MoreView.swift in Sources */,
 				AA000098 /* NotesView.swift in Sources */,
 				AA000200 /* ChangePasswordView.swift in Sources */,
+				AA000202 /* SecurityView.swift in Sources */,
 				AA00004D /* SignUpView.swift in Sources */,
 				AA00004E /* FamilyGroupsView.swift in Sources */,
 				AA00004F /* EventDetailView.swift in Sources */,

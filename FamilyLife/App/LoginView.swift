@@ -8,6 +8,13 @@ struct LoginView: View {
     @State private var errorMessage: String?
     @State private var appeared = false
     @State private var showingSignUp = false
+    @State private var twoFactor: TwoFactorPresentation?
+
+    // Wrapper so a LoginStep can drive a `fullScreenCover(item:)`.
+    private struct TwoFactorPresentation: Identifiable {
+        let id = UUID()
+        let step: AuthService.LoginStep
+    }
 
     var body: some View {
         GeometryReader { geo in
@@ -158,6 +165,10 @@ struct LoginView: View {
         .sheet(isPresented: $showingSignUp) {
             SignUpView()
         }
+        .fullScreenCover(item: $twoFactor) { presentation in
+            TwoFactorView(initialStep: presentation.step)
+                .environment(authService)
+        }
     }
 
     private func login() {
@@ -165,7 +176,13 @@ struct LoginView: View {
         errorMessage = nil
         Task {
             do {
-                try await authService.login(username: username, password: password)
+                let step = try await authService.login(username: username, password: password)
+                switch step {
+                case .authenticated:
+                    break // root view swaps to the app
+                case .needsEmailEnrollment, .needsCode:
+                    twoFactor = TwoFactorPresentation(step: step)
+                }
             } catch {
                 errorMessage = "Invalid username or password"
             }

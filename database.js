@@ -86,6 +86,9 @@ class FamilyDB {
         this.db.run('ALTER TABLE appointments ADD COLUMN recurrence_end TEXT', () => {});
         // Profile image column
         this.db.run('ALTER TABLE users ADD COLUMN profile_image TEXT', () => {});
+        // Email 2FA columns (idempotent — error ignored if already present)
+        this.db.run('ALTER TABLE users ADD COLUMN email_verified INTEGER DEFAULT 0', () => {});
+        this.db.run('ALTER TABLE users ADD COLUMN two_factor_enabled INTEGER DEFAULT 0', () => {});
         // Group/household profile image
         this.db.run('ALTER TABLE groups ADD COLUMN profile_image TEXT', () => {});
         // DM image support
@@ -2013,6 +2016,63 @@ class FamilyDB {
     return new Promise((resolve, reject) => {
       this.db.run('UPDATE users SET password_hash = ? WHERE id = ?', [passwordHash, userId],
         function(err) { err ? reject(err) : resolve({ changed: this.changes }); });
+    });
+  }
+
+  // ── Email + two-factor ──────────────────────────────────────────────────
+  // Set (or change) a user's email. Always resets verification — the new
+  // address must be proven again via a code.
+  setUserEmail(userId, email) {
+    return new Promise((resolve, reject) => {
+      this.db.run('UPDATE users SET email = ?, email_verified = 0 WHERE id = ?', [email, userId],
+        (err) => err ? reject(err) : resolve({ ok: true }));
+    });
+  }
+
+  markEmailVerifiedAndEnable(userId) {
+    return new Promise((resolve, reject) => {
+      this.db.run('UPDATE users SET email_verified = 1, two_factor_enabled = 1 WHERE id = ?', [userId],
+        (err) => err ? reject(err) : resolve({ ok: true }));
+    });
+  }
+
+  createLoginChallenge({ token, userId, status, codeHash = null, expiresAt }) {
+    return new Promise((resolve, reject) => {
+      this.db.run(
+        'INSERT INTO login_challenges (token, user_id, code_hash, status, expires_at) VALUES (?, ?, ?, ?, ?)',
+        [token, userId, codeHash, status, expiresAt],
+        function(err) { err ? reject(err) : resolve({ id: this.lastID }); }
+      );
+    });
+  }
+
+  getLoginChallenge(token) {
+    return new Promise((resolve, reject) => {
+      this.db.get('SELECT * FROM login_challenges WHERE token = ?', [token],
+        (err, row) => err ? reject(err) : resolve(row || null));
+    });
+  }
+
+  updateLoginChallengeCode(token, { codeHash, status, expiresAt }) {
+    return new Promise((resolve, reject) => {
+      this.db.run(
+        'UPDATE login_challenges SET code_hash = ?, status = ?, expires_at = ?, attempts = 0 WHERE token = ?',
+        [codeHash, status, expiresAt, token],
+        (err) => err ? reject(err) : resolve({ ok: true }));
+    });
+  }
+
+  incrementLoginChallengeAttempts(token) {
+    return new Promise((resolve, reject) => {
+      this.db.run('UPDATE login_challenges SET attempts = attempts + 1 WHERE token = ?', [token],
+        (err) => err ? reject(err) : resolve({ ok: true }));
+    });
+  }
+
+  consumeLoginChallenge(token) {
+    return new Promise((resolve, reject) => {
+      this.db.run('UPDATE login_challenges SET consumed = 1 WHERE token = ?', [token],
+        (err) => err ? reject(err) : resolve({ ok: true }));
     });
   }
 

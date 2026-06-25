@@ -146,20 +146,64 @@ final class AuthService {
         isRestoringSession = false
     }
 
-    func login(username: String, password: String) async throws {
+    /// Outcome of the password step under email-2FA.
+    enum LoginStep: Equatable {
+        case authenticated
+        case needsEmailEnrollment(challenge: String)   // first login — no email on file yet
+        case needsCode(challenge: String, emailHint: String?)
+    }
+
+    // Held between the password step and code verification so we can persist the
+    // credential to the Keychain only once 2FA fully succeeds.
+    @ObservationIgnored private var pendingUsername: String?
+    @ObservationIgnored private var pendingPassword: String?
+
+    func login(username: String, password: String) async throws -> LoginStep {
         let response = try await api.login(username: username, password: password)
-        guard response.success, let user = response.user else {
+        if response.two_factor_required == true, let challenge = response.challenge {
+            pendingUsername = username
+            pendingPassword = password
+            if response.status == "enroll_email" {
+                return .needsEmailEnrollment(challenge: challenge)
+            }
+            return .needsCode(challenge: challenge, emailHint: response.email_hint)
+        }
+        guard response.success == true, let user = response.user else {
             throw APIError.unauthorized
         }
+        completeLogin(user: user, password: password, username: username)
+        return .authenticated
+    }
+
+    /// First-login: submit the email; server sends a code. Returns the code step.
+    func submitLoginEmail(challenge: String, email: String) async throws -> LoginStep {
+        let r = try await api.submitLoginEmail(challenge: challenge, email: email)
+        return .needsCode(challenge: challenge, emailHint: r.email_hint)
+    }
+
+    /// Verify the emailed code and finish signing in.
+    func verifyLoginCode(challenge: String, code: String) async throws {
+        let response = try await api.verifyLoginCode(challenge: challenge, code: code)
+        guard response.success == true, let user = response.user else {
+            throw APIError.unauthorized
+        }
+        completeLogin(user: user, password: pendingPassword, username: pendingUsername ?? user.username)
+    }
+
+    func resendLoginCode(challenge: String) async throws {
+        _ = try await api.resendLoginCode(challenge: challenge)
+    }
+
+    private func completeLogin(user: APIService.UserInfo, password: String?, username: String) {
         currentUser = UserProfile(id: user.id, username: user.username, name: user.name, avatar: user.avatar ?? "")
         isAuthenticated = true
-
         UserDefaults.standard.set(user.username, forKey: "auth_username")
         UserDefaults.standard.set(user.name, forKey: "auth_name")
         if let id = user.id { UserDefaults.standard.set(id, forKey: "auth_user_id") }
-
-        // Save password to Keychain for session restoration
-        Self.savePassword(password, for: username)
+        // Save password to Keychain so the fast password step can autofill / Face ID.
+        if let password { Self.savePassword(password, for: username) }
+        pendingUsername = nil
+        pendingPassword = nil
     }
 
     func register(username: String, password: String, name: String, inviteCode: String? = nil, householdName: String? = nil) async throws {
@@ -205,8 +249,11 @@ final class AuthService {
             return false
         }
         do {
+            // Under 2FA, the password step alone can't restore a session (a code is
+            // required), so this only succeeds when 2FA is disabled server-side.
+            // Otherwise it returns false and the app routes to interactive login.
             let response = try await api.login(username: username, password: password)
-            return response.success
+            return response.success == true
         } catch {
             return false
         }
