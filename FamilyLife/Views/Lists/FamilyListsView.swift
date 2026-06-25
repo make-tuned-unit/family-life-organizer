@@ -952,12 +952,12 @@ struct TasksDetailSection: View {
     }
 
     private func taskRow(_ task: TaskResponse) -> some View {
-        let isDone = task.status != "active"
+        let isDone = task.status != "active" || recentlyToggledIds.contains(task.id)
         return HStack(spacing: 12) {
             Button { toggleComplete(task) } label: {
                 Image(systemName: isDone ? "checkmark.circle.fill" : "circle")
                     .font(.system(size: 20))
-                    .foregroundStyle(isDone ? TabAccent.home.color : WarmPalette.ink3)
+                    .foregroundStyle(isDone ? WarmPalette.good : WarmPalette.ink4)
             }
             .buttonStyle(.plain)
 
@@ -1007,12 +1007,13 @@ struct TasksDetailSection: View {
 
     private func toggleComplete(_ task: TaskResponse) {
         guard task.status == "active" else { return }
-        withAnimation { recentlyToggledIds.insert(task.id) }
+        // Show checkmark + strikethrough in place, then let it fade out of the active list.
+        withAnimation(.easeInOut(duration: 0.2)) { _ = recentlyToggledIds.insert(task.id) }
         Task {
             try? await api.completeTask(id: task.id)
-            try? await Task.sleep(for: .seconds(0.4))
+            try? await Task.sleep(for: .milliseconds(700))
             await loadTasks()
-            recentlyToggledIds.remove(task.id)
+            withAnimation(.easeInOut(duration: 0.2)) { _ = recentlyToggledIds.remove(task.id) }
         }
     }
 

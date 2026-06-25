@@ -60,6 +60,15 @@ final class AuthService {
         }
     }
 
+    /// Updates the user's display name on the server and in local state.
+    func updateName(_ newName: String) async throws {
+        let trimmed = newName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, let user = currentUser else { return }
+        try await api.updateName(trimmed)
+        currentUser = UserProfile(id: user.id, username: user.username, name: trimmed, avatar: user.avatar)
+        UserDefaults.standard.set(trimmed, forKey: "auth_name")
+    }
+
     /// Pre-renders a circular thumbnail at 128x128. The circular crop is baked into the
     /// UIImage so ProfileAvatar needs NO .clipShape or .mask (zero offscreen render passes).
     private static func thumbnail(from data: Data) -> UIImage? {

@@ -863,6 +863,10 @@ final class APIService {
         let _: SuccessResponse = try await put("/api/users/me/avatar", body: ["image": base64])
     }
 
+    func updateName(_ name: String) async throws {
+        let _: SuccessResponse = try await put("/api/users/me/name", body: ["name": name])
+    }
+
     func fetchProfileImage(userId: Int) async throws -> String {
         let response: AvatarResponse = try await get("/api/users/\(userId)/avatar")
         return response.image

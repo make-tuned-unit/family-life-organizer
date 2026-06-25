@@ -529,6 +529,27 @@ app.put('/api/users/me/avatar', requireAuth, async (req, res) => {
   }
 });
 
+// Update own display name
+app.put('/api/users/me/name', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const userId = req.session.user?.id;
+    if (!userId) return res.status(401).json({ error: 'Not authenticated' });
+    const name = (req.body?.name || '').trim();
+    if (!name) return res.status(400).json({ error: 'Name is required' });
+    if (name.length > 60) return res.status(400).json({ error: 'Name is too long' });
+    await new Promise((resolve, reject) => {
+      db.db.run('UPDATE users SET name = ? WHERE id = ?', [name, userId], (err) => err ? reject(err) : resolve());
+    });
+    if (req.session.user) req.session.user.name = name;
+    res.json({ success: true, name });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    db.close();
+  }
+});
+
 // Profile image for any user
 app.get('/api/users/:id/avatar', requireAuth, async (req, res) => {
   const db = new FamilyDB();

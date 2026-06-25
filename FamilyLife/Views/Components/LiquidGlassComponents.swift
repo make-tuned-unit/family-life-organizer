@@ -235,10 +235,18 @@ struct WarmAgendaRow: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            Text(time)
-                .font(.system(size: 15, weight: .semibold, design: .default))
-                .foregroundStyle(WarmPalette.ink1)
-                .frame(minWidth: 44, alignment: .leading)
+            if isAuto {
+                // Task rows show a checkable circle in the left column to match the Lists layout.
+                Image(systemName: "circle")
+                    .font(.system(size: 20))
+                    .foregroundStyle(WarmPalette.ink4)
+                    .frame(minWidth: 44, alignment: .leading)
+            } else {
+                Text(time)
+                    .font(.system(size: 15, weight: .semibold, design: .default))
+                    .foregroundStyle(WarmPalette.ink1)
+                    .frame(minWidth: 44, alignment: .leading)
+            }
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)

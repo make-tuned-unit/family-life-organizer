@@ -217,8 +217,7 @@ struct ConciergeChatView: View {
                 .foregroundStyle(speech.isRecording ? .white : accent)
                 .frame(width: 40, height: 40)
                 .background(speech.isRecording ? WarmPalette.bad : WarmPalette.cardSurface, in: Circle())
-                .scaleEffect(speech.isRecording ? 1.06 : 1.0)
-                .animation(.easeInOut(duration: 0.5).repeatForever(autoreverses: true), value: speech.isRecording)
+                .animation(.easeInOut(duration: 0.2), value: speech.isRecording)
         }
         .accessibilityLabel(speech.isRecording ? "Stop dictation" : "Dictate a message")
     }

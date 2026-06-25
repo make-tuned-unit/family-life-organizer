@@ -9,7 +9,6 @@ struct SettingsView: View {
     @Environment(LocationService.self) private var locationService
     @Environment(\.dismiss) private var dismiss
 
-    @State private var serverURL: String = ""
     @State private var showingLogoutConfirm = false
     @State private var notificationsEnabled = false
     @State private var locationEnabled = false
@@ -18,6 +17,9 @@ struct SettingsView: View {
     @State private var selectedPhoto: PhotosPickerItem?
     @State private var profileImage: Image?
     @State private var copiedCode = false
+    @State private var showingNameEdit = false
+    @State private var editingName = ""
+    @State private var nameError: String?
 
     var body: some View {
         Form {
@@ -62,14 +64,26 @@ struct SettingsView: View {
                     .buttonStyle(.plain)
 
                     if let user = auth.currentUser {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(user.name)
-                                .font(.system(size: 17, weight: .semibold))
-                                .foregroundStyle(WarmPalette.ink1)
-                            Text(user.username)
-                                .font(.system(size: 13))
-                                .foregroundStyle(WarmPalette.ink3)
+                        Button {
+                            editingName = user.name
+                            nameError = nil
+                            showingNameEdit = true
+                        } label: {
+                            VStack(alignment: .leading, spacing: 2) {
+                                HStack(spacing: 6) {
+                                    Text(user.name)
+                                        .font(.system(size: 17, weight: .semibold))
+                                        .foregroundStyle(WarmPalette.ink1)
+                                    Image(systemName: "pencil")
+                                        .font(.system(size: 12, weight: .semibold))
+                                        .foregroundStyle(WarmPalette.ink3)
+                                }
+                                Text(user.username)
+                                    .font(.system(size: 13))
+                                    .foregroundStyle(WarmPalette.ink3)
+                            }
                         }
+                        .buttonStyle(.plain)
                     }
 
                     Spacer()
@@ -119,23 +133,6 @@ struct SettingsView: View {
                 Text("Used for trip tracking and ETA calculation.")
                     .font(.caption)
                     .foregroundStyle(WarmPalette.ink3)
-            }
-
-            Section("Server") {
-                TextField("Server URL", text: $serverURL)
-                    .textContentType(.URL)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
-                    .onAppear { serverURL = api.baseURL }
-
-                Button {
-                    api.baseURL = serverURL
-                    UserDefaults.standard.set(serverURL, forKey: "server_url")
-                } label: {
-                    Text("Update Server URL")
-                        .foregroundStyle(TabAccent.home.color)
-                }
-                .disabled(serverURL == api.baseURL)
             }
 
             Section("Household") {
@@ -243,6 +240,28 @@ struct SettingsView: View {
             Button("Sign Out", role: .destructive) {
                 auth.logout()
                 dismiss()
+            }
+        }
+        .alert("Edit Name", isPresented: $showingNameEdit) {
+            TextField("Your name", text: $editingName)
+                .textInputAutocapitalization(.words)
+            Button("Cancel", role: .cancel) {}
+            Button("Save") {
+                let trimmed = editingName.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !trimmed.isEmpty else { return }
+                Task {
+                    do {
+                        try await auth.updateName(trimmed)
+                    } catch {
+                        nameError = "Couldn't update your name. Try again."
+                    }
+                }
+            }
+        } message: {
+            if let nameError {
+                Text(nameError)
+            } else {
+                Text("This is how your name appears across the app.")
             }
         }
         .task {
