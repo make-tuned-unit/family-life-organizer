@@ -22,7 +22,9 @@ final class ConciergeViewModel {
             onDeviceSummary = nil
             state = .loaded(brief)
             // Privately re-summarize on-device when available (non-blocking for cards).
-            if OnDeviceSummarizer.isAvailable {
+            // Screenshot harness wants the server brief's clean bullet formatting.
+            let uitest = ProcessInfo.processInfo.environment["UITEST_AUTOLOGIN"] != nil
+            if !uitest, OnDeviceSummarizer.isAvailable {
                 onDeviceSummary = await OnDeviceSummarizer.summarize(brief)
             }
         } catch {

@@ -75,6 +75,10 @@ enum ScreenshotHarness {
 
     static var openCare: Bool { env["UITEST_SHEET"] == "care" }
 
+    /// Present the concierge chat sheet directly (its empty "How can I help?"
+    /// state), bypassing the premium gate, for the marketing "ask" screenshot.
+    static var openConciergeChat: Bool { env["UITEST_SHEET"] == "conciergechat" }
+
     /// Full-screen view to present for screenshots that live deeper than a tab.
     static var screen: String? { env["UITEST_SCREEN"] }
 
@@ -98,6 +102,7 @@ struct MainTabView: View {
     @State private var selectedTab: MainTab = ScreenshotHarness.initialTab
     @State private var loadedTabs: Set<MainTab> = [ScreenshotHarness.initialTab, .home]
     @State private var showingChat = ScreenshotHarness.initialChat
+    @State private var showingConciergeChat = ScreenshotHarness.openConciergeChat
     #else
     @State private var selectedTab: MainTab = .home
     @State private var loadedTabs: Set<MainTab> = [.home]
@@ -214,6 +219,9 @@ struct MainTabView: View {
                 default:          EmptyView()
                 }
             }
+        }
+        .sheet(isPresented: $showingConciergeChat) {
+            ConciergeChatView()
         }
         #endif
         .onChange(of: deepLinkRouter.pendingType) {
