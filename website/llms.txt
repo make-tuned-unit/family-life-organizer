@@ -14,12 +14,18 @@ Kinrows keeps a household's shared life in one calm place and gets everyone "row
 ## Key URLs
 - Homepage: https://kinrows.com/
 - Compare vs other family apps: https://kinrows.com/compare.html
+- Best family organizer apps (honest 2026 comparison): https://kinrows.com/best-family-organizer-apps.html
 - Blog (family organization advice): https://kinrows.com/blog/
+- What is emotional labour at home: https://kinrows.com/blog/what-is-emotional-labour.html
+- Emotional labour vs the mental load: https://kinrows.com/blog/emotional-labour-vs-mental-load.html
+- Signs you carry too much emotional labour: https://kinrows.com/blog/signs-too-much-emotional-labour.html
+- How couples divide emotional labour fairly: https://kinrows.com/blog/divide-emotional-labour-fairly.html
+- The invisible work of parenting: https://kinrows.com/blog/emotional-labour-parenting.html
 - Privacy Policy: https://kinrows.com/privacy.html
 - Terms of Use: https://kinrows.com/terms.html
 
 ## Structured data
-The homepage includes Organization, WebSite, and SoftwareApplication JSON-LD. Blog posts include BlogPosting + BreadcrumbList. The compare page includes BreadcrumbList + FAQPage. Legal pages include BreadcrumbList.
+The homepage includes Organization, WebSite, and SoftwareApplication JSON-LD. Blog posts include BlogPosting + BreadcrumbList, and the emotional-labour articles add FAQPage (and HowTo where relevant). The compare page includes BreadcrumbList + FAQPage; the best-family-organizer-apps page includes ItemList + FAQPage + BreadcrumbList. Legal pages include BreadcrumbList.
 
 ## Full spec
 See https://kinrows.com/llms-full.txt for complete product details.
