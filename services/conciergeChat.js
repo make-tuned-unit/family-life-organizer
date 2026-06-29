@@ -116,4 +116,81 @@ async function handleChat(db, { userId, userName, message, conversationId }) {
   return { conversation_id: conversationId, reply, actions };
 }
 
-module.exports = { handleChat };
+// Streaming variant of handleChat. Identical tool-use loop, but each Claude
+// call streams text deltas to opts.onText(token) as they generate. The final
+// persisted reply is authoritative (the client reconciles to it on 'done').
+async function handleChatStream(db, { userId, userName, message, conversationId }, { onText } = {}) {
+  const today = todayISO();
+  const groupId = await db.getUserHouseholdId(userId);
+
+  let isNewConversation = false;
+  if (conversationId) {
+    const convo = await db.getConciergeConversation(conversationId);
+    if (!convo || convo.user_id !== userId) {
+      const err = new Error('Conversation not found');
+      err.status = 404;
+      throw err;
+    }
+  } else {
+    const created = await db.createConciergeConversation(userId, groupId);
+    conversationId = created.id;
+    isNewConversation = true;
+  }
+
+  if (!ai.isAIEnabled()) {
+    const reply = "I need AI to be enabled to chat. Your daily brief still works without it.";
+    await db.addConciergeMessage(conversationId, 'user', message);
+    await db.addConciergeMessage(conversationId, 'assistant', reply);
+    return { conversation_id: conversationId, reply, actions: [] };
+  }
+
+  const history = await db.getConciergeMessages(conversationId, HISTORY_LIMIT);
+  const messages = history.map(m => ({ role: m.role, content: m.content }));
+  messages.push({ role: 'user', content: message });
+  await db.addConciergeMessage(conversationId, 'user', message);
+
+  const memories = await db.getConciergeMemory(groupId);
+  const system = buildSystem(userName, today, memories);
+  const ctx = { db, userId, userName, groupId, push, today };
+  const toolDefs = tools.definitions();
+
+  const actions = [];
+  let reply = '';
+
+  for (let turn = 0; turn < MAX_TURNS; turn++) {
+    const resp = await ai.streamClaudeRaw({ system, messages, tools: toolDefs, maxTokens: 600, onText });
+    messages.push({ role: 'assistant', content: resp.content });
+
+    if (resp.stop_reason !== 'tool_use') {
+      const textBlock = resp.content.find(b => b.type === 'text');
+      reply = textBlock ? textBlock.text.trim() : '';
+      break;
+    }
+
+    const toolResults = [];
+    for (const block of resp.content) {
+      if (block.type !== 'tool_use') continue;
+      const out = await tools.run(block.name, ctx, block.input);
+      if (out.action) actions.push(out.action);
+      toolResults.push({
+        type: 'tool_result',
+        tool_use_id: block.id,
+        content: JSON.stringify(out.result ?? out),
+      });
+    }
+    messages.push({ role: 'user', content: toolResults });
+  }
+
+  if (!reply) reply = "Done — let me know if there's anything else.";
+
+  await db.addConciergeMessage(conversationId, 'assistant', reply);
+  await db.touchConciergeConversation(conversationId);
+  if (isNewConversation) {
+    const title = message.length > 60 ? message.slice(0, 57).trimEnd() + '…' : message;
+    await db.setConciergeConversationTitle(conversationId, title);
+  }
+
+  return { conversation_id: conversationId, reply, actions };
+}
+
+module.exports = { handleChat, handleChatStream };

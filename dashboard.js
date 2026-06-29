@@ -12,7 +12,7 @@ const push = require('./push');
 const ai = require('./services/anthropic');
 const { buildSnapshot } = require('./services/conciergeContext');
 const { generateBrief } = require('./services/conciergeBrief');
-const { handleChat } = require('./services/conciergeChat');
+const { handleChat, handleChatStream } = require('./services/conciergeChat');
 const subscription = require('./services/subscription');
 const { runProactiveSweep } = require('./services/conciergeNudge');
 const { createRateLimiter } = require('./services/rateLimit');
@@ -2919,6 +2919,45 @@ app.post('/api/concierge/chat', requireAuth, conciergeLimiter, conciergeChatDail
     // Surface intentional, client-safe errors (err.status set); keep unexpected 500s opaque.
     if (err.status) { res.status(err.status).json({ error: err.message }); }
     else { sendServerError(res, err); }
+  } finally {
+    db.close();
+  }
+});
+
+// Concierge - streaming chat (SSE). Same tool-calling loop as /chat, but text
+// is streamed token-by-token. The non-streaming endpoint above stays as a
+// fallback. Gating runs before any SSE bytes; once streaming starts, errors are
+// delivered as `error` events.
+app.post('/api/concierge/chat/stream', requireAuth, conciergeLimiter, conciergeChatDailyLimiter, requirePremium, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const message = (req.body.message || '').trim();
+    if (!message) return res.status(400).json({ error: 'message required' });
+    if (message.length > 4000) return res.status(400).json({ error: 'message too long' });
+
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no'); // disable proxy buffering so deltas flush
+    if (res.flushHeaders) res.flushHeaders();
+
+    const send = (event, data) => res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+
+    try {
+      const result = await handleChatStream(db, {
+        userId: req.session.user.id,
+        userName: req.session.user.name,
+        message,
+        conversationId: req.body.conversation_id || null,
+      }, { onText: (t) => send('delta', { text: t }) });
+      send('done', result);
+    } catch (err) {
+      send('error', { error: err.status ? err.message : 'Something went wrong.' });
+    }
+    res.end();
+  } catch (err) {
+    if (!res.headersSent) sendServerError(res, err);
+    else { try { res.end(); } catch { /* already closed */ } }
   } finally {
     db.close();
   }
