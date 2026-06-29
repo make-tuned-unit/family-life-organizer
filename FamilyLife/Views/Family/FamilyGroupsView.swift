@@ -285,6 +285,9 @@ struct GroupDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var members: [APIService.GroupMemberResponse] = []
     @State private var feed: [APIService.FeedPostResponse] = []
+    @State private var isLoadingMoreFeed = false
+    @State private var feedReachedEnd = false
+    private let feedPageSize = 50
     @State private var showingNewPost = false
     @State private var showingAddMember = false
     @State private var showingLeaveConfirm = false
@@ -534,6 +537,15 @@ struct GroupDetailView: View {
                 ForEach(feed) { post in
                     FeedPostCard(post: post)
                         .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
+                        .onAppear {
+                            if post.id == feed.last?.id {
+                                Task { await loadMoreFeed() }
+                            }
+                        }
+                }
+                if isLoadingMoreFeed {
+                    ProgressView()
+                        .padding(.vertical, 8)
                 }
             }
         }
@@ -609,7 +621,26 @@ struct GroupDetailView: View {
     }
 
     private func loadFeed() async {
-        do { feed = try await api.fetchFeed(groupId: group.id) } catch {}
+        do {
+            let page = try await api.fetchFeed(groupId: group.id, limit: feedPageSize)
+            feed = page
+            feedReachedEnd = page.count < feedPageSize
+        } catch {}
+    }
+
+    // Cursor pagination: load older posts using the oldest loaded post's id as
+    // the before_id cursor (feed is ordered id DESC). Triggered when the last
+    // row appears.
+    private func loadMoreFeed() async {
+        guard !isLoadingMoreFeed, !feedReachedEnd, let beforeId = feed.last?.id else { return }
+        isLoadingMoreFeed = true
+        defer { isLoadingMoreFeed = false }
+        do {
+            let page = try await api.fetchFeed(groupId: group.id, limit: feedPageSize, beforeId: beforeId)
+            let existing = Set(feed.map { $0.id })
+            feed.append(contentsOf: page.filter { !existing.contains($0.id) })
+            if page.count < feedPageSize { feedReachedEnd = true }
+        } catch {}
     }
 }
 
