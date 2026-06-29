@@ -93,6 +93,7 @@ struct PersonGiftListView: View {
                 Button { showingAddIdea = true } label: {
                     Image(systemName: "plus")
                 }
+                .accessibilityLabel("Add gift idea")
             }
         }
         .sheet(isPresented: $showingAddIdea) {

@@ -98,6 +98,7 @@ struct HomeView: View {
                     Image(systemName: "plus")
                         .foregroundStyle(WarmPalette.ink2)
                 }
+                .accessibilityLabel("New item")
             }
         }
         .sheet(isPresented: $showingAddTask) {

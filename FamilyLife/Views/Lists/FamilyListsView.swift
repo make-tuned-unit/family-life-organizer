@@ -47,7 +47,7 @@ struct FamilyListsView: View {
         .toolbarBackgroundVisibility(.hidden, for: .navigationBar)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                GlassIconButton(systemName: "plus") {
+                GlassIconButton(systemName: "plus", accessibilityLabel: "Add list") {
                     showingNewList = true
                 }
             }

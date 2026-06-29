@@ -105,6 +105,7 @@ struct RivalriesView: View {
                 Button { showingStartRivalry = true } label: {
                     Image(systemName: "plus")
                 }
+                .accessibilityLabel("Start a rivalry")
             }
         }
         .sheet(isPresented: $showingStartRivalry) {

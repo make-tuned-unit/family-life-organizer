@@ -108,6 +108,7 @@ struct ItineraryDetailView: View {
                 Button { showingAddStay = true } label: {
                     Image(systemName: "plus")
                 }
+                .accessibilityLabel("Add accommodation")
             }
         }
         .sheet(isPresented: $showingAddStay) {

@@ -54,9 +54,11 @@ struct ConciergeChatView: View {
                     Button { showingHistory = true } label: {
                         Image(systemName: "clock.arrow.circlepath")
                     }
+                    .accessibilityLabel("Conversation history")
                     Button { viewModel.startNew(); draft = "" } label: {
                         Image(systemName: "square.and.pencil")
                     }
+                    .accessibilityLabel("New conversation")
                     .disabled(viewModel.messages.isEmpty)
                 }
                 ToolbarItem(placement: .topBarTrailing) {
@@ -188,6 +190,7 @@ struct ConciergeChatView: View {
                         .foregroundStyle(.white)
                         .frame(width: 40, height: 40)
                         .background(canSend ? accent : WarmPalette.ink3.opacity(0.4), in: Circle())
+                        .accessibilityLabel("Send message")
                 }
                 .disabled(!canSend)
             }

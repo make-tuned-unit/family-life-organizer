@@ -118,6 +118,7 @@ struct AskAISheet: View {
                                     .font(.system(size: 16))
                                     .foregroundStyle(query.isEmpty ? WarmPalette.ink4 : AccentTheme.terracotta.color)
                             }
+                            .accessibilityLabel("Send")
                             .disabled(query.isEmpty || isLoading)
                         }
                         .padding(14)
