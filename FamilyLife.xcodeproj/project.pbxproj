@@ -10,8 +10,6 @@
 		AA000001 /* FamilyLifeApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000001 /* FamilyLifeApp.swift */; };
 		AA000002 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000002 /* ContentView.swift */; };
 		AA000003 /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000003 /* LoginView.swift */; };
-		AA000201 /* TwoFactorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000201 /* TwoFactorView.swift */; };
-		AA000202 /* SecurityView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000202 /* SecurityView.swift */; };
 		AA000004 /* FLTask.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000004 /* FLTask.swift */; };
 		AA000005 /* Grocery.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000005 /* Grocery.swift */; };
 		AA000006 /* Appointment.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000006 /* Appointment.swift */; };
@@ -115,20 +113,20 @@
 		AA000096 /* BudgetStatsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000096 /* BudgetStatsView.swift */; };
 		AA000097 /* RecurringPaymentsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000097 /* RecurringPaymentsView.swift */; };
 		AA000098 /* NotesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000098 /* NotesView.swift */; };
-		AA000200 /* ChangePasswordView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000200 /* ChangePasswordView.swift */; };
 		AA000099 /* TravelHubView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000099 /* TravelHubView.swift */; };
 		AA000100 /* EventAttachment.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000100 /* EventAttachment.swift */; };
 		AA000101 /* EventAttachmentsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000101 /* EventAttachmentsView.swift */; };
 		AA000102 /* ConciergeHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000102 /* ConciergeHistoryView.swift */; };
 		AA000103 /* ConciergeSpeechRecognizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000103 /* ConciergeSpeechRecognizer.swift */; };
+		AA000200 /* ChangePasswordView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000200 /* ChangePasswordView.swift */; };
+		AA000201 /* TwoFactorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000201 /* TwoFactorView.swift */; };
+		AA000202 /* SecurityView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000202 /* SecurityView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		BB000001 /* FamilyLifeApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FamilyLifeApp.swift; sourceTree = "<group>"; };
 		BB000002 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		BB000003 /* LoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
-		BB000201 /* TwoFactorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TwoFactorView.swift; sourceTree = "<group>"; };
-		BB000202 /* SecurityView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecurityView.swift; sourceTree = "<group>"; };
 		BB000004 /* FLTask.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FLTask.swift; sourceTree = "<group>"; };
 		BB000005 /* Grocery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Grocery.swift; sourceTree = "<group>"; };
 		BB000006 /* Appointment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Appointment.swift; sourceTree = "<group>"; };
@@ -232,12 +230,14 @@
 		BB000096 /* BudgetStatsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BudgetStatsView.swift; sourceTree = "<group>"; };
 		BB000097 /* RecurringPaymentsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecurringPaymentsView.swift; sourceTree = "<group>"; };
 		BB000098 /* NotesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotesView.swift; sourceTree = "<group>"; };
-		BB000200 /* ChangePasswordView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChangePasswordView.swift; sourceTree = "<group>"; };
 		BB000099 /* TravelHubView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TravelHubView.swift; sourceTree = "<group>"; };
 		BB000100 /* EventAttachment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventAttachment.swift; sourceTree = "<group>"; };
 		BB000101 /* EventAttachmentsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventAttachmentsView.swift; sourceTree = "<group>"; };
 		BB000102 /* ConciergeHistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConciergeHistoryView.swift; sourceTree = "<group>"; };
 		BB000103 /* ConciergeSpeechRecognizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConciergeSpeechRecognizer.swift; sourceTree = "<group>"; };
+		BB000200 /* ChangePasswordView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChangePasswordView.swift; sourceTree = "<group>"; };
+		BB000201 /* TwoFactorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TwoFactorView.swift; sourceTree = "<group>"; };
+		BB000202 /* SecurityView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecurityView.swift; sourceTree = "<group>"; };
 		CC000001 /* FamilyLife.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = FamilyLife.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -746,11 +746,12 @@
 				CODE_SIGN_ENTITLEMENTS = FamilyLife/FamilyLife.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 119;
+				CURRENT_PROJECT_VERSION = 122;
 				DEVELOPMENT_ASSET_PATHS = "";
 				DEVELOPMENT_TEAM = GANM22MFCH;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = FamilyLife/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Kinrows;
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_NSCameraUsageDescription = "Kinrows uses your camera to scan receipts.";
@@ -789,11 +790,12 @@
 				CODE_SIGN_ENTITLEMENTS = FamilyLife/FamilyLife.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 119;
+				CURRENT_PROJECT_VERSION = 122;
 				DEVELOPMENT_ASSET_PATHS = "";
 				DEVELOPMENT_TEAM = GANM22MFCH;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = FamilyLife/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Kinrows;
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_NSCameraUsageDescription = "Kinrows uses your camera to scan receipts.";

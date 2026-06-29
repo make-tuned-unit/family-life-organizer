@@ -149,10 +149,20 @@ final class LocationService: NSObject, CLLocationManagerDelegate {
 
     // MARK: - Private
 
+    /// Enabling `allowsBackgroundLocationUpdates` throws a hard exception unless
+    /// the bundle declares the "location" background mode in UIBackgroundModes.
+    /// Gate on the bundle so a missing/misconfigured Info.plist degrades to
+    /// foreground-only tracking instead of crashing the app.
+    private static let declaresLocationBackgroundMode: Bool = {
+        let modes = Bundle.main.object(forInfoDictionaryKey: "UIBackgroundModes") as? [String]
+        return modes?.contains("location") ?? false
+    }()
+
     private func applyBackgroundMode() {
-        let isAlways = manager.authorizationStatus == .authorizedAlways
-        manager.allowsBackgroundLocationUpdates = isAlways
-        manager.showsBackgroundLocationIndicator = isAlways
+        let canBackground = manager.authorizationStatus == .authorizedAlways
+            && Self.declaresLocationBackgroundMode
+        manager.allowsBackgroundLocationUpdates = canBackground
+        manager.showsBackgroundLocationIndicator = canBackground
     }
 
     // MARK: - Distance helpers
