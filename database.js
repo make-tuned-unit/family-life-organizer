@@ -1298,6 +1298,32 @@ class FamilyDB {
     });
   }
 
+  // Batched version of getRivalryEntryTotals: one query for many rivalries,
+  // returns a Map<rivalry_id, [{member_name, total}]>. Avoids N+1 when
+  // enriching a list of rivalries with their score totals.
+  getRivalryEntryTotalsBatch(rivalryIds = []) {
+    return new Promise((resolve, reject) => {
+      if (!rivalryIds.length) return resolve(new Map());
+      const placeholders = rivalryIds.map(() => '?').join(',');
+      this.db.all(
+        `SELECT rivalry_id, member_name, SUM(value) as total
+           FROM rivalry_entries
+          WHERE rivalry_id IN (${placeholders})
+          GROUP BY rivalry_id, member_name`,
+        rivalryIds,
+        (err, rows) => {
+          if (err) return reject(err);
+          const byRivalry = new Map();
+          for (const row of rows || []) {
+            if (!byRivalry.has(row.rivalry_id)) byRivalry.set(row.rivalry_id, []);
+            byRivalry.get(row.rivalry_id).push({ member_name: row.member_name, total: row.total });
+          }
+          resolve(byRivalry);
+        }
+      );
+    });
+  }
+
   getRivalries(filters = {}, userId = null) {
     return new Promise((resolve, reject) => {
       let sql = 'SELECT * FROM rivalries WHERE 1=1';
