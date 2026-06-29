@@ -373,6 +373,74 @@ final class APIService {
         return try await post("/api/concierge/chat", body: body, timeout: 60)
     }
 
+    enum ConciergeStreamEvent {
+        case delta(String)
+        case done(ConciergeChatResponse)
+    }
+
+    /// Streaming concierge chat over SSE. Yields `.delta` tokens as they arrive
+    /// and a final `.done` with the authoritative reply + actions. The producer
+    /// runs off the main actor; consume the stream wherever you update UI.
+    func conciergeMessageStream(_ message: String, conversationId: Int?) -> AsyncThrowingStream<ConciergeStreamEvent, Error> {
+        let base = baseURL
+        let session = self.session
+        let enabled = cloudAIEnabled
+        return AsyncThrowingStream { continuation in
+            let task = Task.detached {
+                do {
+                    guard enabled else { throw APIError.cloudAIDisabled }
+                    guard let url = URL(string: base + "/api/concierge/chat/stream") else { throw APIError.invalidResponse }
+                    var request = URLRequest(url: url)
+                    request.httpMethod = "POST"
+                    request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+                    request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
+                    request.timeoutInterval = 120
+                    var body: [String: Any] = ["message": message]
+                    if let conversationId { body["conversation_id"] = conversationId }
+                    request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+                    let (bytes, response) = try await session.bytes(for: request)
+                    guard let http = response as? HTTPURLResponse else { throw APIError.invalidResponse }
+                    if http.statusCode == 401 {
+                        NotificationCenter.default.post(name: Self.unauthorizedNotification, object: nil)
+                        throw APIError.unauthorized
+                    }
+                    guard (200...299).contains(http.statusCode) else { throw APIError.serverError(http.statusCode) }
+
+                    var pendingEvent = ""
+                    for try await line in bytes.lines {
+                        if line.hasPrefix("event:") {
+                            pendingEvent = String(line.dropFirst(6)).trimmingCharacters(in: .whitespaces)
+                        } else if line.hasPrefix("data:") {
+                            let payload = String(line.dropFirst(5)).trimmingCharacters(in: .whitespaces)
+                            guard let data = payload.data(using: .utf8) else { continue }
+                            switch pendingEvent {
+                            case "delta":
+                                if let obj = try? JSONDecoder().decode([String: String].self, from: data),
+                                   let t = obj["text"] {
+                                    continuation.yield(.delta(t))
+                                }
+                            case "done":
+                                if let r = try? JSONDecoder().decode(ConciergeChatResponse.self, from: data) {
+                                    continuation.yield(.done(r))
+                                }
+                            case "error":
+                                let obj = try? JSONDecoder().decode([String: String].self, from: data)
+                                throw APIError.streamError(obj?["error"] ?? "Something went wrong.")
+                            default:
+                                break
+                            }
+                        }
+                    }
+                    continuation.finish()
+                } catch {
+                    continuation.finish(throwing: error)
+                }
+            }
+            continuation.onTermination = { _ in task.cancel() }
+        }
+    }
+
     func fetchConciergeConversations() async throws -> [ConciergeConversationSummary] {
         try await get("/api/concierge/conversations")
     }
@@ -1300,6 +1368,7 @@ enum APIError: LocalizedError {
     case unauthorized
     case serverError(Int)
     case cloudAIDisabled
+    case streamError(String)
 
     var errorDescription: String? {
         switch self {
@@ -1307,6 +1376,7 @@ enum APIError: LocalizedError {
         case .unauthorized: "Please sign in again"
         case .serverError(let code): "Server error (\(code))"
         case .cloudAIDisabled: "Cloud AI is off. Turn it on in Settings → Privacy to use this feature."
+        case .streamError(let msg): msg
         }
     }
 }

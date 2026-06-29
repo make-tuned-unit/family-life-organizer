@@ -1,5 +1,6 @@
 import Foundation
 
+@MainActor
 @Observable
 final class ConciergeChatViewModel {
     /// A message in the visible thread.
@@ -47,11 +48,36 @@ final class ConciergeChatViewModel {
         isSending = true
         errorMessage = nil
 
+        // Stream the reply: create the assistant bubble on the first token, fill
+        // it as deltas arrive, then reconcile to the authoritative reply on done.
+        var assistantIndex: Int?
+        var streamed = ""
         do {
-            let response = try await api.sendConciergeMessage(trimmed, conversationId: conversationId)
-            conversationId = response.conversationId
-            messages.append(Message(role: .assistant, text: response.reply, actions: response.actions))
+            for try await event in api.conciergeMessageStream(trimmed, conversationId: conversationId) {
+                switch event {
+                case .delta(let token):
+                    streamed += token
+                    if let i = assistantIndex, messages.indices.contains(i) {
+                        messages[i].text = streamed
+                    } else {
+                        assistantIndex = messages.count
+                        messages.append(Message(role: .assistant, text: streamed))
+                    }
+                case .done(let response):
+                    conversationId = response.conversationId
+                    if let i = assistantIndex, messages.indices.contains(i) {
+                        messages[i].text = response.reply
+                        messages[i].actions = response.actions
+                    } else {
+                        messages.append(Message(role: .assistant, text: response.reply, actions: response.actions))
+                    }
+                }
+            }
         } catch {
+            // Drop an empty placeholder; keep any partial text and surface the error.
+            if let i = assistantIndex, messages.indices.contains(i), messages[i].text.isEmpty {
+                messages.remove(at: i)
+            }
             errorMessage = error.localizedDescription
         }
         isSending = false
