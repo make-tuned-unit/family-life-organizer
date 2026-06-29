@@ -74,6 +74,7 @@ struct ItineraryListView: View {
                 Button { showingNewItinerary = true } label: {
                     Image(systemName: "plus")
                 }
+                .accessibilityLabel("Plan new itinerary")
             }
         }
         .sheet(isPresented: $showingNewItinerary) {

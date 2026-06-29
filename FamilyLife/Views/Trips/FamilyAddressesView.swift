@@ -48,6 +48,7 @@ struct FamilyAddressesView: View {
                 Button { showingAdd = true } label: {
                     Image(systemName: "plus")
                 }
+                .accessibilityLabel("Add place")
             }
         }
         .alert("Couldn’t update addresses", isPresented: errorAlertIsPresented) {

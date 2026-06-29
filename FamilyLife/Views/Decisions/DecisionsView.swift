@@ -64,7 +64,7 @@ struct DecisionsView: View {
                 }
             }
             ToolbarItem(placement: .topBarTrailing) {
-                GlassIconButton(systemName: "plus") {
+                GlassIconButton(systemName: "plus", accessibilityLabel: "Start a decision") {
                     showingNewDecision = true
                 }
             }

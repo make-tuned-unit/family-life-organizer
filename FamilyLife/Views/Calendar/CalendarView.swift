@@ -62,10 +62,10 @@ struct CalendarView: View {
             }
             ToolbarItem(placement: .topBarTrailing) {
                 HStack(spacing: 8) {
-                    GlassIconButton(systemName: "arrow.triangle.swap") {
+                    GlassIconButton(systemName: "arrow.triangle.swap", accessibilityLabel: "Request coverage") {
                         showingCareCascade = true
                     }
-                    GlassIconButton(systemName: "plus") {
+                    GlassIconButton(systemName: "plus", accessibilityLabel: "Add event") {
                         showingAddAppointment = true
                     }
                 }

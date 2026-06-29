@@ -289,6 +289,9 @@ struct GlassDivider: View {
 
 struct GlassIconButton: View {
     let systemName: String
+    /// VoiceOver label describing the action (e.g. "Add list"). Falls back to
+    /// the SF Symbol name so the control is never unlabeled.
+    var accessibilityLabel: String? = nil
     var action: () -> Void = {}
 
     var body: some View {
@@ -297,6 +300,7 @@ struct GlassIconButton: View {
                 .font(.system(size: 16, weight: .medium))
                 .foregroundStyle(WarmPalette.ink2)
         }
+        .accessibilityLabel(accessibilityLabel ?? systemName)
     }
 }
 

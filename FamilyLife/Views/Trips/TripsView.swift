@@ -100,7 +100,7 @@ struct TripsView: View {
                 }
             }
             ToolbarItem(placement: .topBarTrailing) {
-                GlassIconButton(systemName: "mappin.and.ellipse") {
+                GlassIconButton(systemName: "mappin.and.ellipse", accessibilityLabel: "Manage saved places") {
                     showingAddresses = true
                 }
             }

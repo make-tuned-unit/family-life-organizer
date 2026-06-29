@@ -31,7 +31,7 @@ struct CookView: View {
             }
             if !embedded {
                 ToolbarItem(placement: .topBarTrailing) {
-                    GlassIconButton(systemName: "gearshape") {
+                    GlassIconButton(systemName: "gearshape", accessibilityLabel: "Concierge settings") {
                         showingAIDisclosure = true
                     }
                 }

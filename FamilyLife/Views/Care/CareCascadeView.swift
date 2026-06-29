@@ -52,6 +52,7 @@ struct CoverageCascadeView: View {
                     } label: {
                         Image(systemName: "chevron.left").foregroundStyle(WarmPalette.ink2)
                     }
+                    .accessibilityLabel("Back")
                 } else {
                     Button("Cancel") { dismiss() }.foregroundStyle(WarmPalette.ink2)
                 }

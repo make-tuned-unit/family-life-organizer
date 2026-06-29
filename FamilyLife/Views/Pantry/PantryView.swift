@@ -38,7 +38,7 @@ struct PantryView: View {
                 }
             }
             ToolbarItem(placement: .topBarTrailing) {
-                GlassIconButton(systemName: "plus") { showingAddItem = true }
+                GlassIconButton(systemName: "plus", accessibilityLabel: "Add pantry item") { showingAddItem = true }
             }
         }
         .sheet(isPresented: $showingAddItem) {

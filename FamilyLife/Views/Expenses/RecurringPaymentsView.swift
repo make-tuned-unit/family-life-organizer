@@ -151,6 +151,7 @@ struct RecurringPaymentsView: View {
             ToolbarItem(placement: .topBarTrailing) {
                 Button { showingAdd = true } label: { Image(systemName: "plus") }
                     .foregroundStyle(WarmPalette.ink2)
+                    .accessibilityLabel("Add recurring payment")
             }
         }
         .sheet(isPresented: $showingAdd) {

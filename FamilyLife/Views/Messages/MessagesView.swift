@@ -71,6 +71,7 @@ struct MessagesView: View {
                     Image(systemName: "square.and.pencil")
                         .foregroundStyle(TabAccent.home.color)
                 }
+                .accessibilityLabel("New message")
             }
         }
         .sheet(isPresented: $showingNewMessage) {

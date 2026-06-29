@@ -91,6 +91,7 @@ struct NotesView: View {
             ToolbarItem(placement: .topBarTrailing) {
                 Button { showingAdd = true } label: { Image(systemName: "square.and.pencil") }
                     .foregroundStyle(WarmPalette.ink2)
+                    .accessibilityLabel("New note")
             }
         }
         .sheet(isPresented: $showingAdd) {
