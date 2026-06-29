@@ -17,6 +17,35 @@ final class MessageCache {
         cache[partnerId] = messages
     }
 
+    /// Optimistic temp messages use ids near Int.max (see insertOptimistic).
+    /// Anything at/above this is a temp, not a real server row.
+    static let tempIdThreshold = Int.max - 1_000_000
+
+    /// Merge the newest page (server-authoritative for its id window) into the
+    /// cache WITHOUT discarding older pages already loaded via load-older.
+    /// Refreshes read receipts in the newest window and drops optimistic temps
+    /// once their real rows arrive. Used by polling/refresh.
+    func mergeNewest(_ fetched: [APIService.DirectMessageResponse], for partnerId: Int) {
+        let existing = cache[partnerId] ?? []
+        guard let minFetchedId = fetched.map(\.id).min() else {
+            // Nothing returned: keep real history, drop optimistic temps.
+            cache[partnerId] = existing.filter { $0.id < Self.tempIdThreshold }
+            return
+        }
+        // Keep only older real pages; the newest window comes from `fetched`
+        // (which is authoritative and contiguous by id), and temps are dropped.
+        let olderRetained = existing.filter { $0.id < minFetchedId }
+        cache[partnerId] = (fetched + olderRetained).sorted { $0.id > $1.id }
+    }
+
+    /// Merge an older page (load-older) into the cache, deduping by id.
+    func appendOlder(_ fetched: [APIService.DirectMessageResponse], for partnerId: Int) {
+        var byId: [Int: APIService.DirectMessageResponse] = [:]
+        for m in cache[partnerId] ?? [] { byId[m.id] = m }
+        for m in fetched { byId[m.id] = m }
+        cache[partnerId] = byId.values.sorted { $0.id > $1.id }
+    }
+
     /// Optimistically insert a sent message for instant display
     func insertOptimistic(partnerId: Int, text: String, senderId: Int, senderName: String,
                           referenceType: String? = nil, referenceId: Int? = nil,

@@ -20,6 +20,9 @@ struct ConversationView: View {
     @State private var showingNewDecision = false
     @State private var openDecisions: [DecisionResponse] = []
     @State private var fullscreenImage: UIImage?
+    @State private var isLoadingOlder = false
+    @State private var reachedOldEnd = false
+    private let messagePageSize = 50
 
     private var messages: [APIService.DirectMessageResponse] {
         messageCache.messages(for: partnerId)
@@ -59,6 +62,10 @@ struct ConversationView: View {
             ScrollViewReader { proxy in
                 ScrollView {
                     LazyVStack(spacing: 8) {
+                        if isLoadingOlder {
+                            ProgressView()
+                                .padding(.vertical, 8)
+                        }
                         ForEach(messages.reversed()) { msg in
                             MessageBubble(
                                 message: msg,
@@ -67,14 +74,22 @@ struct ConversationView: View {
                                 onImageTap: { image in fullscreenImage = image }
                             )
                             .id(msg.id)
+                            .onAppear {
+                                // Top of the thread (oldest loaded) reached → page older.
+                                if msg.id == messages.last?.id {
+                                    Task { await loadOlderMessages(proxy: proxy) }
+                                }
+                            }
                         }
                     }
                     .padding(.horizontal, 14)
                     .padding(.vertical, 10)
                 }
-                .onChange(of: messages.count) {
-                    if let last = messages.reversed().last {
-                        withAnimation { proxy.scrollTo(last.id, anchor: .bottom) }
+                // Scroll to bottom only when the NEWEST message changes (sent or
+                // received) — not when older pages are prepended.
+                .onChange(of: messages.first?.id) {
+                    if let newest = messages.first {
+                        withAnimation { proxy.scrollTo(newest.id, anchor: .bottom) }
                     }
                 }
             }
@@ -191,8 +206,25 @@ struct ConversationView: View {
 
     private func refreshMessages() async {
         do {
-            let fetched = try await api.fetchMessages(partnerId: partnerId)
-            messageCache.setMessages(fetched, for: partnerId)
+            let fetched = try await api.fetchMessages(partnerId: partnerId, limit: messagePageSize)
+            messageCache.mergeNewest(fetched, for: partnerId)
+        } catch {}
+    }
+
+    // Cursor pagination: load older messages using the oldest loaded id as the
+    // before_id cursor, then restore scroll position to where the user was.
+    private func loadOlderMessages(proxy: ScrollViewProxy) async {
+        guard !isLoadingOlder, !reachedOldEnd else { return }
+        guard let oldestId = messages.last?.id, oldestId < MessageCache.tempIdThreshold else { return }
+        isLoadingOlder = true
+        defer { isLoadingOlder = false }
+        do {
+            let older = try await api.fetchMessages(partnerId: partnerId, limit: messagePageSize, beforeId: oldestId)
+            guard !older.isEmpty else { reachedOldEnd = true; return }
+            messageCache.appendOlder(older, for: partnerId)
+            if older.count < messagePageSize { reachedOldEnd = true }
+            // Keep the viewport anchored on the message that was at the top.
+            proxy.scrollTo(oldestId, anchor: .top)
         } catch {}
     }
 
