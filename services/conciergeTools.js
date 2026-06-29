@@ -550,17 +550,17 @@ const TOOLS = [
     async run(ctx, input) {
       const filters = {};
       if (input.status) filters.status = input.status;
-      const rows = await ctx.db.getRivalries(filters, ctx.userId);
-      const out = [];
-      for (const r of rows.slice(0, 20)) {
-        let totals = [];
-        try { totals = await ctx.db.getRivalryEntryTotals(r.id); } catch { /* ignore */ }
-        out.push({
-          id: r.id, title: r.title, type: r.challenge_type, status: r.status,
-          start_date: r.start_date, end_date: r.end_date,
-          totals: totals.map(t => ({ member: t.member_name, total: t.total })),
-        });
-      }
+      const rows = (await ctx.db.getRivalries(filters, ctx.userId)).slice(0, 20);
+      // Batch-load all score totals in one query instead of one per rivalry (N+1).
+      let totalsByRivalry = new Map();
+      try {
+        totalsByRivalry = await ctx.db.getRivalryEntryTotalsBatch(rows.map(r => r.id));
+      } catch { /* ignore — totals are best-effort */ }
+      const out = rows.map(r => ({
+        id: r.id, title: r.title, type: r.challenge_type, status: r.status,
+        start_date: r.start_date, end_date: r.end_date,
+        totals: (totalsByRivalry.get(r.id) || []).map(t => ({ member: t.member_name, total: t.total })),
+      }));
       return { result: out };
     },
   },
