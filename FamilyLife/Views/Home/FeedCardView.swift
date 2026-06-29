@@ -408,6 +408,16 @@ struct FeedCard: View {
         guard !text.isEmpty else { return }
         isSendingComment = true
         newComment = ""
+        // Optimistic: show the comment immediately with a temporary id; the
+        // refetch reconciles it on success, and we roll back on failure.
+        let temp = APIService.FeedCommentResponse(
+            id: Int.random(in: Int.min ..< 0), user_id: auth.currentUser?.id,
+            user_name: auth.currentUser?.name, user_avatar: nil, text: text, created_at: nil
+        )
+        withAnimation(.spring(response: 0.3)) {
+            comments.append(temp)
+            commentCount += 1
+        }
         do {
             try await api.addFeedComment(postId: item.ref_id, text: text)
             let fetched = try await api.fetchFeedComments(postId: item.ref_id)
@@ -417,6 +427,10 @@ struct FeedCard: View {
             }
         } catch {
             guard !error.isCancellation else { return }
+            withAnimation(.spring(response: 0.3)) {
+                comments.removeAll { $0.id == temp.id }
+                commentCount = max(0, commentCount - 1)
+            }
             newComment = text
         }
         isSendingComment = false

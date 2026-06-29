@@ -33,11 +33,25 @@ final class PantryViewModel {
     }
 
     func addItem(_ data: [String: Any], api: APIService) async {
+        // Optimistic: show the item immediately with a temporary id. load()
+        // reconciles it with the server row on success; remove it on failure.
+        let temp = PantryItemResponse(
+            id: Int.random(in: Int.min ..< 0),
+            item: data["item"] as? String ?? "",
+            category: data["category"] as? String,
+            location: data["location"] as? String,
+            quantity: data["quantity"] as? String,
+            unit: data["unit"] as? String,
+            expiry_date: data["expiry_date"] as? String,
+            added_by: nil, created_at: nil
+        )
+        items.insert(temp, at: 0)
         do {
             try await api.addPantryItem(data)
             await load(api: api)
         } catch {
             guard !error.isCancellation else { return }
+            items.removeAll { $0.id == temp.id }
             self.error = error.localizedDescription
         }
     }
