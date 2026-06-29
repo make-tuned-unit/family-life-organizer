@@ -68,6 +68,13 @@ struct TripsView: View {
                         ForEach(viewModel.pastTrips) { trip in
                             TripHistoryRow(trip: trip)
                                 .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
+                                .contextMenu {
+                                    Button(role: .destructive) {
+                                        Task { await viewModel.deleteTrip(trip.id, api: api) }
+                                    } label: {
+                                        Label("Delete Trip", systemImage: "trash")
+                                    }
+                                }
                         }
                     }
                 }
@@ -439,18 +446,26 @@ struct TripLiveMapView: View {
     }
 
     private var currentCoordinate: CLLocationCoordinate2D? {
-        if let curLat = trip.current_lat, let curLng = trip.current_lng {
-            return CLLocationCoordinate2D(latitude: curLat, longitude: curLng)
+        if let curLat = trip.current_lat, let curLng = trip.current_lng,
+           let coord = Self.validCoordinate(curLat, curLng) {
+            return coord
         }
         if let originLat = trip.origin_lat, let originLng = trip.origin_lng {
-            return CLLocationCoordinate2D(latitude: originLat, longitude: originLng)
+            return Self.validCoordinate(originLat, originLng)
         }
         return nil
     }
 
     private var destinationCoordinate: CLLocationCoordinate2D? {
         guard let destLat = trip.destination_lat, let destLng = trip.destination_lng else { return nil }
-        return CLLocationCoordinate2D(latitude: destLat, longitude: destLng)
+        return Self.validCoordinate(destLat, destLng)
+    }
+
+    /// Returns a coordinate only if both components are finite and within valid
+    /// lat/lng ranges. Guards against NaN/Inf reaching MapKit (which crashes).
+    private static func validCoordinate(_ lat: Double, _ lng: Double) -> CLLocationCoordinate2D? {
+        let coord = CLLocationCoordinate2D(latitude: lat, longitude: lng)
+        return CLLocationCoordinate2DIsValid(coord) ? coord : nil
     }
 
     private var mapRefreshID: String {
@@ -459,6 +474,25 @@ struct TripLiveMapView: View {
 
     private func loadRoute() async {
         guard let currentCoordinate, let destinationCoordinate else { return }
+
+        // When the traveler is essentially at the destination (e.g. a trip
+        // started to a place they're already at), a route is degenerate and
+        // MKDirections returns a polyline whose boundingMapRect is null —
+        // feeding that into MapCameraPosition.rect crashes MapKit. Skip routing
+        // and just frame the destination with a sane region.
+        let separation = LocationService.distance(from: currentCoordinate, to: destinationCoordinate)
+        guard separation > 75 else {
+            await MainActor.run {
+                route = nil
+                position = .region(
+                    MKCoordinateRegion(
+                        center: destinationCoordinate,
+                        span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
+                    )
+                )
+            }
+            return
+        }
 
         let request = MKDirections.Request()
         request.transportType = .automobile
@@ -470,29 +504,42 @@ struct TripLiveMapView: View {
             let bestRoute = response.routes.first
             await MainActor.run {
                 route = bestRoute
-                if let rect = bestRoute?.polyline.boundingMapRect {
+                // Only adopt a rect-based camera when the rect is real. A null /
+                // empty boundingMapRect (degenerate route) crashes MapKit.
+                if let rect = bestRoute?.polyline.boundingMapRect,
+                   !rect.isNull, !rect.isEmpty,
+                   rect.size.width.isFinite, rect.size.height.isFinite {
                     position = .rect(rect)
+                } else {
+                    position = fallbackRegion(currentCoordinate, destinationCoordinate)
                 }
             }
         } catch {
             await MainActor.run {
-                let latDelta = abs((currentCoordinate.latitude - destinationCoordinate.latitude) * 1.8)
-                let lngDelta = abs((currentCoordinate.longitude - destinationCoordinate.longitude) * 1.8)
-                let center = CLLocationCoordinate2D(
-                    latitude: (currentCoordinate.latitude + destinationCoordinate.latitude) / 2,
-                    longitude: (currentCoordinate.longitude + destinationCoordinate.longitude) / 2
-                )
-                position = .region(
-                    MKCoordinateRegion(
-                        center: center,
-                        span: MKCoordinateSpan(
-                            latitudeDelta: max(latDelta, 0.02),
-                            longitudeDelta: max(lngDelta, 0.02)
-                        )
-                    )
-                )
+                position = fallbackRegion(currentCoordinate, destinationCoordinate)
             }
         }
+    }
+
+    private func fallbackRegion(
+        _ current: CLLocationCoordinate2D,
+        _ destination: CLLocationCoordinate2D
+    ) -> MapCameraPosition {
+        let latDelta = abs((current.latitude - destination.latitude) * 1.8)
+        let lngDelta = abs((current.longitude - destination.longitude) * 1.8)
+        let center = CLLocationCoordinate2D(
+            latitude: (current.latitude + destination.latitude) / 2,
+            longitude: (current.longitude + destination.longitude) / 2
+        )
+        return .region(
+            MKCoordinateRegion(
+                center: center,
+                span: MKCoordinateSpan(
+                    latitudeDelta: max(latDelta, 0.02),
+                    longitudeDelta: max(lngDelta, 0.02)
+                )
+            )
+        )
     }
 }
 

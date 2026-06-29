@@ -64,6 +64,17 @@ final class TripsViewModel {
         }
     }
 
+    func deleteTrip(_ id: Int, api: APIService) async {
+        do {
+            try await api.deleteTrip(id: id)
+            NotificationService.shared.clearTripAlertState(tripId: id)
+            await loadAll(api: api)
+        } catch {
+            guard !error.isCancellation else { return }
+            self.error = error.localizedDescription
+        }
+    }
+
     func updateLocation(tripId: Int, lat: Double, lng: Double, etaMinutes: Int, api: APIService) async {
         guard shouldSyncLocation(lat: lat, lng: lng, etaMinutes: etaMinutes) else { return }
         do {

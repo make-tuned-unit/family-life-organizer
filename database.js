@@ -1087,6 +1087,15 @@ class FamilyDB {
     });
   }
 
+  deleteTrip(id) {
+    return new Promise((resolve, reject) => {
+      this.db.run('DELETE FROM trips WHERE id = ?', [id], (err) => {
+        if (err) reject(err);
+        else resolve({ id });
+      });
+    });
+  }
+
   // Family address operations
   addFamilyAddress(addr) {
     return new Promise((resolve, reject) => {
