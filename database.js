@@ -534,7 +534,10 @@ class FamilyDB {
         params.push(parseInt(userId, 10));
       }
 
-      sql += ' ORDER BY created_at DESC';
+      // Safety cap: household-scoped list, newest first. Far above realistic
+      // family scale; prevents an unbounded scan if data accumulates for years.
+      // (Full cursor pagination is deferred — see review notes.)
+      sql += ' ORDER BY created_at DESC LIMIT 1000';
 
       this.db.all(sql, params, (err, rows) => {
         if (err) reject(err);
@@ -1166,7 +1169,7 @@ class FamilyDB {
         const uid = parseInt(userId);
         sql += ` AND group_id IN (SELECT group_id FROM group_members WHERE user_id = ${uid})`;
       }
-      sql += ' ORDER BY datetime(created_at) DESC';
+      sql += ' ORDER BY datetime(created_at) DESC LIMIT 1000'; // safety cap (household-scoped); full pagination deferred
       this.db.all(sql, params, (err, rows) => {
         if (err) reject(err);
         else resolve(rows.map(row => ({ ...row, poll_options: this.parseJSONList(row.poll_options) })));
@@ -1333,7 +1336,7 @@ class FamilyDB {
         const uid = parseInt(userId);
         sql += ` AND group_id IN (SELECT group_id FROM group_members WHERE user_id = ${uid})`;
       }
-      sql += ' ORDER BY datetime(created_at) DESC';
+      sql += ' ORDER BY datetime(created_at) DESC LIMIT 1000'; // safety cap (household-scoped); full pagination deferred
       this.db.all(sql, params, (err, rows) => err ? reject(err) : resolve(rows));
     });
   }
@@ -1708,7 +1711,7 @@ class FamilyDB {
         sql += ' AND person_id = ?';
         params.push(personId);
       }
-      sql += ' ORDER BY datetime(created_at) DESC';
+      sql += ' ORDER BY datetime(created_at) DESC LIMIT 1000'; // safety cap (household-scoped); full pagination deferred
       this.db.all(sql, params, (err, rows) => err ? reject(err) : resolve(rows));
     });
   }
