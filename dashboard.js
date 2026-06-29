@@ -160,6 +160,30 @@ async function sendLoginCode(to, code) {
 // Short-lived per-user cache for the daily brief (regenerated on ?refresh).
 const briefCache = new Map();
 const BRIEF_TTL_MS = 30 * 60 * 1000; // 30 min: fewer brief regenerations = fewer AI calls
+const _briefRegenInFlight = new Set(); // guards against duplicate background regens per cacheKey
+
+// Regenerate a user's brief off the request thread and update the cache.
+// Used for stale-while-revalidate so the HTTP request never blocks on the
+// Anthropic call. Errors are logged, not swallowed.
+function regenerateBriefInBackground(userId, userName, skipAI, cacheKey) {
+  if (_briefRegenInFlight.has(cacheKey)) return;
+  _briefRegenInFlight.add(cacheKey);
+  (async () => {
+    const db = new FamilyDB();
+    try {
+      const snapshot = await buildSnapshot(db, userId);
+      const brief = await generateBrief(snapshot, userName, { skipAI });
+      const now = Date.now();
+      for (const [k, v] of briefCache) if (now - v.ts >= BRIEF_TTL_MS) briefCache.delete(k);
+      briefCache.set(cacheKey, { brief, ts: now });
+    } catch (e) {
+      console.error('[brief] background regen failed:', e?.message || e);
+    } finally {
+      db.close();
+      _briefRegenInFlight.delete(cacheKey);
+    }
+  })();
+}
 
 const app = express();
 const PORT = process.env.PORT || 3456;
@@ -2812,6 +2836,15 @@ app.get('/api/concierge/brief', requireAuth, conciergeLimiter, async (req, res) 
     if (!req.query.refresh && cached && Date.now() - cached.ts < BRIEF_TTL_MS) {
       return res.json(cached.brief);
     }
+    // Stale-while-revalidate: if a previous brief exists, return it immediately
+    // and regenerate off-thread so the request never blocks on the Anthropic
+    // call. Explicit ?refresh still waits for the fresh brief.
+    if (!req.query.refresh && cached) {
+      res.json(cached.brief);
+      regenerateBriefInBackground(userId, req.session.user.name, skipAI, cacheKey);
+      return;
+    }
+    // Cold cache (or explicit refresh): generate synchronously.
     const snapshot = await buildSnapshot(db, userId);
     const brief = await generateBrief(snapshot, req.session.user.name, { skipAI });
     const now = Date.now();
