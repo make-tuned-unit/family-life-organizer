@@ -215,11 +215,28 @@ final class HomeViewModel {
     }
 
     func addTask(_ data: [String: Any], api: APIService) async {
+        // Optimistic: show the task immediately with a temporary id. loadAll()
+        // reconciles it with the server row on success; remove it on failure.
+        let temp = TaskResponse(
+            id: Int.random(in: Int.min ..< 0),
+            category: data["category"] as? String ?? "general",
+            title: data["title"] as? String ?? "",
+            description: data["description"] as? String,
+            status: "pending",
+            priority: data["priority"] as? String ?? "normal",
+            due_date: data["due_date"] as? String,
+            due_time: data["due_time"] as? String,
+            assigned_to: data["assigned_to"] as? String,
+            created_by: nil, recurrence_pattern: nil, tags: nil,
+            created_at: nil, updated_at: nil, completed_at: nil
+        )
+        activeTasks.insert(temp, at: 0)
         do {
             try await api.addTask(data)
             await loadAll(api: api)
         } catch {
             guard !error.isCancellation else { return }
+            activeTasks.removeAll { $0.id == temp.id }
             self.error = error.localizedDescription
         }
     }

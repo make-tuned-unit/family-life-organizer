@@ -625,12 +625,21 @@ struct ListDetailSection: View {
         guard !title.isEmpty else { return }
         newItem = ""
         isInputFocused = true
+        // Optimistic: append immediately with a temporary id. loadItems()
+        // reconciles with the server row on success; remove it on failure.
+        let temp = APIService.ListItemResponse(
+            id: Int.random(in: Int.min ..< 0), list_id: list.id, title: title,
+            is_done: 0, sort_order: nil, added_by: nil, category: nil,
+            created_at: nil, completed_at: nil
+        )
+        items.append(temp)
         Task {
             do {
                 let _ = try await api.addListItem(listId: list.id, title: title)
                 await loadItems()
             } catch {
                 guard !error.isCancellation else { return }
+                items.removeAll { $0.id == temp.id }
             }
         }
     }
