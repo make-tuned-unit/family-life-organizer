@@ -108,6 +108,33 @@ final class HomeViewModel {
         }
     }
 
+    /// Cancel an active trip straight from the Home presence chip. Optimistically
+    /// drops it from the list; reloads to restore truth on failure.
+    func cancelTrip(_ id: Int, api: APIService) async {
+        activeTrips.removeAll { $0.id == id }
+        NotificationService.shared.clearTripAlertState(tripId: id)
+        do {
+            try await api.cancelTrip(id: id)
+        } catch {
+            guard !error.isCancellation else { return }
+            await reloadTrips(api: api)
+            self.error = error.localizedDescription
+        }
+    }
+
+    /// Mark an active trip arrived from the Home presence chip.
+    func arriveTrip(_ id: Int, api: APIService) async {
+        activeTrips.removeAll { $0.id == id }
+        NotificationService.shared.clearTripAlertState(tripId: id)
+        do {
+            try await api.arriveTrip(id: id)
+        } catch {
+            guard !error.isCancellation else { return }
+            await reloadTrips(api: api)
+            self.error = error.localizedDescription
+        }
+    }
+
     // MARK: - Feed preparation
 
     static func prepareFeed(_ items: [APIService.ActivityItem], currentUserName: String? = nil, currentUsername: String? = nil) -> [PreparedFeedItem] {

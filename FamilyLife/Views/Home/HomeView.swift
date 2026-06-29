@@ -320,6 +320,18 @@ struct HomeView: View {
                     statusColor: eta <= 0 ? WarmPalette.good : WarmPalette.warn,
                     showTrip: true
                 )
+                .contextMenu {
+                    Button {
+                        Task { await viewModel.arriveTrip(trip.id, api: api) }
+                    } label: {
+                        Label("Mark arrived", systemImage: "checkmark.circle")
+                    }
+                    Button(role: .destructive) {
+                        Task { await viewModel.cancelTrip(trip.id, api: api) }
+                    } label: {
+                        Label("Cancel trip", systemImage: "xmark.circle")
+                    }
+                }
                 Spacer()
             }
             .padding(.horizontal, 22)
