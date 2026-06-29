@@ -3084,6 +3084,19 @@ app.post('/api/trips/:id/cancel', requireAuth, async (req, res) => {
   }
 });
 
+app.delete('/api/trips/:id', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    if (!(await requireHouseholdRow(db, 'trips', req.params.id, req, res))) return;
+    await db.deleteTrip(req.params.id);
+    res.json({ success: true });
+  } catch (err) {
+    sendServerError(res, err);
+  } finally {
+    db.close();
+  }
+});
+
 // Family addresses
 app.get('/api/addresses', requireAuth, async (req, res) => {
   const db = new FamilyDB();

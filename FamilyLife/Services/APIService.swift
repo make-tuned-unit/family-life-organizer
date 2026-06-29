@@ -405,6 +405,10 @@ final class APIService {
         let _: SuccessResponse = try await post("/api/trips/\(id)/cancel", body: [:] as [String: String])
     }
 
+    func deleteTrip(id: Int) async throws {
+        let _: SuccessResponse = try await delete("/api/trips/\(id)")
+    }
+
     // MARK: - Family Addresses
 
     func fetchFamilyAddresses() async throws -> [FamilyAddressResponse] {
