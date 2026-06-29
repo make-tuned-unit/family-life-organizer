@@ -758,7 +758,7 @@ app.post('/api/waitlist', waitlistLimiter, async (req, res) => {
       if (email.emailConfig.notify) {
         const note = email.waitlistNotifyEmail(raw, total);
         email.sendEmail({ to: email.emailConfig.notify, subject: note.subject, html: note.html, text: note.text })
-          .catch(() => {});
+          .catch((e) => console.error('[waitlist] admin notify send failed:', e?.message || e));
       }
     } else if (created) {
       console.warn('[waitlist] new signup but email disabled (no RESEND_API_KEY):', raw);
