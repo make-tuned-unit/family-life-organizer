@@ -658,10 +658,11 @@ struct ListDetailSection: View {
         recentlyToggledIds.remove(id)
 
         do {
+            // Local flip above is the optimistic update; no refetch needed on success.
             try await api.toggleListItem(id: id)
-            await loadItems()
         } catch {
             guard !error.isCancellation else { return }
+            // Roll back to server truth on failure.
             await loadItems()
         }
     }
@@ -679,12 +680,18 @@ struct ListDetailSection: View {
         let trimmed = editingText.trimmingCharacters(in: .whitespaces)
         editingItemId = nil
         guard !trimmed.isEmpty, trimmed != item.title else { return }
+        guard let idx = items.firstIndex(where: { $0.id == item.id }) else { return }
+        let previousTitle = items[idx].title
+        // Optimistic: show the new title immediately, roll back on failure.
+        items[idx].title = trimmed
         Task {
             do {
                 try await api.updateListItem(id: item.id, title: trimmed)
-                await loadItems()
             } catch {
                 guard !error.isCancellation else { return }
+                if let i = items.firstIndex(where: { $0.id == item.id }) {
+                    items[i].title = previousTitle
+                }
             }
         }
     }
