@@ -2044,7 +2044,6 @@ app.post('/api/appointments', requireAuth, async (req, res) => {
   try {
     const data = { ...req.body };
     const userId = req.session.user.id;
-    const senderName = (req.session.user.name || '').trim();
     if (typeof data.title === 'string') data.title = data.title.trim();
     if (data.appointment_date) data.appointment_date = normalizeDate(data.appointment_date);
     // Events are household-only: a supplied group_id must be one of the caller's
@@ -2059,6 +2058,10 @@ app.post('/api/appointments', requireAuth, async (req, res) => {
       const title = (data.title || 'New event').trim();
       const dateStr = data.appointment_date || '';
       const body = dateStr ? `${title} on ${dateStr} has been added to your calendar.` : `${title} has been added to your calendar.`;
+      // Resolve the creator's CURRENT name from the DB — req.session.user.name is
+      // cached at login and can be stale (e.g. an old "Sophie Chiasson " value).
+      const creator = await db.getUserById(userId);
+      const senderName = (creator?.name || '').trim();
       const pushTitle = senderName ? `${senderName} added an event` : 'New event added';
       push.pushToGroup(db, data.group_id, userId, pushTitle, body, { type: 'event' });
     }
