@@ -371,9 +371,18 @@ final class NotificationService {
 
     // MARK: - Rivalry milestone reminders
 
+    /// Fuzzy participant/entry name match: exact (case-insensitive), or one is a
+    /// first-name prefix of the other ("Jesse" ↔ "Jesse Fairbanks"). Mirrors the
+    /// matching used server-side and in ContentView so totals never silently
+    /// drop the device owner's own entries.
+    private static func nameMatches(_ a: String, _ b: String) -> Bool {
+        let aL = a.lowercased(), bL = b.lowercased()
+        return aL == bL || aL.hasPrefix(bL + " ") || bL.hasPrefix(aL + " ")
+    }
+
     /// Schedule local notifications for active rivalry milestones (halfway, 1-day-left, daily nudge at 9am).
     /// Call whenever rivalries are loaded/refreshed. Idempotent — removes stale rivalry notifications first.
-    func scheduleRivalryMilestones(_ rivalries: [RivalryResponse], myName: String, entriesByRivalry: [Int: [RivalryEntryResponse]]) {
+    func scheduleRivalryMilestones(_ rivalries: [RivalryResponse], myName: String, myUsername: String = "", entriesByRivalry: [Int: [RivalryEntryResponse]]) {
         // Remove any previously scheduled rivalry reminders
         UNUserNotificationCenter.current().getPendingNotificationRequests { requests in
             let ids = requests.filter { $0.identifier.hasPrefix("rivalry-milestone-") }.map(\.identifier)
@@ -385,31 +394,33 @@ final class NotificationService {
         let now = Date()
         let calendar = Calendar.current
 
+        // Match the user's account name/username to the name used inside the
+        // rivalry. Entries are stored under the in-rivalry name (e.g. "Jesse"),
+        // which may differ from the account display name ("Jesse Fairbanks") —
+        // so resolve it the same way ContentView.myRivalryName does.
+        let candidates = [myName, myUsername].filter { !$0.isEmpty }
+
         for rivalry in rivalries {
             guard rivalry.status == RivalryStatus.active.rawValue || rivalry.status == RivalryStatus.pending.rawValue else { continue }
             guard let endDate = rivalry.endDate, endDate > now else { continue }
-            // Only schedule for rivalries the user is actually in
-            let isParticipant = rivalry.participantNames.contains {
-                $0.localizedCaseInsensitiveCompare(myName) == .orderedSame
-                || $0.lowercased().hasPrefix(myName.lowercased() + " ")
-                || myName.lowercased().hasPrefix($0.lowercased() + " ")
-            }
-            guard isParticipant else { continue }
+            // Only schedule for rivalries the user is actually in. Capture the
+            // user's name AS IT APPEARS in this rivalry so all totals below
+            // resolve against the same string the entries are stored under.
+            guard let myParticipantName = rivalry.participantNames.first(where: { p in
+                candidates.contains { Self.nameMatches(p, $0) }
+            }) else { continue }
             let startDate = ISO8601DateFormatter.flexible.date(from: rivalry.start_date)
                 ?? DateFormatter.isoDate.date(from: rivalry.start_date)
                 ?? now
 
             let entries = entriesByRivalry[rivalry.id] ?? []
-            let myTotal = entries.filter { $0.member_name.localizedCaseInsensitiveCompare(myName) == .orderedSame }.reduce(0.0) { $0 + $1.value }
-            let opponents = rivalry.participantNames.filter { $0.localizedCaseInsensitiveCompare(myName) != .orderedSame }
-            let topOpponent = opponents.max { a, b in
-                let aTotal = entries.filter { $0.member_name.localizedCaseInsensitiveCompare(a) == .orderedSame }.reduce(0.0) { $0 + $1.value }
-                let bTotal = entries.filter { $0.member_name.localizedCaseInsensitiveCompare(b) == .orderedSame }.reduce(0.0) { $0 + $1.value }
-                return aTotal < bTotal
+            let totalFor: (String) -> Double = { name in
+                entries.filter { Self.nameMatches($0.member_name, name) }.reduce(0.0) { $0 + $1.value }
             }
-            let opTotal = topOpponent.map { name in
-                entries.filter { $0.member_name.localizedCaseInsensitiveCompare(name) == .orderedSame }.reduce(0.0) { $0 + $1.value }
-            } ?? 0
+            let myTotal = totalFor(myParticipantName)
+            let opponents = rivalry.participantNames.filter { !Self.nameMatches($0, myParticipantName) }
+            let topOpponent = opponents.max { totalFor($0) < totalFor($1) }
+            let opTotal = topOpponent.map(totalFor) ?? 0
             let opName = topOpponent ?? "your opponent"
 
             let scoreStatus: String
