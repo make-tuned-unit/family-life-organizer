@@ -84,6 +84,9 @@ class FamilyDB {
         // Recurring events columns
         this.db.run('ALTER TABLE appointments ADD COLUMN recurrence_rule TEXT', () => {});
         this.db.run('ALTER TABLE appointments ADD COLUMN recurrence_end TEXT', () => {});
+        // Creator attribution — appointments previously had no creator, so the
+        // activity feed mislabeled events by their person_tags (attendees).
+        this.db.run('ALTER TABLE appointments ADD COLUMN created_by INTEGER REFERENCES users(id)', () => {});
         // Profile image column
         this.db.run('ALTER TABLE users ADD COLUMN profile_image TEXT', () => {});
         // Email 2FA columns (idempotent — error ignored if already present)
@@ -610,7 +613,7 @@ class FamilyDB {
   addAppointment(appointment) {
     return new Promise((resolve, reject) => {
       this.db.run(
-        'INSERT INTO appointments (title, description, appointment_date, appointment_time, location, with_person, category, person_tags, recurrence_rule, recurrence_end, group_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        'INSERT INTO appointments (title, description, appointment_date, appointment_time, location, with_person, category, person_tags, recurrence_rule, recurrence_end, group_id, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
         [
           appointment.title,
           appointment.description || null,
@@ -622,7 +625,8 @@ class FamilyDB {
           appointment.person_tags ? (Array.isArray(appointment.person_tags) ? appointment.person_tags.join(',') : String(appointment.person_tags)) : null,
           appointment.recurrence_rule || null,
           appointment.recurrence_end || null,
-          appointment.group_id || null
+          appointment.group_id || null,
+          appointment.created_by || null
         ],
         function(err) {
           if (err) reject(err);
@@ -2693,10 +2697,12 @@ class FamilyDB {
           AND d.group_id IN (${myGroups})` : ''}
         UNION ALL
         SELECT 'event' as feed_type, a.id as ref_id, a.title, a.location as body,
-          COALESCE(a.person_tags, 'Family') as author, 'upcoming' as status,
+          COALESCE(au.name, au.username, 'Family') as author, 'upcoming' as status,
           a.created_at,
-          0 as reaction_count, 0 as comment_count, NULL as author_id, a.group_id, g.name as group_name
-        FROM appointments a LEFT JOIN groups g ON g.id = a.group_id
+          0 as reaction_count, 0 as comment_count, a.created_by as author_id, a.group_id, g.name as group_name
+        FROM appointments a
+        LEFT JOIN groups g ON g.id = a.group_id
+        LEFT JOIN users au ON au.id = a.created_by
         WHERE a.appointment_date <= date('now', '+7 days', 'localtime')
           AND (
             a.appointment_date > date('now', 'localtime')

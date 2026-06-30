@@ -72,8 +72,10 @@ CREATE TABLE IF NOT EXISTS appointments (
     recurrence_end TEXT,
     reminder_sent BOOLEAN DEFAULT 0,
     group_id INTEGER,
+    created_by INTEGER,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (group_id) REFERENCES groups(id)
+    FOREIGN KEY (group_id) REFERENCES groups(id),
+    FOREIGN KEY (created_by) REFERENCES users(id)
 );
 
 -- Automations

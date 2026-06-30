@@ -98,6 +98,7 @@ const TOOLS = [
         location: input.location || null,
         with_person: input.with_person || null,
         group_id: ctx.groupId,
+        created_by: ctx.userId,
       };
       await ctx.db.addAppointment(data);
       if (ctx.groupId && ctx.push) {
