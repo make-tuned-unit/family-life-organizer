@@ -2197,6 +2197,43 @@ app.delete('/api/appointments/:id/attachments/:attachmentId', requireAuth, async
 });
 
 // Appointments - by month
+// Calendar sync — push this device's calendar events up to the household.
+// Body: { events: [{external_id, calendar_name, title, location, starts_at, ends_at, all_day}],
+//         window_start, window_end }  (window bounds let us soft-delete removed events)
+app.post('/api/calendar-sync', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const userId = req.session.user.id;
+    const gid = await db.getUserHouseholdId(userId);
+    if (gid == null) return res.status(403).json({ error: 'No household to share a calendar with' });
+    const { events, window_start, window_end } = req.body || {};
+    if (!Array.isArray(events) || !window_start || !window_end) {
+      return res.status(400).json({ error: 'events[], window_start and window_end are required' });
+    }
+    const result = await db.upsertSyncedCalendarEvents(userId, gid, events, window_start, window_end);
+    res.json({ success: true, ...result });
+  } catch (err) {
+    sendServerError(res, err);
+  } finally {
+    db.close();
+  }
+});
+
+// Household members' synced device-calendar events for a month.
+app.get('/api/calendar-sync/:year/:month', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const year = parseInt(req.params.year);
+    const month = parseInt(req.params.month);
+    const rows = await db.getSyncedCalendarEventsByMonth(year, month, req.session.user.id);
+    res.json(rows);
+  } catch (err) {
+    sendServerError(res, err);
+  } finally {
+    db.close();
+  }
+});
+
 app.get('/api/appointments/:year/:month', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {

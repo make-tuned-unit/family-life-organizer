@@ -78,6 +78,28 @@ CREATE TABLE IF NOT EXISTS appointments (
     FOREIGN KEY (created_by) REFERENCES users(id)
 );
 
+-- Device-calendar events (Apple/Google via EventKit) synced up from each
+-- member's phone so the household can see everyone's schedule. Owner = user_id,
+-- household-scoped via group_id. starts_at/ends_at are local ISO8601 strings.
+CREATE TABLE IF NOT EXISTS synced_calendar_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    group_id INTEGER,
+    external_id TEXT NOT NULL,
+    calendar_name TEXT,
+    title TEXT,
+    location TEXT,
+    starts_at TEXT NOT NULL,
+    ends_at TEXT,
+    all_day INTEGER DEFAULT 0,
+    deleted INTEGER DEFAULT 0,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(user_id, external_id, starts_at),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (group_id) REFERENCES groups(id)
+);
+CREATE INDEX IF NOT EXISTS idx_synced_cal_group_date ON synced_calendar_events(group_id, starts_at);
+
 -- Automations
 CREATE TABLE IF NOT EXISTS automations (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
