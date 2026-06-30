@@ -2044,7 +2044,8 @@ app.post('/api/appointments', requireAuth, async (req, res) => {
   try {
     const data = { ...req.body };
     const userId = req.session.user.id;
-    const senderName = req.session.user.name;
+    const senderName = (req.session.user.name || '').trim();
+    if (typeof data.title === 'string') data.title = data.title.trim();
     if (data.appointment_date) data.appointment_date = normalizeDate(data.appointment_date);
     // Events are household-only: a supplied group_id must be one of the caller's
     // households; otherwise default to their primary household. Never a clan.
@@ -2055,10 +2056,11 @@ app.post('/api/appointments', requireAuth, async (req, res) => {
     res.json({ success: true, id: created.id });
     // Notify household members about the new event
     if (data.group_id) {
-      const title = data.title || 'New event';
+      const title = (data.title || 'New event').trim();
       const dateStr = data.appointment_date || '';
       const body = dateStr ? `${title} on ${dateStr} has been added to your calendar.` : `${title} has been added to your calendar.`;
-      push.pushToGroup(db, data.group_id, userId, `${senderName} added an event`, body, { type: 'event' });
+      const pushTitle = senderName ? `${senderName} added an event` : 'New event added';
+      push.pushToGroup(db, data.group_id, userId, pushTitle, body, { type: 'event' });
     }
   } catch (err) {
     sendServerError(res, err);
