@@ -718,6 +718,69 @@ class FamilyDB {
     });
   }
 
+  // ---- Synced device-calendar events (household calendar sharing) ----
+
+  // Upsert the caller's device-calendar events for a date window and soft-delete
+  // any of their previously-synced events in that window that are no longer
+  // present (handles deletions on the phone). Only ever touches user_id's own
+  // rows, so it can't disturb other household members' synced events.
+  upsertSyncedCalendarEvents(userId, groupId, events, windowStart, windowEnd) {
+    return new Promise((resolve, reject) => {
+      const run = (sql, p = []) => new Promise((r, j) => this.db.run(sql, p, function (e) { e ? j(e) : r(this); }));
+      (async () => {
+        await run('BEGIN');
+        try {
+          // Tentatively mark the window deleted; each re-sent event revives itself.
+          await run(
+            'UPDATE synced_calendar_events SET deleted = 1 WHERE user_id = ? AND starts_at >= ? AND starts_at < ?',
+            [userId, windowStart, windowEnd]
+          );
+          for (const ev of events || []) {
+            if (!ev || !ev.external_id || !ev.starts_at) continue;
+            await run(
+              `INSERT INTO synced_calendar_events
+                 (user_id, group_id, external_id, calendar_name, title, location, starts_at, ends_at, all_day, deleted, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, CURRENT_TIMESTAMP)
+               ON CONFLICT(user_id, external_id, starts_at) DO UPDATE SET
+                 group_id = excluded.group_id, calendar_name = excluded.calendar_name,
+                 title = excluded.title, location = excluded.location,
+                 ends_at = excluded.ends_at, all_day = excluded.all_day,
+                 deleted = 0, updated_at = CURRENT_TIMESTAMP`,
+              [userId, groupId || null, ev.external_id, ev.calendar_name || null, ev.title || null,
+               ev.location || null, ev.starts_at, ev.ends_at || null, ev.all_day ? 1 : 0]
+            );
+          }
+          await run('COMMIT');
+          resolve({ synced: (events || []).length });
+        } catch (e) {
+          await run('ROLLBACK').catch(() => {});
+          reject(e);
+        }
+      })();
+    });
+  }
+
+  // Household members' synced device-calendar events for a month (group-scoped).
+  getSyncedCalendarEventsByMonth(year, month, userId) {
+    return new Promise((resolve, reject) => {
+      const uid = parseInt(userId);
+      const monthKey = `${year}-${String(month).padStart(2, '0')}`;
+      const sql = `
+        SELECT s.id, s.user_id AS owner_id, u.name AS owner_name, s.external_id,
+          s.calendar_name, s.title, s.location, s.starts_at, s.ends_at, s.all_day, s.group_id
+        FROM synced_calendar_events s
+        JOIN users u ON u.id = s.user_id
+        WHERE s.deleted = 0
+          AND substr(s.starts_at, 1, 7) = ?
+          AND s.group_id IN (
+            SELECT gm.group_id FROM group_members gm
+            JOIN groups g ON g.id = gm.group_id
+            WHERE gm.user_id = ? AND g.group_type = 'household')
+        ORDER BY s.starts_at`;
+      this.db.all(sql, [monthKey, uid], (err, rows) => err ? reject(err) : resolve(rows));
+    });
+  }
+
   updateAppointment(id, updates) {
     return new Promise((resolve, reject) => {
       const fields = [];
@@ -2276,7 +2339,8 @@ class FamilyDB {
       'budget_categories', 'budget_projects', 'project_expenses', 'pantry', 'trips',
       'gift_people', 'gift_ideas', 'special_events', 'family_addresses', 'feed_posts',
       'itineraries', 'itinerary_stays', 'subscriptions', 'concierge_memory', 'concierge_nudges',
-      'concierge_conversations', 'recurring_payments', 'notes', 'event_attachments'];
+      'concierge_conversations', 'recurring_payments', 'notes', 'event_attachments',
+      'synced_calendar_events'];
   }
 
   // Merge one household into another: re-point all household-scoped data and
