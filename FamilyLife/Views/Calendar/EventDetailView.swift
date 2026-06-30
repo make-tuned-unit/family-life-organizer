@@ -5,6 +5,7 @@ struct EventDetailView: View {
     var onUpdate: (() async -> Void)?
 
     @Environment(APIService.self) private var api
+    @Environment(CalendarService.self) private var calendarService
     @Environment(\.dismiss) private var dismiss
     @State private var showingEdit = false
     @State private var showingShareSheet = false
@@ -186,6 +187,7 @@ struct EventDetailView: View {
                     Button(role: .destructive) {
                         Task {
                             try? await api.deleteAppointment(id: appointment.id)
+                            await calendarService.syncDelete(appointmentId: appointment.id)
                             await onUpdate?()
                             dismiss()
                         }
@@ -288,4 +290,5 @@ struct EventDetailView: View {
         ))
     }
     .environment(APIService())
+    .environment(CalendarService())
 }

@@ -5,6 +5,7 @@ struct HomeView: View {
     @Binding var pendingListName: String?
     @Environment(APIService.self) private var api
     @Environment(AuthService.self) private var auth
+    @Environment(CalendarService.self) private var calendarService
     @State private var viewModel = HomeViewModel()
     @State private var showingAddTask = false
     @State private var showingNewDecision = false
@@ -110,9 +111,11 @@ struct HomeView: View {
             }
         }
         .sheet(isPresented: $showingNewEvent) {
-            AddAppointmentView { data in
+            AddAppointmentView { data, syncToApple in
                 Task {
-                    try? await api.addAppointment(data)
+                    if let newId = try? await api.addAppointment(data), syncToApple {
+                        await calendarService.syncCreate(appointmentId: newId, fields: data)
+                    }
                     await viewModel.loadAll(api: api)
                 }
             }
@@ -608,4 +611,5 @@ struct HomeView: View {
     .environment(APIService())
     .environment(AuthService())
     .environment(ProfileImageCache())
+    .environment(CalendarService())
 }

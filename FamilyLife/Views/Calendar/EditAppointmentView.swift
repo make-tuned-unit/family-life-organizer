@@ -5,7 +5,10 @@ struct EditAppointmentView: View {
     @Environment(APIService.self) private var api
     @Environment(HouseholdService.self) private var household
     @Environment(AuthService.self) private var auth
+    @Environment(CalendarService.self) private var calendarService
     @Environment(\.dismiss) private var dismiss
+    @AppStorage(AppleCalendarSyncMode.storageKey) private var calendarSyncMode: AppleCalendarSyncMode = .off
+    @State private var addToAppleCalendar = false
 
     let appointment: AppointmentResponse
     let onSaved: () -> Void
@@ -158,9 +161,20 @@ struct EditAppointmentView: View {
                         }
                     }
                 }
+
+                if calendarSyncMode == .ask {
+                    Section {
+                        Toggle("Add to Apple Calendar", isOn: $addToAppleCalendar)
+                    }
+                }
             }
             .scrollContentBackground(.hidden)
             .background { AmbientBackground(style: .calendar) }
+            .onAppear {
+                if calendarSyncMode == .ask {
+                    addToAppleCalendar = calendarService.isSynced(appointmentId: appointment.id)
+                }
+            }
             .navigationTitle("Edit Appointment")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -208,6 +222,14 @@ struct EditAppointmentView: View {
         Task {
             do {
                 try await api.updateAppointment(id: appointment.id, data: data)
+                switch calendarSyncMode {
+                case .always:
+                    await calendarService.syncUpdate(appointmentId: appointment.id, fields: data, shouldSync: true)
+                case .ask:
+                    await calendarService.syncUpdate(appointmentId: appointment.id, fields: data, shouldSync: addToAppleCalendar)
+                case .off:
+                    break
+                }
                 onSaved()
                 dismiss()
             } catch {
@@ -231,4 +253,5 @@ struct EditAppointmentView: View {
     .environment(APIService())
     .environment(AuthService())
     .environment(HouseholdService())
+    .environment(CalendarService())
 }

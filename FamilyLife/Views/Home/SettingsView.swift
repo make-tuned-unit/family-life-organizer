@@ -21,6 +21,7 @@ struct SettingsView: View {
     @State private var editingName = ""
     @State private var nameError: String?
     @AppStorage("cloudAIEnabled") private var cloudAIEnabled = true
+    @AppStorage(AppleCalendarSyncMode.storageKey) private var calendarSyncMode: AppleCalendarSyncMode = .off
 
     var body: some View {
         Form {
@@ -211,6 +212,22 @@ struct SettingsView: View {
                 Text(cloudAIEnabled
                     ? "Your daily brief is summarized privately on-device when your iPhone supports it — nothing is sent. The concierge chat sends what it needs to Anthropic to answer and take actions; Anthropic doesn’t train on it."
                     : "Cloud AI is off. The brief stays fully on-device/offline and the concierge chat is disabled, so no household data is sent to Anthropic.")
+            }
+
+            Section {
+                Picker(selection: $calendarSyncMode) {
+                    ForEach(AppleCalendarSyncMode.allCases) { mode in
+                        Text(mode.displayName).tag(mode)
+                    }
+                } label: {
+                    Label("Apple Calendar sync", systemImage: "calendar")
+                        .foregroundStyle(TabAccent.calendar.color)
+                }
+                .tint(AccentTheme.sage.color)
+            } header: {
+                Text("Apple Calendar")
+            } footer: {
+                Text("Adds Kinrows events to your iPhone's default calendar — which also syncs to Google if that account is connected in iOS Settings. \"Ask each time\" lets you choose per event. Applies to events created on this device.")
             }
 
             Section("About") {

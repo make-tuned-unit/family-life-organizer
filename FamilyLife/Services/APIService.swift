@@ -161,8 +161,10 @@ final class APIService {
         try await get("/api/appointments/\(year)/\(month)")
     }
 
-    func addAppointment(_ appointment: [String: Any]) async throws {
-        let _: SuccessResponse = try await post("/api/appointments", body: appointment)
+    @discardableResult
+    func addAppointment(_ appointment: [String: Any]) async throws -> Int {
+        let response: IDResponse = try await post("/api/appointments", body: appointment)
+        return response.id
     }
 
     func deleteAppointment(id: Int) async throws {

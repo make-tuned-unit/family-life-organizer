@@ -76,6 +76,7 @@ struct FamilyLifeApp: App {
     @State private var locationService = LocationService()
     @State private var subscriptionService = SubscriptionService()
     @State private var conciergeLaunch = ConciergeLaunch()
+    @State private var calendarService = CalendarService()
 
     var body: some Scene {
         WindowGroup {
@@ -89,6 +90,7 @@ struct FamilyLifeApp: App {
                 .environment(locationService)
                 .environment(subscriptionService)
                 .environment(conciergeLaunch)
+                .environment(calendarService)
                 .task {
                     // Wire up API service and deep link router to app delegate
                     appDelegate.apiService = apiService

@@ -2051,8 +2051,8 @@ app.post('/api/appointments', requireAuth, async (req, res) => {
     const apptGid = await resolveCreateGroupId(db, userId, data.group_id, { householdOnly: true });
     if (apptGid == null) return res.status(403).json({ error: 'Cannot create an event in that group' });
     data.group_id = apptGid;
-    await db.addAppointment(data);
-    res.json({ success: true });
+    const created = await db.addAppointment(data);
+    res.json({ success: true, id: created.id });
     // Notify household members about the new event
     if (data.group_id) {
       const title = data.title || 'New event';

@@ -10,6 +10,7 @@ struct CalendarView: View {
     var showsDismissButton = false
     @Environment(\.dismiss) private var dismiss
     @Environment(APIService.self) private var api
+    @Environment(CalendarService.self) private var calendarService
     @State private var viewModel = CalendarViewModel()
     @State private var showingAddAppointment = false
     @State private var selectedEvent: AppointmentResponse?
@@ -28,6 +29,7 @@ struct CalendarView: View {
                 headerSection
                 careRequestBanner
                 incomingCoverageBanner
+                calendarConnectBanner
                 segmentedControl
 
                 switch displayMode {
@@ -72,8 +74,8 @@ struct CalendarView: View {
             }
         }
         .sheet(isPresented: $showingAddAppointment) {
-            AddAppointmentView(initialDate: viewModel.selectedDate) { appointment in
-                Task { await viewModel.addAppointment(appointment, api: api) }
+            AddAppointmentView(initialDate: viewModel.selectedDate) { appointment, syncToApple in
+                Task { await viewModel.addAppointment(appointment, syncToApple: syncToApple, api: api, calendarService: calendarService) }
             }
         }
         .sheet(isPresented: $showingCareCascade) {
@@ -103,12 +105,69 @@ struct CalendarView: View {
             Text(viewModel.error ?? "An unexpected error occurred.")
         }
         .task {
-            await viewModel.loadMonth(api: api)
+            calendarService.refreshAuthorizationStatus()
+            await viewModel.loadMonth(api: api, calendarService: calendarService)
             incomingCount = ((try? await api.fetchIncomingCoverage()) ?? []).filter { $0.recipient_status == "pending" }.count
             myRequestCount = ((try? await api.fetchCoverageRequests()) ?? []).filter { $0.status == "pending" || $0.status == "approved" }.count
         }
         .onChange(of: viewModel.displayedMonth) {
-            Task { await viewModel.loadMonth(api: api) }
+            Task { await viewModel.loadMonth(api: api, calendarService: calendarService) }
+        }
+    }
+
+    // MARK: - Connect Calendar Banner
+
+    @ViewBuilder
+    private var calendarConnectBanner: some View {
+        switch calendarService.access {
+        case .notDetermined:
+            Button {
+                Task {
+                    let granted = await calendarService.requestAccess()
+                    if granted { await viewModel.loadMonth(api: api, calendarService: calendarService) }
+                }
+            } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: "calendar.badge.plus")
+                        .font(.system(size: 18, weight: .medium))
+                        .foregroundStyle(AccentTheme.sage.color)
+                        .frame(width: 36, height: 36)
+                        .background(AccentTheme.sage.color.opacity(0.15))
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Show your other calendars")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(WarmPalette.ink1)
+                        Text("Bring iCloud and synced Google events into Kinrows")
+                            .font(.system(size: 12))
+                            .foregroundStyle(WarmPalette.ink3)
+                    }
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(WarmPalette.ink4)
+                }
+                .padding(12)
+                .background(WarmPalette.cream1)
+                .clipShape(RoundedRectangle(cornerRadius: 14))
+            }
+            .buttonStyle(.plain)
+            .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
+            .padding(.bottom, 8)
+        case .denied:
+            HStack(spacing: 10) {
+                Image(systemName: "calendar.badge.exclamationmark")
+                    .font(.system(size: 14))
+                    .foregroundStyle(WarmPalette.ink3)
+                Text("Enable Calendar access in Settings to see your other calendars here.")
+                    .font(.system(size: 12))
+                    .foregroundStyle(WarmPalette.ink3)
+                Spacer()
+            }
+            .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
+            .padding(.bottom, 8)
+        case .granted:
+            EmptyView()
         }
     }
 
@@ -300,7 +359,7 @@ struct CalendarView: View {
                     CalendarDayCell(
                         day: day,
                         isSelected: viewModel.selectedDate == day.date,
-                        appointmentCount: viewModel.appointmentCount(for: day.date),
+                        appointmentCount: viewModel.markerCount(for: day.date),
                         hasCoverage: viewModel.hasCoverage(for: day.date)
                     )
                     .onTapGesture {
@@ -323,10 +382,12 @@ struct CalendarView: View {
         if let selected = viewModel.selectedDate {
             let dayAppointments = viewModel.appointments(for: selected)
             let dayCoverage = viewModel.coverageBlocks(for: selected)
+            let dayExternal = viewModel.externalEvents(for: selected)
+            let eventCount = dayAppointments.count + dayExternal.count
 
             WarmSectionHeader(
                 title: viewModel.selectedDateString,
-                trailing: dayAppointments.isEmpty ? nil : "\(dayAppointments.count) event\(dayAppointments.count == 1 ? "" : "s")"
+                trailing: eventCount == 0 ? nil : "\(eventCount) event\(eventCount == 1 ? "" : "s")"
             )
             .padding(.bottom, 6)
 
@@ -340,7 +401,7 @@ struct CalendarView: View {
                 .padding(.bottom, 8)
             }
 
-            if dayAppointments.isEmpty && dayCoverage.isEmpty {
+            if dayAppointments.isEmpty && dayCoverage.isEmpty && dayExternal.isEmpty {
                 VStack(spacing: 8) {
                     Image(systemName: "calendar.badge.plus")
                         .font(.system(size: 32))
@@ -359,6 +420,9 @@ struct CalendarView: View {
                         }
                         .buttonStyle(.plain)
                     }
+                    ForEach(dayExternal) { event in
+                        ExternalEventCard(event: event)
+                    }
                 }
                 .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
             }
@@ -372,6 +436,8 @@ struct CalendarView: View {
         if let selected = viewModel.selectedDate {
             let dayAppointments = viewModel.appointments(for: selected)
             let dayCoverage = viewModel.coverageBlocks(for: selected)
+            let dayExternal = viewModel.externalEvents(for: selected)
+            let eventCount = dayAppointments.count + dayExternal.count
 
             // Date picker strip
             ScrollView(.horizontal, showsIndicators: false) {
@@ -409,7 +475,7 @@ struct CalendarView: View {
             // Full day header
             WarmSectionHeader(
                 title: viewModel.selectedDateString,
-                trailing: dayAppointments.isEmpty ? nil : "\(dayAppointments.count) event\(dayAppointments.count == 1 ? "" : "s")"
+                trailing: eventCount == 0 ? nil : "\(eventCount) event\(eventCount == 1 ? "" : "s")"
             )
             .padding(.bottom, 6)
 
@@ -423,7 +489,7 @@ struct CalendarView: View {
                 .padding(.bottom, 8)
             }
 
-            if dayAppointments.isEmpty && dayCoverage.isEmpty {
+            if dayAppointments.isEmpty && dayCoverage.isEmpty && dayExternal.isEmpty {
                 VStack(spacing: 8) {
                     Image(systemName: "calendar.badge.plus")
                         .font(.system(size: 32))
@@ -441,6 +507,9 @@ struct CalendarView: View {
                             CalendarEventCard(appointment: appt)
                         }
                         .buttonStyle(.plain)
+                    }
+                    ForEach(dayExternal) { event in
+                        ExternalEventCard(event: event)
                     }
                 }
                 .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
@@ -583,6 +652,52 @@ struct CalendarEventCard: View {
     }
 }
 
+// MARK: - External Event Card (read-only system calendar event)
+
+struct ExternalEventCard: View {
+    let event: ExternalEvent
+
+    var body: some View {
+        HStack(spacing: 12) {
+            RoundedRectangle(cornerRadius: 999)
+                .fill(event.calendarColor)
+                .frame(width: 4)
+
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
+                    Text(event.timeString)
+                        .font(.system(size: 15, weight: .bold))
+                        .foregroundStyle(WarmPalette.ink1)
+                    Spacer()
+                    Text(event.calendarTitle)
+                        .font(.system(size: 12))
+                        .foregroundStyle(WarmPalette.ink3)
+                        .lineLimit(1)
+                }
+                Text(event.title)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(WarmPalette.ink1)
+                if let location = event.location, !location.isEmpty {
+                    HStack(spacing: 4) {
+                        Image(systemName: "mappin")
+                            .font(.system(size: 11))
+                        Text(location)
+                    }
+                    .font(.system(size: 13))
+                    .foregroundStyle(WarmPalette.ink3)
+                }
+            }
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: 20))
+        .overlay(
+            RoundedRectangle(cornerRadius: 20)
+                .strokeBorder(event.calendarColor.opacity(0.25), style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
+        )
+    }
+}
+
 // MARK: - Appointment Row (kept for WeekView compatibility)
 
 struct AppointmentListRow: View {
@@ -667,4 +782,5 @@ struct CoverageBlockCard: View {
         CalendarView()
     }
     .environment(APIService())
+    .environment(CalendarService())
 }
