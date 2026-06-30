@@ -151,7 +151,7 @@ struct RivalriesView: View {
 
             // Schedule local milestone notifications for active rivalries
             if let myName = auth.currentUser?.name {
-                NotificationService.shared.scheduleRivalryMilestones(fetchedRivalries, myName: myName, entriesByRivalry: nextEntries)
+                NotificationService.shared.scheduleRivalryMilestones(fetchedRivalries, myName: myName, myUsername: auth.currentUser?.username ?? "", entriesByRivalry: nextEntries)
             }
         } catch {
             guard !error.isCancellation else { return }

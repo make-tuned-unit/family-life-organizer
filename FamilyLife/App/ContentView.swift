@@ -371,6 +371,23 @@ struct MainTabView: View {
                 ])
             }
         }
+
+        // Refresh milestone notifications so their baked-in scores reflect the
+        // totals we just synced. Local notifications can't recompute at fire
+        // time, so without this the "last day / final push" reminder shows
+        // whatever the score was the last time the Rivalries tab was opened.
+        if let myName = auth.currentUser?.name {
+            var entriesByRivalry: [Int: [RivalryEntryResponse]] = [:]
+            for rivalry in rivalries {
+                entriesByRivalry[rivalry.id] = (try? await api.fetchRivalryEntries(id: rivalry.id)) ?? []
+            }
+            NotificationService.shared.scheduleRivalryMilestones(
+                rivalries,
+                myName: myName,
+                myUsername: auth.currentUser?.username ?? "",
+                entriesByRivalry: entriesByRivalry
+            )
+        }
     }
 
     /// The current user's name as it appears in this rivalry's participants
