@@ -11,6 +11,7 @@ struct CalendarView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(APIService.self) private var api
     @Environment(CalendarService.self) private var calendarService
+    @Environment(AuthService.self) private var auth
     @State private var viewModel = CalendarViewModel()
     @State private var showingAddAppointment = false
     @State private var selectedEvent: AppointmentResponse?
@@ -31,6 +32,7 @@ struct CalendarView: View {
                 incomingCoverageBanner
                 calendarConnectBanner
                 segmentedControl
+                ownerFilterBar
 
                 switch displayMode {
                 case .month:
@@ -106,12 +108,57 @@ struct CalendarView: View {
         }
         .task {
             calendarService.refreshAuthorizationStatus()
+            viewModel.currentUserId = auth.currentUser?.id
             await viewModel.loadMonth(api: api, calendarService: calendarService)
             incomingCount = ((try? await api.fetchIncomingCoverage()) ?? []).filter { $0.recipient_status == "pending" }.count
             myRequestCount = ((try? await api.fetchCoverageRequests()) ?? []).filter { $0.status == "pending" || $0.status == "approved" }.count
         }
         .onChange(of: viewModel.displayedMonth) {
             Task { await viewModel.loadMonth(api: api, calendarService: calendarService) }
+        }
+    }
+
+    // MARK: - Owner Filter (Everyone / Just me / per-person)
+
+    @ViewBuilder
+    private var ownerFilterBar: some View {
+        if !viewModel.householdOwners.isEmpty {
+            Menu {
+                Button { viewModel.ownerFilter = .everyone } label: {
+                    Label("Everyone", systemImage: viewModel.ownerFilter == .everyone ? "checkmark" : "person.2")
+                }
+                Button { viewModel.ownerFilter = .me } label: {
+                    Label("Just me", systemImage: viewModel.ownerFilter == .me ? "checkmark" : "person")
+                }
+                ForEach(viewModel.householdOwners, id: \.id) { owner in
+                    Button { viewModel.ownerFilter = .person(owner.id) } label: {
+                        Label(owner.name, systemImage: viewModel.ownerFilter == .person(owner.id) ? "checkmark" : "person")
+                    }
+                }
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "line.3.horizontal.decrease.circle")
+                        .font(.system(size: 13, weight: .semibold))
+                    Text(ownerFilterLabel)
+                        .font(.system(size: 13, weight: .semibold))
+                    Image(systemName: "chevron.down").font(.system(size: 10, weight: .bold))
+                }
+                .foregroundStyle(WarmPalette.ink2)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 7)
+                .background(WarmPalette.cream1, in: Capsule())
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
+            .padding(.bottom, 8)
+        }
+    }
+
+    private var ownerFilterLabel: String {
+        switch viewModel.ownerFilter {
+        case .everyone: return "Everyone"
+        case .me: return "Just me"
+        case .person(let id): return viewModel.householdOwners.first { $0.id == id }?.name ?? "Member"
         }
     }
 
@@ -383,7 +430,8 @@ struct CalendarView: View {
             let dayAppointments = viewModel.appointments(for: selected)
             let dayCoverage = viewModel.coverageBlocks(for: selected)
             let dayExternal = viewModel.externalEvents(for: selected)
-            let eventCount = dayAppointments.count + dayExternal.count
+            let dayHousehold = viewModel.householdEvents(for: selected)
+            let eventCount = dayAppointments.count + dayExternal.count + dayHousehold.count
 
             WarmSectionHeader(
                 title: viewModel.selectedDateString,
@@ -401,7 +449,7 @@ struct CalendarView: View {
                 .padding(.bottom, 8)
             }
 
-            if dayAppointments.isEmpty && dayCoverage.isEmpty && dayExternal.isEmpty {
+            if dayAppointments.isEmpty && dayCoverage.isEmpty && dayExternal.isEmpty && dayHousehold.isEmpty {
                 VStack(spacing: 8) {
                     Image(systemName: "calendar.badge.plus")
                         .font(.system(size: 32))
@@ -423,6 +471,9 @@ struct CalendarView: View {
                     ForEach(dayExternal) { event in
                         ExternalEventCard(event: event)
                     }
+                    ForEach(dayHousehold) { event in
+                        HouseholdEventCard(event: event, color: colorForOwner(event.owner_id))
+                    }
                 }
                 .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
             }
@@ -437,7 +488,8 @@ struct CalendarView: View {
             let dayAppointments = viewModel.appointments(for: selected)
             let dayCoverage = viewModel.coverageBlocks(for: selected)
             let dayExternal = viewModel.externalEvents(for: selected)
-            let eventCount = dayAppointments.count + dayExternal.count
+            let dayHousehold = viewModel.householdEvents(for: selected)
+            let eventCount = dayAppointments.count + dayExternal.count + dayHousehold.count
 
             // Date picker strip
             ScrollView(.horizontal, showsIndicators: false) {
@@ -489,7 +541,7 @@ struct CalendarView: View {
                 .padding(.bottom, 8)
             }
 
-            if dayAppointments.isEmpty && dayCoverage.isEmpty && dayExternal.isEmpty {
+            if dayAppointments.isEmpty && dayCoverage.isEmpty && dayExternal.isEmpty && dayHousehold.isEmpty {
                 VStack(spacing: 8) {
                     Image(systemName: "calendar.badge.plus")
                         .font(.system(size: 32))
@@ -510,6 +562,9 @@ struct CalendarView: View {
                     }
                     ForEach(dayExternal) { event in
                         ExternalEventCard(event: event)
+                    }
+                    ForEach(dayHousehold) { event in
+                        HouseholdEventCard(event: event, color: colorForOwner(event.owner_id))
                     }
                 }
                 .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
@@ -698,6 +753,77 @@ struct ExternalEventCard: View {
     }
 }
 
+// MARK: - Household Event Card (another member's shared device-calendar event)
+
+private let householdOwnerColors: [Color] = [
+    AccentTheme.ocean.color, AccentTheme.mauve.color, AccentTheme.saffron.color,
+    AccentTheme.sage.color, Color(hex: "#b97090")
+]
+
+func colorForOwner(_ id: Int?) -> Color {
+    guard let id else { return WarmPalette.ink3 }
+    return householdOwnerColors[abs(id) % householdOwnerColors.count]
+}
+
+struct HouseholdEventCard: View {
+    let event: APIService.SyncedEventResponse
+    let color: Color
+
+    private static let parser: DateFormatter = {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
+        return f
+    }()
+
+    private var timeString: String {
+        if (event.all_day ?? 0) == 1 { return "All day" }
+        if let d = Self.parser.date(from: event.starts_at) { return DateFormatter.shortTime.string(from: d) }
+        return ""
+    }
+
+    var body: some View {
+        HStack(spacing: 12) {
+            RoundedRectangle(cornerRadius: 999)
+                .fill(color)
+                .frame(width: 4)
+
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
+                    Text(timeString)
+                        .font(.system(size: 15, weight: .bold))
+                        .foregroundStyle(WarmPalette.ink1)
+                    Spacer()
+                    HStack(spacing: 5) {
+                        FamilyAvatar(initial: String((event.owner_name ?? "?").prefix(1)).uppercased(), size: 18)
+                        Text(event.owner_name ?? "")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(color)
+                    }
+                }
+                Text(event.title ?? "(No title)")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(WarmPalette.ink1)
+                if let loc = event.location, !loc.isEmpty {
+                    HStack(spacing: 4) {
+                        Image(systemName: "mappin").font(.system(size: 11))
+                        Text(loc)
+                    }
+                    .font(.system(size: 13))
+                    .foregroundStyle(WarmPalette.ink3)
+                }
+            }
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: 20))
+        .overlay(
+            RoundedRectangle(cornerRadius: 20)
+                .strokeBorder(color.opacity(0.3), lineWidth: 1)
+        )
+    }
+}
+
 // MARK: - Appointment Row (kept for WeekView compatibility)
 
 struct AppointmentListRow: View {
@@ -783,4 +909,5 @@ struct CoverageBlockCard: View {
     }
     .environment(APIService())
     .environment(CalendarService())
+    .environment(AuthService())
 }

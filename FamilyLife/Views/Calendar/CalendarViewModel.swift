@@ -9,6 +9,10 @@ final class CalendarViewModel {
     var coverageBlocks: [APIService.CoverageBlockResponse] = []
     var externalEvents: [ExternalEvent] = []
     var showExternalEvents = true
+    /// Other household members' shared device-calendar events (owner != me).
+    var householdEvents: [APIService.SyncedEventResponse] = []
+    var currentUserId: Int?
+    var ownerFilter: CalendarOwnerFilter = .everyone
     var isLoading = false
     var error: String?
 
@@ -86,9 +90,19 @@ final class CalendarViewModel {
             .sorted { ($0.appointment_time ?? "") < ($1.appointment_time ?? "") }
     }
 
+    /// Whether the current user's own device-calendar mirror should be shown,
+    /// given the owner filter ("Everyone" or "Just me" — not when filtered to another person).
+    var showSelfMirror: Bool {
+        switch ownerFilter {
+        case .everyone, .me: return true
+        case .person: return false
+        }
+    }
+
     /// System-calendar events overlapping the given day, all-day first.
+    /// These are the CURRENT user's own device events (the on-device mirror).
     func externalEvents(for date: Date) -> [ExternalEvent] {
-        guard showExternalEvents else { return [] }
+        guard showExternalEvents, showSelfMirror else { return [] }
         let dayStart = calendar.startOfDay(for: date)
         guard let dayEnd = calendar.date(byAdding: .day, value: 1, to: dayStart) else { return [] }
         return externalEvents
@@ -99,10 +113,40 @@ final class CalendarViewModel {
             }
     }
 
-    /// Total markers for a month cell — Kinrows appointments plus external events.
+    /// Other household members' shared device events for a day, honoring the owner filter.
+    func householdEvents(for date: Date) -> [APIService.SyncedEventResponse] {
+        let dayStr = Self.dateString(from: date)
+        return householdEvents
+            .filter { String($0.starts_at.prefix(10)) == dayStr }
+            .filter { ev in
+                switch ownerFilter {
+                case .everyone: return true
+                case .me: return false               // others hidden
+                case .person(let id): return ev.owner_id == id
+                }
+            }
+            .sorted {
+                if ($0.all_day ?? 0) != ($1.all_day ?? 0) { return ($0.all_day ?? 0) > ($1.all_day ?? 0) }
+                return $0.starts_at < $1.starts_at
+            }
+    }
+
+    /// Distinct other members present in this month's synced events (for the filter menu).
+    var householdOwners: [(id: Int, name: String)] {
+        var seen = Set<Int>()
+        var out: [(id: Int, name: String)] = []
+        for ev in householdEvents {
+            guard let id = ev.owner_id, !seen.contains(id) else { continue }
+            seen.insert(id)
+            out.append((id: id, name: ev.owner_name ?? "Member"))
+        }
+        return out.sorted { $0.name < $1.name }
+    }
+
+    /// Total markers for a month cell — appointments + own mirror + others' shared events.
     func markerCount(for date: Date?) -> Int {
         guard let date else { return 0 }
-        return appointmentCount(for: date) + externalEvents(for: date).count
+        return appointmentCount(for: date) + externalEvents(for: date).count + householdEvents(for: date).count
     }
 
     func hasCoverage(for date: Date?) -> Bool {
@@ -150,6 +194,9 @@ final class CalendarViewModel {
         }
 
         await loadExternalEvents(calendarService: calendarService)
+        // Other members' shared device calendars (own events come from the local mirror).
+        householdEvents = ((try? await api.fetchSyncedCalendarEvents(year: year, month: month)) ?? [])
+            .filter { $0.owner_id != currentUserId }
         isLoading = false
     }
 
@@ -204,4 +251,11 @@ struct CalendarDay: Identifiable {
     let date: Date?
     let isCurrentMonth: Bool
     let isToday: Bool
+}
+
+/// Who to show on the merged household calendar.
+enum CalendarOwnerFilter: Equatable {
+    case everyone
+    case me
+    case person(Int)   // owner user id
 }
