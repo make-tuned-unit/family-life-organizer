@@ -20,6 +20,8 @@ struct AddAppointmentView: View {
     @State private var recurrenceEnd: Date? = nil
     @State private var showRecurrenceEnd = false
     @State private var addReminder = true
+    @AppStorage(AppleCalendarSyncMode.storageKey) private var calendarSyncMode: AppleCalendarSyncMode = .off
+    @State private var addToAppleCalendar = true
     @State private var shareGroupId: Int?
     @State private var isSaving = false
     @State private var error: String?
@@ -30,7 +32,7 @@ struct AddAppointmentView: View {
 
     // Family contacts from shared household
 
-    let onSave: ([String: Any]) -> Void
+    let onSave: ([String: Any], Bool) -> Void
 
     private let categories = ["personal", "medical", "school", "daycare", "work", "social"]
 
@@ -148,6 +150,12 @@ struct AddAppointmentView: View {
                 Section("Reminder") {
                     Toggle("Notify me before this event", isOn: $addReminder)
                 }
+
+                if calendarSyncMode == .ask {
+                    Section {
+                        Toggle("Add to Apple Calendar", isOn: $addToAppleCalendar)
+                    }
+                }
             }
             .scrollContentBackground(.hidden)
             .background { AmbientBackground(style: .calendar) }
@@ -201,7 +209,8 @@ struct AddAppointmentView: View {
             }
         }
 
-        onSave(data)
+        let syncToApple = calendarSyncMode == .always || (calendarSyncMode == .ask && addToAppleCalendar)
+        onSave(data, syncToApple)
         if let groupId = shareGroupId {
             let dateStr = date.formatted(date: .abbreviated, time: .omitted)
             let timeStr = includeTime ? " at \(DateFormatter.hourMinute.string(from: time))" : ""
@@ -264,7 +273,7 @@ final class LocationCompleter: NSObject, MKLocalSearchCompleterDelegate {
 }
 
 #Preview {
-    AddAppointmentView { _ in }
+    AddAppointmentView { _, _ in }
         .environment(APIService())
         .environment(HouseholdService())
 }

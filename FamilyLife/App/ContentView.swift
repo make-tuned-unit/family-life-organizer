@@ -546,4 +546,5 @@ struct FloatingTabBar: View {
         .environment(LocationService())
         .environment(SubscriptionService())
         .environment(ConciergeLaunch())
+        .environment(CalendarService())
 }

@@ -118,6 +118,7 @@
 		AA000101 /* EventAttachmentsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000101 /* EventAttachmentsView.swift */; };
 		AA000102 /* ConciergeHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000102 /* ConciergeHistoryView.swift */; };
 		AA000103 /* ConciergeSpeechRecognizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000103 /* ConciergeSpeechRecognizer.swift */; };
+		AA000150 /* CalendarService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000150 /* CalendarService.swift */; };
 		AA000200 /* ChangePasswordView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000200 /* ChangePasswordView.swift */; };
 		AA000201 /* TwoFactorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000201 /* TwoFactorView.swift */; };
 		AA000202 /* SecurityView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000202 /* SecurityView.swift */; };
@@ -235,6 +236,7 @@
 		BB000101 /* EventAttachmentsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventAttachmentsView.swift; sourceTree = "<group>"; };
 		BB000102 /* ConciergeHistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConciergeHistoryView.swift; sourceTree = "<group>"; };
 		BB000103 /* ConciergeSpeechRecognizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConciergeSpeechRecognizer.swift; sourceTree = "<group>"; };
+		BB000150 /* CalendarService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarService.swift; sourceTree = "<group>"; };
 		BB000200 /* ChangePasswordView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChangePasswordView.swift; sourceTree = "<group>"; };
 		BB000201 /* TwoFactorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TwoFactorView.swift; sourceTree = "<group>"; };
 		BB000202 /* SecurityView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecurityView.swift; sourceTree = "<group>"; };
@@ -320,6 +322,7 @@
 				BB00001F /* LocationService.swift */,
 				BB000020 /* NotificationService.swift */,
 				BB000026 /* HealthKitManager.swift */,
+				BB000150 /* CalendarService.swift */,
 				BB000050 /* HouseholdService.swift */,
 				BB000070 /* ProfileImageCache.swift */,
 				BB000077 /* MessageCache.swift */,
@@ -676,6 +679,7 @@
 				AA000086 /* AddStayView.swift in Sources */,
 				AA000025 /* Rivalry.swift in Sources */,
 				AA000026 /* HealthKitManager.swift in Sources */,
+				AA000150 /* CalendarService.swift in Sources */,
 				AA000027 /* RivalriesView.swift in Sources */,
 				AA000028 /* StartRivalryView.swift in Sources */,
 				AA000029 /* RivalryDetailView.swift in Sources */,
@@ -746,7 +750,7 @@
 				CODE_SIGN_ENTITLEMENTS = FamilyLife/FamilyLife.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 122;
+				CURRENT_PROJECT_VERSION = 125;
 				DEVELOPMENT_ASSET_PATHS = "";
 				DEVELOPMENT_TEAM = GANM22MFCH;
 				ENABLE_PREVIEWS = YES;
@@ -754,6 +758,7 @@
 				INFOPLIST_FILE = FamilyLife/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Kinrows;
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
+				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "Kinrows shows your existing calendar events (including synced Google calendars) alongside your family schedule.";
 				INFOPLIST_KEY_NSCameraUsageDescription = "Kinrows uses your camera to scan receipts.";
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "Kinrows uses your step count to track fitness rivalries and show daily activity on your dashboard.";
 				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Kinrows records fitness activity for family rivalries and challenges.";
@@ -790,7 +795,7 @@
 				CODE_SIGN_ENTITLEMENTS = FamilyLife/FamilyLife.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 122;
+				CURRENT_PROJECT_VERSION = 125;
 				DEVELOPMENT_ASSET_PATHS = "";
 				DEVELOPMENT_TEAM = GANM22MFCH;
 				ENABLE_PREVIEWS = YES;
@@ -798,6 +803,7 @@
 				INFOPLIST_FILE = FamilyLife/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Kinrows;
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
+				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "Kinrows shows your existing calendar events (including synced Google calendars) alongside your family schedule.";
 				INFOPLIST_KEY_NSCameraUsageDescription = "Kinrows uses your camera to scan receipts.";
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "Kinrows uses your step count to track fitness rivalries and show daily activity on your dashboard.";
 				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Kinrows records fitness activity for family rivalries and challenges.";

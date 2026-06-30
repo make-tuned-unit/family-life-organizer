@@ -7,6 +7,8 @@ final class CalendarViewModel {
     var selectedDate: Date?
     var monthAppointments: [AppointmentResponse] = []
     var coverageBlocks: [APIService.CoverageBlockResponse] = []
+    var externalEvents: [ExternalEvent] = []
+    var showExternalEvents = true
     var isLoading = false
     var error: String?
 
@@ -84,6 +86,25 @@ final class CalendarViewModel {
             .sorted { ($0.appointment_time ?? "") < ($1.appointment_time ?? "") }
     }
 
+    /// System-calendar events overlapping the given day, all-day first.
+    func externalEvents(for date: Date) -> [ExternalEvent] {
+        guard showExternalEvents else { return [] }
+        let dayStart = calendar.startOfDay(for: date)
+        guard let dayEnd = calendar.date(byAdding: .day, value: 1, to: dayStart) else { return [] }
+        return externalEvents
+            .filter { $0.startDate < dayEnd && $0.endDate > dayStart }
+            .sorted {
+                if $0.isAllDay != $1.isAllDay { return $0.isAllDay }
+                return $0.startDate < $1.startDate
+            }
+    }
+
+    /// Total markers for a month cell — Kinrows appointments plus external events.
+    func markerCount(for date: Date?) -> Int {
+        guard let date else { return 0 }
+        return appointmentCount(for: date) + externalEvents(for: date).count
+    }
+
     func hasCoverage(for date: Date?) -> Bool {
         guard let date else { return false }
         let dateStr = Self.dateString(from: date)
@@ -109,7 +130,7 @@ final class CalendarViewModel {
 
     // MARK: - API
 
-    func loadMonth(api: APIService) async {
+    func loadMonth(api: APIService, calendarService: CalendarService? = nil) async {
         isLoading = true
         error = nil
         let year = calendar.component(.year, from: displayedMonth)
@@ -127,22 +148,43 @@ final class CalendarViewModel {
             guard !error.isCancellation else { return }
             self.error = error.localizedDescription
         }
+
+        await loadExternalEvents(calendarService: calendarService)
         isLoading = false
     }
 
-    func addAppointment(_ data: [String: Any], api: APIService) async {
+    /// Fetches system-calendar events for the displayed month, if access is granted.
+    func loadExternalEvents(calendarService: CalendarService?) async {
+        guard let calendarService, calendarService.access == .granted, showExternalEvents else {
+            externalEvents = []
+            return
+        }
+        let comps = calendar.dateComponents([.year, .month], from: displayedMonth)
+        guard let monthStart = calendar.date(from: comps),
+              let monthEnd = calendar.date(byAdding: .month, value: 1, to: monthStart) else {
+            externalEvents = []
+            return
+        }
+        externalEvents = await calendarService.events(from: monthStart, to: monthEnd)
+    }
+
+    func addAppointment(_ data: [String: Any], syncToApple: Bool = false, api: APIService, calendarService: CalendarService? = nil) async {
         do {
-            try await api.addAppointment(data)
-            await loadMonth(api: api)
+            let newId = try await api.addAppointment(data)
+            if syncToApple, let calendarService {
+                await calendarService.syncCreate(appointmentId: newId, fields: data)
+            }
+            await loadMonth(api: api, calendarService: calendarService)
         } catch {
             guard !error.isCancellation else { return }
             self.error = error.localizedDescription
         }
     }
 
-    func deleteAppointment(_ id: Int, api: APIService) async {
+    func deleteAppointment(_ id: Int, api: APIService, calendarService: CalendarService? = nil) async {
         do {
             try await api.deleteAppointment(id: id)
+            await calendarService?.syncDelete(appointmentId: id)
             monthAppointments.removeAll { $0.id == id }
         } catch {
             guard !error.isCancellation else { return }
