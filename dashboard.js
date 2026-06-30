@@ -2044,6 +2044,7 @@ app.post('/api/appointments', requireAuth, async (req, res) => {
   try {
     const data = { ...req.body };
     const userId = req.session.user.id;
+    data.created_by = userId;
     if (typeof data.title === 'string') data.title = data.title.trim();
     if (data.appointment_date) data.appointment_date = normalizeDate(data.appointment_date);
     // Events are household-only: a supplied group_id must be one of the caller's
