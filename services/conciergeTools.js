@@ -49,6 +49,20 @@ async function assertListAccess(ctx, listId) {
   if (!row) throw new Error(`No list #${listId} in your household`);
 }
 
+// Resolve the household's grocery list (the Lists feature — list_type 'grocery' —
+// is what the iOS app actually shows; the legacy `groceries` table is not surfaced).
+// Prefers a list named "Groceries", then any grocery-type list, else creates one.
+async function resolveGroceryList(ctx, { create = false } = {}) {
+  const lists = await ctx.db.getLists(ctx.userId);
+  const grocery = lists.filter(l => (l.list_type || '').toLowerCase() === 'grocery');
+  let list = grocery.find(l => (l.name || '').toLowerCase() === 'groceries') || grocery[0] || null;
+  if (!list && create) {
+    const { id } = await ctx.db.createList({ name: 'Groceries', icon: 'cart', list_type: 'grocery', created_by: ctx.userId });
+    list = { id, name: 'Groceries' };
+  }
+  return list;
+}
+
 const TOOLS = [
   // ---- Calendar ----
   {
@@ -191,8 +205,11 @@ const TOOLS = [
       required: ['item'],
     },
     async run(ctx, input) {
-      await ctx.db.addGrocery(input.item, input.category || null, input.quantity || '1', ctx.userName, ctx.groupId);
-      const summary = `Added ${input.item} to the grocery list`;
+      const list = await resolveGroceryList(ctx, { create: true });
+      const qty = input.quantity && String(input.quantity).trim() && String(input.quantity).trim() !== '1'
+        ? ` (${String(input.quantity).trim()})` : '';
+      await ctx.db.addListItem({ list_id: list.id, title: `${input.item}${qty}`, added_by: ctx.userName, category: input.category || null });
+      const summary = `Added ${input.item} to ${list.name}`;
       return { result: { ok: true, summary }, action: { tool: 'add_grocery', summary } };
     },
   },
@@ -258,18 +275,23 @@ const TOOLS = [
       properties: { status: { type: 'string', enum: ['needed', 'purchased'] } },
     },
     async run(ctx, input) {
-      const rows = await ctx.db.getGroceries(input.status || 'needed', ctx.userId);
-      return { result: rows.slice(0, 60).map(g => ({ id: g.id, item: g.item, quantity: g.quantity, category: g.category })) };
+      const list = await resolveGroceryList(ctx);
+      if (!list) return { result: [] };
+      const wantDone = (input.status || 'needed') === 'purchased';
+      const items = await ctx.db.getListItems(list.id);
+      return { result: items.filter(i => !!i.is_done === wantDone).slice(0, 60).map(i => ({ id: i.id, item: i.title, category: i.category })) };
     },
   },
   {
     name: 'purchase_grocery',
-    description: 'Mark a grocery item as purchased. Use list_groceries first for the id.',
+    description: 'Mark a grocery item as purchased (checked off). Use list_groceries first for the id.',
     write: true,
     input_schema: { type: 'object', properties: { id: { type: 'integer' } }, required: ['id'] },
     async run(ctx, input) {
-      await assertHousehold(ctx, 'groceries', input.id);
-      await ctx.db.purchaseGrocery(input.id);
+      const item = await dbGet(ctx, 'SELECT id, list_id, is_done FROM list_items WHERE id = ?', [input.id]);
+      if (!item) throw new Error(`No grocery item #${input.id} found`);
+      await assertListAccess(ctx, item.list_id);
+      if (!item.is_done) await ctx.db.toggleListItem(input.id);
       const summary = `Marked grocery #${input.id} as purchased`;
       return { result: { ok: true, summary }, action: { tool: 'purchase_grocery', summary } };
     },
