@@ -41,8 +41,7 @@ struct CalendarView: View {
                 case .week:
                     WeekView(
                         weekStart: currentWeekStart,
-                        selectedDate: $viewModel.selectedDate,
-                        appointments: viewModel.monthAppointments
+                        viewModel: viewModel
                     )
                     .frame(minHeight: 400)
                 case .day:

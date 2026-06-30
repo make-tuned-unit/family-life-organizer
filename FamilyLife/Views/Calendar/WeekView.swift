@@ -1,10 +1,8 @@
 import SwiftUI
 
 struct WeekView: View {
-    @Environment(APIService.self) private var api
     let weekStart: Date
-    @Binding var selectedDate: Date?
-    let appointments: [AppointmentResponse]
+    var viewModel: CalendarViewModel
 
     private let calendar = Calendar.current
 
@@ -18,9 +16,9 @@ struct WeekView: View {
             HStack(spacing: 4) {
                 ForEach(weekDays, id: \.self) { day in
                     let isToday = calendar.isDateInToday(day)
-                    let isSelected = selectedDate.map { calendar.isDate($0, inSameDayAs: day) } ?? false
+                    let isSelected = viewModel.selectedDate.map { calendar.isDate($0, inSameDayAs: day) } ?? false
                     Button {
-                        selectedDate = day
+                        viewModel.selectedDate = day
                     } label: {
                         VStack(spacing: 2) {
                             Text(dayName(day))
@@ -49,9 +47,11 @@ struct WeekView: View {
             .padding(.vertical, 8)
 
             // Agenda for selected day
-            if let selected = selectedDate {
-                let dayAppts = appointmentsFor(selected)
-                if dayAppts.isEmpty {
+            if let selected = viewModel.selectedDate {
+                let dayAppts = viewModel.appointments(for: selected)
+                let dayExternal = viewModel.externalEvents(for: selected)
+                let dayHousehold = viewModel.householdEvents(for: selected)
+                if dayAppts.isEmpty && dayExternal.isEmpty && dayHousehold.isEmpty {
                     VStack(spacing: 8) {
                         Image(systemName: "calendar.badge.checkmark")
                             .font(.system(size: 28))
@@ -63,13 +63,23 @@ struct WeekView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
                     ScrollView {
-                        VStack(spacing: 0) {
-                            ForEach(Array(dayAppts.enumerated()), id: \.element.id) { index, appt in
-                                if index > 0 { GlassDivider() }
-                                WeekAgendaRow(appointment: appt)
+                        VStack(spacing: 10) {
+                            if !dayAppts.isEmpty {
+                                VStack(spacing: 0) {
+                                    ForEach(Array(dayAppts.enumerated()), id: \.element.id) { index, appt in
+                                        if index > 0 { GlassDivider() }
+                                        WeekAgendaRow(appointment: appt)
+                                    }
+                                }
+                                .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
+                            }
+                            ForEach(dayExternal) { event in
+                                ExternalEventCard(event: event)
+                            }
+                            ForEach(dayHousehold) { event in
+                                HouseholdEventCard(event: event, color: colorForOwner(event.owner_id))
                             }
                         }
-                        .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
                         .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
                         .padding(.top, 8)
                     }
@@ -80,13 +90,6 @@ struct WeekView: View {
 
     private func dayName(_ date: Date) -> String {
         DateFormatter.shortWeekday.string(from: date)
-    }
-
-    private func appointmentsFor(_ date: Date) -> [AppointmentResponse] {
-        let dateStr = DateFormatter.isoDate.string(from: date)
-        return appointments
-            .filter { $0.appointment_date == dateStr }
-            .sorted { ($0.appointment_time ?? "") < ($1.appointment_time ?? "") }
     }
 }
 
@@ -148,8 +151,7 @@ struct AgendaRow: View {
         AmbientBackground(style: .calendar)
         WeekView(
             weekStart: Date(),
-            selectedDate: .constant(Date()),
-            appointments: []
+            viewModel: CalendarViewModel()
         )
     }
     .environment(APIService())
