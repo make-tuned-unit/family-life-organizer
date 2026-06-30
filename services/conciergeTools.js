@@ -49,16 +49,30 @@ async function assertListAccess(ctx, listId) {
   if (!row) throw new Error(`No list #${listId} in your household`);
 }
 
-// Resolve the household's grocery list (the Lists feature — list_type 'grocery' —
-// is what the iOS app actually shows; the legacy `groceries` table is not surfaced).
-// Prefers a list named "Groceries", then any grocery-type list, else creates one.
-async function resolveGroceryList(ctx, { create = false } = {}) {
+// Names that should be created as grocery-type (checklist) lists.
+const GROCERY_LIST_NAMES = new Set(['groceries', 'grocery', 'costco', 'walmart', 'superstore', 'sobeys', 'loblaws', 'market']);
+const TASKS_ALIASES = new Set(['task', 'tasks', 'to-do', 'todo', 'to do', 'todos']);
+
+// Resolve a household list by NAME (case-insensitive). The reserved "Tasks" list
+// is backed by the tasks table, so it returns { reserved: 'tasks' }. The iOS app
+// shows the Lists feature (lists/list_items); the legacy `groceries` table is not
+// surfaced, so everything routes through Lists here.
+async function resolveListByName(ctx, name, { create = false } = {}) {
+  const target = String(name || '').trim().toLowerCase();
+  if (!target) return null;
+  if (TASKS_ALIASES.has(target)) return { reserved: 'tasks', name: 'Tasks' };
   const lists = await ctx.db.getLists(ctx.userId);
-  const grocery = lists.filter(l => (l.list_type || '').toLowerCase() === 'grocery');
-  let list = grocery.find(l => (l.name || '').toLowerCase() === 'groceries') || grocery[0] || null;
+  let list = lists.find(l => (l.name || '').trim().toLowerCase() === target)
+    || lists.find(l => (l.name || '').trim().toLowerCase().includes(target))
+    || null;
   if (!list && create) {
-    const { id } = await ctx.db.createList({ name: 'Groceries', icon: 'cart', list_type: 'grocery', created_by: ctx.userId });
-    list = { id, name: 'Groceries' };
+    const properName = String(name).trim();
+    const list_type = GROCERY_LIST_NAMES.has(target) ? 'grocery' : 'standard';
+    const { id } = await ctx.db.createList({
+      name: properName, icon: list_type === 'grocery' ? 'cart' : 'list.bullet',
+      list_type, created_by: ctx.userId,
+    });
+    list = { id, name: properName, list_type };
   }
   return list;
 }
@@ -190,27 +204,46 @@ const TOOLS = [
     },
   },
 
-  // ---- Groceries ----
+  // ---- Lists (any named list: Groceries, Costco, shopping/to-do lists, …) ----
   {
-    name: 'add_grocery',
-    description: 'Add an item to the shared grocery list.',
+    name: 'get_lists',
+    description: 'List the household\'s lists by name (e.g. Groceries, Costco) so you can pick the right one before adding/reading items. The "Tasks" list is also available by name.',
+    write: false,
+    input_schema: { type: 'object', properties: {} },
+    async run(ctx) {
+      const lists = await ctx.db.getLists(ctx.userId);
+      const result = lists.map(l => ({ name: l.name, type: l.list_type || 'standard', items: l.active_count }));
+      result.unshift({ name: 'Tasks', type: 'tasks' });
+      return { result };
+    },
+  },
+  {
+    name: 'add_list_item',
+    description: 'Add an item to a named list (Groceries, Costco, any shopping or to-do list). Identify the list by its name; it is created if it does not exist. Use the name "Tasks" to add a household task.',
     write: true,
     input_schema: {
       type: 'object',
       properties: {
-        item: { type: 'string' },
+        list: { type: 'string', description: 'List name, e.g. "Groceries", "Costco", "Tasks"' },
+        item: { type: 'string', description: 'The item or task to add' },
         quantity: { type: 'string', description: 'e.g. "2" or "1 dozen" (optional)' },
         category: { type: 'string' },
       },
-      required: ['item'],
+      required: ['list', 'item'],
     },
     async run(ctx, input) {
-      const list = await resolveGroceryList(ctx, { create: true });
+      const list = await resolveListByName(ctx, input.list, { create: true });
+      if (list && list.reserved === 'tasks') {
+        await ctx.db.addTask({ title: input.item, category: input.category || 'general', status: 'active', group_id: ctx.groupId });
+        const summary = `Added task "${input.item}"`;
+        return { result: { ok: true, summary }, action: { tool: 'add_list_item', summary } };
+      }
+      if (!list) throw new Error(`Could not find or create a list named "${input.list}"`);
       const qty = input.quantity && String(input.quantity).trim() && String(input.quantity).trim() !== '1'
         ? ` (${String(input.quantity).trim()})` : '';
       await ctx.db.addListItem({ list_id: list.id, title: `${input.item}${qty}`, added_by: ctx.userName, category: input.category || null });
       const summary = `Added ${input.item} to ${list.name}`;
-      return { result: { ok: true, summary }, action: { tool: 'add_grocery', summary } };
+      return { result: { ok: true, summary }, action: { tool: 'add_list_item', summary } };
     },
   },
 
@@ -265,35 +298,57 @@ const TOOLS = [
     },
   },
 
-  // ---- Groceries (list / purchase) ----
+  // ---- Lists (read / check off) ----
   {
-    name: 'list_groceries',
-    description: 'List items on the shared grocery list. status "needed" (default) or "purchased".',
+    name: 'get_list',
+    description: 'Show items on a named list (Groceries, Costco, etc.). status "needed" (default, unchecked) or "purchased" (checked off). Use the name "Tasks" to read tasks.',
     write: false,
     input_schema: {
       type: 'object',
-      properties: { status: { type: 'string', enum: ['needed', 'purchased'] } },
+      properties: {
+        list: { type: 'string', description: 'List name' },
+        status: { type: 'string', enum: ['needed', 'purchased'] },
+      },
+      required: ['list'],
     },
     async run(ctx, input) {
-      const list = await resolveGroceryList(ctx);
-      if (!list) return { result: [] };
+      const list = await resolveListByName(ctx, input.list);
       const wantDone = (input.status || 'needed') === 'purchased';
+      if (list && list.reserved === 'tasks') {
+        const rows = await ctx.db.getTasks({ status: wantDone ? 'completed' : 'active' }, ctx.userId);
+        return { result: rows.slice(0, 60).map(t => ({ id: t.id, item: t.title })) };
+      }
+      if (!list) return { result: [] };
       const items = await ctx.db.getListItems(list.id);
       return { result: items.filter(i => !!i.is_done === wantDone).slice(0, 60).map(i => ({ id: i.id, item: i.title, category: i.category })) };
     },
   },
   {
-    name: 'purchase_grocery',
-    description: 'Mark a grocery item as purchased (checked off). Use list_groceries first for the id.',
+    name: 'check_off_item',
+    description: 'Check off / complete an item on a named list. Use get_list first to get the id. Use the name "Tasks" to complete a task.',
     write: true,
-    input_schema: { type: 'object', properties: { id: { type: 'integer' } }, required: ['id'] },
+    input_schema: {
+      type: 'object',
+      properties: {
+        list: { type: 'string', description: 'The list the item is on' },
+        id: { type: 'integer', description: 'Item id from get_list' },
+      },
+      required: ['list', 'id'],
+    },
     async run(ctx, input) {
+      const list = await resolveListByName(ctx, input.list);
+      if (list && list.reserved === 'tasks') {
+        const r = await ctx.db.completeTask(input.id, ctx.groupId);
+        if (!r.changed) return { result: { ok: false, error: `No task #${input.id} in this household` } };
+        const summary = `Marked task #${input.id} complete`;
+        return { result: { ok: true, summary }, action: { tool: 'check_off_item', summary } };
+      }
       const item = await dbGet(ctx, 'SELECT id, list_id, is_done FROM list_items WHERE id = ?', [input.id]);
-      if (!item) throw new Error(`No grocery item #${input.id} found`);
+      if (!item) throw new Error(`No list item #${input.id} found`);
       await assertListAccess(ctx, item.list_id);
       if (!item.is_done) await ctx.db.toggleListItem(input.id);
-      const summary = `Marked grocery #${input.id} as purchased`;
-      return { result: { ok: true, summary }, action: { tool: 'purchase_grocery', summary } };
+      const summary = `Checked off item #${input.id}`;
+      return { result: { ok: true, summary }, action: { tool: 'check_off_item', summary } };
     },
   },
 
