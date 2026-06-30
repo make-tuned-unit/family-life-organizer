@@ -7,6 +7,7 @@ struct SettingsView: View {
     @Environment(APIService.self) private var api
     @Environment(HouseholdService.self) private var household
     @Environment(LocationService.self) private var locationService
+    @Environment(CalendarService.self) private var calendarService
     @Environment(\.dismiss) private var dismiss
 
     @State private var showingLogoutConfirm = false
@@ -230,6 +231,42 @@ struct SettingsView: View {
                 Text("Adds Kinrows events to your iPhone's default calendar — which also syncs to Google if that account is connected in iOS Settings. \"Ask each time\" lets you choose per event. Applies to events created on this device.")
             }
 
+            Section {
+                Toggle(isOn: Binding(
+                    get: { calendarService.shareEnabled },
+                    set: { on in
+                        calendarService.shareEnabled = on
+                        if on {
+                            Task {
+                                if calendarService.access != .granted { _ = await calendarService.requestAccess() }
+                                await calendarService.syncToHousehold(api: api)
+                            }
+                        }
+                    }
+                )) {
+                    Label("Share my calendar", systemImage: "person.2")
+                        .foregroundStyle(TabAccent.calendar.color)
+                }
+                .tint(AccentTheme.sage.color)
+
+                if calendarService.shareEnabled {
+                    NavigationLink {
+                        CalendarSharePicker()
+                    } label: {
+                        HStack {
+                            Text("Calendars to share")
+                            Spacer()
+                            Text("\(calendarService.sharedCalendarIDs.count) selected")
+                                .foregroundStyle(WarmPalette.ink3)
+                        }
+                    }
+                }
+            } header: {
+                Text("Household calendar")
+            } footer: {
+                Text("Share your selected device calendars (including synced Google calendars) so your household can see your schedule at a glance. Pick which calendars below.")
+            }
+
             Section("About") {
                 HStack {
                     Text("Version")
@@ -323,4 +360,53 @@ struct SettingsView: View {
     .environment(APIService())
     .environment(HouseholdService())
     .environment(LocationService())
+    .environment(CalendarService())
+}
+
+// MARK: - Calendar Share Picker
+
+private struct CalendarSharePicker: View {
+    @Environment(CalendarService.self) private var calendarService
+    @Environment(APIService.self) private var api
+    @State private var calendars: [CalendarService.DeviceCalendar] = []
+
+    var body: some View {
+        List {
+            Section {
+                ForEach(calendars) { cal in
+                    Button {
+                        toggle(cal.id)
+                    } label: {
+                        HStack(spacing: 12) {
+                            Circle().fill(cal.color).frame(width: 12, height: 12)
+                            Text(cal.title)
+                                .foregroundStyle(WarmPalette.ink1)
+                            Spacer()
+                            if calendarService.sharedCalendarIDs.contains(cal.id) {
+                                Image(systemName: "checkmark")
+                                    .foregroundStyle(AccentTheme.sage.color)
+                            }
+                        }
+                    }
+                }
+            } footer: {
+                Text("Tap to choose which calendars your household can see. Includes any Google or iCloud calendars synced to this iPhone.")
+            }
+        }
+        .navigationTitle("Calendars to Share")
+        .navigationBarTitleDisplayMode(.inline)
+        .task {
+            if calendarService.access != .granted { _ = await calendarService.requestAccess() }
+            calendars = calendarService.availableCalendars()
+        }
+    }
+
+    private func toggle(_ id: String) {
+        if calendarService.sharedCalendarIDs.contains(id) {
+            calendarService.sharedCalendarIDs.remove(id)
+        } else {
+            calendarService.sharedCalendarIDs.insert(id)
+        }
+        Task { await calendarService.syncToHousehold(api: api) }
+    }
 }

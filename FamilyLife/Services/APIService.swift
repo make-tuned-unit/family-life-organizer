@@ -161,6 +161,29 @@ final class APIService {
         try await get("/api/appointments/\(year)/\(month)")
     }
 
+    // MARK: - Household calendar sync (device calendars shared to the household)
+
+    struct SyncedEventResponse: Codable, Identifiable {
+        let id: Int
+        let owner_id: Int?
+        let owner_name: String?
+        let calendar_name: String?
+        let title: String?
+        let location: String?
+        let starts_at: String
+        let ends_at: String?
+        let all_day: Int?
+    }
+
+    func syncCalendarEvents(events: [[String: Any]], windowStart: String, windowEnd: String) async throws {
+        let body: [String: Any] = ["events": events, "window_start": windowStart, "window_end": windowEnd]
+        let _: SuccessResponse = try await post("/api/calendar-sync", body: body)
+    }
+
+    func fetchSyncedCalendarEvents(year: Int, month: Int) async throws -> [SyncedEventResponse] {
+        try await get("/api/calendar-sync/\(year)/\(month)")
+    }
+
     @discardableResult
     func addAppointment(_ appointment: [String: Any]) async throws -> Int {
         let response: IDResponse = try await post("/api/appointments", body: appointment)

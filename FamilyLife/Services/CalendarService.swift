@@ -53,7 +53,31 @@ final class CalendarService {
     private static let mapKey = "kinrowsAppleEventMap"
     private var eventMap: [String: String] = [:]
 
+    // MARK: - Calendar sharing settings (which device calendars sync to the household)
+
+    private static let shareEnabledKey = "calendarShareEnabled"
+    private static let sharedIDsKey = "calendarSharedIDs"
+
+    /// Master switch for uploading this device's calendar to the household.
+    var shareEnabled: Bool {
+        didSet { UserDefaults.standard.set(shareEnabled, forKey: Self.shareEnabledKey) }
+    }
+
+    /// Calendar identifiers the user has opted to share.
+    var sharedCalendarIDs: Set<String> {
+        didSet { UserDefaults.standard.set(Array(sharedCalendarIDs), forKey: Self.sharedIDsKey) }
+    }
+
+    private static let syncDateFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"  // local time, no tz — matches backend month filtering
+        return f
+    }()
+
     init() {
+        shareEnabled = UserDefaults.standard.bool(forKey: Self.shareEnabledKey)
+        sharedCalendarIDs = Set(UserDefaults.standard.stringArray(forKey: Self.sharedIDsKey) ?? [])
         if let stored = UserDefaults.standard.dictionary(forKey: Self.mapKey) as? [String: String] {
             eventMap = stored
         }
@@ -236,5 +260,66 @@ final class CalendarService {
     private func spanFor(forKey identifier: String) -> EKSpan {
         guard let event = store.event(withIdentifier: identifier) else { return .thisEvent }
         return (event.recurrenceRules?.isEmpty == false) ? .futureEvents : .thisEvent
+    }
+
+    // MARK: - Sharing to household
+
+    struct DeviceCalendar: Identifiable {
+        let id: String
+        let title: String
+        let color: Color
+    }
+
+    /// All event calendars on the device — for the share picker.
+    func availableCalendars() -> [DeviceCalendar] {
+        guard access == .granted else { return [] }
+        return store.calendars(for: .event)
+            .sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
+            .map { cal in
+                let cg = cal.cgColor
+                return DeviceCalendar(id: cal.calendarIdentifier, title: cal.title,
+                                      color: cg != nil ? Color(cgColor: cg!) : .gray)
+            }
+    }
+
+    /// Uploads the user's selected calendars to the household for a rolling window
+    /// (1 month back → 3 months ahead). No-op unless sharing is on and granted.
+    func syncToHousehold(api: APIService) async {
+        guard shareEnabled, access == .granted, !sharedCalendarIDs.isEmpty else { return }
+        let cal = Calendar.current
+        let now = Date()
+        let start = cal.date(byAdding: .month, value: -1, to: cal.startOfDay(for: now)) ?? now
+        let end = cal.date(byAdding: .month, value: 3, to: cal.startOfDay(for: now)) ?? now
+        let events = await collectEventsForSync(from: start, to: end)
+        let fmt = Self.syncDateFormatter
+        try? await api.syncCalendarEvents(events: events,
+                                          windowStart: fmt.string(from: start),
+                                          windowEnd: fmt.string(from: end))
+    }
+
+    /// Reads events from the shared calendars and builds the JSON payload off-main.
+    private func collectEventsForSync(from start: Date, to end: Date) async -> [[String: Any]] {
+        guard !sharedCalendarIDs.isEmpty else { return [] }
+        let store = self.store
+        let ids = sharedCalendarIDs
+        return await Task.detached {
+            let fmt = DateFormatter()
+            fmt.locale = Locale(identifier: "en_US_POSIX")
+            fmt.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
+            let cals = store.calendars(for: .event).filter { ids.contains($0.calendarIdentifier) }
+            guard !cals.isEmpty else { return [] }
+            let predicate = store.predicateForEvents(withStart: start, end: end, calendars: cals)
+            return store.events(matching: predicate).map { ev -> [String: Any] in
+                [
+                    "external_id": ev.eventIdentifier ?? UUID().uuidString,
+                    "calendar_name": ev.calendar.title,
+                    "title": ev.title ?? "(No title)",
+                    "location": ev.location ?? "",
+                    "starts_at": fmt.string(from: ev.startDate),
+                    "ends_at": fmt.string(from: ev.endDate),
+                    "all_day": ev.isAllDay
+                ]
+            }
+        }.value
     }
 }

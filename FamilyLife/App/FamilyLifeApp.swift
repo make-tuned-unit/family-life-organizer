@@ -112,6 +112,7 @@ struct FamilyLifeApp: App {
                                 UIApplication.shared.registerForRemoteNotifications()
                             }
                         }
+                        await calendarService.syncToHousehold(api: apiService)
                     }
                 }
                 .onChange(of: authService.isAuthenticated) { _, isAuthenticated in
@@ -136,6 +137,7 @@ struct FamilyLifeApp: App {
                 .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
                     guard authService.isAuthenticated, let userId = authService.currentUser?.id else { return }
                     messageCache.preload(api: apiService, userId: userId)
+                    Task { await calendarService.syncToHousehold(api: apiService) }
                 }
                 .preferredColorScheme(.light)
         }
