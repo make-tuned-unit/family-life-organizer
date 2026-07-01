@@ -14,6 +14,7 @@ struct CalendarView: View {
     @Environment(CalendarService.self) private var calendarService
     @Environment(AuthService.self) private var auth
     @Environment(LocationService.self) private var locationService
+    @Environment(HouseholdService.self) private var household
     @State private var viewModel = CalendarViewModel()
     @State private var showingAddAppointment = false
     @State private var selectedEvent: AppointmentResponse?
@@ -127,9 +128,28 @@ struct CalendarView: View {
 
     // MARK: - Owner Filter (Everyone / Just me / per-person)
 
+    /// Other people whose calendars can appear here — driven by the household
+    /// roster (consistent across ALL months), plus anyone seen in synced events.
+    /// This is why the filter no longer only shows on months that have events.
+    private var householdOwners: [(id: Int, name: String)] {
+        var seen = Set<Int>()
+        var out: [(id: Int, name: String)] = []
+        for member in household.householdMembers {
+            if let id = household.userId(for: member.name), !seen.contains(id) {
+                seen.insert(id); out.append((id: id, name: member.name))
+            }
+        }
+        for ev in viewModel.householdEvents {
+            if let id = ev.owner_id, !seen.contains(id) {
+                seen.insert(id); out.append((id: id, name: ev.owner_name ?? "Member"))
+            }
+        }
+        return out.sorted { $0.name < $1.name }
+    }
+
     @ViewBuilder
     private var ownerFilterBar: some View {
-        if !viewModel.householdOwners.isEmpty {
+        if !householdOwners.isEmpty {
             Menu {
                 Button { viewModel.ownerFilter = .everyone } label: {
                     Label("Everyone", systemImage: viewModel.ownerFilter == .everyone ? "checkmark" : "person.2")
@@ -137,7 +157,7 @@ struct CalendarView: View {
                 Button { viewModel.ownerFilter = .me } label: {
                     Label("Just me", systemImage: viewModel.ownerFilter == .me ? "checkmark" : "person")
                 }
-                ForEach(viewModel.householdOwners, id: \.id) { owner in
+                ForEach(householdOwners, id: \.id) { owner in
                     Button { viewModel.ownerFilter = .person(owner.id) } label: {
                         Label(owner.name, systemImage: viewModel.ownerFilter == .person(owner.id) ? "checkmark" : "person")
                     }
@@ -165,7 +185,7 @@ struct CalendarView: View {
         switch viewModel.ownerFilter {
         case .everyone: return "Everyone"
         case .me: return "Just me"
-        case .person(let id): return viewModel.householdOwners.first { $0.id == id }?.name ?? "Member"
+        case .person(let id): return householdOwners.first { $0.id == id }?.name ?? "Member"
         }
     }
 
@@ -918,4 +938,5 @@ struct CoverageBlockCard: View {
     .environment(CalendarService())
     .environment(AuthService())
     .environment(LocationService())
+    .environment(HouseholdService())
 }
