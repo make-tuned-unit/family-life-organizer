@@ -1,5 +1,7 @@
 import Foundation
 import UserNotifications
+import CoreLocation
+import MapKit
 
 final class NotificationService {
     static let shared = NotificationService()
@@ -45,6 +47,61 @@ final class NotificationService {
 
         let request = UNNotificationRequest(identifier: "appt-\(id)", content: content, trigger: trigger)
         UNUserNotificationCenter.current().add(request)
+    }
+
+    // MARK: - Leave-soon travel reminders
+
+    /// For upcoming located events, estimate drive time from `origin` and schedule
+    /// a "time to head out" notification 15 min before you'd need to leave.
+    /// Only considers events in the next ~36h that have a location and a time.
+    func scheduleTravelReminders(_ appointments: [AppointmentResponse], origin: CLLocationCoordinate2D) async {
+        guard await isAuthorized() else { return }
+        let now = Date()
+        let horizon = now.addingTimeInterval(36 * 60 * 60)
+        for appt in appointments {
+            guard let location = appt.location, !location.isEmpty,
+                  let time = appt.appointment_time, !time.isEmpty,
+                  let start = parseDateTime(date: appt.appointment_date, time: time, minutesBefore: 0),
+                  start > now, start < horizon else { continue }
+            guard let dest = await geocode(location),
+                  let travel = await estimateTravelSeconds(from: origin, to: dest) else { continue }
+            scheduleTravelReminder(id: appt.id, title: appt.title, location: location, eventStart: start, travelSeconds: travel)
+        }
+    }
+
+    private func scheduleTravelReminder(id: Int, title: String, location: String, eventStart: Date, travelSeconds: TimeInterval) {
+        let identifier = "travel-\(id)"
+        // Notify 15 min before you'd have to leave (leave-by = start − drive time).
+        let fireDate = eventStart.addingTimeInterval(-travelSeconds - 15 * 60)
+        guard fireDate > Date() else {
+            UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: [identifier])
+            return
+        }
+        let minutes = max(1, Int((travelSeconds / 60).rounded()))
+        let content = UNMutableNotificationContent()
+        content.title = "Time to head out soon"
+        content.body = "Leave in about 15 min for \(title) — ~\(minutes) min drive to \(location)."
+        content.sound = .default
+        content.categoryIdentifier = "TRAVEL"
+
+        let components = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute], from: fireDate)
+        let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
+        let request = UNNotificationRequest(identifier: identifier, content: content, trigger: trigger)
+        UNUserNotificationCenter.current().add(request)
+    }
+
+    private func geocode(_ address: String) async -> CLLocationCoordinate2D? {
+        let placemarks = try? await CLGeocoder().geocodeAddressString(address)
+        return placemarks?.first?.location?.coordinate
+    }
+
+    private func estimateTravelSeconds(from origin: CLLocationCoordinate2D, to dest: CLLocationCoordinate2D) async -> TimeInterval? {
+        let request = MKDirections.Request()
+        request.source = MKMapItem(placemark: MKPlacemark(coordinate: origin))
+        request.destination = MKMapItem(placemark: MKPlacemark(coordinate: dest))
+        request.transportType = .automobile
+        let eta = try? await MKDirections(request: request).calculateETA()
+        return eta?.expectedTravelTime
     }
 
     // MARK: - Pantry expiry alerts
