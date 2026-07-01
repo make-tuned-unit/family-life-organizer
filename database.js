@@ -429,17 +429,22 @@ class FamilyDB {
     });
   }
 
-  // Primary household — the lowest-id household the user belongs to. Used as the
-  // DEFAULT target when CREATING household-scoped data. A user may belong to more
-  // than one household (e.g. a shared-custody teen), so reads must use
-  // getUserHouseholdIds, not this.
+  // Primary household — used as the DEFAULT target when CREATING household-scoped
+  // data. Prefers the household with the MOST members (the shared one) over a
+  // stale single-member solo group left over from signup — otherwise a spouse's
+  // events silently land in their private group that their partner can't see.
+  // Tiebreak by lowest id. A user may belong to more than one household, so reads
+  // must use the (all-households) subquery, not this.
   getUserHouseholdId(userId) {
     return new Promise((resolve, reject) => {
       this.db.get(`
-        SELECT g.id FROM groups g
+        SELECT g.id,
+          (SELECT COUNT(*) FROM group_members m WHERE m.group_id = g.id) AS member_count
+        FROM groups g
         JOIN group_members gm ON gm.group_id = g.id
         WHERE gm.user_id = ? AND g.group_type = 'household'
-        ORDER BY g.id LIMIT 1
+        ORDER BY member_count DESC, g.id ASC
+        LIMIT 1
       `, [userId], (err, row) => {
         if (err) reject(err);
         else resolve(row?.id || null);
