@@ -192,13 +192,21 @@ struct RivalryCardRemote: View {
     let rivalry: RivalryResponse
     let entries: [RivalryEntryResponse]
 
-    private var initiatorTotal: Double {
-        entries.filter { rivalryNameMatches($0.member_name, rivalry.initiator_name) }.reduce(0) { $0 + $1.value }
+    private func total(for name: String) -> Double {
+        entries.filter { rivalryNameMatches($0.member_name, name) }.reduce(0) { $0 + $1.value }
     }
 
-    private var opponentTotal: Double {
-        entries.filter { rivalryNameMatches($0.member_name, rivalry.opponent_name) }.reduce(0) { $0 + $1.value }
+    private func teamLabel(_ names: [String]) -> String {
+        if names.count <= 1 { return names.first ?? "Team" }
+        if names.count == 2 { return names.joined(separator: " & ") }
+        return "\(names.first ?? "Team") +\(names.count - 1)"
     }
+
+    // Left/right sides unify individual (initiator vs opponent) and team modes.
+    private var leftTotal: Double { rivalry.isTeam ? rivalry.teamANames.reduce(0) { $0 + total(for: $1) } : total(for: rivalry.initiator_name) }
+    private var rightTotal: Double { rivalry.isTeam ? rivalry.teamBNames.reduce(0) { $0 + total(for: $1) } : total(for: rivalry.opponent_name) }
+    private var leftName: String { rivalry.isTeam ? teamLabel(rivalry.teamANames) : rivalry.initiator_name }
+    private var rightName: String { rivalry.isTeam ? teamLabel(rivalry.teamBNames) : rivalry.opponent_name }
 
     var body: some View {
         VStack(spacing: 12) {
@@ -212,27 +220,34 @@ struct RivalryCardRemote: View {
             }
 
             HStack {
-                CompetitorScore(name: rivalry.initiator_name, value: initiatorTotal, isLeading: initiatorTotal >= opponentTotal)
+                CompetitorScore(name: leftName, value: leftTotal, isLeading: leftTotal >= rightTotal)
                 Spacer()
                 Text("vs")
                     .font(.caption.weight(.bold))
                     .foregroundStyle(WarmPalette.ink3)
                 Spacer()
-                CompetitorScore(name: rivalry.opponent_name, value: opponentTotal, isLeading: opponentTotal >= initiatorTotal, trailing: true)
+                CompetitorScore(name: rightName, value: rightTotal, isLeading: rightTotal >= leftTotal, trailing: true)
             }
 
             GeometryReader { geo in
-                let total = max(initiatorTotal + opponentTotal, 1)
+                let total = max(leftTotal + rightTotal, 1)
                 HStack(spacing: 2) {
                     RoundedRectangle(cornerRadius: 4)
                         .fill(TabAccent.home.color)
-                        .frame(width: geo.size.width * (initiatorTotal / total))
+                        .frame(width: geo.size.width * (leftTotal / total))
                     RoundedRectangle(cornerRadius: 4)
                         .fill(AccentTheme.saffron.color)
-                        .frame(width: geo.size.width * (opponentTotal / total))
+                        .frame(width: geo.size.width * (rightTotal / total))
                 }
             }
             .frame(height: 8)
+
+            if rivalry.isTeam {
+                Text("Team challenge")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(TabAccent.rivalries.color)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
 
             HStack {
                 Label("\(rivalry.point_value) pts", systemImage: "trophy.fill")
