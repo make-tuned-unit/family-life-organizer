@@ -119,13 +119,28 @@ struct RivalryResponse: Codable, Identifiable {
     let winner_name: String?
     let created_at: String?
     let participants: String?
+    let rivalry_type: String?
+    let team_a: String?
+    let team_b: String?
+    let winner_team: String?
+
+    private static func decodeNames(_ s: String?) -> [String] {
+        guard let s, let data = s.data(using: .utf8),
+              let names = try? JSONDecoder().decode([String].self, from: data) else { return [] }
+        return names
+    }
+
+    var isTeam: Bool { (rivalry_type ?? "individual") == "team" }
+    var teamANames: [String] { Self.decodeNames(team_a) }
+    var teamBNames: [String] { Self.decodeNames(team_b) }
 
     var participantNames: [String] {
-        guard let participants, let data = participants.data(using: .utf8),
-              let names = try? JSONDecoder().decode([String].self, from: data) else {
-            return [initiator_name, opponent_name]
+        if isTeam {
+            let all = teamANames + teamBNames
+            if !all.isEmpty { return all }
         }
-        return names
+        let decoded = Self.decodeNames(participants)
+        return decoded.isEmpty ? [initiator_name, opponent_name] : decoded
     }
 
     var isMultiPlayer: Bool { participantNames.count > 2 }
@@ -144,6 +159,7 @@ struct RivalryEntryResponse: Codable, Identifiable {
 struct RivalryCompleteResponse: Codable {
     let success: Bool
     let winner_name: String?
+    let winner_team: String?
     let initiator_total: Double
     let opponent_total: Double
     let scores: [ParticipantScore]?

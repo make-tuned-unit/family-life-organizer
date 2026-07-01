@@ -42,6 +42,27 @@ struct RivalryDetailView: View {
         }.sorted { $0.total > $1.total }
     }
 
+    private var teamATotal: Double { currentRivalry.teamANames.reduce(0) { $0 + entriesTotal(for: $1) } }
+    private var teamBTotal: Double { currentRivalry.teamBNames.reduce(0) { $0 + entriesTotal(for: $1) } }
+
+    @ViewBuilder
+    private func teamColumn(names: [String], total: Double, color: Color, leading: Bool) -> some View {
+        VStack(spacing: 4) {
+            Text(leading ? "Leading" : " ")
+                .font(.caption2.weight(.bold))
+                .foregroundStyle(leading ? color : .clear)
+            Text(Int(total).formatted())
+                .font(.title.bold())
+                .foregroundStyle(color)
+            Text(names.joined(separator: ", "))
+                .font(.caption)
+                .foregroundStyle(WarmPalette.ink3)
+                .multilineTextAlignment(.center)
+                .lineLimit(2)
+        }
+        .frame(maxWidth: .infinity)
+    }
+
     /// Match entries to a participant name, handling "Sophie" vs "Sophie Chiasson" mismatches
     private func entriesTotal(for name: String) -> Double {
         entries.filter { rivalryNameMatches($0.member_name, name) }.reduce(0) { $0 + $1.value }
@@ -95,7 +116,21 @@ struct RivalryDetailView: View {
                         StatusBadge(status: currentRivalry.statusValue)
                     }
 
-                    if currentRivalry.isMultiPlayer {
+                    if currentRivalry.isTeam {
+                        // Team scoreboard: two team totals, then per-member breakdown.
+                        HStack(spacing: 16) {
+                            teamColumn(names: currentRivalry.teamANames, total: teamATotal, color: TabAccent.home.color, leading: teamATotal >= teamBTotal)
+                            Text("vs").font(.title3.bold()).foregroundStyle(WarmPalette.ink3)
+                            teamColumn(names: currentRivalry.teamBNames, total: teamBTotal, color: AccentTheme.saffron.color, leading: teamBTotal > teamATotal)
+                        }
+                        let maxVal = participantScores.first?.total ?? 0
+                        VStack(spacing: 6) {
+                            ForEach(Array(participantScores.enumerated()), id: \.element.name) { _, ps in
+                                let onA = currentRivalry.teamANames.contains { rivalryNameMatches(ps.name, $0) }
+                                ProgressRow(name: ps.name, value: ps.total, maxValue: maxVal, color: onA ? TabAccent.home.color : AccentTheme.saffron.color)
+                            }
+                        }
+                    } else if currentRivalry.isMultiPlayer {
                         // Multi-player scoreboard
                         let maxVal = participantScores.first?.total ?? 0
                         VStack(spacing: 6) {
@@ -416,7 +451,11 @@ struct RivalryDetailView: View {
                 point_value: currentRivalry.point_value,
                 winner_name: result.winner_name,
                 created_at: currentRivalry.created_at,
-                participants: currentRivalry.participants
+                participants: currentRivalry.participants,
+                rivalry_type: currentRivalry.rivalry_type,
+                team_a: currentRivalry.team_a,
+                team_b: currentRivalry.team_b,
+                winner_team: result.winner_team
             )
             // Level-up check
             let myName = auth.currentUser?.name ?? ""
@@ -474,7 +513,7 @@ struct EntryRowRemote: View {
 #Preview {
     NavigationStack {
         RivalryDetailView(
-            rivalry: RivalryResponse(id: 1, title: "Step Challenge", challenge_type: "steps", initiator_name: "Jesse", opponent_name: "Sophie", start_date: "2026-04-01", end_date: "2026-04-10", status: "active", point_value: 100, winner_name: nil, created_at: nil, participants: nil)
+            rivalry: RivalryResponse(id: 1, title: "Step Challenge", challenge_type: "steps", initiator_name: "Jesse", opponent_name: "Sophie", start_date: "2026-04-01", end_date: "2026-04-10", status: "active", point_value: 100, winner_name: nil, created_at: nil, participants: nil, rivalry_type: nil, team_a: nil, team_b: nil, winner_team: nil)
         )
         .environment(APIService())
     }
