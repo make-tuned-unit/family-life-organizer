@@ -1,6 +1,7 @@
 import SwiftUI
 import UIKit
 import CoreLocation
+import BackgroundTasks
 
 @Observable
 class DeepLinkRouter {
@@ -23,9 +24,15 @@ class DeepLinkRouter {
 
 class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
     var apiService: APIService?
+    var calendarService: CalendarService?
     var deepLinkRouter: DeepLinkRouter?
 
     var launchedForLocation = false
+
+    /// Background task that keeps this device's shared calendar pushed to the
+    /// household even when the user doesn't open the app (must match the id in
+    /// Info.plist BGTaskSchedulerPermittedIdentifiers).
+    static let calSyncTaskID = "com.mylauft.kinrows.calsync"
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         UNUserNotificationCenter.current().delegate = self
@@ -33,7 +40,38 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
         if launchOptions?[.location] != nil {
             launchedForLocation = true
         }
+        // Register + schedule background calendar sync (no-op on simulator).
+        BGTaskScheduler.shared.register(forTaskWithIdentifier: Self.calSyncTaskID, using: nil) { [weak self] task in
+            self?.handleCalendarSync(task as? BGAppRefreshTask)
+        }
+        scheduleCalendarSync()
         return true
+    }
+
+    func applicationDidEnterBackground(_ application: UIApplication) {
+        scheduleCalendarSync()
+    }
+
+    /// Ask iOS to run a calendar sync in the background later (~2h out; iOS
+    /// decides actual timing). Safe to call often; replaces any pending request.
+    func scheduleCalendarSync() {
+        let request = BGAppRefreshTaskRequest(identifier: Self.calSyncTaskID)
+        request.earliestBeginDate = Date(timeIntervalSinceNow: 2 * 60 * 60)
+        try? BGTaskScheduler.shared.submit(request)
+    }
+
+    private func handleCalendarSync(_ task: BGAppRefreshTask?) {
+        guard let task else { return }
+        scheduleCalendarSync()  // chain the next one
+        let work = Task { @MainActor in
+            // Fresh instances work in a background launch: CalendarService reads its
+            // settings from UserDefaults, APIService authenticates via the stored cookie.
+            let calendar = self.calendarService ?? CalendarService()
+            let api = self.apiService ?? APIService()
+            await calendar.syncToHousehold(api: api)
+            task.setTaskCompleted(success: true)
+        }
+        task.expirationHandler = { work.cancel() }
     }
 
     func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
@@ -94,6 +132,7 @@ struct FamilyLifeApp: App {
                 .task {
                     // Wire up API service and deep link router to app delegate
                     appDelegate.apiService = apiService
+                    appDelegate.calendarService = calendarService
                     appDelegate.deepLinkRouter = deepLinkRouter
 
                     if authService.isAuthenticated {
