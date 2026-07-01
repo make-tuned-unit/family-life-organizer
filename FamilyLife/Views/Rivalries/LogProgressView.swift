@@ -114,7 +114,7 @@ struct LogProgressView: View {
 
 #Preview {
     LogProgressView(
-        rivalry: RivalryResponse(id: 1, title: "Test", challenge_type: "steps", initiator_name: "Jesse", opponent_name: "Sophie", start_date: "2026-04-01", end_date: "2026-04-10", status: "active", point_value: 100, winner_name: nil, created_at: nil, participants: nil),
+        rivalry: RivalryResponse(id: 1, title: "Test", challenge_type: "steps", initiator_name: "Jesse", opponent_name: "Sophie", start_date: "2026-04-01", end_date: "2026-04-10", status: "active", point_value: 100, winner_name: nil, created_at: nil, participants: nil, rivalry_type: nil, team_a: nil, team_b: nil, winner_team: nil),
         memberName: "Jesse",
         onSaved: {}
     )

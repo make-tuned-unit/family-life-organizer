@@ -10,6 +10,9 @@ struct StartRivalryView: View {
 
     @State private var title = ""
     @State private var challengeType: ChallengeType = .steps
+    @State private var isTeamMode = false
+    @State private var teamA: Set<String> = []   // your team (includes you)
+    @State private var teamB: Set<String> = []   // their team
     @State private var selectedOpponents: Set<String> = []
     @State private var endDate = Calendar.current.date(byAdding: .day, value: 7, to: Date()) ?? Date().addingTimeInterval(7 * 86400)
     @State private var pointValue = 100
@@ -56,35 +59,67 @@ struct StartRivalryView: View {
                     }
                 }
 
-                Section(selectedOpponents.count <= 1 ? "Opponent" : "Opponents (\(selectedOpponents.count))") {
-                    ForEach(household.members) { member in
-                        Button {
-                            if selectedOpponents.contains(member.name) {
-                                selectedOpponents.remove(member.name)
-                            } else {
-                                selectedOpponents.insert(member.name)
-                            }
-                            updateDefaultTitle()
-                        } label: {
-                            HStack {
-                                FamilyAvatar(initial: member.avatar_initial ?? String(member.name.prefix(1)).uppercased(), size: 28)
-                                Text(member.name)
-                                    .foregroundStyle(.primary)
-                                Spacer()
+                Section("Format") {
+                    Picker("Type", selection: $isTeamMode) {
+                        Text("1-on-1 / Free-for-all").tag(false)
+                        Text("Teams").tag(true)
+                    }
+                    .pickerStyle(.segmented)
+                    .onChange(of: isTeamMode) { _, team in
+                        if team { teamA.insert(currentUser) }
+                        updateDefaultTitle()
+                    }
+                }
+
+                if !isTeamMode {
+                    Section(selectedOpponents.count <= 1 ? "Opponent" : "Opponents (\(selectedOpponents.count))") {
+                        ForEach(household.members) { member in
+                            Button {
                                 if selectedOpponents.contains(member.name) {
-                                    Image(systemName: "checkmark.circle.fill")
-                                        .foregroundStyle(TabAccent.home.color)
+                                    selectedOpponents.remove(member.name)
                                 } else {
-                                    Image(systemName: "circle")
-                                        .foregroundStyle(WarmPalette.ink4)
+                                    selectedOpponents.insert(member.name)
+                                }
+                                updateDefaultTitle()
+                            } label: {
+                                HStack {
+                                    FamilyAvatar(initial: member.avatar_initial ?? String(member.name.prefix(1)).uppercased(), size: 28)
+                                    Text(member.name)
+                                        .foregroundStyle(.primary)
+                                    Spacer()
+                                    if selectedOpponents.contains(member.name) {
+                                        Image(systemName: "checkmark.circle.fill")
+                                            .foregroundStyle(TabAccent.home.color)
+                                    } else {
+                                        Image(systemName: "circle")
+                                            .foregroundStyle(WarmPalette.ink4)
+                                    }
                                 }
                             }
                         }
+                        if household.members.isEmpty {
+                            Text("Add family members in Settings to challenge them")
+                                .font(.caption)
+                                .foregroundStyle(WarmPalette.ink3)
+                        }
                     }
-                    if household.members.isEmpty {
-                        Text("Add family members in Settings to challenge them")
-                            .font(.caption)
-                            .foregroundStyle(WarmPalette.ink3)
+                } else {
+                    Section {
+                        Button("Add my whole household to my team") {
+                            teamA.insert(currentUser)
+                            for name in allPeople where household.householdMemberNames.contains(name.lowercased()) {
+                                teamA.insert(name); teamB.remove(name)
+                            }
+                            updateDefaultTitle()
+                        }
+                        .font(.subheadline)
+                        ForEach(allPeople, id: \.self) { name in
+                            teamPickRow(name)
+                        }
+                    } header: {
+                        Text("Your team (\(teamA.count)) vs Their team (\(teamB.count))")
+                    } footer: {
+                        Text("Tap a name to put them on your team, tap again for their team, again to clear.")
                     }
                 }
 
@@ -110,7 +145,7 @@ struct StartRivalryView: View {
                     Button("Challenge!") {
                         Task { await createRivalry() }
                     }
-                    .disabled(title.isEmpty || selectedOpponents.isEmpty || isSaving)
+                    .disabled(title.isEmpty || isSaving || (isTeamMode ? (teamA.isEmpty || teamB.isEmpty) : selectedOpponents.isEmpty))
                 }
             }
         }
@@ -126,12 +161,52 @@ struct StartRivalryView: View {
         }
     }
 
+    /// People available to place on teams — the current user plus household/clan members.
+    private var allPeople: [String] {
+        var seen = Set<String>()
+        var out: [String] = []
+        for name in [currentUser] + household.members.map(\.name) {
+            let key = name.lowercased()
+            if !seen.contains(key) { seen.insert(key); out.append(name) }
+        }
+        return out
+    }
+
+    @ViewBuilder
+    private func teamPickRow(_ name: String) -> some View {
+        let inA = teamA.contains(name)
+        let inB = teamB.contains(name)
+        Button {
+            if inA { teamA.remove(name); teamB.insert(name) }
+            else if inB { teamB.remove(name) }
+            else { teamA.insert(name); teamB.remove(name) }
+            updateDefaultTitle()
+        } label: {
+            HStack {
+                FamilyAvatar(initial: String(name.prefix(1)).uppercased(), size: 28)
+                Text(name).foregroundStyle(.primary)
+                Spacer()
+                if inA {
+                    Text("Your team").font(.caption.weight(.semibold)).foregroundStyle(AccentTheme.ocean.color)
+                } else if inB {
+                    Text("Their team").font(.caption.weight(.semibold)).foregroundStyle(AccentTheme.terracotta.color)
+                } else {
+                    Image(systemName: "circle").foregroundStyle(WarmPalette.ink4)
+                }
+            }
+        }
+    }
+
     private func updateDefaultTitle() {
-        let opponents = selectedOpponents.sorted()
         let isAutoTitle = title.isEmpty
             || title.contains(" vs ")
             || title.hasSuffix("Challenge")
         guard isAutoTitle else { return }
+        if isTeamMode {
+            title = "Team \(challengeType.displayName) Challenge"
+            return
+        }
+        let opponents = selectedOpponents.sorted()
         if opponents.count == 1 {
             title = "\(currentUser) vs \(opponents[0]): \(challengeType.displayName)"
         } else if opponents.count > 1 {
@@ -139,27 +214,41 @@ struct StartRivalryView: View {
         }
     }
 
+    private func jsonString(_ names: [String]) -> String {
+        guard let data = try? JSONEncoder().encode(names) else { return "[]" }
+        return String(data: data, encoding: .utf8) ?? "[]"
+    }
+
     private func createRivalry() async {
         isSaving = true
-        let opponents = selectedOpponents.sorted()
-        let allParticipants = [currentUser] + opponents
         do {
             var body: [String: Any] = [
                 "title": title,
                 "challenge_type": challengeType.rawValue,
                 "initiator_name": currentUser,
-                "opponent_name": opponents.first ?? "",
                 "start_date": ISO8601DateFormatter().string(from: Date()),
                 "end_date": ISO8601DateFormatter().string(from: endDate),
                 "status": RivalryStatus.active.rawValue,
                 "point_value": pointValue
             ]
-            if allParticipants.count > 2 {
-                // JSON-encode participant list
-                if let jsonData = try? JSONEncoder().encode(allParticipants) {
-                    body["participants"] = String(data: jsonData, encoding: .utf8) ?? "[]"
+
+            if isTeamMode {
+                let teamANames = teamA.sorted()
+                let teamBNames = teamB.sorted()
+                body["rivalry_type"] = "team"
+                body["team_a"] = jsonString(teamANames)
+                body["team_b"] = jsonString(teamBNames)
+                body["opponent_name"] = teamBNames.first ?? ""
+                body["participants"] = jsonString(teamANames + teamBNames)
+            } else {
+                let opponents = selectedOpponents.sorted()
+                let allParticipants = [currentUser] + opponents
+                body["opponent_name"] = opponents.first ?? ""
+                if allParticipants.count > 2 {
+                    body["participants"] = jsonString(allParticipants)
                 }
             }
+
             try await api.addRivalry(body)
             await onSaved()
             dismiss()

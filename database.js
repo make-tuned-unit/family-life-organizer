@@ -122,6 +122,11 @@ class FamilyDB {
         this.db.run('ALTER TABLE groceries ADD COLUMN group_id INTEGER REFERENCES groups(id)', () => {});
         // Multi-player rivalries
         this.db.run('ALTER TABLE rivalries ADD COLUMN participants TEXT', () => {});
+        // Team rivalries (household vs household or ad-hoc rosters)
+        this.db.run("ALTER TABLE rivalries ADD COLUMN rivalry_type TEXT DEFAULT 'individual'", () => {});
+        this.db.run('ALTER TABLE rivalries ADD COLUMN team_a TEXT', () => {});
+        this.db.run('ALTER TABLE rivalries ADD COLUMN team_b TEXT', () => {});
+        this.db.run('ALTER TABLE rivalries ADD COLUMN winner_team TEXT', () => {});
         this.db.run('CREATE INDEX IF NOT EXISTS idx_groceries_group ON groceries(group_id)', () => {});
         // Data isolation (round 2): budgets, pantry, trips, gifts, special events
         this.db.run('ALTER TABLE receipts ADD COLUMN group_id INTEGER REFERENCES groups(id)', () => {});
@@ -1335,8 +1340,8 @@ class FamilyDB {
   addRivalry(rivalry) {
     return new Promise((resolve, reject) => {
       this.db.run(
-        `INSERT INTO rivalries (title, challenge_type, initiator_name, opponent_name, start_date, end_date, status, point_value, winner_name, group_id, participants)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO rivalries (title, challenge_type, initiator_name, opponent_name, start_date, end_date, status, point_value, winner_name, group_id, participants, rivalry_type, team_a, team_b)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           rivalry.title,
           rivalry.challenge_type,
@@ -1350,7 +1355,10 @@ class FamilyDB {
           rivalry.group_id || null,
           rivalry.participants
             ? (Array.isArray(rivalry.participants) ? JSON.stringify(rivalry.participants) : String(rivalry.participants))
-            : null
+            : null,
+          rivalry.rivalry_type || 'individual',
+          rivalry.team_a ? (Array.isArray(rivalry.team_a) ? JSON.stringify(rivalry.team_a) : String(rivalry.team_a)) : null,
+          rivalry.team_b ? (Array.isArray(rivalry.team_b) ? JSON.stringify(rivalry.team_b) : String(rivalry.team_b)) : null
         ],
         function(err) {
           if (err) reject(err);
@@ -1417,7 +1425,7 @@ class FamilyDB {
   }
 
   updateRivalry(id, updates) {
-    const ALLOWED = new Set(['title', 'challenge_type', 'initiator_name', 'opponent_name', 'start_date', 'end_date', 'status', 'point_value', 'winner_name', 'participants']);
+    const ALLOWED = new Set(['title', 'challenge_type', 'initiator_name', 'opponent_name', 'start_date', 'end_date', 'status', 'point_value', 'winner_name', 'participants', 'rivalry_type', 'team_a', 'team_b', 'winner_team']);
     return new Promise((resolve, reject) => {
       const fields = [];
       const params = [];
@@ -1531,28 +1539,43 @@ class FamilyDB {
             total: findTotal(name)
           })).sort((a, b) => b.total - a.total);
 
-          const iTotal = findTotal(rivalry.initiator_name);
-          const oTotal = findTotal(rivalry.opponent_name);
+          // Team mode: sum each side; winner is the higher-total team.
+          let teamA = [], teamB = [];
+          try { teamA = JSON.parse(rivalry.team_a || '[]'); } catch (_) {}
+          try { teamB = JSON.parse(rivalry.team_b || '[]'); } catch (_) {}
+          const isTeam = rivalry.rivalry_type === 'team' && teamA.length > 0 && teamB.length > 0;
+          const teamATotal = teamA.reduce((s, n) => s + findTotal(n), 0);
+          const teamBTotal = teamB.reduce((s, n) => s + findTotal(n), 0);
+
+          // For teams, iTotal/oTotal carry the two TEAM totals (reused by the client).
+          const iTotal = isTeam ? teamATotal : findTotal(rivalry.initiator_name);
+          const oTotal = isTeam ? teamBTotal : findTotal(rivalry.opponent_name);
 
           if (rivalry.status === 'completed') {
-            return resolve({ rivalry, initiator_total: iTotal, opponent_total: oTotal, scores, winner_name: rivalry.winner_name, already_completed: true });
+            return resolve({ rivalry, initiator_total: iTotal, opponent_total: oTotal, scores, winner_name: rivalry.winner_name, winner_team: rivalry.winner_team, already_completed: true });
           }
 
-          // Determine winner (highest score, null if tie for first)
+          // Determine winner
           let winnerName = null;
-          if (scores.length > 0 && scores[0].total > 0) {
+          let winnerTeam = null;
+          if (isTeam) {
+            if (teamATotal !== teamBTotal && (teamATotal > 0 || teamBTotal > 0)) {
+              winnerTeam = teamATotal > teamBTotal ? 'a' : 'b';
+              winnerName = (winnerTeam === 'a' ? teamA : teamB).join(' & ');
+            }
+          } else if (scores.length > 0 && scores[0].total > 0) {
             if (scores.length === 1 || scores[0].total > scores[1].total) {
               winnerName = scores[0].name;
             }
           }
 
-          this.db.run('UPDATE rivalries SET status = ?, winner_name = ? WHERE id = ?',
-            ['completed', winnerName, id], (err3) => {
+          this.db.run('UPDATE rivalries SET status = ?, winner_name = ?, winner_team = ? WHERE id = ?',
+            ['completed', winnerName, winnerTeam, id], (err3) => {
               if (err3) return reject(err3);
               resolve({
-                rivalry: { ...rivalry, status: 'completed', winner_name: winnerName },
+                rivalry: { ...rivalry, status: 'completed', winner_name: winnerName, winner_team: winnerTeam },
                 initiator_total: iTotal, opponent_total: oTotal,
-                scores, winner_name: winnerName, already_completed: false
+                scores, winner_name: winnerName, winner_team: winnerTeam, already_completed: false
               });
             });
         });
@@ -1575,17 +1598,21 @@ class FamilyDB {
           if (!stats.has(n)) stats.set(n, { member_name: n, rivalries_completed: 0, rivalries_won: 0, total_points: 0 });
           return stats.get(n);
         };
+        const parseArr = (s) => { try { const p = JSON.parse(s || '[]'); return Array.isArray(p) ? p.filter(Boolean).map(String) : []; } catch (_) { return []; } };
         for (const r of rows || []) {
-          let names = [];
-          if (r.participants) {
-            try { const p = JSON.parse(r.participants); if (Array.isArray(p)) names = p.filter(Boolean).map(String); } catch (_) {}
-          }
+          const teamA = parseArr(r.team_a), teamB = parseArr(r.team_b);
+          let names = (r.rivalry_type === 'team') ? [...teamA, ...teamB] : parseArr(r.participants);
           if (!names.length) names = [r.initiator_name, r.opponent_name].filter(Boolean).map(String);
           const uniq = [...new Set(names)];
           for (const n of uniq) ensure(n);              // appear on the board even mid-rivalry
           if (r.status === 'completed') {
             for (const n of uniq) ensure(n).rivalries_completed += 1;
-            if (r.winner_name) {
+            if (r.rivalry_type === 'team' && r.winner_team) {
+              // Every member of the winning team gets the win + points.
+              for (const n of (r.winner_team === 'a' ? teamA : teamB)) {
+                const w = ensure(String(n)); w.rivalries_won += 1; w.total_points += (r.point_value || 0);
+              }
+            } else if (r.winner_name) {
               const w = ensure(String(r.winner_name));
               w.rivalries_won += 1;
               w.total_points += (r.point_value || 0);
