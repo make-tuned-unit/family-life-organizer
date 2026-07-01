@@ -918,108 +918,9 @@ const TOOLS = [
     },
   },
 
-  // ---- Lists & list items ----
-  {
-    name: 'list_lists',
-    description: "List the household's checklists/lists (e.g. groceries, packing, to-buy).",
-    write: false,
-    input_schema: { type: 'object', properties: {} },
-    async run(ctx) {
-      const rows = await ctx.db.getLists(ctx.userId);
-      return { result: rows.map(l => ({
-        id: l.id, name: l.name, type: l.list_type, active_items: l.active_count, total_items: l.total_count,
-      })) };
-    },
-  },
-  {
-    name: 'get_list_items',
-    description: 'List the items in a list. Use list_lists for the id.',
-    write: false,
-    input_schema: { type: 'object', properties: { list_id: { type: 'integer' } }, required: ['list_id'] },
-    async run(ctx, input) {
-      await assertListAccess(ctx, input.list_id);
-      const rows = await ctx.db.getListItems(input.list_id);
-      return { result: rows.map(i => ({ id: i.id, title: i.title, done: !!i.is_done, category: i.category })) };
-    },
-  },
-  {
-    name: 'add_list',
-    description: 'Create a new checklist/list.',
-    write: true,
-    input_schema: {
-      type: 'object',
-      properties: {
-        name: { type: 'string' },
-        list_type: { type: 'string', enum: ['standard', 'grocery'], description: 'default standard' },
-      },
-      required: ['name'],
-    },
-    async run(ctx, input) {
-      const r = await ctx.db.createList({ name: input.name, list_type: input.list_type || 'standard', created_by: ctx.userId });
-      const summary = `Created list "${input.name}"`;
-      return { result: { ok: true, id: r.id, summary }, action: { tool: 'add_list', summary } };
-    },
-  },
-  {
-    name: 'add_list_item',
-    description: 'Add an item to a list. Use list_lists for the id.',
-    write: true,
-    input_schema: {
-      type: 'object',
-      properties: {
-        list_id: { type: 'integer' },
-        title: { type: 'string' },
-        category: { type: 'string' },
-      },
-      required: ['list_id', 'title'],
-    },
-    async run(ctx, input) {
-      await assertListAccess(ctx, input.list_id);
-      await ctx.db.addListItem({ list_id: input.list_id, title: input.title, added_by: ctx.userName, category: input.category || null });
-      const summary = `Added "${input.title}" to list #${input.list_id}`;
-      return { result: { ok: true, summary }, action: { tool: 'add_list_item', summary } };
-    },
-  },
-  {
-    name: 'check_list_item',
-    description: 'Toggle a list item done/undone. Use get_list_items for the id.',
-    write: true,
-    input_schema: { type: 'object', properties: { id: { type: 'integer' } }, required: ['id'] },
-    async run(ctx, input) {
-      const item = await dbGet(ctx, 'SELECT list_id FROM list_items WHERE id = ?', [input.id]);
-      if (!item) return { result: { ok: false, error: `No list item #${input.id}` } };
-      await assertListAccess(ctx, item.list_id);
-      await ctx.db.toggleListItem(input.id);
-      const summary = `Toggled list item #${input.id}`;
-      return { result: { ok: true, summary }, action: { tool: 'check_list_item', summary } };
-    },
-  },
-  {
-    name: 'delete_list_item',
-    description: 'Remove an item from a list. Use get_list_items for the id.',
-    write: true,
-    input_schema: { type: 'object', properties: { id: { type: 'integer' } }, required: ['id'] },
-    async run(ctx, input) {
-      const item = await dbGet(ctx, 'SELECT list_id FROM list_items WHERE id = ?', [input.id]);
-      if (!item) return { result: { ok: false, error: `No list item #${input.id}` } };
-      await assertListAccess(ctx, item.list_id);
-      await ctx.db.deleteListItem(input.id);
-      const summary = `Deleted list item #${input.id}`;
-      return { result: { ok: true, summary }, action: { tool: 'delete_list_item', summary } };
-    },
-  },
-  {
-    name: 'delete_list',
-    description: 'Delete an entire list and its items permanently. Use list_lists for the id.',
-    write: true,
-    input_schema: { type: 'object', properties: { id: { type: 'integer' } }, required: ['id'] },
-    async run(ctx, input) {
-      await assertListAccess(ctx, input.id);
-      await ctx.db.deleteList(input.id);
-      const summary = `Deleted list #${input.id}`;
-      return { result: { ok: true, summary }, action: { tool: 'delete_list', summary } };
-    },
-  },
+  // (Legacy id-based list tools removed — superseded by the name-based
+  // get_lists/add_list_item/get_list/check_off_item tools above. Their duplicate
+  // add_list_item was causing an Anthropic 400 that broke all concierge chat.)
 
   // ---- Itineraries (delete + stay edit/delete; create/update already above) ----
   {
@@ -1154,6 +1055,14 @@ const TOOLS = [
     },
   },
 ];
+
+// Fail fast on duplicate tool names — Anthropic 400-rejects a tools array with
+// duplicates, which would break every concierge chat turn (silent until runtime).
+{
+  const seen = new Set();
+  const dupes = TOOLS.map(t => t.name).filter(n => seen.size === seen.add(n).size);
+  if (dupes.length) throw new Error(`Duplicate concierge tool name(s): ${[...new Set(dupes)].join(', ')}`);
+}
 
 const BY_NAME = new Map(TOOLS.map(t => [t.name, t]));
 

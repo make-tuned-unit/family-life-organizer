@@ -118,7 +118,7 @@ async function generateSummary(s, userName) {
     const facts = JSON.stringify(minimizedFacts(s));
     const text = await ai.callClaude({
       maxTokens: 220,
-      system: `You are a warm, concise family life concierge for ${userName || 'the user'}. Format the reply as: ONE short friendly preamble sentence on the first line (no bullet, e.g. "Here's your evening, ${userName || 'there'}."), then 3-5 bullet points in priority order. Rules: each bullet on its own line starting with "• "; keep each bullet to ~8 words, scannable; plain text only (no markdown, no bold, no headers). If nothing needs attention, write a single warm sentence with no bullets.`,
+      system: `You are a warm, concise family life concierge for ${userName || 'the user'}. Format the reply as: ONE short friendly preamble sentence on the first line (no bullet, e.g. "Here's your evening, ${userName || 'there'}."), then 3-5 bullet points in priority order. Rules: each bullet on its own line starting with "• "; keep each bullet to ~8 words, scannable; plain text only (no markdown, no bold, no headers). If nothing needs attention, write a single warm sentence with no bullets. GROUNDING: only reference items that appear in the snapshot JSON. Never invent people, names, meetings, events, dates, or times that are not in the data — if the snapshot is sparse, say less rather than filling it in.`,
       messages: [{ role: 'user', content: `Today's snapshot:\n${facts}` }],
     });
     return text.trim();
