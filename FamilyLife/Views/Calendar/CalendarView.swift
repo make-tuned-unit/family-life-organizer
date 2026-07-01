@@ -1,4 +1,5 @@
 import SwiftUI
+import CoreLocation
 
 enum CalendarDisplayMode: String, CaseIterable {
     case month = "Month"
@@ -12,6 +13,7 @@ struct CalendarView: View {
     @Environment(APIService.self) private var api
     @Environment(CalendarService.self) private var calendarService
     @Environment(AuthService.self) private var auth
+    @Environment(LocationService.self) private var locationService
     @State private var viewModel = CalendarViewModel()
     @State private var showingAddAppointment = false
     @State private var selectedEvent: AppointmentResponse?
@@ -109,6 +111,12 @@ struct CalendarView: View {
             calendarService.refreshAuthorizationStatus()
             viewModel.currentUserId = auth.currentUser?.id
             await viewModel.loadMonth(api: api, calendarService: calendarService)
+            // Leave-soon travel reminders for upcoming located events (best-effort;
+            // only when location is already granted, so we never prompt from here).
+            if locationService.authorizationStatus == .authorizedWhenInUse || locationService.authorizationStatus == .authorizedAlways,
+               let origin = await locationService.getCurrentLocation() {
+                await NotificationService.shared.scheduleTravelReminders(viewModel.monthAppointments, origin: origin)
+            }
             incomingCount = ((try? await api.fetchIncomingCoverage()) ?? []).filter { $0.recipient_status == "pending" }.count
             myRequestCount = ((try? await api.fetchCoverageRequests()) ?? []).filter { $0.status == "pending" || $0.status == "approved" }.count
         }
@@ -909,4 +917,5 @@ struct CoverageBlockCard: View {
     .environment(APIService())
     .environment(CalendarService())
     .environment(AuthService())
+    .environment(LocationService())
 }
