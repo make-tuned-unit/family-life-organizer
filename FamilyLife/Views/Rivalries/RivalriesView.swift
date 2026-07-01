@@ -48,12 +48,17 @@ struct RivalriesView: View {
 
                         ForEach(activeRivalries) { rivalry in
                             NavigationLink {
-                                RivalryDetailView(rivalry: rivalry)
+                                RivalryDetailView(rivalry: rivalry) { await loadAll() }
                             } label: {
                                 RivalryCardRemote(rivalry: rivalry, entries: entriesByRivalry[rivalry.id] ?? [])
                             }
                             .buttonStyle(.plain)
                             .padding(.horizontal)
+                            .contextMenu {
+                                Button(role: .destructive) {
+                                    Task { await deleteRivalry(rivalry) }
+                                } label: { Label("Delete Challenge", systemImage: "trash") }
+                            }
                         }
                     }
                 }
@@ -66,12 +71,17 @@ struct RivalriesView: View {
 
                         ForEach(completedRivalries.prefix(10)) { rivalry in
                             NavigationLink {
-                                RivalryDetailView(rivalry: rivalry)
+                                RivalryDetailView(rivalry: rivalry) { await loadAll() }
                             } label: {
                                 RivalryCardRemote(rivalry: rivalry, entries: entriesByRivalry[rivalry.id] ?? [])
                             }
                             .buttonStyle(.plain)
                             .padding(.horizontal)
+                            .contextMenu {
+                                Button(role: .destructive) {
+                                    Task { await deleteRivalry(rivalry) }
+                                } label: { Label("Delete Challenge", systemImage: "trash") }
+                            }
                         }
                     }
                 }
@@ -158,6 +168,16 @@ struct RivalriesView: View {
             self.error = error.localizedDescription
         }
         isLoading = false
+    }
+
+    private func deleteRivalry(_ rivalry: RivalryResponse) async {
+        do {
+            try await api.deleteRivalry(id: rivalry.id)
+            await loadAll()
+        } catch {
+            guard !error.isCancellation else { return }
+            self.error = error.localizedDescription
+        }
     }
 
     private var errorAlertIsPresented: Binding<Bool> {

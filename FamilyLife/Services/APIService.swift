@@ -593,6 +593,10 @@ final class APIService {
         try await post("/api/rivalries/\(id)/complete", body: [:] as [String: String])
     }
 
+    func deleteRivalry(id: Int) async throws {
+        let _: SuccessResponse = try await delete("/api/rivalries/\(id)")
+    }
+
     // MARK: - Gifts
 
     func fetchGiftPeople() async throws -> [GiftPersonResponse] {

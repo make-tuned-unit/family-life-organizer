@@ -3491,6 +3491,19 @@ app.put('/api/rivalries/:id', requireAuth, async (req, res) => {
   }
 });
 
+app.delete('/api/rivalries/:id', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    if (!(await requireGroupRow(db, 'rivalries', req.params.id, req, res))) return;
+    await db.deleteRivalry(req.params.id);
+    res.json({ success: true });
+  } catch (err) {
+    sendServerError(res, err);
+  } finally {
+    db.close();
+  }
+});
+
 app.get('/api/rivalries/:id/entries', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {

@@ -1330,8 +1330,8 @@ class FamilyDB {
   addRivalry(rivalry) {
     return new Promise((resolve, reject) => {
       this.db.run(
-        `INSERT INTO rivalries (title, challenge_type, initiator_name, opponent_name, start_date, end_date, status, point_value, winner_name, group_id)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO rivalries (title, challenge_type, initiator_name, opponent_name, start_date, end_date, status, point_value, winner_name, group_id, participants)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           rivalry.title,
           rivalry.challenge_type,
@@ -1342,7 +1342,10 @@ class FamilyDB {
           rivalry.status || 'active',
           rivalry.point_value || 100,
           rivalry.winner_name || null,
-          rivalry.group_id || null
+          rivalry.group_id || null,
+          rivalry.participants
+            ? (Array.isArray(rivalry.participants) ? JSON.stringify(rivalry.participants) : String(rivalry.participants))
+            : null
         ],
         function(err) {
           if (err) reject(err);
@@ -1423,6 +1426,16 @@ class FamilyDB {
       this.db.run(`UPDATE rivalries SET ${fields.join(', ')} WHERE id = ?`, params, (err) => {
         if (err) reject(err);
         else resolve({ id, ...updates });
+      });
+    });
+  }
+
+  deleteRivalry(id) {
+    return new Promise((resolve, reject) => {
+      // rivalry_entries cascade via FK ON DELETE CASCADE.
+      this.db.run('DELETE FROM rivalries WHERE id = ?', [id], (err) => {
+        if (err) reject(err);
+        else resolve({ id, deleted: true });
       });
     });
   }
@@ -1542,31 +1555,42 @@ class FamilyDB {
     });
   }
 
+  // Participant-aware leaderboard: expands each rivalry's full participant set
+  // (JSON `participants`, falling back to initiator+opponent) so 3rd+ players
+  // are credited, then aggregates completions/wins/points in JS.
   getRivalryLeaderboard(userId = null) {
     return new Promise((resolve, reject) => {
       const groupFilter = userId
         ? `WHERE group_id IN (SELECT group_id FROM group_members WHERE user_id = ${parseInt(userId)})`
         : '';
-      const sql = `
-        WITH scoped_rivalries AS (
-          SELECT * FROM rivalries ${groupFilter}
-        ),
-        participants AS (
-          SELECT DISTINCT member_name FROM (
-            SELECT initiator_name AS member_name FROM scoped_rivalries
-            UNION
-            SELECT opponent_name AS member_name FROM scoped_rivalries
-          )
-        )
-        SELECT
-          p.member_name,
-          (SELECT COUNT(*) FROM scoped_rivalries WHERE status = 'completed' AND (initiator_name = p.member_name OR opponent_name = p.member_name)) AS rivalries_completed,
-          (SELECT COUNT(*) FROM scoped_rivalries WHERE status = 'completed' AND winner_name = p.member_name) AS rivalries_won,
-          COALESCE((SELECT SUM(point_value) FROM scoped_rivalries WHERE status = 'completed' AND winner_name = p.member_name), 0) AS total_points
-        FROM participants p
-        ORDER BY total_points DESC, rivalries_won DESC, p.member_name ASC
-      `;
-      this.db.all(sql, [], (err, rows) => err ? reject(err) : resolve(rows));
+      this.db.all(`SELECT * FROM rivalries ${groupFilter}`, [], (err, rows) => {
+        if (err) return reject(err);
+        const stats = new Map();
+        const ensure = (n) => {
+          if (!stats.has(n)) stats.set(n, { member_name: n, rivalries_completed: 0, rivalries_won: 0, total_points: 0 });
+          return stats.get(n);
+        };
+        for (const r of rows || []) {
+          let names = [];
+          if (r.participants) {
+            try { const p = JSON.parse(r.participants); if (Array.isArray(p)) names = p.filter(Boolean).map(String); } catch (_) {}
+          }
+          if (!names.length) names = [r.initiator_name, r.opponent_name].filter(Boolean).map(String);
+          const uniq = [...new Set(names)];
+          for (const n of uniq) ensure(n);              // appear on the board even mid-rivalry
+          if (r.status === 'completed') {
+            for (const n of uniq) ensure(n).rivalries_completed += 1;
+            if (r.winner_name) {
+              const w = ensure(String(r.winner_name));
+              w.rivalries_won += 1;
+              w.total_points += (r.point_value || 0);
+            }
+          }
+        }
+        const out = [...stats.values()].sort((a, b) =>
+          b.total_points - a.total_points || b.rivalries_won - a.rivalries_won || a.member_name.localeCompare(b.member_name));
+        resolve(out);
+      });
     });
   }
 
