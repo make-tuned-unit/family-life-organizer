@@ -3,9 +3,13 @@ import SwiftUI
 
 struct RivalryDetailView: View {
     @Environment(APIService.self) private var api
+    @Environment(\.dismiss) private var dismiss
     let rivalry: RivalryResponse
+    let onChange: (() async -> Void)?
 
     @State private var currentRivalry: RivalryResponse
+    @State private var showingDeleteConfirm = false
+    @State private var isDeleting = false
     @State private var entries: [RivalryEntryResponse] = []
     @State private var showingLogProgress = false
     @State private var error: String?
@@ -18,8 +22,9 @@ struct RivalryDetailView: View {
 
     @Environment(AuthService.self) private var auth
 
-    init(rivalry: RivalryResponse) {
+    init(rivalry: RivalryResponse, onChange: (() async -> Void)? = nil) {
         self.rivalry = rivalry
+        self.onChange = onChange
         _currentRivalry = State(initialValue: rivalry)
     }
 
@@ -229,6 +234,23 @@ struct RivalryDetailView: View {
         .background { AmbientBackground(style: .rivalries) }
         .navigationTitle(currentRivalry.title)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Menu {
+                    Button(role: .destructive) { showingDeleteConfirm = true } label: {
+                        Label("Delete Challenge", systemImage: "trash")
+                    }
+                } label: {
+                    Image(systemName: "ellipsis.circle")
+                }
+            }
+        }
+        .confirmationDialog("Delete this challenge?", isPresented: $showingDeleteConfirm, titleVisibility: .visible) {
+            Button("Delete", role: .destructive) { Task { await deleteRivalry() } }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This removes the challenge and all logged progress for everyone. This can't be undone.")
+        }
         .sheet(isPresented: $showingLogProgress) {
             LogProgressView(rivalry: currentRivalry, memberName: myRivalryName) {
                 await loadEntries()
@@ -354,6 +376,20 @@ struct RivalryDetailView: View {
         do {
             entries = try await api.fetchRivalryEntries(id: currentRivalry.id)
         } catch {
+            guard !error.isCancellation else { return }
+            self.error = error.localizedDescription
+        }
+    }
+
+    private func deleteRivalry() async {
+        guard !isDeleting else { return }
+        isDeleting = true
+        do {
+            try await api.deleteRivalry(id: currentRivalry.id)
+            await onChange?()
+            dismiss()
+        } catch {
+            isDeleting = false
             guard !error.isCancellation else { return }
             self.error = error.localizedDescription
         }
