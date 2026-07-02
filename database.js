@@ -783,20 +783,38 @@ class FamilyDB {
   getSyncedCalendarEventsByMonth(year, month, userId) {
     return new Promise((resolve, reject) => {
       const uid = safeUid(userId);
-      const monthKey = `${year}-${String(month).padStart(2, '0')}`;
+      // Half-open range instead of substr() so idx_synced_cal_group_date is
+      // usable — this is the app's hottest polled query.
+      const y = parseInt(year, 10), m = parseInt(month, 10);
+      const monthStart = `${y}-${String(m).padStart(2, '0')}-01`;
+      const monthEnd = m === 12
+        ? `${y + 1}-01-01`
+        : `${y}-${String(m + 1).padStart(2, '0')}-01`;
       const sql = `
         SELECT s.id, s.user_id AS owner_id, u.name AS owner_name, s.external_id,
           s.calendar_name, s.title, s.location, s.starts_at, s.ends_at, s.all_day, s.group_id
         FROM synced_calendar_events s
         JOIN users u ON u.id = s.user_id
         WHERE s.deleted = 0
-          AND substr(s.starts_at, 1, 7) = ?
+          AND s.starts_at >= ? AND s.starts_at < ?
           AND s.group_id IN (
             SELECT gm.group_id FROM group_members gm
             JOIN groups g ON g.id = gm.group_id
             WHERE gm.user_id = ? AND g.group_type = 'household')
         ORDER BY s.starts_at`;
-      this.db.all(sql, [monthKey, uid], (err, rows) => err ? reject(err) : resolve(rows));
+      this.db.all(sql, [monthStart, monthEnd, uid], (err, rows) => err ? reject(err) : resolve(rows));
+    });
+  }
+
+  // Housekeeping: drop soft-deleted synced events once every client has had
+  // ample time to observe the tombstone. Keeps the hottest table bounded.
+  purgeDeletedSyncedEvents(days = 30) {
+    return new Promise((resolve, reject) => {
+      this.db.run(
+        `DELETE FROM synced_calendar_events WHERE deleted = 1 AND updated_at < datetime('now', ?)`,
+        [`-${parseInt(days, 10) || 30} days`],
+        function (err) { err ? reject(err) : resolve({ purged: this.changes }); }
+      );
     });
   }
 
@@ -3694,6 +3712,14 @@ class FamilyDB {
         [groupId, key, `-${hours} hours`],
         (err, row) => err ? reject(err) : resolve(!!row)
       );
+    });
+  }
+
+  // Snapshot the live DB into destPath. VACUUM INTO produces a consistent,
+  // compacted copy even while writers are active under WAL.
+  backupTo(destPath) {
+    return new Promise((resolve, reject) => {
+      this.db.run('VACUUM INTO ?', [destPath], (err) => err ? reject(err) : resolve(destPath));
     });
   }
 
