@@ -9,6 +9,15 @@ final class HouseholdService {
     private(set) var householdMemberNames: Set<String> = []
     /// Maps member names (lowercased) to their users table ID (for messaging)
     private(set) var userIdsByName: [String: Int] = [:]
+    /// Actual users (id + display name) in the user's own household group,
+    /// excluding the current user. Unlike `householdMembers` this never depends
+    /// on a contact's name matching the group member's name — it's the group
+    /// roster itself, so it's stable regardless of month, contacts, or naming.
+    struct HouseholdUser: Identifiable, Hashable {
+        let id: Int
+        let name: String
+    }
+    private(set) var householdUsers: [HouseholdUser] = []
     private(set) var isLoaded = false
     private var isLoading = false
 
@@ -35,6 +44,7 @@ final class HouseholdService {
             var addedNames = Set(contacts.map { $0.name.lowercased() })
             var addedUserIds = Set<Int>()
             var householdNames = Set<String>()
+            var householdUserList: [HouseholdUser] = []
             for group in groups {
                 let isHouseholdGroup = group.group_type == "household"
                 if let groupMembers = try? await api.fetchGroupMembers(groupId: group.id) {
@@ -45,7 +55,13 @@ final class HouseholdService {
                         let nameLC = name.lowercased()
                         // Record household membership before any skip logic so the current
                         // user and existing contacts are still captured as household members.
-                        if isHouseholdGroup { householdNames.insert(nameLC) }
+                        if isHouseholdGroup {
+                            householdNames.insert(nameLC)
+                            if let uid = member.user_id, uid != currentUserId,
+                               !householdUserList.contains(where: { $0.id == uid }) {
+                                householdUserList.append(HouseholdUser(id: uid, name: name))
+                            }
+                        }
                         // Track user_id for messaging
                         if let uid = member.user_id {
                             nameToUserId[nameLC] = uid
@@ -92,6 +108,7 @@ final class HouseholdService {
             members = combined
             userIdsByName = nameToUserId
             householdMemberNames = householdNames
+            householdUsers = householdUserList.sorted { $0.name < $1.name }
         } catch {
             guard !error.isCancellation else { isLoading = false; return }
         }
