@@ -84,7 +84,10 @@ async function householdDailyMax(req) {
 const conciergeChatDailyLimiter = createRateLimiter({ windowMs: 24 * 60 * 60 * 1000, keyFn: householdRateKey, maxFn: householdDailyMax });
 
 // IP-keyed limiter for the unauthenticated, brute-forceable auth endpoints.
-const clientIp = (req) => (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.ip || 'unknown';
+// Use req.ip (derived by Express under `trust proxy: 1` from the RIGHTMOST
+// proxy-appended X-Forwarded-For entry) — never the raw leftmost XFF value,
+// which the client controls and could rotate to bypass the limiter.
+const clientIp = (req) => req.ip || 'unknown';
 // 20/min/IP: headroom for the multi-step 2FA flow (login → email → verify) and
 // a family behind one NAT, while still throttling brute force (bcrypt cost 12
 // adds ~250ms/attempt server-side on top).
@@ -113,6 +116,10 @@ const TWO_FA_MAX_ATTEMPTS = 5;          // wrong-code guesses before a challenge
 // TEST ONLY: echo the code in the JSON response so automated tests can complete
 // the flow without an inbox. Never enable in production.
 const TWO_FA_ECHO = process.env.AUTH_2FA_ECHO_CODE === '1';
+if (TWO_FA_ECHO && IS_PROD) {
+  console.error('FATAL: AUTH_2FA_ECHO_CODE must never be set in production — it leaks every OTP in the login response.');
+  process.exit(1);
+}
 const echoCode = (code) => (TWO_FA_ECHO ? { dev_code: code } : {});
 
 function genCode() {
@@ -205,8 +212,31 @@ app.set('trust proxy', 1);
 app.use(helmet({
   // The API + a few server-rendered pages; CSP is enforced on the static
   // marketing site via its own meta tags. Keep HSTS/no-sniff/frame-guard.
+  // The server-rendered /login and /app pages set their own CSP (PAGE_CSP).
   contentSecurityPolicy: false,
 }));
+
+// CSP for the server-rendered pages. Their markup relies on inline <script>/
+// <style>/handlers, so 'unsafe-inline' stays — but external script loading,
+// fetch/XHR exfiltration, and remote image beacons are all blocked, which
+// bounds the blast radius of any injected markup.
+const PAGE_CSP = [
+  "default-src 'self'",
+  "script-src 'unsafe-inline'",
+  "style-src 'unsafe-inline' https://fonts.googleapis.com",
+  "font-src https://fonts.gstatic.com",
+  "img-src 'self' data:",
+  "connect-src 'self'",
+  "object-src 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+  "frame-ancestors 'none'",
+].join('; ');
+
+// Escape a value for interpolation into server-rendered HTML.
+const htmlEsc = (s) => String(s ?? '')
+  .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 // Small default cap to blunt memory-exhaustion via large bodies (the body is
 // parsed before auth). Routes that legitimately carry a base64 image opt into a
 // larger cap by path. Everything else — including the unauthenticated auth
@@ -981,6 +1011,7 @@ app.get('/api/groups/:id/avatar', requireAuth, async (req, res) => {
 
 // Login page - Modern Design
 app.get('/login', (req, res) => {
+  res.set('Content-Security-Policy', PAGE_CSP);
   res.send(`<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1197,6 +1228,7 @@ app.get('/app', requireAuth, async (req, res) => {
       if (!tasksByCategory[task.category]) tasksByCategory[task.category] = [];
       tasksByCategory[task.category].push(task);
     });
+    res.set('Content-Security-Policy', PAGE_CSP);
     res.send(renderDashboard(req.session.user, summary, groceries, tasksByCategory, appointments));
   } catch (err) {
     console.error('[error]', err && err.stack ? err.stack : err);
@@ -1515,8 +1547,8 @@ function renderDashboard(user, summary, groceries, tasksByCategory, appointments
       </div>
       <div class="user-menu">
         <div class="user-badge">
-          <span>${user.avatar}</span>
-          <span>${user.name}</span>
+          <span>${htmlEsc(user.avatar)}</span>
+          <span>${htmlEsc(user.name)}</span>
         </div>
         <button class="logout-btn" onclick="location.href='/logout'">Sign Out</button>
       </div>
@@ -1595,11 +1627,11 @@ function renderDashboard(user, summary, groceries, tasksByCategory, appointments
           </div>
           <div class="card-body">
             ${categories.slice(0, 3).map(cat => `
-              <h4 style="font-size:14px;color:var(--gray-600);margin:16px 0 8px">${cat}</h4>
+              <h4 style="font-size:14px;color:var(--gray-600);margin:16px 0 8px">${htmlEsc(cat)}</h4>
               ${tasksByCategory[cat].slice(0, 2).map(task => `
                 <div class="list-item">
                   <div class="checkbox" onclick="completeTask(${task.id})"></div>
-                  <div class="list-content">${task.title}</div>
+                  <div class="list-content">${htmlEsc(task.title)}</div>
                 </div>
               `).join('')}
             `).join('') || '<p style="color:var(--gray-600);text-align:center;padding:32px">No tasks for today!</p>'}
@@ -1614,8 +1646,8 @@ function renderDashboard(user, summary, groceries, tasksByCategory, appointments
             ${groceries.slice(0, 5).map(item => `
               <div class="list-item">
                 <div class="checkbox" onclick="completeGrocery(${item.id})"></div>
-                <div class="list-content">${item.item}</div>
-                ${item.category ? `<span class="badge">${item.category}</span>` : ''}
+                <div class="list-content">${htmlEsc(item.item)}</div>
+                ${item.category ? `<span class="badge">${htmlEsc(item.category)}</span>` : ''}
               </div>
             `).join('') || '<p style="color:var(--gray-600);text-align:center;padding:32px">No items needed</p>'}
           </div>
@@ -1629,9 +1661,9 @@ function renderDashboard(user, summary, groceries, tasksByCategory, appointments
             ${todayAppointments.map(appt => `
               <div class="list-item">
                 <div class="list-content">
-                  <strong>${appt.title}</strong>
-                  ${appt.appointment_time ? `<span style="color:var(--gray-500);margin-left:8px">${appt.appointment_time}</span>` : ''}
-                  ${appt.person_tags ? `<div style="margin-top:4px">${appt.person_tags.split(',').map(p => `<span class="badge" style="margin-right:4px">${p}</span>`).join('')}</div>` : ''}
+                  <strong>${htmlEsc(appt.title)}</strong>
+                  ${appt.appointment_time ? `<span style="color:var(--gray-500);margin-left:8px">${htmlEsc(appt.appointment_time)}</span>` : ''}
+                  ${appt.person_tags ? `<div style="margin-top:4px">${appt.person_tags.split(',').map(p => `<span class="badge" style="margin-right:4px">${htmlEsc(p)}</span>`).join('')}</div>` : ''}
                 </div>
               </div>
             `).join('') || '<p style="color:var(--gray-600);text-align:center;padding:32px">No appointments today</p>'}
@@ -1711,8 +1743,8 @@ function renderDashboard(user, summary, groceries, tasksByCategory, appointments
           ${groceries.map(item => `
             <div class="list-item">
               <div class="checkbox" onclick="completeGrocery(${item.id})"></div>
-              <div class="list-content">${item.item}</div>
-              ${item.category ? `<span class="badge">${item.category}</span>` : ''}
+              <div class="list-content">${htmlEsc(item.item)}</div>
+              ${item.category ? `<span class="badge">${htmlEsc(item.category)}</span>` : ''}
             </div>
           `).join('') || '<p style="color:var(--gray-600);text-align:center;padding:32px">No items needed</p>'}
         </div>
@@ -1727,12 +1759,12 @@ function renderDashboard(user, summary, groceries, tasksByCategory, appointments
         </div>
         <div class="card-body">
           ${categories.map(cat => `
-            <h4 style="font-size:14px;color:var(--gray-600);margin:24px 0 12px;text-transform:capitalize">${cat}</h4>
+            <h4 style="font-size:14px;color:var(--gray-600);margin:24px 0 12px;text-transform:capitalize">${htmlEsc(cat)}</h4>
             ${tasksByCategory[cat].map(task => `
               <div class="list-item">
                 <div class="checkbox" onclick="completeTask(${task.id})"></div>
-                <div class="list-content">${task.title}</div>
-                ${task.due_date ? `<span class="badge">${task.due_date}</span>` : ''}
+                <div class="list-content">${htmlEsc(task.title)}</div>
+                ${task.due_date ? `<span class="badge">${htmlEsc(task.due_date)}</span>` : ''}
               </div>
             `).join('')}
           `).join('') || '<p style="color:var(--gray-600);text-align:center;padding:32px">No tasks yet!</p>'}
@@ -1895,7 +1927,15 @@ function renderDashboard(user, summary, groceries, tasksByCategory, appointments
     
     // Calendar Functions
     let currentCalendarDate = new Date();
-    const appointmentsData = ${JSON.stringify(appointments)};
+    // "<" escaped as \\u003c so user data can never break out of this <script>
+    // block (e.g. a title containing "</script>").
+    const appointmentsData = ${JSON.stringify(appointments).replace(/</g, '\\u003c')};
+
+    function escHtml(s) {
+      return String(s == null ? '' : s)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
     
     function renderCalendar() {
       const year = currentCalendarDate.getFullYear();
@@ -1935,7 +1975,7 @@ function renderDashboard(user, summary, groceries, tasksByCategory, appointments
 
         if (dayAppointments.length > 0) {
           dayAppointments.slice(0, 2).forEach(appt => {
-            html += '<div class="calendar-event" title="' + appt.title + '">' + appt.title + '</div>';
+            html += '<div class="calendar-event" title="' + escHtml(appt.title) + '">' + escHtml(appt.title) + '</div>';
           });
           if (dayAppointments.length > 2) {
             html += '<div style="font-size:10px;color:var(--gray-500)">+' + (dayAppointments.length - 2) + ' more</div>';
