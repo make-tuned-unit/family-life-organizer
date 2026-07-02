@@ -29,6 +29,30 @@ struct PeopleView: View {
                     }
                 }
 
+                NavigationLink { YearRecapView() } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: "sparkles")
+                            .font(.system(size: 15))
+                            .foregroundStyle(AccentTheme.saffron.color)
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text("Year in milestones")
+                                .font(.system(size: 15, weight: .semibold))
+                                .foregroundStyle(WarmPalette.ink1)
+                            Text("Everything the family celebrated, year by year")
+                                .font(.system(size: 12))
+                                .foregroundStyle(WarmPalette.ink3)
+                        }
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(WarmPalette.ink3)
+                    }
+                    .padding(14)
+                    .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: 16))
+                }
+                .buttonStyle(.plain)
+                .padding(.top, 6)
+
                 NavigationLink { GiftsView() } label: {
                     HStack(spacing: 12) {
                         Image(systemName: "gift.fill")
@@ -240,6 +264,137 @@ struct AddPersonSheet: View {
                 self.error = "Couldn't save. Try again."
                 isSaving = false
             }
+        }
+    }
+}
+
+// MARK: - Year in milestones
+
+/// The family's year, told through its milestones — grouped by person,
+/// switchable by year. The seed of the year-end recap.
+struct YearRecapView: View {
+    @Environment(APIService.self) private var api
+
+    @State private var milestones: [MilestoneResponse] = []
+    @State private var selectedYear: Int = Calendar.current.component(.year, from: Date())
+    @State private var isLoading = true
+
+    private var years: [Int] {
+        let ys = Set(milestones.compactMap { Int($0.milestone_date.prefix(4)) })
+        return ys.sorted(by: >)
+    }
+
+    private var yearMilestones: [MilestoneResponse] {
+        milestones
+            .filter { Int($0.milestone_date.prefix(4)) == selectedYear }
+            .sorted { $0.milestone_date < $1.milestone_date }
+    }
+
+    private var byPerson: [(name: String, items: [MilestoneResponse])] {
+        let groups = Dictionary(grouping: yearMilestones) { $0.person_name ?? "Someone" }
+        return groups.map { (name: $0.key, items: $0.value) }
+            .sorted { $0.items.count == $1.items.count ? $0.name < $1.name : $0.items.count > $1.items.count }
+    }
+
+    var body: some View {
+        ScrollView(showsIndicators: false) {
+            VStack(spacing: 14) {
+                if !years.isEmpty {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            ForEach(years, id: \.self) { y in
+                                WarmChip(label: String(y), isActive: selectedYear == y) {
+                                    selectedYear = y
+                                }
+                            }
+                        }
+                        .padding(.horizontal, 2)
+                    }
+                }
+
+                if isLoading && milestones.isEmpty {
+                    ProgressView().padding(.top, 60)
+                } else if yearMilestones.isEmpty {
+                    VStack(spacing: 8) {
+                        Image(systemName: "sparkles")
+                            .font(.system(size: 30))
+                            .foregroundStyle(WarmPalette.ink4)
+                        Text("No milestones in \(String(selectedYear)) yet")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(WarmPalette.ink1)
+                        Text("Log the family's moments from each person's card, and this page becomes the story of your year.")
+                            .font(.system(size: 12.5))
+                            .foregroundStyle(WarmPalette.ink3)
+                            .multilineTextAlignment(.center)
+                    }
+                    .padding(.top, 50)
+                    .padding(.horizontal, 30)
+                } else {
+                    HStack {
+                        Text("\(yearMilestones.count) moment\(yearMilestones.count == 1 ? "" : "s") in \(String(selectedYear))")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(WarmPalette.ink3)
+                        Spacer()
+                    }
+
+                    ForEach(byPerson, id: \.name) { group in
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack(spacing: 8) {
+                                Text(group.name)
+                                    .font(.system(size: 16, weight: .bold))
+                                    .foregroundStyle(WarmPalette.ink1)
+                                Text("\(group.items.count)")
+                                    .font(.system(size: 11, weight: .bold))
+                                    .foregroundStyle(AccentTheme.saffron.color)
+                                    .padding(.horizontal, 7)
+                                    .padding(.vertical, 2)
+                                    .background(AccentTheme.saffron.color.opacity(0.14), in: Capsule())
+                                Spacer()
+                            }
+                            ForEach(group.items) { m in
+                                HStack(spacing: 11) {
+                                    Image(systemName: m.categoryEnum.icon)
+                                        .font(.system(size: 13))
+                                        .foregroundStyle(m.categoryEnum.color)
+                                        .frame(width: 26)
+                                    VStack(alignment: .leading, spacing: 1) {
+                                        Text(m.title)
+                                            .font(.system(size: 14, weight: .semibold))
+                                            .foregroundStyle(WarmPalette.ink1)
+                                        if let date = DateFormatter.isoDate.date(from: String(m.milestone_date.prefix(10))) {
+                                            Text(DateFormatter.longMonthDay.string(from: date))
+                                                .font(.system(size: 11.5))
+                                                .foregroundStyle(WarmPalette.ink3)
+                                        }
+                                    }
+                                    Spacer()
+                                    if let b64 = m.photo_data, let data = Data(base64Encoded: b64), let img = UIImage(data: data) {
+                                        Image(uiImage: img)
+                                            .resizable()
+                                            .scaledToFill()
+                                            .frame(width: 40, height: 40)
+                                            .clipShape(RoundedRectangle(cornerRadius: 9))
+                                    }
+                                }
+                                .padding(11)
+                                .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: 14))
+                            }
+                        }
+                        .padding(.top, 6)
+                    }
+                }
+            }
+            .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
+            .padding(.top, 10)
+            .padding(.bottom, 110)
+        }
+        .background { AmbientBackground(style: .gifts) }
+        .navigationTitle("Year in milestones")
+        .navigationBarTitleDisplayMode(.inline)
+        .task {
+            milestones = (try? await api.fetchMilestones()) ?? []
+            if let latest = years.first, yearMilestones.isEmpty { selectedYear = latest }
+            isLoading = false
         }
     }
 }

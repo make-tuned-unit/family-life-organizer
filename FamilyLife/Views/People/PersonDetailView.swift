@@ -24,6 +24,7 @@ struct PersonDetailView: View {
     @State private var showingAddMilestone = false
     @State private var showingEditPerson = false
     @State private var showingDeleteConfirm = false
+    @State private var editingMilestone: MilestoneResponse?
     /// Live copy of the person — refreshed after edits so the header updates in place.
     @State private var current: PersonResponse?
 
@@ -79,6 +80,12 @@ struct PersonDetailView: View {
         }
         .sheet(isPresented: $showingEditPerson) {
             EditPersonSheet(person: display) {
+                await load()
+                await onChanged?()
+            }
+        }
+        .sheet(item: $editingMilestone) { m in
+            EditMilestoneSheet(milestone: m, accent: display.accentColor) {
                 await load()
                 await onChanged?()
             }
@@ -198,6 +205,9 @@ struct PersonDetailView: View {
         .padding(13)
         .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: 16))
         .contextMenu {
+            Button { editingMilestone = m } label: {
+                Label("Edit milestone", systemImage: "pencil")
+            }
             Button(role: .destructive) {
                 Task {
                     try? await api.deleteMilestone(id: m.id)
@@ -458,6 +468,138 @@ struct AddMilestoneSheet: View {
         Task {
             do {
                 try await api.addMilestone(data)
+                await onSaved()
+                dismiss()
+            } catch {
+                self.error = "Couldn't save. Try again."
+                isSaving = false
+            }
+        }
+    }
+}
+
+// MARK: - Edit milestone
+
+struct EditMilestoneSheet: View {
+    @Environment(APIService.self) private var api
+    @Environment(\.dismiss) private var dismiss
+    let milestone: MilestoneResponse
+    let accent: Color
+    var onSaved: () async -> Void
+
+    @State private var title: String
+    @State private var note: String
+    @State private var date: Date
+    @State private var category: MilestoneCategory
+    /// nil = untouched, .some(nil) = removed, .some(data) = replaced
+    @State private var photoChange: Data?? = nil
+    @State private var selectedPhoto: PhotosPickerItem?
+    @State private var isSaving = false
+    @State private var error: String?
+
+    init(milestone: MilestoneResponse, accent: Color, onSaved: @escaping () async -> Void) {
+        self.milestone = milestone
+        self.accent = accent
+        self.onSaved = onSaved
+        _title = State(initialValue: milestone.title)
+        _note = State(initialValue: milestone.description ?? "")
+        _date = State(initialValue: DateFormatter.isoDate.date(from: String(milestone.milestone_date.prefix(10))) ?? Date())
+        _category = State(initialValue: milestone.categoryEnum)
+    }
+
+    private var currentImage: UIImage? {
+        if case .some(let change) = photoChange {
+            return change.flatMap { UIImage(data: $0) }
+        }
+        if let b64 = milestone.photo_data, let data = Data(base64Encoded: b64) {
+            return UIImage(data: data)
+        }
+        return nil
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("The moment") {
+                    TextField("What happened?", text: $title)
+                    TextField("A little detail (optional)", text: $note, axis: .vertical)
+                        .lineLimit(2...4)
+                    DatePicker("When", selection: $date, displayedComponents: .date)
+                }
+                Section("Category") {
+                    Picker("Category", selection: $category) {
+                        ForEach(MilestoneCategory.allCases) { c in
+                            Label(c.displayName, systemImage: c.icon).tag(c)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                }
+                Section("Photo") {
+                    if let img = currentImage {
+                        Image(uiImage: img)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(maxHeight: 180)
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                            .frame(maxWidth: .infinity)
+                        Button(role: .destructive) {
+                            photoChange = .some(nil)
+                            selectedPhoto = nil
+                        } label: {
+                            Label("Remove photo", systemImage: "trash")
+                        }
+                    }
+                    PhotosPicker(selection: $selectedPhoto, matching: .images) {
+                        Label(currentImage == nil ? "Add a photo" : "Change photo",
+                              systemImage: currentImage == nil ? "photo.on.rectangle" : "arrow.triangle.2.circlepath")
+                            .foregroundStyle(accent)
+                    }
+                    .onChange(of: selectedPhoto) {
+                        Task {
+                            if let data = try? await selectedPhoto?.loadTransferable(type: Data.self) {
+                                photoChange = .some(data)
+                            }
+                        }
+                    }
+                }
+                if let error {
+                    Text(error).foregroundStyle(.red).font(.system(size: 13))
+                }
+            }
+            .navigationTitle("Edit milestone")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(isSaving ? "Saving…" : "Save") { save() }
+                        .disabled(title.trimmingCharacters(in: .whitespaces).isEmpty || isSaving)
+                }
+            }
+        }
+    }
+
+    private func save() {
+        isSaving = true
+        var data: [String: Any] = [
+            "title": title.trimmingCharacters(in: .whitespaces),
+            "milestone_date": DateFormatter.isoDate.string(from: date),
+            "category": category.rawValue,
+        ]
+        let trimmedNote = note.trimmingCharacters(in: .whitespacesAndNewlines)
+        data["description"] = trimmedNote.isEmpty ? NSNull() : trimmedNote
+        if case .some(let change) = photoChange {
+            if let imageData = change,
+               let compressed = UIImage(data: imageData)?.jpegData(compressionQuality: 0.7) {
+                data["photo_data"] = compressed.base64EncodedString()
+            } else {
+                data["photo_data"] = NSNull()
+            }
+        }
+        Task {
+            do {
+                try await api.updateMilestone(id: milestone.id, data: data)
                 await onSaved()
                 dismiss()
             } catch {

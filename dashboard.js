@@ -258,7 +258,7 @@ const LARGE_BODY_PATHS = [
   /^\/api\/receipts(\/(scan|save))?$/,
   /^\/api\/decisions$/,
   /^\/api\/messages$/,
-  /^\/api\/milestones$/,          // optional base64 photo on create
+  /^\/api\/milestones(\/\d+)?$/,  // optional base64 photo on create/update
 ];
 app.use((req, res, next) => {
   const parser = LARGE_BODY_PATHS.some(re => re.test(req.path)) ? jsonLarge : jsonSmall;
@@ -4334,6 +4334,8 @@ app.post('/api/milestones', requireAuth, async (req, res) => {
           post_type: 'milestone',
           title: `${person.name}: ${title}`,
           body: req.body.description || null,
+          // base64, same convention as photo posts — renders in the group feed
+          photo_url: typeof req.body.photo_data === 'string' && req.body.photo_data ? req.body.photo_data : null,
           reference_type: 'milestone',
           reference_id: result.id,
         });
