@@ -178,6 +178,13 @@ struct FamilyLifeApp: App {
                     messageCache.preload(api: apiService, userId: userId)
                     Task { await calendarService.syncToHousehold(api: apiService) }
                 }
+                // System calendar changed while the app is running — push the fresh
+                // snapshot to the household so deletions/edits propagate right away
+                // (and any stale tombstones from a partial read heal themselves).
+                .onChange(of: calendarService.storeVersion) {
+                    guard authService.isAuthenticated else { return }
+                    Task { await calendarService.syncToHousehold(api: apiService) }
+                }
                 .preferredColorScheme(.light)
         }
     }
