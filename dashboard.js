@@ -111,6 +111,10 @@ function establishSession(req, user) {
 // has no 2FA UI. Flip on (AUTH_2FA_ENABLED=1) only once the 2FA-capable build is
 // installed and RESEND_API_KEY is set. Then it's required for everyone.
 const TWO_FA_ENABLED = process.env.AUTH_2FA_ENABLED === '1';
+if (TWO_FA_ENABLED && IS_PROD && !process.env.RESEND_API_KEY) {
+  console.error('FATAL: AUTH_2FA_ENABLED=1 but RESEND_API_KEY is not set — no code email can be sent, which locks every user out of login.');
+  process.exit(1);
+}
 const TWO_FA_TTL_MS = 10 * 60 * 1000;   // code/challenge lifetime
 const TWO_FA_MAX_ATTEMPTS = 5;          // wrong-code guesses before a challenge dies
 // TEST ONLY: echo the code in the JSON response so automated tests can complete
@@ -5251,6 +5255,9 @@ async function initializeDatabase() {
     console.log('✅ Database initialized with full schema + household isolation');
   } catch (err) {
     console.error('❌ Database init error:', err.message);
+    // Never serve traffic against a half-migrated schema — fail the boot so
+    // the platform keeps the previous healthy deploy running.
+    throw err;
   } finally {
     db.close();
   }
@@ -5270,14 +5277,71 @@ app.use((err, req, res, next) => {
   else res.status(500).send('Something went wrong. Please try again.');
 });
 
+// Last-resort process guards: log fire-and-forget failures (background pushes,
+// brief regeneration) instead of dying silently; exit on truly unknown state.
+process.on('unhandledRejection', (reason) => {
+  console.error('[unhandledRejection]', reason && reason.stack ? reason.stack : reason);
+});
+process.on('uncaughtException', (err) => {
+  console.error('[uncaughtException]', err && err.stack ? err.stack : err);
+  process.exit(1);
+});
+
 // Start server after DB init
 initializeDatabase().then(() => {
-  app.listen(PORT, () => {
+  const server = app.listen(PORT, () => {
     console.log('Kinrows running on port', PORT);
     console.log('AI features:', process.env.ANTHROPIC_API_KEY ? 'ENABLED' : 'DISABLED (no ANTHROPIC_API_KEY)');
     startProactiveNudges();
+    startNightlyBackups();
   });
+  // Graceful shutdown on platform-issued SIGTERM (deploys/restarts): stop
+  // accepting connections, let in-flight requests finish, then exit. WAL keeps
+  // the DB crash-safe if the 10s drain window expires.
+  process.on('SIGTERM', () => {
+    console.log('SIGTERM received — draining connections');
+    server.close(() => process.exit(0));
+    setTimeout(() => process.exit(0), 10000).unref();
+  });
+}).catch((err) => {
+  console.error('FATAL: DB init/migration failed, refusing to start:', err && err.stack ? err.stack : err);
+  process.exit(1);
 });
+
+// Nightly on-disk DB snapshots (VACUUM INTO), retained 14 days. Guards against
+// bad migrations and corruption. Note: backups live on the same volume as the
+// DB — offsite copies still need a disk snapshot or external sync.
+function startNightlyBackups() {
+  const fs = require('fs');
+  const BACKUP_DIR = path.join(FamilyDB.DB_DIR, 'backups');
+  const RETAIN = 14;
+  const runBackup = async () => {
+    const db = new FamilyDB();
+    try {
+      fs.mkdirSync(BACKUP_DIR, { recursive: true });
+      const stamp = new Date().toISOString().slice(0, 10);
+      const dest = path.join(BACKUP_DIR, `family-${stamp}.db`);
+      if (!fs.existsSync(dest)) {
+        await db.backupTo(dest);
+        console.log('DB backup written:', dest);
+      }
+      const { purged } = await db.purgeDeletedSyncedEvents(30);
+      if (purged) console.log(`Purged ${purged} soft-deleted synced calendar events`);
+      const files = fs.readdirSync(BACKUP_DIR)
+        .filter(f => /^family-\d{4}-\d{2}-\d{2}\.db$/.test(f)).sort();
+      for (const f of files.slice(0, Math.max(0, files.length - RETAIN))) {
+        fs.unlinkSync(path.join(BACKUP_DIR, f));
+      }
+    } catch (err) {
+      console.error('DB backup failed:', err.message);
+    } finally {
+      db.close();
+    }
+  };
+  runBackup(); // at boot, so every deploy day has a snapshot before any writes
+  const handle = setInterval(runBackup, 24 * 60 * 60 * 1000);
+  handle.unref();
+}
 
 // Proactive concierge nudges: sweep premium households hourly, but only push
 // during waking hours. Throttling/dedup lives in the sweep itself.
