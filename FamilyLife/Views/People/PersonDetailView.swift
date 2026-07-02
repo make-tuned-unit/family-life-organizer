@@ -1,9 +1,11 @@
 import SwiftUI
+import PhotosUI
 
 /// One family member's card: their milestones timeline, gift ideas, key
 /// dates, and the decisions the household has tagged to them.
 struct PersonDetailView: View {
     @Environment(APIService.self) private var api
+    @Environment(\.dismiss) private var dismiss
     let person: PersonResponse
     var onChanged: (() async -> Void)?
 
@@ -20,6 +22,12 @@ struct PersonDetailView: View {
     @State private var decisions: [DecisionResponse] = []
     @State private var keyDates: [SpecialEventResponse] = []
     @State private var showingAddMilestone = false
+    @State private var showingEditPerson = false
+    @State private var showingDeleteConfirm = false
+    /// Live copy of the person — refreshed after edits so the header updates in place.
+    @State private var current: PersonResponse?
+
+    private var display: PersonResponse { current ?? person }
 
     var body: some View {
         ScrollView(showsIndicators: false) {
@@ -43,13 +51,48 @@ struct PersonDetailView: View {
             .padding(.bottom, 110)
         }
         .background { AmbientBackground(style: .gifts) }
-        .navigationTitle(person.name)
+        .navigationTitle(display.name)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Menu {
+                    Button { showingEditPerson = true } label: {
+                        Label("Edit person", systemImage: "pencil")
+                    }
+                    if display.isDependent {
+                        // Linked adults are recreated automatically on next fetch,
+                        // so deleting them would just be confusing — dependents only.
+                        Button(role: .destructive) { showingDeleteConfirm = true } label: {
+                            Label("Remove person", systemImage: "trash")
+                        }
+                    }
+                } label: {
+                    Image(systemName: "ellipsis.circle")
+                }
+            }
+        }
         .sheet(isPresented: $showingAddMilestone) {
             AddMilestoneSheet(person: person) {
                 await load()
                 await onChanged?()
             }
+        }
+        .sheet(isPresented: $showingEditPerson) {
+            EditPersonSheet(person: display) {
+                await load()
+                await onChanged?()
+            }
+        }
+        .confirmationDialog("Remove \(display.name)?", isPresented: $showingDeleteConfirm, titleVisibility: .visible) {
+            Button("Remove person and their history", role: .destructive) {
+                Task {
+                    try? await api.deletePerson(id: person.id)
+                    await onChanged?()
+                    dismiss()
+                }
+            }
+        } message: {
+            Text("Their milestones, gift ideas and key dates go too. This can't be undone.")
         }
         .task { await load() }
     }
@@ -60,22 +103,22 @@ struct PersonDetailView: View {
         VStack(spacing: 8) {
             ZStack {
                 Circle()
-                    .fill(person.accentColor.opacity(0.18))
+                    .fill(display.accentColor.opacity(0.18))
                     .frame(width: 76, height: 76)
-                Text(String(person.name.prefix(1)).uppercased())
+                Text(String(display.name.prefix(1)).uppercased())
                     .font(.system(size: 30, weight: .bold))
-                    .foregroundStyle(person.accentColor)
+                    .foregroundStyle(display.accentColor)
             }
             HStack(spacing: 8) {
-                if let rel = person.relationship, rel != "other", rel != "household" {
+                if let rel = display.relationship, rel != "other", rel != "household" {
                     Text(rel.capitalized)
                         .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(person.accentColor)
+                        .foregroundStyle(display.accentColor)
                         .padding(.horizontal, 9)
                         .padding(.vertical, 3)
-                        .background(person.accentColor.opacity(0.12), in: Capsule())
+                        .background(display.accentColor.opacity(0.12), in: Capsule())
                 }
-                if let bday = person.birthday, let date = DateFormatter.isoDate.date(from: bday) {
+                if let bday = display.birthday, let date = DateFormatter.isoDate.date(from: bday) {
                     HStack(spacing: 4) {
                         Image(systemName: "birthday.cake.fill").font(.system(size: 10))
                         Text(DateFormatter.longMonthDay.string(from: date))
@@ -97,8 +140,8 @@ struct PersonDetailView: View {
                     .font(.system(size: 14, weight: .semibold))
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 11)
-                    .background(person.accentColor.opacity(0.14), in: RoundedRectangle(cornerRadius: 14))
-                    .foregroundStyle(person.accentColor)
+                    .background(display.accentColor.opacity(0.14), in: RoundedRectangle(cornerRadius: 14))
+                    .foregroundStyle(display.accentColor)
             }
             .buttonStyle(.plain)
 
@@ -144,6 +187,13 @@ struct PersonDetailView: View {
                 .foregroundStyle(WarmPalette.ink3)
             }
             Spacer()
+            if let b64 = m.photo_data, let data = Data(base64Encoded: b64), let img = UIImage(data: data) {
+                Image(uiImage: img)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: 52, height: 52)
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+            }
         }
         .padding(13)
         .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: 16))
@@ -165,17 +215,17 @@ struct PersonDetailView: View {
     private var giftsSection: some View {
         VStack(spacing: 10) {
             NavigationLink {
-                PersonGiftListView(person: person.asGiftPerson)
+                PersonGiftListView(person: display.asGiftPerson)
             } label: {
                 HStack(spacing: 12) {
                     Image(systemName: "gift.fill")
                         .font(.system(size: 15))
                         .foregroundStyle(AccentTheme.rose.color)
                     VStack(alignment: .leading, spacing: 1) {
-                        Text("Gift ideas for \(person.name)")
+                        Text("Gift ideas for \(display.name)")
                             .font(.system(size: 15, weight: .semibold))
                             .foregroundStyle(WarmPalette.ink1)
-                        Text("\(person.gift_idea_count ?? 0) idea\((person.gift_idea_count ?? 0) == 1 ? "" : "s") saved")
+                        Text("\(display.gift_idea_count ?? 0) idea\((display.gift_idea_count ?? 0) == 1 ? "" : "s") saved")
                             .font(.system(size: 12))
                             .foregroundStyle(WarmPalette.ink3)
                     }
@@ -195,16 +245,16 @@ struct PersonDetailView: View {
 
     private var datesSection: some View {
         VStack(spacing: 10) {
-            if let bday = person.birthday, let date = DateFormatter.isoDate.date(from: bday) {
+            if let bday = display.birthday, let date = DateFormatter.isoDate.date(from: bday) {
                 dateRow("birthday.cake.fill", "Birthday", DateFormatter.longMonthDay.string(from: date), AccentTheme.saffron.color)
             }
-            if let ann = person.anniversary, let date = DateFormatter.isoDate.date(from: ann) {
+            if let ann = display.anniversary, let date = DateFormatter.isoDate.date(from: ann) {
                 dateRow("heart.fill", "Anniversary", DateFormatter.longMonthDay.string(from: date), AccentTheme.rose.color)
             }
             ForEach(keyDates) { ev in
                 dateRow("calendar", ev.title, ev.date, AccentTheme.ocean.color)
             }
-            if person.birthday == nil && person.anniversary == nil && keyDates.isEmpty {
+            if display.birthday == nil && display.anniversary == nil && keyDates.isEmpty {
                 sectionEmpty("calendar", "No key dates",
                              "Add a birthday when editing this person, or occasions from the Gifts overview.")
             }
@@ -235,7 +285,7 @@ struct PersonDetailView: View {
         VStack(spacing: 10) {
             if decisions.isEmpty {
                 sectionEmpty("chart.bar.fill", "Nothing tagged yet",
-                             "When you create a decision, tag \(person.name) and it will appear here — the story of what you've talked about for them.")
+                             "When you create a decision, tag \(display.name) and it will appear here — the story of what you've talked about for them.")
             } else {
                 ForEach(decisions) { d in
                     NavigationLink {
@@ -298,9 +348,13 @@ struct PersonDetailView: View {
         async let ms = api.fetchMilestones(personId: person.id)
         async let decs = api.fetchPersonDecisions(personId: person.id)
         async let events = api.fetchSpecialEvents()
+        async let people = api.fetchPeople()
         milestones = (try? await ms) ?? []
         decisions = (try? await decs) ?? []
         keyDates = ((try? await events) ?? []).filter { $0.person_id == person.id }
+        if let refreshed = (try? await people)?.first(where: { $0.id == person.id }) {
+            current = refreshed
+        }
     }
 }
 
@@ -317,6 +371,8 @@ struct AddMilestoneSheet: View {
     @State private var date = Date()
     @State private var category: MilestoneCategory = .moment
     @State private var shareGroupId: Int?
+    @State private var selectedPhoto: PhotosPickerItem?
+    @State private var selectedImageData: Data?
     @State private var isSaving = false
     @State private var error: String?
 
@@ -336,6 +392,28 @@ struct AddMilestoneSheet: View {
                         }
                     }
                     .pickerStyle(.menu)
+                }
+                Section("Photo") {
+                    if let selectedImageData, let uiImage = UIImage(data: selectedImageData) {
+                        Image(uiImage: uiImage)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(maxHeight: 180)
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                            .frame(maxWidth: .infinity)
+                    }
+                    PhotosPicker(selection: $selectedPhoto, matching: .images) {
+                        Label(selectedImageData == nil ? "Add a photo (optional)" : "Change photo",
+                              systemImage: selectedImageData == nil ? "photo.on.rectangle" : "arrow.triangle.2.circlepath")
+                            .foregroundStyle(person.accentColor)
+                    }
+                    .onChange(of: selectedPhoto) {
+                        Task {
+                            if let data = try? await selectedPhoto?.loadTransferable(type: Data.self) {
+                                selectedImageData = data
+                            }
+                        }
+                    }
                 }
                 ShareWithSection(selectedGroupId: $shareGroupId)
 
@@ -373,9 +451,115 @@ struct AddMilestoneSheet: View {
         let trimmedNote = note.trimmingCharacters(in: .whitespacesAndNewlines)
         if !trimmedNote.isEmpty { data["description"] = trimmedNote }
         if let shareGroupId { data["shared_group_id"] = shareGroupId }
+        if let imageData = selectedImageData,
+           let compressed = UIImage(data: imageData)?.jpegData(compressionQuality: 0.7) {
+            data["photo_data"] = compressed.base64EncodedString()
+        }
         Task {
             do {
                 try await api.addMilestone(data)
+                await onSaved()
+                dismiss()
+            } catch {
+                self.error = "Couldn't save. Try again."
+                isSaving = false
+            }
+        }
+    }
+}
+
+// MARK: - Edit person
+
+struct EditPersonSheet: View {
+    @Environment(APIService.self) private var api
+    @Environment(\.dismiss) private var dismiss
+    let person: PersonResponse
+    var onSaved: () async -> Void
+
+    @State private var name: String
+    @State private var relationship: String
+    @State private var hasBirthday: Bool
+    @State private var birthday: Date
+    @State private var avatarColor: String
+    @State private var isSaving = false
+    @State private var error: String?
+
+    private let relationships = ["son", "daughter", "partner", "parent", "grandparent", "household", "other"]
+    private let colors = ["sage", "rose", "ocean", "saffron", "mauve", "terracotta"]
+
+    init(person: PersonResponse, onSaved: @escaping () async -> Void) {
+        self.person = person
+        self.onSaved = onSaved
+        _name = State(initialValue: person.name)
+        _relationship = State(initialValue: person.relationship ?? "other")
+        let bday = person.birthday.flatMap { DateFormatter.isoDate.date(from: $0) }
+        _hasBirthday = State(initialValue: bday != nil)
+        _birthday = State(initialValue: bday ?? Date())
+        _avatarColor = State(initialValue: person.avatar_color ?? "sage")
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Details") {
+                    TextField("Name", text: $name)
+                        .textInputAutocapitalization(.words)
+                    Picker("Relationship", selection: $relationship) {
+                        ForEach(relationships, id: \.self) { Text($0.capitalized) }
+                    }
+                }
+                Section("Birthday") {
+                    Toggle("Has a birthday set", isOn: $hasBirthday)
+                    if hasBirthday {
+                        DatePicker("Birthday", selection: $birthday, displayedComponents: .date)
+                    }
+                }
+                Section("Color") {
+                    HStack(spacing: 12) {
+                        ForEach(colors, id: \.self) { c in
+                            Circle()
+                                .fill((AccentTheme(rawValue: c) ?? .sage).color)
+                                .frame(width: 30, height: 30)
+                                .overlay {
+                                    if avatarColor == c {
+                                        Image(systemName: "checkmark")
+                                            .font(.system(size: 12, weight: .bold))
+                                            .foregroundStyle(.white)
+                                    }
+                                }
+                                .onTapGesture { avatarColor = c }
+                        }
+                    }
+                }
+                if let error {
+                    Text(error).foregroundStyle(.red).font(.system(size: 13))
+                }
+            }
+            .navigationTitle("Edit \(person.name)")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(isSaving ? "Saving…" : "Save") { save() }
+                        .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty || isSaving)
+                }
+            }
+        }
+    }
+
+    private func save() {
+        isSaving = true
+        let data: [String: Any] = [
+            "name": name.trimmingCharacters(in: .whitespaces),
+            "relationship": relationship,
+            "birthday": hasBirthday ? DateFormatter.isoDate.string(from: birthday) : NSNull(),
+            "avatar_color": avatarColor,
+        ]
+        Task {
+            do {
+                try await api.updatePerson(id: person.id, data: data)
                 await onSaved()
                 dismiss()
             } catch {

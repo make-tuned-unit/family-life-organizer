@@ -258,6 +258,7 @@ const LARGE_BODY_PATHS = [
   /^\/api\/receipts(\/(scan|save))?$/,
   /^\/api\/decisions$/,
   /^\/api\/messages$/,
+  /^\/api\/milestones$/,          // optional base64 photo on create
 ];
 app.use((req, res, next) => {
   const parser = LARGE_BODY_PATHS.some(re => re.test(req.path)) ? jsonLarge : jsonSmall;

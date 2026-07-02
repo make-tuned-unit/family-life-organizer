@@ -49,6 +49,7 @@ struct MilestoneResponse: Codable, Identifiable {
     let description: String?
     let milestone_date: String
     let category: String?
+    let photo_data: String?
     let creator_name: String?
     let created_at: String?
 

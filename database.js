@@ -2039,9 +2039,15 @@ class FamilyDB {
 
   deletePerson(id) {
     return new Promise((resolve, reject) => {
-      // gift_ideas / special_events / milestones cascade via their FKs.
-      this.db.run('DELETE FROM gift_people WHERE id = ?', [id], (err) => {
-        err ? reject(err) : resolve({ id, deleted: true });
+      // Decisions keep living when a person goes — just drop the tag. (Their
+      // FK has no ON DELETE action on already-migrated DBs, so a lingering
+      // tag would block the delete under foreign_keys=ON.)
+      this.db.run('UPDATE decisions SET person_id = NULL WHERE person_id = ?', [id], (err) => {
+        if (err) return reject(err);
+        // gift_ideas / special_events / milestones cascade via their FKs.
+        this.db.run('DELETE FROM gift_people WHERE id = ?', [id], (err2) => {
+          err2 ? reject(err2) : resolve({ id, deleted: true });
+        });
       });
     });
   }

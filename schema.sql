@@ -224,7 +224,7 @@ CREATE TABLE IF NOT EXISTS decisions (
     status TEXT DEFAULT 'active',
     expires_at TEXT,
     group_id INTEGER,
-    person_id INTEGER REFERENCES gift_people(id), -- optional "about <person>" tag
+    person_id INTEGER REFERENCES gift_people(id) ON DELETE SET NULL, -- optional "about <person>" tag
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (group_id) REFERENCES groups(id)
 );

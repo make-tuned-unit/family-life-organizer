@@ -225,4 +225,13 @@ test('people & milestones: dependents and milestones are household-scoped', asyn
   assert.ok((cardDecisions.body || []).some(d => d.title === 'Improv class for Kiddo'), 'decision shows on person card');
   const bDec = await b('POST', '/api/decisions', { title: 'evil', decision_type: 'text', person_id: kidId });
   assert.equal(bDec.status, 403, 'tagging a foreign person blocked');
+
+  // Deleting the dependent keeps tagged decisions (tag cleared) and cascades milestones.
+  const del = await a('DELETE', `/api/people/${kidId}`);
+  assert.equal(del.status, 200, 'person deleted despite tagged decision');
+  const aDecs = await a('GET', '/api/decisions');
+  const kept = (aDecs.body || []).find(d => d.title === 'Improv class for Kiddo');
+  assert.ok(kept && kept.person_id == null, 'decision survives with tag cleared');
+  const aMs = await a('GET', '/api/milestones');
+  assert.ok(!(aMs.body || []).some(m => m.id === msId), 'milestones cascade on person delete');
 });
