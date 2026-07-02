@@ -83,6 +83,11 @@ async function householdDailyMax(req) {
 // Tier-aware daily cap, bounded per HOUSEHOLD (was a flat 200/user = ~6000/mo, dangerous).
 const conciergeChatDailyLimiter = createRateLimiter({ windowMs: 24 * 60 * 60 * 1000, keyFn: householdRateKey, maxFn: householdDailyMax });
 
+// Daily cap for the other Anthropic-calling endpoints (cook suggestions,
+// receipt vision scans). Generous for real use, but stops an authenticated
+// loop from running up the API bill — these had no cap at all before.
+const aiDailyLimiter = createRateLimiter({ windowMs: 24 * 60 * 60 * 1000, max: 60, keyFn: req => `ai:${req.session?.user?.id ?? clientIp(req)}` });
+
 // IP-keyed limiter for the unauthenticated, brute-forceable auth endpoints.
 // Use req.ip (derived by Express under `trust proxy: 1` from the RIGHTMOST
 // proxy-appended X-Forwarded-For entry) — never the raw leftmost XFF value,
@@ -2031,12 +2036,11 @@ app.post('/api/add', requireAuth, async (req, res) => {
     const { type, data } = req.body;
     if (type === 'grocery') {
       // Resolve user's household group_id
-      const username = req.session.user?.username || 'jesse';
-      const userGroupId = await new Promise((resolve) => {
-        db.db.get(`SELECT gm.group_id FROM group_members gm
-          JOIN groups g ON g.id = gm.group_id AND g.group_type = 'household'
-          WHERE gm.user_id = ?`, [req.session.user?.id], (err, row) => resolve(row?.group_id || null));
-      });
+      const username = req.session.user.username || req.session.user.name;
+      const userGroupId = await db.getUserHouseholdId(req.session.user?.id);
+      // Never write a NULL-group row: the startup backfill would later re-home
+      // it into another household (cross-household leak).
+      if (!userGroupId) return res.status(403).json({ error: 'Join a household first' });
       await db.addGrocery(data.item, data.category || null, data.quantity || '1', username, userGroupId);
     } else if (type === 'task') {
       const groupId = await db.getUserHouseholdId(req.session.user?.id);
@@ -2458,6 +2462,9 @@ app.post('/api/recurring-payments', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
     const groupId = await db.getUserHouseholdId(req.session.user?.id);
+    // Never write a NULL-group row: the startup backfill would later re-home
+    // it into another household (cross-household leak).
+    if (!groupId) return res.status(403).json({ error: 'Join a household first' });
     const result = await db.addRecurringPayment({
       ...req.body,
       created_by: req.session.user?.username || req.session.user?.name,
@@ -2650,12 +2657,15 @@ app.post('/api/receipts', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
     const groupId = await db.getUserHouseholdId(req.session.user?.id);
+    // Never write a NULL-group row: the startup backfill would later re-home
+    // it into another household (cross-household leak).
+    if (!groupId) return res.status(403).json({ error: 'Join a household first' });
     if (req.body.category) {
       await db.ensureBudgetCategory(req.body.category, groupId);
     }
     const data = { ...req.body, group_id: groupId };
     if (data.date) data.date = normalizeDate(data.date);
-    if (!data.added_by) data.added_by = req.session.user?.username || 'jesse';
+    if (!data.added_by) data.added_by = req.session.user.username || req.session.user.name;
     const result = await db.addReceipt(data);
     res.json({ success: true, id: result.id });
   } catch (err) {
@@ -2666,7 +2676,7 @@ app.post('/api/receipts', requireAuth, async (req, res) => {
 });
 
 // Receipts - scan with Claude Vision
-app.post('/api/receipts/scan', requireAuth, async (req, res) => {
+app.post('/api/receipts/scan', requireAuth, conciergeLimiter, aiDailyLimiter, async (req, res) => {
   try {
     const { image } = req.body;
 
@@ -2712,8 +2722,11 @@ app.post('/api/receipts/save', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
     const { merchant, date, total, category, notes, itinerary_id } = req.body;
-    const username = req.session.user?.username || 'jesse';
+    const username = req.session.user.username || req.session.user.name;
     const groupId = await db.getUserHouseholdId(req.session.user?.id);
+    // Never write a NULL-group row: the startup backfill would later re-home
+    // it into another household (cross-household leak).
+    if (!groupId) return res.status(403).json({ error: 'Join a household first' });
 
     // Normalize date to YYYY-MM-DD for strftime compatibility
     // If the AI returned a date more than 60 days in the past or in the future, use today
@@ -2873,6 +2886,9 @@ app.post('/api/pantry', requireAuth, async (req, res) => {
     const data = { ...req.body };
     if (data.expiry_date) data.expiry_date = normalizeDate(data.expiry_date);
     data.group_id = await db.getUserHouseholdId(req.session.user?.id);
+    // Never write a NULL-group row: the startup backfill would later re-home
+    // it into another household (cross-household leak).
+    if (!data.group_id) return res.status(403).json({ error: 'Join a household first' });
     const result = await db.addPantryItem(data);
     res.json({ success: true, id: result.id });
   } catch (err) {
@@ -3081,7 +3097,7 @@ app.get('/api/concierge/conversations/:id/messages', requireAuth, conciergeLimit
 });
 
 // Cook - recipe suggestions (requires ANTHROPIC_API_KEY env var)
-app.post('/api/cook/suggest', requireAuth, async (req, res) => {
+app.post('/api/cook/suggest', requireAuth, conciergeLimiter, aiDailyLimiter, async (req, res) => {
   const db = new FamilyDB();
   try {
     const groupId = await db.getUserHouseholdId(req.session.user?.id);
@@ -3681,14 +3697,25 @@ app.post('/api/rivalries/:id/complete', requireAuth, async (req, res) => {
   try {
     if (!(await requireGroupRow(db, 'rivalries', req.params.id, req, res))) return;
     const result = await db.completeRivalryWithTotals(Number(req.params.id));
-    const { rivalry, initiator_total, opponent_total, winner_name, already_completed } = result;
+    const { rivalry, initiator_total, opponent_total, winner_name, winner_team, already_completed } = result;
     const ct = rivalry.challenge_type === 'steps' ? 'steps' : rivalry.challenge_type;
 
+    const parseRoster = (s) => { try { const p = JSON.parse(s || '[]'); return Array.isArray(p) ? p.filter(Boolean) : []; } catch (_) { return []; } };
     let message;
     if (winner_name) {
-      const loser = winner_name === rivalry.initiator_name ? rivalry.opponent_name : rivalry.initiator_name;
-      const ws = winner_name === rivalry.initiator_name ? initiator_total : opponent_total;
-      const ls = winner_name === rivalry.initiator_name ? opponent_total : initiator_total;
+      let loser, ws, ls;
+      if (rivalry.rivalry_type === 'team' && winner_team) {
+        // Team mode: winner_name is the winning roster ("X & Y"); the loser is
+        // the other roster, and the totals are the TEAM totals.
+        loser = parseRoster(winner_team === 'a' ? rivalry.team_b : rivalry.team_a).join(' & ')
+          || (winner_team === 'a' ? rivalry.opponent_name : rivalry.initiator_name);
+        ws = winner_team === 'a' ? initiator_total : opponent_total;
+        ls = winner_team === 'a' ? opponent_total : initiator_total;
+      } else {
+        loser = winner_name === rivalry.initiator_name ? rivalry.opponent_name : rivalry.initiator_name;
+        ws = winner_name === rivalry.initiator_name ? initiator_total : opponent_total;
+        ls = winner_name === rivalry.initiator_name ? opponent_total : initiator_total;
+      }
       message = pick(RIVALRY_WINNER_MESSAGES)(winner_name, loser, ws, ls, ct);
     } else {
       message = pick(RIVALRY_TIE_MESSAGES)(rivalry.initiator_name, rivalry.opponent_name, initiator_total, ct);
@@ -3730,7 +3757,7 @@ app.post('/api/rivalries/:id/complete', requireAuth, async (req, res) => {
     }
 
     const scores = result.scores || [];
-    res.json({ success: true, winner_name, initiator_total, opponent_total, scores, message, is_tie: !winner_name });
+    res.json({ success: true, winner_name, winner_team: winner_team || null, initiator_total, opponent_total, scores, message, is_tie: !winner_name });
   } catch (err) {
     sendServerError(res, err);
   } finally {
