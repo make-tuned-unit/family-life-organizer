@@ -463,14 +463,6 @@ a:focus-visible, button:focus-visible{outline:2px solid var(--terracotta);outlin
 .cta-logo{margin:0 auto 22px;width:72px;height:72px;border-radius:20px;object-fit:cover;
   box-shadow:0 14px 34px rgba(196,106,74,.34), inset 0 0 0 1px rgba(255,255,255,.4)}
 .cta h2{margin-bottom:6px}
-/* founding-household perks, above the final form */
-.cta-perks{list-style:none;display:flex;justify-content:center;gap:10px 26px;flex-wrap:wrap;
-  margin:22px auto 0;max-width:640px}
-.cta-perks li{display:inline-flex;align-items:center;gap:8px;font-size:.93rem;font-weight:500;
-  color:var(--ink-2);background:var(--card-2);border:1px solid var(--line-soft);
-  border-radius:999px;padding:8px 16px;box-shadow:var(--shadow-sm)}
-.cta-perks .ic{color:var(--terracotta)}
-
 .notify-form{display:flex;gap:10px;max-width:440px;margin:30px auto 0}
 .notify-form input{flex:1;padding:.9em 1.2em;border-radius:999px;border:1px solid var(--line);
   background:#fff;font-family:var(--sans);font-size:1rem;color:var(--ink-1);box-shadow:var(--shadow-sm)}
@@ -918,3 +910,159 @@ a:focus-visible, button:focus-visible{outline:2px solid var(--terracotta);outlin
 .cmp-card p{font-size:.95rem;color:var(--ink-2);line-height:1.55;margin:0 0 12px}
 .cmp-card a{font-size:.92rem;color:var(--terracotta);font-weight:500;border-bottom:1px solid var(--line)}
 .cmp-card a:hover{border-color:var(--terracotta)}
+
+/* ============================================================
+   LIQUID GLASS LAYER — matches the app's iOS 26 glass feel.
+   Appended as an override layer: aurora canvas behind everything,
+   frosted translucent surfaces with specular top edges in front.
+   ============================================================ */
+
+/* ---------- Aurora canvas (the app's AmbientBackground, for the web) ---------- */
+body::before{
+  content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
+  background:
+    radial-gradient(46% 38% at 10% 4%,  rgba(249,205,140,.42), transparent 70%),
+    radial-gradient(40% 34% at 92% 10%, rgba(194,90,122,.16),  transparent 70%),
+    radial-gradient(44% 40% at 86% 52%, rgba(123,160,91,.15),  transparent 72%),
+    radial-gradient(42% 36% at 6% 74%,  rgba(90,135,160,.14),  transparent 72%),
+    radial-gradient(50% 40% at 50% 100%,rgba(217,158,58,.16),  transparent 72%),
+    var(--cream-1);
+}
+/* soften the old opaque section washes so the aurora reads through */
+.band{background:none}
+.band-quiet{background:linear-gradient(180deg,transparent 0%,rgba(249,205,140,.13) 50%,transparent 100%)}
+.feature-alt{background:linear-gradient(180deg,transparent 0%,rgba(250,228,180,.26) 26%,rgba(250,228,180,.26) 74%,transparent 100%)}
+.privacy{background:none}
+.footer{background:linear-gradient(180deg,transparent 0%,rgba(250,228,180,.34) 60%)}
+
+/* ---------- Shared glass tokens ---------- */
+:root{
+  --glass:rgba(255,253,246,.55);
+  --glass-strong:rgba(255,253,247,.72);
+  --glass-line:rgba(255,255,255,.55);
+  --glass-blur:saturate(165%) blur(18px);
+  --glass-inset:inset 0 1px 0 rgba(255,255,255,.75);
+}
+
+/* ---------- Frosted surfaces ---------- */
+.gf,.rw,.pc,.moment,.price-card,.blog-card,.cmp-card,.legal-tldr,.legal-toc,.post-cta{
+  background:var(--glass);
+  -webkit-backdrop-filter:var(--glass-blur);backdrop-filter:var(--glass-blur);
+  border:1px solid var(--glass-line);
+  box-shadow:var(--glass-inset), 0 10px 30px rgba(120,74,46,.09), 0 2px 8px rgba(120,74,46,.05);
+}
+.gf:hover,.rw:hover,.blog-card:hover{
+  transform:translateY(-4px);
+  border-color:rgba(255,255,255,.8);
+  box-shadow:var(--glass-inset), 0 22px 44px rgba(120,74,46,.15), 0 4px 12px rgba(120,74,46,.08);
+}
+.price-feature{
+  background:linear-gradient(165deg,rgba(255,250,242,.78),rgba(248,236,218,.6));
+  border-color:rgba(196,106,74,.32);
+  box-shadow:var(--glass-inset), var(--shadow-md);
+}
+.gf-ico,.rw-ico,.pc-ico,.moment-ico{
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.5), inset 0 0 0 1px rgba(255,255,255,.35);
+}
+
+/* ---------- Floating glass nav pill ---------- */
+.nav{padding:12px 16px 0}
+.nav-inner{
+  border-radius:999px;padding:10px 12px 10px 22px;border:1px solid transparent;
+  transition:background .3s ease, box-shadow .3s ease, border-color .3s ease;
+}
+.nav.scrolled{background:none;backdrop-filter:none;-webkit-backdrop-filter:none;border-bottom:0;box-shadow:none}
+.nav.scrolled .nav-inner{
+  background:rgba(253,247,231,.6);
+  -webkit-backdrop-filter:var(--glass-blur);backdrop-filter:var(--glass-blur);
+  border-color:rgba(255,255,255,.55);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.65), 0 12px 32px rgba(120,74,46,.14);
+}
+@media (max-width:900px){
+  .nav-links{
+    left:16px;right:16px;border-radius:24px;overflow:hidden;margin-top:8px;
+    background:rgba(253,247,231,.8);
+    border:1px solid rgba(255,255,255,.55);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.65), 0 18px 40px rgba(120,74,46,.16);
+  }
+}
+
+/* ---------- Hero fine print: glass chips so they stay readable on the photo ---------- */
+.hero-note,.hero-trust{
+  width:fit-content;padding:7px 14px;border-radius:999px;
+  background:rgba(253,247,231,.55);
+  -webkit-backdrop-filter:blur(14px) saturate(160%);backdrop-filter:blur(14px) saturate(160%);
+  border:1px solid rgba(255,255,255,.5);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.6), 0 4px 14px rgba(120,74,46,.06);
+  color:var(--ink-2);
+}
+
+/* ---------- Glass controls ---------- */
+.btn-ghost{
+  background:rgba(255,255,255,.42);
+  -webkit-backdrop-filter:blur(14px) saturate(160%);backdrop-filter:blur(14px) saturate(160%);
+  border-color:rgba(255,255,255,.6);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.7), 0 4px 14px rgba(120,74,46,.07);
+}
+.btn-ghost:hover{background:rgba(255,255,255,.65)}
+.notify-form input, .notify-form.hero-form input{
+  background:rgba(255,255,255,.55);
+  -webkit-backdrop-filter:blur(14px) saturate(160%);backdrop-filter:blur(14px) saturate(160%);
+  border-color:rgba(255,255,255,.65);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.8), 0 4px 14px rgba(120,74,46,.07);
+}
+.notify-form input:focus, .notify-form.hero-form input:focus{
+  border-color:var(--terracotta);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.8), 0 0 0 4px rgba(196,106,74,.14);
+}
+
+/* ---------- Concierge: full-bleed band becomes a floating dark-glass panel ---------- */
+.assist{background:none;padding:56px 28px 104px;overflow:visible}
+.assist::after{display:none}                /* grain moves inside the panel */
+.assist-ambient{                            /* warm halo *behind* the panel */
+  background:
+    radial-gradient(46% 42% at 78% 22%, rgba(247,200,154,.34), transparent 70%),
+    radial-gradient(50% 46% at 16% 78%, rgba(196,106,74,.26), transparent 70%);
+  filter:blur(6px);
+}
+.assist-grid{
+  position:relative;z-index:2;border-radius:44px;padding:76px 64px;
+  background:
+    radial-gradient(52% 46% at 84% 6%,  rgba(247,200,154,.15), transparent 70%),
+    radial-gradient(56% 50% at 8% 96%,  rgba(196,106,74,.17),  transparent 70%),
+    linear-gradient(155deg,#332417 0%,#241a12 52%,#1c130c 100%);
+  border:1px solid rgba(247,200,154,.18);
+  box-shadow:inset 0 1px 0 rgba(251,231,207,.14),
+    0 44px 90px rgba(64,38,18,.30), 0 10px 30px rgba(64,38,18,.16);
+}
+.assist-grid::before{                       /* grain dither, clipped to the panel */
+  content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;opacity:.65;
+  border-radius:inherit;mix-blend-mode:soft-light;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='ng'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.92' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23ng)'/%3E%3C/svg%3E");
+}
+.ap-ico{box-shadow:inset 0 1px 0 rgba(251,231,207,.25)}
+.teaser-card{box-shadow:inset 0 1px 0 rgba(251,231,207,.16), var(--shadow-lg)}
+@media (max-width:900px){
+  .assist{padding:32px 16px 72px}
+  .assist-grid{padding:52px 30px;border-radius:34px}
+}
+@media (max-width:560px){
+  .assist-grid{padding:44px 22px;border-radius:28px}
+}
+
+/* ---------- Mobile: prevent grid-column blowout past the viewport ---------- */
+/* A grid item's default min-width:auto lets wide content push the single
+   column wider than the screen, clipping text at the right edge. */
+@media (max-width:900px){
+  .hero-grid,.feature-grid,.feature-grid.reverse,.privacy-grid,.assist-grid{
+    grid-template-columns:minmax(0,1fr);
+  }
+  .hero-copy,.feature-copy,.assist-copy,.feature-stage,.assist-stage,.hero-stage{min-width:0}
+}
+
+/* ---------- Fallback when backdrop-filter is unsupported ---------- */
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
+  .gf,.rw,.pc,.moment,.price-card,.blog-card,.cmp-card,.legal-tldr,.legal-toc,.post-cta{background:var(--card-2)}
+  .nav.scrolled .nav-inner,.nav-links{background:rgba(253,245,224,.96)}
+  .btn-ghost,.notify-form input,.notify-form.hero-form input{background:#fff}
+}
