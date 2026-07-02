@@ -134,14 +134,18 @@ struct CalendarView: View {
     // MARK: - Owner Filter (Everyone / Just me / per-person)
 
     /// Other people whose calendars can appear here — driven by the household
-    /// roster (consistent across ALL months), plus anyone seen in synced events.
-    /// This is why the filter no longer only shows on months that have events.
+    /// group's actual user roster (stable across every month and year), plus
+    /// anyone seen in this month's synced events. The roster comes straight
+    /// from group membership (`householdUsers`), NOT from contacts filtered by
+    /// name — a contact called "Sophie" never matching the group member
+    /// "Sophie Chiasson" is what used to make this menu vanish on months
+    /// without synced events.
     private var householdOwners: [(id: Int, name: String)] {
         var seen = Set<Int>()
         var out: [(id: Int, name: String)] = []
-        for member in household.householdMembers {
-            if let id = household.userId(for: member.name), !seen.contains(id) {
-                seen.insert(id); out.append((id: id, name: member.name))
+        for user in household.householdUsers {
+            if !seen.contains(user.id) {
+                seen.insert(user.id); out.append((id: user.id, name: user.name))
             }
         }
         for ev in viewModel.householdEvents {
