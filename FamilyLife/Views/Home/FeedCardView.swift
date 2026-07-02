@@ -23,6 +23,7 @@ struct FeedCard: View {
     @State private var commentCount = 0
     @State private var mentionSuggestions: [APIService.ContactResponse] = []
     @State private var metaLoaded = false
+    @State private var photo: UIImage?
 
     private var item: APIService.ActivityItem { prepared.item }
     private var displayLikeCount: Int { metaLoaded ? likeCount : (item.reaction_count ?? 0) }
@@ -67,6 +68,12 @@ struct FeedCard: View {
                     .lineSpacing(2)
                     .padding(.horizontal, 14)
                     .padding(.bottom, 12)
+            }
+
+            // Photo — the list only carries a flag; the image is fetched lazily
+            // per post and cached so scrolling doesn't refetch.
+            if prepared.isPost && (item.has_photo ?? 0) == 1 {
+                feedPhoto
             }
 
             // Inline counts — always visible for posts, no buttons during scroll
@@ -436,6 +443,42 @@ struct FeedCard: View {
         isSendingComment = false
     }
 
+    // MARK: - Photo (lazy)
+
+    @ViewBuilder
+    private var feedPhoto: some View {
+        Group {
+            if let photo {
+                Image(uiImage: photo)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 200)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+            } else {
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(WarmPalette.ink1.opacity(0.05))
+                    .frame(height: 200)
+                    .overlay { ProgressView() }
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.bottom, 12)
+        .task(id: item.ref_id) { await loadPhoto() }
+    }
+
+    private func loadPhoto() async {
+        if let cached = FeedPhotoCache.shared.object(forKey: NSNumber(value: item.ref_id)) {
+            photo = cached
+            return
+        }
+        guard let b64 = try? await api.fetchFeedPhoto(postId: item.ref_id),
+              let data = Data(base64Encoded: b64 ?? ""),
+              let img = UIImage(data: data) else { return }
+        FeedPhotoCache.shared.setObject(img, forKey: NSNumber(value: item.ref_id))
+        photo = img
+    }
+
     // MARK: - Helpers
 
     private func tapped() {
@@ -504,6 +547,13 @@ struct FeedCard: View {
     }
 }
 
+/// Process-wide cache for lazily-fetched feed photos, so scrolling the Home
+/// feed doesn't refetch the same image.
+final class FeedPhotoCache {
+    static let shared = NSCache<NSNumber, UIImage>()
+    private init() {}
+}
+
 #Preview {
     VStack(spacing: 12) {
         FeedCard(
@@ -520,7 +570,8 @@ struct FeedCard: View {
                     reaction_count: 2,
                     comment_count: 1,
                     group_id: 1,
-                    group_name: "Fairbanks"
+                    group_name: "Fairbanks",
+                    has_photo: 0
                 ),
                 body: AttributedString("Took the kids to Point Pleasant Park."),
                 time: "2 hours ago",

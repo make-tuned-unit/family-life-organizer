@@ -4688,6 +4688,22 @@ app.post('/api/groups/:id/feed', requireAuth, async (req, res) => {
   }
 });
 
+// Lazy photo fetch for the Home activity feed: the list carries only a
+// has_photo flag (inlining base64 photos would balloon the hottest payload
+// in the app); clients fetch the actual image per post on demand.
+app.get('/api/feed/:id/photo', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    if (!(await requireFeedPostMember(db, req.params.id, req, res))) return;
+    const row = await dbGet(db, 'SELECT photo_url FROM feed_posts WHERE id = ?', [req.params.id]);
+    res.json({ photo_url: row?.photo_url || null });
+  } catch (err) {
+    sendServerError(res, err);
+  } finally {
+    db.close();
+  }
+});
+
 app.delete('/api/feed/:id', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
