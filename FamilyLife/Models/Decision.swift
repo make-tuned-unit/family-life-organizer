@@ -46,6 +46,7 @@ struct DecisionResponse: Codable, Identifiable {
     let created_at: String?
     let expires_at: String?
     let group_id: Int?
+    let person_id: Int?    // optional "about <person>" tag (People registry id)
 }
 
 struct DecisionReactionResponse: Codable, Identifiable {

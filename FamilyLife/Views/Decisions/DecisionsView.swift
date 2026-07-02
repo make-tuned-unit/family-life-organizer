@@ -7,6 +7,7 @@ struct DecisionsView: View {
     @Environment(APIService.self) private var api
 
     @State private var decisions: [DecisionResponse] = []
+    @State private var peopleNames: [Int: String] = [:]
     @State private var showingNewDecision = false
     @State private var filterType: DecisionType?
     @State private var error: String?
@@ -180,7 +181,7 @@ struct DecisionsView: View {
                 NavigationLink {
                     DecisionDetailView(decision: decision) { await loadDecisions() }
                 } label: {
-                    DecisionCard(decision: decision)
+                    DecisionCard(decision: decision, aboutName: decision.person_id.flatMap { peopleNames[$0] })
                 }
                 .buttonStyle(.plain)
                 .contextMenu {
@@ -212,7 +213,7 @@ struct DecisionsView: View {
                 NavigationLink {
                     DecisionDetailView(decision: decision) { await loadDecisions() }
                 } label: {
-                    DecisionCard(decision: decision)
+                    DecisionCard(decision: decision, aboutName: decision.person_id.flatMap { peopleNames[$0] })
                 }
                 .buttonStyle(.plain)
                 .contextMenu {
@@ -250,6 +251,10 @@ struct DecisionsView: View {
             self.error = error.localizedDescription
         }
         isLoading = false
+        // Person names for "About <name>" chips (best-effort, non-blocking).
+        if let people = try? await api.fetchPeople() {
+            peopleNames = Dictionary(uniqueKeysWithValues: people.map { ($0.id, $0.name) })
+        }
     }
 
     private var errorAlertIsPresented: Binding<Bool> {
@@ -263,6 +268,7 @@ struct DecisionCard: View {
     @Environment(APIService.self) private var api
     @Environment(AuthService.self) private var auth
     let decision: DecisionResponse
+    var aboutName: String? = nil
 
     @State private var reactions: [DecisionReactionResponse] = []
     @State private var comments: [DecisionCommentResponse] = []
@@ -284,6 +290,18 @@ struct DecisionCard: View {
                     Text(createdAt)
                         .font(.system(size: 11))
                         .foregroundStyle(WarmPalette.ink3)
+                }
+                if let aboutName {
+                    HStack(spacing: 3) {
+                        Image(systemName: "person")
+                            .font(.system(size: 9, weight: .semibold))
+                        Text(aboutName)
+                            .font(.system(size: 11, weight: .semibold))
+                    }
+                    .foregroundStyle(AccentTheme.mauve.color)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(AccentTheme.mauve.color.opacity(0.13), in: Capsule())
                 }
                 Spacer()
                 if decision.status == DecisionStatus.resolved.rawValue {

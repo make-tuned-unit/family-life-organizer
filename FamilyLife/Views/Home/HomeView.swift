@@ -12,6 +12,7 @@ struct HomeView: View {
     @State private var showingNewEvent = false
     @State private var showingNewPost = false
     @State private var showingSettings = false
+    @State private var onThisDay: [MilestoneResponse] = []
     @State private var presenceMembers: [APIService.PresenceMember] = []
     @State private var eventRange = 0 // 0=today, 1=week, 2=month
     enum FeedFilter: Equatable {
@@ -47,6 +48,7 @@ struct HomeView: View {
                 presenceRow
                 statsGrid
                 heroFocusCard
+                onThisDaySection
                 upNextSection
                 activityFeedSection
             }
@@ -55,7 +57,9 @@ struct HomeView: View {
         .refreshable {
             await viewModel.loadAll(api: api, userName: auth.currentUser?.name, username: auth.currentUser?.username)
             checkFeedNotifications()
+            await loadOnThisDay()
         }
+        .task { await loadOnThisDay() }
         .background { AmbientBackground(style: .home) }
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackgroundVisibility(.hidden, for: .navigationBar)
@@ -461,6 +465,65 @@ struct HomeView: View {
         }
         .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
         .padding(.bottom, 14)
+    }
+
+    // MARK: - On this day (milestone anniversaries)
+
+    @ViewBuilder
+    private var onThisDaySection: some View {
+        if !onThisDay.isEmpty {
+            VStack(spacing: 8) {
+                ForEach(onThisDay) { m in
+                    HStack(spacing: 12) {
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 11)
+                                .fill(AccentTheme.saffron.color.opacity(0.16))
+                                .frame(width: 38, height: 38)
+                            Image(systemName: "sparkles")
+                                .font(.system(size: 15))
+                                .foregroundStyle(AccentTheme.saffron.color)
+                        }
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("On this day, \(yearsAgoLabel(m))")
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundStyle(WarmPalette.ink3)
+                                .textCase(.uppercase)
+                            Text("\(m.person_name ?? "Someone") — \(m.title)")
+                                .font(.system(size: 14.5, weight: .semibold))
+                                .foregroundStyle(WarmPalette.ink1)
+                        }
+                        Spacer()
+                    }
+                    .padding(13)
+                    .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: 16))
+                }
+            }
+            .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
+            .padding(.top, 14)
+        }
+    }
+
+    private func yearsAgoLabel(_ m: MilestoneResponse) -> String {
+        let thisYear = Calendar.current.component(.year, from: Date())
+        let year = Int(m.milestone_date.prefix(4)) ?? thisYear
+        let diff = thisYear - year
+        return diff == 1 ? "one year ago" : "\(diff) years ago"
+    }
+
+    private func loadOnThisDay() async {
+        let all = (try? await api.fetchMilestones()) ?? []
+        let now = Date()
+        let cal = Calendar.current
+        let todayMD = String(format: "%02d-%02d", cal.component(.month, from: now), cal.component(.day, from: now))
+        let thisYear = cal.component(.year, from: now)
+        onThisDay = all.filter { m in
+            let d = String(m.milestone_date.prefix(10))
+            guard d.count == 10 else { return false }
+            let md = String(d.suffix(5))
+            let year = Int(d.prefix(4)) ?? thisYear
+            return md == todayMD && year < thisYear
+        }
+        .prefix(2).map { $0 }
     }
 
     // MARK: - Up Next

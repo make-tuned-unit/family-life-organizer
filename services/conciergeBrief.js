@@ -108,6 +108,8 @@ function minimizedFacts(s) {
     upcomingEvents: s.upcomingEvents.slice(0, 3).map(e => ({ title: e.title, daysUntil: e.daysUntil })),
     budgetAlerts: s.budgetAlerts.slice(0, 3).map(b => ({ category: b.category, pct: b.pct, over: b.over })),
     openDecisions: s.openDecisions.slice(0, 3).map(d => ({ title: d.title })),
+    recentMilestones: (s.recentMilestones || []).slice(0, 2).map(m => ({ person: m.person, title: m.title, daysAgo: m.daysAgo })),
+    onThisDay: (s.onThisDay || []).slice(0, 2).map(m => ({ person: m.person, title: m.title, yearsAgo: m.yearsAgo })),
   };
 }
 
