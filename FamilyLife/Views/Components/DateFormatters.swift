@@ -97,10 +97,14 @@ extension DateFormatter {
         return f
     }()
 
-    /// "yyyy-MM-dd HH:mm:ss" — SQLite datetime strings (trip duration)
+    /// "yyyy-MM-dd HH:mm:ss" — SQLite datetime strings (CURRENT_TIMESTAMP is
+    /// UTC on the server, so parse as UTC — not device-local, which shifted
+    /// every trip timestamp by the UTC offset).
     static let sqliteDateTime: DateFormatter = {
         let f = DateFormatter()
         f.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.timeZone = TimeZone(identifier: "UTC")
         return f
     }()
 
@@ -112,10 +116,55 @@ extension DateFormatter {
     }()
 }
 
-extension ISO8601DateFormatter {
-    static let flexible: ISO8601DateFormatter = {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return formatter
+/// Parses every timestamp shape the backend actually emits. The old `.flexible`
+/// required fractional seconds, but the server mostly sends SQLite
+/// CURRENT_TIMESTAMP ("yyyy-MM-dd HH:mm:ss", UTC, no T/Z/millis) and plain
+/// non-fractional ISO — so message times, feed ages, and decision expiry all
+/// silently parsed to nil. Tries, in order:
+///   1. fractional ISO   "2026-07-01T12:34:56.789Z"
+///   2. plain ISO        "2026-07-01T12:34:56Z"
+///   3. SQLite datetime  "2026-07-01 12:34:56" (UTC)
+///   4. bare date        "2026-07-01" (midnight UTC)
+/// `string(from:)` is unchanged (fractional ISO), so round-trips still work.
+final class ServerDateFormatter: ISO8601DateFormatter, @unchecked Sendable {
+    private let plainISO: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime]
+        return f
     }()
+    private let sqlite: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.timeZone = TimeZone(identifier: "UTC")
+        return f
+    }()
+    private let dateOnly: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd"
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.timeZone = TimeZone(identifier: "UTC")
+        return f
+    }()
+
+    override init() {
+        super.init()
+        formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+    }
+
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+    }
+
+    override func date(from string: String) -> Date? {
+        super.date(from: string)
+            ?? plainISO.date(from: string)
+            ?? sqlite.date(from: string)
+            ?? dateOnly.date(from: string)
+    }
+}
+
+extension ISO8601DateFormatter {
+    static let flexible: ISO8601DateFormatter = ServerDateFormatter()
 }
