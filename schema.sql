@@ -224,6 +224,7 @@ CREATE TABLE IF NOT EXISTS decisions (
     status TEXT DEFAULT 'active',
     expires_at TEXT,
     group_id INTEGER,
+    person_id INTEGER REFERENCES gift_people(id), -- optional "about <person>" tag
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (group_id) REFERENCES groups(id)
 );
@@ -293,6 +294,11 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_rivalry_entries_daily
     WHERE note = 'Synced from Apple Health';
 
 -- Gifts and events
+-- The household's PEOPLE registry (grew out of the gifts feature, hence the
+-- table name). A row is either linked to a real user account (user_id set) or
+-- a dependent — a child or relative without a device — so everything
+-- person-shaped (gift ideas, key dates, milestones, tagged decisions) hangs
+-- off one id even for people who can't log in.
 CREATE TABLE IF NOT EXISTS gift_people (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
@@ -301,6 +307,9 @@ CREATE TABLE IF NOT EXISTS gift_people (
     anniversary TEXT,
     notes TEXT,
     group_id INTEGER REFERENCES groups(id),
+    user_id INTEGER REFERENCES users(id),   -- linked account, NULL for dependents
+    is_dependent BOOLEAN DEFAULT 0,
+    avatar_color TEXT,                      -- member accent (sage/rose/ocean/saffron/…)
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -333,6 +342,28 @@ CREATE TABLE IF NOT EXISTS special_events (
 
 CREATE INDEX IF NOT EXISTS idx_gift_ideas_person_id ON gift_ideas(person_id);
 CREATE INDEX IF NOT EXISTS idx_special_events_person_id ON special_events(person_id);
+
+-- Milestones: the family's memory line, one row per moment per person.
+-- shared_scope 'household' keeps it private; 'group' celebrates it to a clan
+-- via a feed post in that group (the row itself stays household-scoped).
+CREATE TABLE IF NOT EXISTS milestones (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    person_id INTEGER NOT NULL,
+    title TEXT NOT NULL,
+    description TEXT,
+    milestone_date TEXT NOT NULL,
+    category TEXT DEFAULT 'moment',         -- first | school | sports | growth | moment
+    photo_data TEXT,
+    shared_scope TEXT DEFAULT 'household',  -- household | group
+    shared_group_id INTEGER REFERENCES groups(id),
+    created_by INTEGER REFERENCES users(id),
+    creator_name TEXT,
+    group_id INTEGER REFERENCES groups(id),
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (person_id) REFERENCES gift_people(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_milestones_person ON milestones(person_id);
+CREATE INDEX IF NOT EXISTS idx_milestones_group ON milestones(group_id);
 
 -- Budget projects (shared within a household)
 CREATE TABLE IF NOT EXISTS budget_projects (

@@ -411,6 +411,18 @@ async function resolveCreateGroupId(db, userId, requested, { householdOnly = fal
   return gid;
 }
 
+// Does this person (people registry / gift_people row) belong to the caller's
+// own household? Used to validate person tags on decisions and milestones —
+// people are household-scoped even when the tagged item is shared to a clan.
+async function personBelongsToCallerHousehold(db, userId, personId) {
+  const pid = parseInt(personId);
+  if (!Number.isInteger(pid)) return false;
+  const hid = await db.getUserHouseholdId(userId);
+  if (!hid) return false;
+  const row = await dbGet(db, 'SELECT id FROM gift_people WHERE id = ? AND group_id = ?', [pid, hid]);
+  return !!row;
+}
+
 // May the caller view this user's avatar? Only if they share a household or any
 // group (so a clan member sees clan co-members, but strangers don't), or it's
 // themselves. Mirrors the per-membership visibility model.
@@ -3374,6 +3386,13 @@ app.post('/api/decisions', requireAuth, async (req, res) => {
     const decisionGid = await resolveCreateGroupId(db, userId, data.group_id, { householdOnly: false });
     if (decisionGid == null) return res.status(403).json({ error: 'Cannot create a decision in that group' });
     data.group_id = decisionGid;
+    // Optional "about <person>" tag: must be a person in the caller's own
+    // household (people stay household-scoped even on clan-shared decisions).
+    if (data.person_id != null && data.person_id !== '') {
+      if (!(await personBelongsToCallerHousehold(db, userId, data.person_id))) {
+        return res.status(403).json({ error: 'Cannot tag that person' });
+      }
+    }
     const result = await db.addDecision(data);
     res.json({ success: true, id: result.id });
     // Push to household members
@@ -3391,6 +3410,11 @@ app.put('/api/decisions/:id', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
     if (!(await requireGroupRow(db, 'decisions', req.params.id, req, res))) return;
+    if (req.body.person_id != null && req.body.person_id !== '') {
+      if (!(await personBelongsToCallerHousehold(db, req.session.user.id, req.body.person_id))) {
+        return res.status(403).json({ error: 'Cannot tag that person' });
+      }
+    }
     await db.updateDecision(req.params.id, req.body);
     res.json({ success: true });
   } catch (err) {
@@ -4162,6 +4186,180 @@ app.delete('/api/gifts/events/:id', requireAuth, async (req, res) => {
   try {
     if (!(await requireHouseholdRow(db, 'special_events', req.params.id, req, res))) return;
     await db.deleteSpecialEvent(req.params.id);
+    res.json({ success: true });
+  } catch (err) {
+    sendServerError(res, err);
+  } finally {
+    db.close();
+  }
+});
+
+// ============================================
+// People — the household's person registry (adults auto-linked to their
+// accounts, dependents added by parents), plus per-person milestones.
+// Backed by the gift_people table; gift routes above share it.
+// ============================================
+
+app.get('/api/people', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const groupId = await db.getUserHouseholdId(req.session.user?.id);
+    if (!groupId) return res.json([]);
+    await db.ensureHouseholdUserPeople(groupId);
+    res.json(await db.getPeople(groupId));
+  } catch (err) {
+    sendServerError(res, err);
+  } finally {
+    db.close();
+  }
+});
+
+app.post('/api/people', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const groupId = await db.getUserHouseholdId(req.session.user?.id);
+    if (!groupId) return res.status(403).json({ error: 'Join a household first' });
+    const name = typeof req.body.name === 'string' ? req.body.name.trim() : '';
+    if (!name) return res.status(400).json({ error: 'A name is required' });
+    // Parents add dependents here; linked-user rows are created automatically.
+    const result = await db.addPerson({ ...req.body, name, user_id: null, group_id: groupId });
+    res.json({ success: true, id: result.id });
+  } catch (err) {
+    sendServerError(res, err);
+  } finally {
+    db.close();
+  }
+});
+
+app.put('/api/people/:id', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    if (!(await requireHouseholdRow(db, 'gift_people', req.params.id, req, res))) return;
+    await db.updatePerson(req.params.id, req.body);
+    res.json({ success: true });
+  } catch (err) {
+    sendServerError(res, err);
+  } finally {
+    db.close();
+  }
+});
+
+app.delete('/api/people/:id', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    if (!(await requireHouseholdRow(db, 'gift_people', req.params.id, req, res))) return;
+    await db.deletePerson(req.params.id);
+    res.json({ success: true });
+  } catch (err) {
+    sendServerError(res, err);
+  } finally {
+    db.close();
+  }
+});
+
+// A person's tagged decisions — the "things we've talked about for them" list.
+app.get('/api/people/:id/decisions', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    if (!(await requireHouseholdRow(db, 'gift_people', req.params.id, req, res))) return;
+    const person = await dbGet(db, 'SELECT id, group_id FROM gift_people WHERE id = ?', [req.params.id]);
+    res.json(await db.getDecisionsForPerson(person.id, person.group_id));
+  } catch (err) {
+    sendServerError(res, err);
+  } finally {
+    db.close();
+  }
+});
+
+app.get('/api/milestones', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const groupId = await db.getUserHouseholdId(req.session.user?.id);
+    if (!groupId) return res.json([]);
+    const personId = req.query.person_id ? Number(req.query.person_id) : null;
+    res.json(await db.getMilestones(groupId, Number.isInteger(personId) ? personId : null));
+  } catch (err) {
+    sendServerError(res, err);
+  } finally {
+    db.close();
+  }
+});
+
+app.post('/api/milestones', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const userId = req.session.user.id;
+    const groupId = await db.getUserHouseholdId(userId);
+    if (!groupId) return res.status(403).json({ error: 'Join a household first' });
+    const { person_id, title, milestone_date } = req.body;
+    if (!title || !milestone_date) return res.status(400).json({ error: 'Title and date are required' });
+    if (!(await personBelongsToCallerHousehold(db, userId, person_id))) {
+      return res.status(403).json({ error: 'Cannot add a milestone for that person' });
+    }
+    // Optional clan celebration: the milestone row stays household-scoped, but
+    // the feed post can go to a clan the caller belongs to.
+    let celebrateGid = groupId;
+    let sharedScope = 'household';
+    let sharedGroupId = null;
+    if (req.body.shared_group_id) {
+      const gid = parseInt(req.body.shared_group_id);
+      if (!Number.isInteger(gid) || !(await db.isGroupMember(gid, userId))) {
+        return res.status(403).json({ error: 'Cannot share to that group' });
+      }
+      celebrateGid = gid;
+      sharedScope = 'group';
+      sharedGroupId = gid;
+    }
+    const person = await dbGet(db, 'SELECT name FROM gift_people WHERE id = ?', [parseInt(person_id)]);
+    const result = await db.addMilestone({
+      ...req.body,
+      shared_scope: sharedScope,
+      shared_group_id: sharedGroupId,
+      created_by: userId,
+      creator_name: req.session.user.name,
+      group_id: groupId,
+    });
+    res.json({ success: true, id: result.id });
+
+    // Celebrate: a feed post in the chosen group + a push to its members.
+    try {
+      await db.addFeedPost({
+        group_id: celebrateGid,
+        author_id: userId,
+        post_type: 'milestone',
+        title: `${person.name}: ${title}`,
+        body: req.body.description || null,
+        reference_type: 'milestone',
+        reference_id: result.id,
+      });
+    } catch (e) { console.error('Milestone feed post error:', e.message); }
+    push.pushToGroup(db, celebrateGid, userId, 'A new milestone',
+      `${person.name} — ${title}. Cheer them on!`, { type: 'milestone', ref_id: result.id });
+  } catch (err) {
+    sendServerError(res, err);
+  } finally {
+    db.close();
+  }
+});
+
+app.put('/api/milestones/:id', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    if (!(await requireHouseholdRow(db, 'milestones', req.params.id, req, res))) return;
+    await db.updateMilestone(req.params.id, req.body);
+    res.json({ success: true });
+  } catch (err) {
+    sendServerError(res, err);
+  } finally {
+    db.close();
+  }
+});
+
+app.delete('/api/milestones/:id', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    if (!(await requireHouseholdRow(db, 'milestones', req.params.id, req, res))) return;
+    await db.deleteMilestone(req.params.id);
     res.json({ success: true });
   } catch (err) {
     sendServerError(res, err);

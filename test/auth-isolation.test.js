@@ -170,3 +170,59 @@ test('DM to a non-shared user is forbidden', async () => {
   const res = await a('POST', '/api/messages', { recipient_id: bobId, text: 'hi' });
   assert.equal(res.status, 403);
 });
+
+test('people & milestones: dependents and milestones are household-scoped', async () => {
+  const a = makeClient();
+  const b = makeClient();
+  // Reuse the two existing single-household users (the register limiter is
+  // 5/hour/IP and earlier tests already spent most of that budget).
+  const ra = await a('POST', '/api/auth/login', { username: 'alice_t', password: 'password123' });
+  assert.equal(ra.status, 200, 'alice logs in');
+  const rb = await b('POST', '/api/auth/login', { username: 'bob_t', password: 'password123' });
+  assert.equal(rb.status, 200, 'bob logs in');
+
+  // Alice's people list auto-includes herself as a linked person row.
+  const listA = await a('GET', '/api/people');
+  assert.equal(listA.status, 200);
+  assert.ok((listA.body || []).some(p => p.name === 'Alice' && p.user_id), 'self auto-linked as a person');
+
+  // Alice adds a dependent (a kid without an account).
+  const kid = await a('POST', '/api/people', { name: 'Kiddo', relationship: 'son', is_dependent: true, birthday: '2020-04-01' });
+  assert.equal(kid.status, 200, 'dependent created');
+  const kidId = kid.body.id;
+  assert.ok(kidId, 'dependent id returned');
+
+  // Erin (another household) can't see, edit or delete Dave's dependent.
+  const bList = await b('GET', '/api/people');
+  assert.ok(!(bList.body || []).some(p => p.id === kidId), 'dependent hidden from other household');
+  const bPut = await b('PUT', `/api/people/${kidId}`, { name: 'hijack' });
+  assert.ok([403, 404].includes(bPut.status), `PUT person blocked (got ${bPut.status})`);
+  const bDel = await b('DELETE', `/api/people/${kidId}`);
+  assert.ok([403, 404].includes(bDel.status), `DELETE person blocked (got ${bDel.status})`);
+
+  // Dave logs a milestone for the kid; it shows in his household list.
+  const ms = await a('POST', '/api/milestones', { person_id: kidId, title: 'First steps', milestone_date: '2026-07-01', category: 'first' });
+  assert.equal(ms.status, 200, 'milestone created');
+  const msId = ms.body.id;
+  const msList = await a('GET', `/api/milestones?person_id=${kidId}`);
+  assert.ok((msList.body || []).some(m => m.id === msId && m.person_name === 'Kiddo'), 'milestone listed with person name');
+
+  // Erin can't read, edit, delete, or create milestones across households.
+  const bMs = await b('GET', '/api/milestones');
+  assert.ok(!(bMs.body || []).some(m => m.id === msId), 'milestone hidden from other household');
+  const bMsPut = await b('PUT', `/api/milestones/${msId}`, { title: 'nope' });
+  assert.ok([403, 404].includes(bMsPut.status), `PUT milestone blocked (got ${bMsPut.status})`);
+  const bMsDel = await b('DELETE', `/api/milestones/${msId}`);
+  assert.ok([403, 404].includes(bMsDel.status), `DELETE milestone blocked (got ${bMsDel.status})`);
+  const bMsPost = await b('POST', '/api/milestones', { person_id: kidId, title: 'x', milestone_date: '2026-07-01' });
+  assert.equal(bMsPost.status, 403, 'milestone for foreign person blocked');
+
+  // A decision tagged to the kid appears on his card; Erin can't tag him.
+  const dec = await a('POST', '/api/decisions', { title: 'Improv class for Kiddo', decision_type: 'text', person_id: kidId });
+  assert.ok([200, 201].includes(dec.status), 'tagged decision created');
+  const cardDecisions = await a('GET', `/api/people/${kidId}/decisions`);
+  assert.equal(cardDecisions.status, 200);
+  assert.ok((cardDecisions.body || []).some(d => d.title === 'Improv class for Kiddo'), 'decision shows on person card');
+  const bDec = await b('POST', '/api/decisions', { title: 'evil', decision_type: 'text', person_id: kidId });
+  assert.equal(bDec.status, 403, 'tagging a foreign person blocked');
+});

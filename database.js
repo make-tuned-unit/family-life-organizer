@@ -156,6 +156,16 @@ class FamilyDB {
         this.db.run('CREATE INDEX IF NOT EXISTS idx_gift_ideas_group ON gift_ideas(group_id)', () => {});
         this.db.run('CREATE INDEX IF NOT EXISTS idx_special_events_group ON special_events(group_id)', () => {});
         this.db.run('CREATE INDEX IF NOT EXISTS idx_family_addresses_group ON family_addresses(group_id)', () => {});
+        // People registry: gift_people doubles as the household's people list.
+        // user_id links a row to a real account; dependents (kids without
+        // devices) have user_id NULL + is_dependent 1.
+        this.db.run('ALTER TABLE gift_people ADD COLUMN user_id INTEGER REFERENCES users(id)', () => {});
+        this.db.run('ALTER TABLE gift_people ADD COLUMN is_dependent BOOLEAN DEFAULT 0', () => {});
+        this.db.run('ALTER TABLE gift_people ADD COLUMN avatar_color TEXT', () => {});
+        // Decisions can be tagged "about" a person (shows on their person card).
+        this.db.run('ALTER TABLE decisions ADD COLUMN person_id INTEGER REFERENCES gift_people(id)', () => {});
+        this.db.run('CREATE INDEX IF NOT EXISTS idx_milestones_person ON milestones(person_id)', () => {});
+        this.db.run('CREATE INDEX IF NOT EXISTS idx_milestones_group ON milestones(group_id)', () => {});
         // Itinerary travelers column (added after initial table creation)
         this.db.run('ALTER TABLE itineraries ADD COLUMN travelers TEXT', () => {});
         this.db.run('ALTER TABLE receipts ADD COLUMN itinerary_id INTEGER REFERENCES itineraries(id)', () => {});
@@ -1247,8 +1257,8 @@ class FamilyDB {
   addDecision(decision) {
     return new Promise((resolve, reject) => {
       this.db.run(
-        `INSERT INTO decisions (title, decision_type, body, link_url, photo_data, poll_options, creator_name, status, expires_at, group_id)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO decisions (title, decision_type, body, link_url, photo_data, poll_options, creator_name, status, expires_at, group_id, person_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           decision.title,
           decision.decision_type,
@@ -1259,7 +1269,8 @@ class FamilyDB {
           decision.creator_name || 'Jesse',
           decision.status || 'active',
           decision.expires_at || null,
-          decision.group_id || null
+          decision.group_id || null,
+          decision.person_id || null
         ],
         function(err) {
           if (err) reject(err);
@@ -1296,7 +1307,7 @@ class FamilyDB {
   }
 
   updateDecision(id, updates) {
-    const ALLOWED = new Set(['title', 'decision_type', 'body', 'link_url', 'photo_data', 'poll_options', 'status', 'expires_at']);
+    const ALLOWED = new Set(['title', 'decision_type', 'body', 'link_url', 'photo_data', 'poll_options', 'status', 'expires_at', 'person_id']);
     return new Promise((resolve, reject) => {
       const fields = [];
       const params = [];
@@ -1933,6 +1944,177 @@ class FamilyDB {
     });
   }
 
+  // ==========================================================================
+  // People registry (gift_people doubles as the household's people list).
+  // Rows are either linked to a user account (user_id) or dependents — kids
+  // and relatives without devices — so milestones, gift ideas, key dates and
+  // tagged decisions all hang off one person id.
+  // ==========================================================================
+
+  getPeople(groupId) {
+    return new Promise((resolve, reject) => {
+      this.db.all(
+        `SELECT p.*,
+           (SELECT COUNT(*) FROM gift_ideas g WHERE g.person_id = p.id) AS gift_idea_count,
+           (SELECT COUNT(*) FROM milestones m WHERE m.person_id = p.id) AS milestone_count,
+           (SELECT COUNT(*) FROM decisions d WHERE d.person_id = p.id) AS decision_count,
+           (SELECT COUNT(*) FROM special_events s WHERE s.person_id = p.id) AS key_date_count
+         FROM gift_people p WHERE p.group_id = ?
+         ORDER BY p.is_dependent DESC, p.name`,
+        [groupId],
+        (err, rows) => err ? reject(err) : resolve(rows || [])
+      );
+    });
+  }
+
+  // Make sure every household USER has a person row (so adults appear in the
+  // People hub without manual setup). Adopts an existing same-name gift person
+  // first (pre-People rows like a manually added "Sophie") so nobody shows up
+  // twice, then inserts rows for any still-unlinked users. Idempotent; runs on
+  // every list fetch.
+  ensureHouseholdUserPeople(groupId) {
+    return new Promise((resolve, reject) => {
+      this.db.run(
+        `UPDATE gift_people SET user_id = (
+           SELECT u.id FROM users u
+           JOIN group_members gm ON gm.user_id = u.id AND gm.group_id = gift_people.group_id
+           WHERE lower(u.name) = lower(gift_people.name)
+             AND NOT EXISTS (SELECT 1 FROM gift_people p2
+                             WHERE p2.user_id = u.id AND p2.group_id = gift_people.group_id))
+         WHERE group_id = ? AND user_id IS NULL
+           AND EXISTS (
+             SELECT 1 FROM users u
+             JOIN group_members gm ON gm.user_id = u.id AND gm.group_id = gift_people.group_id
+             WHERE lower(u.name) = lower(gift_people.name)
+               AND NOT EXISTS (SELECT 1 FROM gift_people p2
+                               WHERE p2.user_id = u.id AND p2.group_id = gift_people.group_id))`,
+        [groupId],
+        (err) => {
+          if (err) return reject(err);
+          this.db.run(
+            `INSERT INTO gift_people (name, relationship, group_id, user_id, is_dependent)
+             SELECT u.name, 'household', gm.group_id, u.id, 0
+             FROM group_members gm
+             JOIN users u ON u.id = gm.user_id
+             WHERE gm.group_id = ?
+               AND NOT EXISTS (SELECT 1 FROM gift_people p WHERE p.user_id = u.id AND p.group_id = gm.group_id)`,
+            [groupId],
+            function (err2) { err2 ? reject(err2) : resolve({ added: this.changes }); }
+          );
+        }
+      );
+    });
+  }
+
+  addPerson(person) {
+    return new Promise((resolve, reject) => {
+      this.db.run(
+        `INSERT INTO gift_people (name, relationship, birthday, anniversary, notes, group_id, user_id, is_dependent, avatar_color)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [person.name, person.relationship || 'other', person.birthday || null,
+         person.anniversary || null, person.notes || null, person.group_id,
+         person.user_id || null, person.is_dependent ? 1 : 0, person.avatar_color || null],
+        function (err) { err ? reject(err) : resolve({ id: this.lastID, ...person }); }
+      );
+    });
+  }
+
+  updatePerson(id, updates) {
+    const ALLOWED = new Set(['name', 'relationship', 'birthday', 'anniversary', 'notes', 'is_dependent', 'avatar_color']);
+    return new Promise((resolve, reject) => {
+      const fields = [];
+      const params = [];
+      for (const [key, value] of Object.entries(updates)) {
+        if (!ALLOWED.has(key)) continue;
+        fields.push(`${key} = ?`);
+        params.push(key === 'is_dependent' ? (value ? 1 : 0) : value);
+      }
+      if (!fields.length) return resolve({ id });
+      params.push(id);
+      this.db.run(`UPDATE gift_people SET ${fields.join(', ')} WHERE id = ?`, params, (err) => {
+        err ? reject(err) : resolve({ id, ...updates });
+      });
+    });
+  }
+
+  deletePerson(id) {
+    return new Promise((resolve, reject) => {
+      // gift_ideas / special_events / milestones cascade via their FKs.
+      this.db.run('DELETE FROM gift_people WHERE id = ?', [id], (err) => {
+        err ? reject(err) : resolve({ id, deleted: true });
+      });
+    });
+  }
+
+  // ==========================================================================
+  // Milestones — the family's memory line
+  // ==========================================================================
+
+  getMilestones(groupId, personId = null) {
+    return new Promise((resolve, reject) => {
+      let sql = `
+        SELECT m.*, p.name AS person_name
+        FROM milestones m JOIN gift_people p ON p.id = m.person_id
+        WHERE m.group_id = ?`;
+      const params = [groupId];
+      if (personId != null) { sql += ' AND m.person_id = ?'; params.push(personId); }
+      sql += ' ORDER BY m.milestone_date DESC, m.id DESC';
+      this.db.all(sql, params, (err, rows) => err ? reject(err) : resolve(rows || []));
+    });
+  }
+
+  addMilestone(m) {
+    return new Promise((resolve, reject) => {
+      this.db.run(
+        `INSERT INTO milestones (person_id, title, description, milestone_date, category,
+           photo_data, shared_scope, shared_group_id, created_by, creator_name, group_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [m.person_id, m.title, m.description || null, m.milestone_date, m.category || 'moment',
+         m.photo_data || null, m.shared_scope || 'household', m.shared_group_id || null,
+         m.created_by || null, m.creator_name || null, m.group_id],
+        function (err) { err ? reject(err) : resolve({ id: this.lastID, ...m }); }
+      );
+    });
+  }
+
+  updateMilestone(id, updates) {
+    const ALLOWED = new Set(['title', 'description', 'milestone_date', 'category', 'photo_data']);
+    return new Promise((resolve, reject) => {
+      const fields = [];
+      const params = [];
+      for (const [key, value] of Object.entries(updates)) {
+        if (!ALLOWED.has(key)) continue;
+        fields.push(`${key} = ?`);
+        params.push(value);
+      }
+      if (!fields.length) return resolve({ id });
+      params.push(id);
+      this.db.run(`UPDATE milestones SET ${fields.join(', ')} WHERE id = ?`, params, (err) => {
+        err ? reject(err) : resolve({ id, ...updates });
+      });
+    });
+  }
+
+  deleteMilestone(id) {
+    return new Promise((resolve, reject) => {
+      this.db.run('DELETE FROM milestones WHERE id = ?', [id], (err) => {
+        err ? reject(err) : resolve({ id, deleted: true });
+      });
+    });
+  }
+
+  // Decisions tagged "about" this person — the person card's discussion history.
+  getDecisionsForPerson(personId, groupId) {
+    return new Promise((resolve, reject) => {
+      this.db.all(
+        'SELECT * FROM decisions WHERE person_id = ? AND group_id = ? ORDER BY datetime(created_at) DESC',
+        [personId, groupId],
+        (err, rows) => err ? reject(err)
+          : resolve((rows || []).map(r => ({ ...r, poll_options: this.parseJSONList(r.poll_options) })))
+      );
+    });
+  }
+
   // Budget project operations
   addProject(project) {
     return new Promise((resolve, reject) => {
@@ -2432,7 +2614,7 @@ class FamilyDB {
       'gift_people', 'gift_ideas', 'special_events', 'family_addresses', 'feed_posts',
       'itineraries', 'itinerary_stays', 'subscriptions', 'concierge_memory', 'concierge_nudges',
       'concierge_conversations', 'recurring_payments', 'notes', 'event_attachments',
-      'synced_calendar_events'];
+      'synced_calendar_events', 'milestones'];
   }
 
   // Merge one household into another: re-point all household-scoped data and
