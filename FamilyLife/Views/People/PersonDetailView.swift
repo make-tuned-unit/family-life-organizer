@@ -21,8 +21,10 @@ struct PersonDetailView: View {
     @State private var milestones: [MilestoneResponse] = []
     @State private var decisions: [DecisionResponse] = []
     @State private var keyDates: [SpecialEventResponse] = []
+    @State private var giftIdeas: [GiftIdeaResponse] = []
     @State private var showingAddMilestone = false
     @State private var showingAddKeyDate = false
+    @State private var showingAddGift = false
     @State private var showingEditPerson = false
     @State private var showingDeleteConfirm = false
     @State private var editingMilestone: MilestoneResponse?
@@ -81,6 +83,12 @@ struct PersonDetailView: View {
         }
         .sheet(isPresented: $showingAddKeyDate) {
             AddKeyDateSheet(person: display) {
+                await load()
+                await onChanged?()
+            }
+        }
+        .sheet(isPresented: $showingAddGift) {
+            AddGiftIdeaView(personID: person.id, personName: display.name) {
                 await load()
                 await onChanged?()
             }
@@ -231,30 +239,120 @@ struct PersonDetailView: View {
 
     private var giftsSection: some View {
         VStack(spacing: 10) {
-            NavigationLink {
-                PersonGiftListView(person: display.asGiftPerson)
-            } label: {
-                HStack(spacing: 12) {
-                    Image(systemName: "gift.fill")
-                        .font(.system(size: 15))
-                        .foregroundStyle(AccentTheme.rose.color)
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text("Gift ideas for \(display.name)")
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundStyle(WarmPalette.ink1)
-                        Text("\(display.gift_idea_count ?? 0) idea\((display.gift_idea_count ?? 0) == 1 ? "" : "s") saved")
-                            .font(.system(size: 12))
-                            .foregroundStyle(WarmPalette.ink3)
-                    }
-                    Spacer()
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(WarmPalette.ink3)
-                }
-                .padding(14)
-                .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: 16))
+            Button { showingAddGift = true } label: {
+                Label("Add a gift idea", systemImage: "plus")
+                    .font(.system(size: 14, weight: .semibold))
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 11)
+                    .background(display.accentColor.opacity(0.14), in: RoundedRectangle(cornerRadius: 14))
+                    .foregroundStyle(display.accentColor)
             }
             .buttonStyle(.plain)
+
+            if giftIdeas.isEmpty {
+                sectionEmpty("gift.fill", "No gift ideas yet",
+                             "Jot down ideas as they come — things to save for birthdays and holidays for \(display.name).")
+            } else {
+                ForEach(giftIdeas) { idea in
+                    giftRow(idea)
+                }
+            }
+        }
+    }
+
+    private func giftRow(_ idea: GiftIdeaResponse) -> some View {
+        let status = GiftIdeaStatus(rawValue: idea.status) ?? .idea
+        return HStack(alignment: .top, spacing: 12) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 11)
+                    .fill(giftStatusColor(status).opacity(0.15))
+                    .frame(width: 38, height: 38)
+                Image(systemName: giftStatusIcon(status))
+                    .font(.system(size: 15))
+                    .foregroundStyle(giftStatusColor(status))
+            }
+            VStack(alignment: .leading, spacing: 3) {
+                Text(idea.title)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(WarmPalette.ink1)
+                    .strikethrough(status == .given)
+                if let notes = idea.notes, !notes.isEmpty {
+                    Text(notes)
+                        .font(.system(size: 13))
+                        .foregroundStyle(WarmPalette.ink2)
+                }
+                HStack(spacing: 6) {
+                    if let event = idea.for_event, !event.isEmpty {
+                        Text(event.capitalized)
+                    }
+                    if let price = idea.estimated_price {
+                        Text("· $\(price, specifier: "%.0f")")
+                    }
+                    Text("· \(status.rawValue.capitalized)")
+                        .foregroundStyle(giftStatusColor(status))
+                }
+                .font(.system(size: 11.5))
+                .foregroundStyle(WarmPalette.ink3)
+            }
+            Spacer()
+            if let url = idea.link_url, !url.isEmpty, let parsed = URL(string: url) {
+                Link(destination: parsed) {
+                    Image(systemName: "link")
+                        .font(.system(size: 13))
+                        .foregroundStyle(AccentTheme.ocean.color)
+                }
+            }
+        }
+        .padding(13)
+        .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: 16))
+        .contextMenu {
+            if status != .given, let next = giftNextStatus(status) {
+                Button {
+                    Task {
+                        try? await api.updateGiftIdea(id: idea.id, data: ["status": next.rawValue])
+                        await load()
+                        await onChanged?()
+                    }
+                } label: {
+                    Label("Mark as \(next.rawValue.capitalized)", systemImage: giftStatusIcon(next))
+                }
+            }
+            Button(role: .destructive) {
+                Task {
+                    try? await api.deleteGiftIdea(id: idea.id)
+                    await load()
+                    await onChanged?()
+                }
+            } label: {
+                Label("Delete gift idea", systemImage: "trash")
+            }
+        }
+    }
+
+    private func giftNextStatus(_ s: GiftIdeaStatus) -> GiftIdeaStatus? {
+        switch s {
+        case .idea: .purchased
+        case .purchased: .wrapped
+        case .wrapped: .given
+        case .given: nil
+        }
+    }
+
+    private func giftStatusIcon(_ s: GiftIdeaStatus) -> String {
+        switch s {
+        case .idea: "lightbulb"
+        case .purchased: "bag.fill"
+        case .wrapped: "gift.fill"
+        case .given: "checkmark.circle.fill"
+        }
+    }
+
+    private func giftStatusColor(_ s: GiftIdeaStatus) -> Color {
+        switch s {
+        case .idea: AccentTheme.saffron.color
+        case .purchased: AccentTheme.ocean.color
+        case .wrapped: AccentTheme.mauve.color
+        case .given: WarmPalette.good
         }
     }
 
@@ -390,10 +488,12 @@ struct PersonDetailView: View {
         async let ms = api.fetchMilestones(personId: person.id)
         async let decs = api.fetchPersonDecisions(personId: person.id)
         async let events = api.fetchSpecialEvents()
+        async let gifts = api.fetchGiftIdeas(personId: person.id)
         async let people = api.fetchPeople()
         milestones = (try? await ms) ?? []
         decisions = (try? await decs) ?? []
         keyDates = ((try? await events) ?? []).filter { $0.person_id == person.id }
+        giftIdeas = (try? await gifts) ?? []
         if let refreshed = (try? await people)?.first(where: { $0.id == person.id }) {
             current = refreshed
         }
