@@ -46,6 +46,13 @@ final class CalendarService {
 
     var access: Access = .notDetermined
 
+    /// Bumped whenever iOS reports the system calendar database changed (an
+    /// event added, edited or deleted in any app — Calendar, iCal via iCloud,
+    /// Google sync). Views observe this to re-read the mirror, and the app
+    /// re-syncs to the household so the backend reflects the change.
+    private(set) var storeVersion = 0
+    @ObservationIgnored private var storeChangeObserver: (any NSObjectProtocol)?
+
     private let store = EKEventStore()
 
     /// Local map: Kinrows appointment id -> the EKEvent identifier we created for
@@ -82,6 +89,19 @@ final class CalendarService {
             eventMap = stored
         }
         refreshAuthorizationStatus()
+        // A long-lived EKEventStore serves a stale snapshot after external edits —
+        // deleting one event in Apple Calendar could make unrelated events vanish
+        // from our reads (and then from the household sync) for the rest of the
+        // session. Refresh the store on every system change notification.
+        storeChangeObserver = NotificationCenter.default.addObserver(
+            forName: .EKEventStoreChanged, object: store, queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                self.store.refreshSourcesIfNecessary()
+                self.storeVersion += 1
+            }
+        }
     }
 
     private func persistMap() {
@@ -124,6 +144,7 @@ final class CalendarService {
         let store = self.store
         let managed = managedIdentifiers
         return await Task.detached {
+            store.refreshSourcesIfNecessary()
             let predicate = store.predicateForEvents(withStart: start, end: end, calendars: nil)
             return store.events(matching: predicate).compactMap { ev -> ExternalEvent? in
                 let identifier = ev.eventIdentifier ?? UUID().uuidString
@@ -303,6 +324,7 @@ final class CalendarService {
         let store = self.store
         let ids = sharedCalendarIDs
         return await Task.detached {
+            store.refreshSourcesIfNecessary()
             let fmt = DateFormatter()
             fmt.locale = Locale(identifier: "en_US_POSIX")
             fmt.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"

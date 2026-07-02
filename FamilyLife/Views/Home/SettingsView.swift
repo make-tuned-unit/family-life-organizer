@@ -289,6 +289,10 @@ struct SettingsView: View {
             }
         }
         .scrollContentBackground(.hidden)
+        // Clearance for the floating tab bar + chat button, which overlay content
+        // in MainTabView's ZStack — without it the Sign Out row can never scroll
+        // above them. Sheets (showsDismissButton) have no tab bar underneath.
+        .contentMargins(.bottom, showsDismissButton ? 0 : 100, for: .scrollContent)
         .background { AmbientBackground(style: .settings) }
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackgroundVisibility(.hidden, for: .navigationBar)

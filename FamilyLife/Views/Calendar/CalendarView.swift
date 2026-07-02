@@ -124,6 +124,11 @@ struct CalendarView: View {
         .onChange(of: viewModel.displayedMonth) {
             Task { await viewModel.loadMonth(api: api, calendarService: calendarService) }
         }
+        // The system calendar changed (event added/edited/deleted in another app)
+        // — re-read the on-device mirror so this screen reflects it immediately.
+        .onChange(of: calendarService.storeVersion) {
+            Task { await viewModel.loadExternalEvents(calendarService: calendarService) }
+        }
     }
 
     // MARK: - Owner Filter (Everyone / Just me / per-person)
