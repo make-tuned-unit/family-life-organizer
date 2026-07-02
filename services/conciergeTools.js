@@ -1054,6 +1054,86 @@ const TOOLS = [
       return { result: { ok: true, summary }, action: { tool: 'delete_pantry_item', summary } };
     },
   },
+
+  // ---- People & milestones ----
+  {
+    name: 'list_people',
+    description: "The household's people — adults and dependents (kids). Includes each person's id for logging milestones.",
+    write: false,
+    input_schema: { type: 'object', properties: {} },
+    async run(ctx) {
+      await ctx.db.ensureHouseholdUserPeople(ctx.groupId);
+      const rows = await ctx.db.getPeople(ctx.groupId);
+      const result = rows.map(p => ({
+        id: p.id, name: p.name, relationship: p.relationship,
+        dependent: !!p.is_dependent, birthday: p.birthday || undefined,
+      }));
+      return { result };
+    },
+  },
+  {
+    name: 'list_milestones',
+    description: "A person's milestones (first steps, first goal, …), newest first. Use list_people for the person id; omit it for the whole household.",
+    write: false,
+    input_schema: {
+      type: 'object',
+      properties: { person_id: { type: 'integer', description: 'Optional — limit to one person' } },
+    },
+    async run(ctx, input) {
+      if (input.person_id != null) await assertHousehold(ctx, 'gift_people', input.person_id);
+      const rows = await ctx.db.getMilestones(ctx.groupId, input.person_id ?? null);
+      const result = rows.slice(0, 30).map(m => ({
+        id: m.id, person: m.person_name, title: m.title,
+        date: m.milestone_date, category: m.category,
+      }));
+      return { result };
+    },
+  },
+  {
+    name: 'log_milestone',
+    description: "Log a milestone for a family member — e.g. \"Rowan lost his first tooth today\". The household gets a feed post to cheer them on. Use list_people for the person id; date defaults to today.",
+    write: true,
+    input_schema: {
+      type: 'object',
+      properties: {
+        person_id: { type: 'integer' },
+        title: { type: 'string', description: 'The moment, e.g. "First steps"' },
+        description: { type: 'string', description: 'A little detail (optional)' },
+        milestone_date: { type: 'string', description: 'YYYY-MM-DD (optional, defaults to today)' },
+        category: { type: 'string', enum: ['first', 'school', 'sports', 'growth', 'moment'] },
+      },
+      required: ['person_id', 'title'],
+    },
+    async run(ctx, input) {
+      await assertHousehold(ctx, 'gift_people', input.person_id);
+      const person = await dbGet(ctx, 'SELECT name FROM gift_people WHERE id = ?', [input.person_id]);
+      const date = input.milestone_date || new Date().toISOString().slice(0, 10);
+      requireDate(date, 'milestone_date');
+      const result = await ctx.db.addMilestone({
+        person_id: input.person_id,
+        title: input.title,
+        description: input.description || null,
+        milestone_date: date,
+        category: input.category || 'moment',
+        created_by: ctx.userId,
+        creator_name: ctx.userName,
+        group_id: ctx.groupId,
+      });
+      try {
+        await ctx.db.addFeedPost({
+          group_id: ctx.groupId, author_id: ctx.userId, post_type: 'milestone',
+          title: `${person.name}: ${input.title}`, body: input.description || null,
+          reference_type: 'milestone', reference_id: result.id,
+        });
+      } catch (e) { /* celebration is best-effort */ }
+      if (ctx.push) {
+        ctx.push.pushToGroup(ctx.db, ctx.groupId, ctx.userId, 'A new milestone',
+          `${person.name} — ${input.title}. Cheer them on!`, { type: 'milestone', ref_id: result.id });
+      }
+      const summary = `Logged milestone "${input.title}" for ${person.name} (${date})`;
+      return { result: { ok: true, summary }, action: { tool: 'log_milestone', summary } };
+    },
+  },
 ];
 
 // Fail fast on duplicate tool names — Anthropic 400-rejects a tools array with

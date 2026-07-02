@@ -51,7 +51,7 @@ async function buildSnapshot(db, userId) {
   const month = currentMonth();
   const groupId = await safe(db.getUserHouseholdId(userId), null, 'household');
 
-  const [tasks, appts, decisions, pantry, events, coverage, budget, trips, itineraries] = await Promise.all([
+  const [tasks, appts, decisions, pantry, events, coverage, budget, trips, itineraries, milestones] = await Promise.all([
     safe(db.getTasks({ status: 'active' }, userId), [], 'tasks'),
     safe(db.getAppointments({}, userId), [], 'appointments'),
     safe(db.getDecisions({ status: 'active' }, userId), [], 'decisions'),
@@ -61,6 +61,7 @@ async function buildSnapshot(db, userId) {
     safe(db.getBudgetSummary(month, groupId), [], 'budget'),
     safe(db.getTrips({ status: 'active' }, groupId), [], 'trips'),
     safe(db.getItineraries(userId), [], 'itineraries'),
+    safe(groupId ? db.getMilestones(groupId) : Promise.resolve([]), [], 'milestones'),
   ]);
 
   const overdueTasks = tasks
@@ -107,6 +108,25 @@ async function buildSnapshot(db, userId) {
   const activeTrips = trips
     .map(t => ({ id: t.id, traveler: t.traveler, destination: t.destination, eta_minutes: t.eta_minutes }));
 
+  // Fresh milestones (last 7 days) — worth a warm mention in the brief.
+  const recentMilestones = milestones
+    .map(m => ({ ...m, _d: daysUntil(m.milestone_date) }))
+    .filter(m => m._d !== null && m._d <= 0 && m._d >= -7)
+    .slice(0, 5)
+    .map(m => ({ person: m.person_name, title: m.title, date: m.milestone_date, daysAgo: -m._d }));
+
+  // "On this day" — milestone anniversaries from earlier years.
+  const onThisDay = milestones
+    .filter(m => {
+      const md = String(m.milestone_date).slice(0, 10);
+      return md.slice(5) === today.slice(5) && md.slice(0, 4) < today.slice(0, 4);
+    })
+    .slice(0, 3)
+    .map(m => ({
+      person: m.person_name, title: m.title, date: m.milestone_date,
+      yearsAgo: Number(today.slice(0, 4)) - Number(String(m.milestone_date).slice(0, 4)),
+    }));
+
   // In-progress or upcoming itineraries (not yet ended, not completed/cancelled).
   const upcomingItineraries = itineraries
     .filter(i => i.status !== 'completed' && i.status !== 'cancelled')
@@ -131,6 +151,8 @@ async function buildSnapshot(db, userId) {
       budgetAlerts: budgetAlerts.length,
       activeTrips: activeTrips.length,
       upcomingItineraries: upcomingItineraries.length,
+      recentMilestones: recentMilestones.length,
+      onThisDay: onThisDay.length,
     },
     overdueTasks,
     upcomingAppointments,
@@ -141,6 +163,8 @@ async function buildSnapshot(db, userId) {
     budgetAlerts,
     activeTrips,
     upcomingItineraries,
+    recentMilestones,
+    onThisDay,
   };
 }
 

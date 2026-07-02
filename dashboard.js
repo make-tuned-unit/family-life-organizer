@@ -4296,9 +4296,10 @@ app.post('/api/milestones', requireAuth, async (req, res) => {
     if (!(await personBelongsToCallerHousehold(db, userId, person_id))) {
       return res.status(403).json({ error: 'Cannot add a milestone for that person' });
     }
-    // Optional clan celebration: the milestone row stays household-scoped, but
-    // the feed post can go to a clan the caller belongs to.
-    let celebrateGid = groupId;
+    // Optional clan celebration: the milestone row stays household-scoped and
+    // the household always gets the feed post; a clan share ADDS a post in
+    // that clan's feed too (clan members may not overlap the household, e.g.
+    // a Jesse∩Ariel clan that Sophie isn't in — she'd miss a clan-only post).
     let sharedScope = 'household';
     let sharedGroupId = null;
     if (req.body.shared_group_id) {
@@ -4306,9 +4307,10 @@ app.post('/api/milestones', requireAuth, async (req, res) => {
       if (!Number.isInteger(gid) || !(await db.isGroupMember(gid, userId))) {
         return res.status(403).json({ error: 'Cannot share to that group' });
       }
-      celebrateGid = gid;
-      sharedScope = 'group';
-      sharedGroupId = gid;
+      if (gid !== groupId) {          // picking your own household = plain household scope
+        sharedScope = 'group';
+        sharedGroupId = gid;
+      }
     }
     const person = await dbGet(db, 'SELECT name FROM gift_people WHERE id = ?', [parseInt(person_id)]);
     const result = await db.addMilestone({
@@ -4321,20 +4323,23 @@ app.post('/api/milestones', requireAuth, async (req, res) => {
     });
     res.json({ success: true, id: result.id });
 
-    // Celebrate: a feed post in the chosen group + a push to its members.
-    try {
-      await db.addFeedPost({
-        group_id: celebrateGid,
-        author_id: userId,
-        post_type: 'milestone',
-        title: `${person.name}: ${title}`,
-        body: req.body.description || null,
-        reference_type: 'milestone',
-        reference_id: result.id,
-      });
-    } catch (e) { console.error('Milestone feed post error:', e.message); }
-    push.pushToGroup(db, celebrateGid, userId, 'A new milestone',
-      `${person.name} — ${title}. Cheer them on!`, { type: 'milestone', ref_id: result.id });
+    // Celebrate: feed post + push in the household, and in the clan if shared.
+    const celebrateIn = [groupId, ...(sharedGroupId ? [sharedGroupId] : [])];
+    for (const gid of celebrateIn) {
+      try {
+        await db.addFeedPost({
+          group_id: gid,
+          author_id: userId,
+          post_type: 'milestone',
+          title: `${person.name}: ${title}`,
+          body: req.body.description || null,
+          reference_type: 'milestone',
+          reference_id: result.id,
+        });
+      } catch (e) { console.error('Milestone feed post error:', e.message); }
+      push.pushToGroup(db, gid, userId, 'A new milestone',
+        `${person.name} — ${title}. Cheer them on!`, { type: 'milestone', ref_id: result.id });
+    }
   } catch (err) {
     sendServerError(res, err);
   } finally {

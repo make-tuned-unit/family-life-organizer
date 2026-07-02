@@ -316,6 +316,7 @@ struct AddMilestoneSheet: View {
     @State private var note = ""
     @State private var date = Date()
     @State private var category: MilestoneCategory = .moment
+    @State private var shareGroupId: Int?
     @State private var isSaving = false
     @State private var error: String?
 
@@ -336,8 +337,10 @@ struct AddMilestoneSheet: View {
                     }
                     .pickerStyle(.menu)
                 }
+                ShareWithSection(selectedGroupId: $shareGroupId)
+
                 Section {
-                    Text("The household gets a feed post and a nudge to cheer \(person.name) on.")
+                    Text("Your household always gets a feed post and a nudge to cheer \(person.name) on. Sharing with a circle celebrates it there too.")
                         .font(.system(size: 12.5))
                         .foregroundStyle(WarmPalette.ink3)
                 }
@@ -369,6 +372,7 @@ struct AddMilestoneSheet: View {
         ]
         let trimmedNote = note.trimmingCharacters(in: .whitespacesAndNewlines)
         if !trimmedNote.isEmpty { data["description"] = trimmedNote }
+        if let shareGroupId { data["shared_group_id"] = shareGroupId }
         Task {
             do {
                 try await api.addMilestone(data)
