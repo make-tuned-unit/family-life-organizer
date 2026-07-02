@@ -22,6 +22,7 @@ struct PersonDetailView: View {
     @State private var decisions: [DecisionResponse] = []
     @State private var keyDates: [SpecialEventResponse] = []
     @State private var showingAddMilestone = false
+    @State private var showingAddKeyDate = false
     @State private var showingEditPerson = false
     @State private var showingDeleteConfirm = false
     @State private var editingMilestone: MilestoneResponse?
@@ -74,6 +75,12 @@ struct PersonDetailView: View {
         }
         .sheet(isPresented: $showingAddMilestone) {
             AddMilestoneSheet(person: person) {
+                await load()
+                await onChanged?()
+            }
+        }
+        .sheet(isPresented: $showingAddKeyDate) {
+            AddKeyDateSheet(person: display) {
                 await load()
                 await onChanged?()
             }
@@ -255,6 +262,16 @@ struct PersonDetailView: View {
 
     private var datesSection: some View {
         VStack(spacing: 10) {
+            Button { showingAddKeyDate = true } label: {
+                Label("Add a key date", systemImage: "plus")
+                    .font(.system(size: 14, weight: .semibold))
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 11)
+                    .background(display.accentColor.opacity(0.14), in: RoundedRectangle(cornerRadius: 14))
+                    .foregroundStyle(display.accentColor)
+            }
+            .buttonStyle(.plain)
+
             if let bday = display.birthday, let date = DateFormatter.isoDate.date(from: bday) {
                 dateRow("birthday.cake.fill", "Birthday", DateFormatter.longMonthDay.string(from: date), AccentTheme.saffron.color)
             }
@@ -262,16 +279,18 @@ struct PersonDetailView: View {
                 dateRow("heart.fill", "Anniversary", DateFormatter.longMonthDay.string(from: date), AccentTheme.rose.color)
             }
             ForEach(keyDates) { ev in
-                dateRow("calendar", ev.title, ev.date, AccentTheme.ocean.color)
+                let dateStr = DateFormatter.isoDate.date(from: String(ev.date.prefix(10)))
+                    .map { DateFormatter.longMonthDay.string(from: $0) } ?? ev.date
+                dateRow("calendar", ev.title, dateStr, AccentTheme.ocean.color, event: ev)
             }
             if display.birthday == nil && display.anniversary == nil && keyDates.isEmpty {
                 sectionEmpty("calendar", "No key dates",
-                             "Add a birthday when editing this person, or occasions from the Gifts overview.")
+                             "Birthdays, anniversaries, gotcha days — add the dates worth remembering for \(display.name).")
             }
         }
     }
 
-    private func dateRow(_ icon: String, _ title: String, _ value: String, _ color: Color) -> some View {
+    private func dateRow(_ icon: String, _ title: String, _ value: String, _ color: Color, event: SpecialEventResponse? = nil) -> some View {
         HStack(spacing: 12) {
             Image(systemName: icon)
                 .font(.system(size: 14))
@@ -287,6 +306,19 @@ struct PersonDetailView: View {
         }
         .padding(13)
         .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: 14))
+        .contextMenu {
+            if let event {
+                Button(role: .destructive) {
+                    Task {
+                        try? await api.deleteSpecialEvent(id: event.id)
+                        await load()
+                        await onChanged?()
+                    }
+                } label: {
+                    Label("Delete key date", systemImage: "trash")
+                }
+            }
+        }
     }
 
     // MARK: - Decisions
@@ -600,6 +632,76 @@ struct EditMilestoneSheet: View {
         Task {
             do {
                 try await api.updateMilestone(id: milestone.id, data: data)
+                await onSaved()
+                dismiss()
+            } catch {
+                self.error = "Couldn't save. Try again."
+                isSaving = false
+            }
+        }
+    }
+}
+
+// MARK: - Add key date
+
+struct AddKeyDateSheet: View {
+    @Environment(APIService.self) private var api
+    @Environment(\.dismiss) private var dismiss
+    let person: PersonResponse
+    var onSaved: () async -> Void
+
+    @State private var title = ""
+    @State private var date = Date()
+    @State private var repeatsAnnually = true
+    @State private var notes = ""
+    @State private var isSaving = false
+    @State private var error: String?
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("The date") {
+                    TextField("What is it? (e.g. Gotcha day)", text: $title)
+                        .textInputAutocapitalization(.sentences)
+                    DatePicker("When", selection: $date, displayedComponents: .date)
+                    Toggle("Repeats every year", isOn: $repeatsAnnually)
+                }
+                Section("Notes") {
+                    TextField("A little detail (optional)", text: $notes, axis: .vertical)
+                        .lineLimit(2...4)
+                }
+                if let error {
+                    Text(error).foregroundStyle(.red).font(.system(size: 13))
+                }
+            }
+            .navigationTitle("New key date for \(person.name)")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(isSaving ? "Saving…" : "Save") { save() }
+                        .disabled(title.trimmingCharacters(in: .whitespaces).isEmpty || isSaving)
+                }
+            }
+        }
+    }
+
+    private func save() {
+        isSaving = true
+        var data: [String: Any] = [
+            "person_id": person.id,
+            "title": title.trimmingCharacters(in: .whitespaces),
+            "date": DateFormatter.isoDate.string(from: date),
+            "event_type": "custom",
+            "is_recurring": repeatsAnnually,
+        ]
+        let trimmedNotes = notes.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmedNotes.isEmpty { data["notes"] = trimmedNotes }
+        Task {
+            do {
+                try await api.addSpecialEvent(data)
                 await onSaved()
                 dismiss()
             } catch {
