@@ -24,12 +24,17 @@ struct PersonResponse: Codable, Identifiable {
 
     var accentColor: Color {
         switch avatar_color {
-        case "rose": AccentTheme.rose.color
-        case "ocean": AccentTheme.ocean.color
-        case "saffron": AccentTheme.saffron.color
-        case "terracotta": AccentTheme.terracotta.color
-        case "mauve": AccentTheme.mauve.color
-        default: AccentTheme.sage.color
+        case "rose": return AccentTheme.rose.color
+        case "ocean": return AccentTheme.ocean.color
+        case "saffron": return AccentTheme.saffron.color
+        case "terracotta": return AccentTheme.terracotta.color
+        case "mauve": return AccentTheme.mauve.color
+        case "sage": return AccentTheme.sage.color
+        default:
+            // No color set — auto-assign a stable one so people don't all look
+            // identical. Deterministic by id, so a person keeps the same color.
+            let palette: [AccentTheme] = [.sage, .rose, .ocean, .saffron, .mauve, .terracotta]
+            return palette[abs(id) % palette.count].color
         }
     }
 
