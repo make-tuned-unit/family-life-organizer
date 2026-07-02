@@ -32,6 +32,15 @@ const PROTECTED_UPDATE_COLUMNS = new Set([
   'processed_by', 'email_id',
 ]);
 
+// Coerce a caller-supplied user id to a safe integer before it is embedded in
+// SQL. Throws on anything non-numeric so a bad session value fails loudly
+// instead of silently matching zero rows (parseInt → NaN → empty result).
+function safeUid(userId) {
+  const uid = Number.parseInt(userId, 10);
+  if (!Number.isInteger(uid)) throw new Error('Invalid user id');
+  return uid;
+}
+
 // Shared connection for concurrent access
 let _sharedDb = null;
 
@@ -593,7 +602,7 @@ class FamilyDB {
     return new Promise((resolve, reject) => {
       let sql = 'SELECT * FROM groceries WHERE status = ?';
       if (userId) {
-        const uid = parseInt(userId);
+        const uid = safeUid(userId);
         sql += ` AND group_id IN (SELECT gm.group_id FROM group_members gm
                    JOIN groups g ON g.id = gm.group_id
                    WHERE gm.user_id = ${uid} AND g.group_type = 'household')`;
@@ -665,7 +674,7 @@ class FamilyDB {
       }
 
       if (userId) {
-        const uid = parseInt(userId);
+        const uid = safeUid(userId);
         sql += ` AND group_id IN (SELECT gm.group_id FROM group_members gm
                    JOIN groups g ON g.id = gm.group_id
                    WHERE gm.user_id = ${uid} AND g.group_type = 'household')`;
@@ -689,7 +698,7 @@ class FamilyDB {
 
       let sql = 'SELECT * FROM appointments WHERE appointment_date >= ? AND appointment_date < ?';
       if (userId) {
-        const uid = parseInt(userId);
+        const uid = safeUid(userId);
         sql += ` AND group_id IN (SELECT gm.group_id FROM group_members gm
                    JOIN groups g ON g.id = gm.group_id
                    WHERE gm.user_id = ${uid} AND g.group_type = 'household')`;
@@ -707,7 +716,7 @@ class FamilyDB {
     return new Promise((resolve, reject) => {
       let sql = 'SELECT * FROM appointments WHERE recurrence_rule IS NOT NULL AND recurrence_rule != ""';
       if (userId) {
-        const uid = parseInt(userId);
+        const uid = safeUid(userId);
         sql += ` AND group_id IN (SELECT gm.group_id FROM group_members gm
                    JOIN groups g ON g.id = gm.group_id
                    WHERE gm.user_id = ${uid} AND g.group_type = 'household')`;
@@ -773,7 +782,7 @@ class FamilyDB {
   // Household members' synced device-calendar events for a month (group-scoped).
   getSyncedCalendarEventsByMonth(year, month, userId) {
     return new Promise((resolve, reject) => {
-      const uid = parseInt(userId);
+      const uid = safeUid(userId);
       const monthKey = `${year}-${String(month).padStart(2, '0')}`;
       const sql = `
         SELECT s.id, s.user_id AS owner_id, u.name AS owner_name, s.external_id,
@@ -792,14 +801,16 @@ class FamilyDB {
   }
 
   updateAppointment(id, updates) {
+    const ALLOWED = new Set(['title', 'description', 'appointment_date', 'appointment_time', 'location', 'with_person', 'category', 'person_tags', 'recurrence_rule', 'recurrence_end', 'reminder_sent']);
     return new Promise((resolve, reject) => {
       const fields = [];
       const params = [];
       for (const [key, value] of Object.entries(updates)) {
-        if (PROTECTED_UPDATE_COLUMNS.has(key)) continue; // never mass-assign ownership/identity columns
+        if (!ALLOWED.has(key)) continue;
         fields.push(`${key} = ?`);
         params.push(value);
       }
+      if (!fields.length) return resolve({ id });
       params.push(id);
       this.db.run(`UPDATE appointments SET ${fields.join(', ')} WHERE id = ?`, params, (err) => {
         if (err) reject(err);
@@ -1074,11 +1085,12 @@ class FamilyDB {
   }
 
   updatePantryItem(id, updates) {
+    const ALLOWED = new Set(['item', 'category', 'location', 'quantity', 'unit', 'expiry_date']);
     return new Promise((resolve, reject) => {
       const fields = [];
       const params = [];
       for (const [key, value] of Object.entries(updates)) {
-        if (PROTECTED_UPDATE_COLUMNS.has(key)) continue; // never mass-assign ownership/identity columns
+        if (!ALLOWED.has(key)) continue;
         fields.push(`${key} = ?`);
         params.push(value);
       }
@@ -1130,14 +1142,16 @@ class FamilyDB {
   }
 
   updateTrip(id, updates) {
+    const ALLOWED = new Set(['origin', 'origin_lat', 'origin_lng', 'destination', 'destination_lat', 'destination_lng', 'purpose', 'status', 'current_lat', 'current_lng', 'eta_minutes', 'started_at', 'arrived_at']);
     return new Promise((resolve, reject) => {
       const fields = [];
       const params = [];
       for (const [key, value] of Object.entries(updates)) {
-        if (PROTECTED_UPDATE_COLUMNS.has(key)) continue; // never mass-assign ownership/identity columns
+        if (!ALLOWED.has(key)) continue;
         fields.push(`${key} = ?`);
         params.push(value);
       }
+      if (!fields.length) return resolve({ id });
       params.push(id);
       this.db.run(`UPDATE trips SET ${fields.join(', ')} WHERE id = ?`, params, (err) => {
         if (err) reject(err);
@@ -1243,7 +1257,7 @@ class FamilyDB {
       const params = [];
       if (filters.status) { sql += ' AND status = ?'; params.push(filters.status); }
       if (userId) {
-        const uid = parseInt(userId);
+        const uid = safeUid(userId);
         sql += ` AND group_id IN (SELECT group_id FROM group_members WHERE user_id = ${uid})`;
       }
       sql += ' ORDER BY datetime(created_at) DESC LIMIT 1000'; // safety cap (household-scoped); full pagination deferred
@@ -1264,14 +1278,16 @@ class FamilyDB {
   }
 
   updateDecision(id, updates) {
+    const ALLOWED = new Set(['title', 'decision_type', 'body', 'link_url', 'photo_data', 'poll_options', 'status', 'expires_at']);
     return new Promise((resolve, reject) => {
       const fields = [];
       const params = [];
       for (const [key, value] of Object.entries(updates)) {
-        if (PROTECTED_UPDATE_COLUMNS.has(key)) continue; // never mass-assign ownership/identity columns
+        if (!ALLOWED.has(key)) continue;
         fields.push(`${key} = ?`);
         params.push(key === 'poll_options' ? JSON.stringify(value || []) : value);
       }
+      if (!fields.length) return resolve({ id });
       params.push(id);
       this.db.run(`UPDATE decisions SET ${fields.join(', ')} WHERE id = ?`, params, (err) => {
         if (err) reject(err);
@@ -1416,7 +1432,7 @@ class FamilyDB {
       const params = [];
       if (filters.status) { sql += ' AND status = ?'; params.push(filters.status); }
       if (userId) {
-        const uid = parseInt(userId);
+        const uid = safeUid(userId);
         sql += ` AND group_id IN (SELECT group_id FROM group_members WHERE user_id = ${uid})`;
       }
       sql += ' ORDER BY datetime(created_at) DESC LIMIT 1000'; // safety cap (household-scoped); full pagination deferred
@@ -1589,7 +1605,7 @@ class FamilyDB {
   getRivalryLeaderboard(userId = null) {
     return new Promise((resolve, reject) => {
       const groupFilter = userId
-        ? `WHERE group_id IN (SELECT group_id FROM group_members WHERE user_id = ${parseInt(userId)})`
+        ? `WHERE group_id IN (SELECT group_id FROM group_members WHERE user_id = ${safeUid(userId)})`
         : '';
       this.db.all(`SELECT * FROM rivalries ${groupFilter}`, [], (err, rows) => {
         if (err) return reject(err);
@@ -1643,7 +1659,7 @@ class FamilyDB {
 
   getItineraries(userId) {
     return new Promise((resolve, reject) => {
-      const uid = parseInt(userId);
+      const uid = safeUid(userId);
       this.db.all(
         `SELECT * FROM itineraries WHERE traveler_id = ? OR group_id IN (SELECT group_id FROM group_members WHERE user_id = ?) ORDER BY datetime(start_date) DESC`,
         [uid, uid],
@@ -1840,14 +1856,16 @@ class FamilyDB {
   }
 
   updateGiftIdea(id, updates) {
+    const ALLOWED = new Set(['title', 'notes', 'link_url', 'estimated_price', 'status', 'for_event']);
     return new Promise((resolve, reject) => {
       const fields = [];
       const params = [];
       for (const [key, value] of Object.entries(updates)) {
-        if (PROTECTED_UPDATE_COLUMNS.has(key)) continue; // never mass-assign ownership/identity columns
+        if (!ALLOWED.has(key)) continue;
         fields.push(`${key} = ?`);
         params.push(value);
       }
+      if (!fields.length) return resolve({ id });
       params.push(id);
       this.db.run(`UPDATE gift_ideas SET ${fields.join(', ')} WHERE id = ?`, params, (err) => {
         if (err) reject(err);
@@ -2042,7 +2060,7 @@ class FamilyDB {
   // Notes the user owns OR that have been shared to a group they belong to.
   getNotes(userId) {
     return new Promise((resolve, reject) => {
-      const uid = parseInt(userId);
+      const uid = safeUid(userId);
       this.db.all(
         `SELECT n.*, u.name AS author_name, g.name AS shared_group_name
          FROM notes n
@@ -2104,7 +2122,7 @@ class FamilyDB {
       }
       if (!fields.length) return resolve({ changed: 0 });
       fields.push("updated_at = CURRENT_TIMESTAMP");
-      const uid = parseInt(userId);
+      const uid = safeUid(userId);
       params.push(id, uid);
       this.db.run(
         `UPDATE notes SET ${fields.join(', ')}
@@ -2593,14 +2611,16 @@ class FamilyDB {
   }
 
   updateContact(id, updates) {
+    const ALLOWED = new Set(['name', 'relationship', 'phone', 'email', 'birthday', 'avatar_initial', 'notes']);
     return new Promise((resolve, reject) => {
       const fields = [];
       const params = [];
       for (const [key, value] of Object.entries(updates)) {
-        if (PROTECTED_UPDATE_COLUMNS.has(key)) continue; // never mass-assign ownership/identity columns
+        if (!ALLOWED.has(key)) continue;
         fields.push(`${key} = ?`);
         params.push(value);
       }
+      if (!fields.length) return resolve({ id });
       params.push(id);
       this.db.run(`UPDATE contacts SET ${fields.join(', ')} WHERE id = ?`, params, (err) => {
         if (err) reject(err);
@@ -2803,7 +2823,7 @@ class FamilyDB {
   // Posts/comments/reactions are filtered to groups the user belongs to
   getActivityFeed(limit = 20, userId = null) {
     return new Promise((resolve, reject) => {
-      const uid = userId ? parseInt(userId) : null;
+      const uid = userId ? safeUid(userId) : null;
       // Subquery for user's group IDs
       const myGroups = uid
         ? `SELECT group_id FROM group_members WHERE user_id = ${uid}`
@@ -2919,7 +2939,7 @@ class FamilyDB {
       const groupFilter = userId
         ? `AND group_id IN (SELECT gm.group_id FROM group_members gm
              JOIN groups g ON g.id = gm.group_id
-             WHERE gm.user_id = ${parseInt(userId)} AND g.group_type = 'household')`
+             WHERE gm.user_id = ${safeUid(userId)} AND g.group_type = 'household')`
         : '';
       const sql = `
         SELECT
@@ -3013,14 +3033,16 @@ class FamilyDB {
   }
 
   updateList(id, updates) {
+    const ALLOWED = new Set(['name', 'icon', 'color', 'pinned', 'list_type']);
     return new Promise((resolve, reject) => {
       const fields = [];
       const params = [];
       for (const [key, value] of Object.entries(updates)) {
-        if (PROTECTED_UPDATE_COLUMNS.has(key)) continue; // never mass-assign ownership/identity columns
+        if (!ALLOWED.has(key)) continue;
         fields.push(`${key} = ?`);
         params.push(value);
       }
+      if (!fields.length) return resolve({ id });
       params.push(id);
       this.db.run(`UPDATE lists SET ${fields.join(', ')} WHERE id = ?`, params, (err) => {
         if (err) reject(err);
@@ -3064,14 +3086,16 @@ class FamilyDB {
   }
 
   updateListItem(id, updates) {
+    const ALLOWED = new Set(['title', 'is_done', 'sort_order', 'category', 'completed_at']);
     return new Promise((resolve, reject) => {
       const fields = [];
       const params = [];
       for (const [key, value] of Object.entries(updates)) {
-        if (PROTECTED_UPDATE_COLUMNS.has(key)) continue; // never mass-assign ownership/identity columns
+        if (!ALLOWED.has(key)) continue;
         fields.push(`${key} = ?`);
         params.push(value);
       }
+      if (!fields.length) return resolve({ id });
       params.push(id);
       this.db.run(`UPDATE list_items SET ${fields.join(', ')} WHERE id = ?`, params, (err) => {
         if (err) reject(err);
