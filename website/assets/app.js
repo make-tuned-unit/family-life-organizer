@@ -203,9 +203,10 @@ if ('IntersectionObserver' in window && jsOn && !reduceMotion) {
   briefParas.forEach((p, i) => { p.innerHTML = briefHTML[i]; });
 }
 
-// Waitlist form — posts to /api/waitlist (same origin as the marketing site).
-const form = document.querySelector('.notify-form');
-if (form) {
+// Waitlist forms — every .notify-form (hero + final CTA) posts to /api/waitlist
+// (same origin as the marketing site). data-source tags where the signup came from.
+document.querySelectorAll('.notify-form').forEach(initNotifyForm);
+function initNotifyForm(form) {
   const input = form.querySelector('input');
   const btn = form.querySelector('button');
 
@@ -239,7 +240,7 @@ if (form) {
       const res = await fetch('/api/waitlist', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: input.value.trim(), source: 'site' }),
+        body: JSON.stringify({ email: input.value.trim(), source: form.dataset.source || 'site' }),
       });
       const data = await res.json().catch(() => ({}));
 
