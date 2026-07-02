@@ -54,7 +54,8 @@ CREATE TABLE IF NOT EXISTS groceries (
     status TEXT DEFAULT 'needed',
     added_by TEXT DEFAULT 'jesse',
     added_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    purchased_at DATETIME
+    purchased_at DATETIME,
+    group_id INTEGER REFERENCES groups(id)
 );
 
 -- Appointments
@@ -136,6 +137,7 @@ CREATE TABLE IF NOT EXISTS receipts (
   email_id TEXT, -- reference to original email if from email
   added_by TEXT DEFAULT 'jesse',
   group_id INTEGER REFERENCES groups(id),
+  itinerary_id INTEGER REFERENCES itineraries(id),
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -262,6 +264,11 @@ CREATE TABLE IF NOT EXISTS rivalries (
     point_value INTEGER DEFAULT 100,
     winner_name TEXT,
     group_id INTEGER,
+    participants TEXT,          -- JSON array of names (multi-player rivalries)
+    rivalry_type TEXT DEFAULT 'individual', -- 'individual' | 'team'
+    team_a TEXT,                -- JSON roster (team mode)
+    team_b TEXT,                -- JSON roster (team mode)
+    winner_team TEXT,           -- 'a' | 'b' (team mode)
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (group_id) REFERENCES groups(id)
 );
@@ -440,8 +447,15 @@ CREATE TABLE IF NOT EXISTS groups (
     description TEXT,
     invite_code TEXT UNIQUE,
     created_by INTEGER,
+    profile_image TEXT,         -- base64 group avatar
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (created_by) REFERENCES users(id)
+);
+
+-- One-time migration/bookkeeping flags (e.g. reattribution_v1)
+CREATE TABLE IF NOT EXISTS app_meta (
+    key TEXT PRIMARY KEY,
+    value TEXT
 );
 
 -- Links users to groups
