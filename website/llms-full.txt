@@ -23,7 +23,7 @@ Kinrows is a single, private home organizer for the whole household. It brings t
 
 ## Coverage / scope
 - Platform: iPhone (iOS 18+). A companion web view exists for the app; the primary product is the iOS app.
-- Availability: Coming fall 2026. Currently pre-launch; visitors can sign up to be notified.
+- Availability: Coming September 2026. Currently pre-launch; visitors can sign up to be notified.
 - Region: Built for families anywhere; English-language at launch.
 
 ## Feature taxonomy
