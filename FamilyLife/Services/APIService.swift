@@ -637,6 +637,49 @@ final class APIService {
         let _: SuccessResponse = try await delete("/api/gifts/events/\(id)")
     }
 
+    // MARK: - People (the household registry: linked users + dependents)
+
+    func fetchPeople() async throws -> [PersonResponse] {
+        try await get("/api/people")
+    }
+
+    func addPerson(_ person: [String: Any]) async throws {
+        let _: IDResponse = try await post("/api/people", body: person)
+    }
+
+    func updatePerson(id: Int, data: [String: Any]) async throws {
+        let _: SuccessResponse = try await put("/api/people/\(id)", body: data)
+    }
+
+    func deletePerson(id: Int) async throws {
+        let _: SuccessResponse = try await delete("/api/people/\(id)")
+    }
+
+    /// Decisions tagged "about" this person — their card's discussion history.
+    func fetchPersonDecisions(personId: Int) async throws -> [DecisionResponse] {
+        try await get("/api/people/\(personId)/decisions")
+    }
+
+    // MARK: - Milestones
+
+    func fetchMilestones(personId: Int? = nil) async throws -> [MilestoneResponse] {
+        var params: [String: String] = [:]
+        if let personId { params["person_id"] = String(personId) }
+        return try await get("/api/milestones", queryParams: params)
+    }
+
+    func addMilestone(_ milestone: [String: Any]) async throws {
+        let _: IDResponse = try await post("/api/milestones", body: milestone)
+    }
+
+    func updateMilestone(id: Int, data: [String: Any]) async throws {
+        let _: SuccessResponse = try await put("/api/milestones/\(id)", body: data)
+    }
+
+    func deleteMilestone(id: Int) async throws {
+        let _: SuccessResponse = try await delete("/api/milestones/\(id)")
+    }
+
     // MARK: - Auth (registration)
 
     struct RegisterResponse: Codable {

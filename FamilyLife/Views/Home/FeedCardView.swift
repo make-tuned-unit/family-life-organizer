@@ -496,6 +496,7 @@ struct FeedCard: View {
             case "decision", "poll": "Decision"
             case "photo": "Photo"
             case "link": "Link"
+            case "milestone": "Milestone"
             default: "Post"
             }
         default: "Update"

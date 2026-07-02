@@ -25,8 +25,8 @@ struct MoreView: View {
                         NavigationLink { RivalriesView() } label: {
                             moreRow(icon: "flag.2.crossed.fill", title: "Rivalries", subtitle: "Family competitions and leaderboards", color: TabAccent.rivalries.color)
                         }
-                        NavigationLink { GiftsView() } label: {
-                            moreRow(icon: "gift.fill", title: "Gifts", subtitle: "Track people, occasions, and gift ideas", color: AccentTheme.rose.color)
+                        NavigationLink { PeopleView() } label: {
+                            moreRow(icon: "person.2.fill", title: "People", subtitle: "Person cards — milestones, gifts, dates & ideas", color: AccentTheme.rose.color)
                         }
                         NavigationLink { MyCoverageRequestsView() } label: {
                             moreRow(icon: "arrow.triangle.swap", title: "Coverage", subtitle: "Your requests and incoming help", color: TabAccent.care.color)
