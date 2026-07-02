@@ -20,6 +20,8 @@ struct NewDecisionView: View {
     @State private var selectedImageData: Data?
     @State private var expiryChoice: ExpiryChoice = .day
     @State private var shareGroupId: Int?
+    @State private var people: [PersonResponse] = []
+    @State private var aboutPersonId: Int?
 
     init(preselectedGroupId: Int? = nil, onSaved: @escaping () async -> Void) {
         self.onSaved = onSaved
@@ -140,6 +142,22 @@ struct NewDecisionView: View {
                     .pickerStyle(.menu)
                 }
 
+                if !people.isEmpty {
+                    Section {
+                        Picker(selection: $aboutPersonId) {
+                            Text("No one in particular").tag(Int?.none)
+                            ForEach(people) { p in
+                                Text(p.name).tag(Int?.some(p.id))
+                            }
+                        } label: {
+                            Label("About", systemImage: "person")
+                        }
+                        .pickerStyle(.menu)
+                    } footer: {
+                        Text("Tagged decisions show on that person's card — the story of what you've talked about for them.")
+                    }
+                }
+
                 ShareWithSection(selectedGroupId: $shareGroupId)
             }
             .scrollContentBackground(.hidden)
@@ -161,6 +179,9 @@ struct NewDecisionView: View {
                     }
                     .disabled(title.isEmpty || isSaving)
                 }
+            }
+            .task {
+                people = (try? await api.fetchPeople()) ?? []
             }
         }
     }
@@ -195,6 +216,7 @@ struct NewDecisionView: View {
             "expires_at": expiresAt.map { ISO8601DateFormatter().string(from: $0) } ?? NSNull()
         ]
         if let shareGroupId { body["group_id"] = shareGroupId }
+        if let aboutPersonId { body["person_id"] = aboutPersonId }
 
         do {
             let result = try await api.addDecision(body)

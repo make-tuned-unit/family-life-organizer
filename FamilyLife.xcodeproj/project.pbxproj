@@ -122,6 +122,9 @@
 		AA000200 /* ChangePasswordView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000200 /* ChangePasswordView.swift */; };
 		AA000201 /* TwoFactorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000201 /* TwoFactorView.swift */; };
 		AA000202 /* SecurityView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000202 /* SecurityView.swift */; };
+		AA000210 /* Person.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000210 /* Person.swift */; };
+		AA000211 /* PeopleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000211 /* PeopleView.swift */; };
+		AA000212 /* PersonDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000212 /* PersonDetailView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -240,6 +243,9 @@
 		BB000200 /* ChangePasswordView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChangePasswordView.swift; sourceTree = "<group>"; };
 		BB000201 /* TwoFactorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TwoFactorView.swift; sourceTree = "<group>"; };
 		BB000202 /* SecurityView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecurityView.swift; sourceTree = "<group>"; };
+		BB000210 /* Person.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Person.swift; sourceTree = "<group>"; };
+		BB000211 /* PeopleView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PeopleView.swift; sourceTree = "<group>"; };
+		BB000212 /* PersonDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersonDetailView.swift; sourceTree = "<group>"; };
 		CC000001 /* FamilyLife.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = FamilyLife.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -310,6 +316,7 @@
 				BB000031 /* Gift.swift */,
 				BB000083 /* Itinerary.swift */,
 				BB000100 /* EventAttachment.swift */,
+				BB000210 /* Person.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -345,6 +352,7 @@
 				EE00000F /* Rivalries */,
 				EE000010 /* Decisions */,
 				EE000011 /* Gifts */,
+				EE000022 /* People */,
 				EE000012 /* Components */,
 				GG000001 /* Care */,
 				GG000002 /* Lists */,
@@ -480,6 +488,15 @@
 				BB000036 /* AddSpecialEventView.swift */,
 			);
 			path = Gifts;
+			sourceTree = "<group>";
+		};
+		EE000022 /* People */ = {
+			isa = PBXGroup;
+			children = (
+				BB000211 /* PeopleView.swift */,
+				BB000212 /* PersonDetailView.swift */,
+			);
+			path = People;
 			sourceTree = "<group>";
 		};
 		EE000012 /* Components */ = {
@@ -744,6 +761,9 @@
 				AA000098 /* NotesView.swift in Sources */,
 				AA000200 /* ChangePasswordView.swift in Sources */,
 				AA000202 /* SecurityView.swift in Sources */,
+				AA000210 /* Person.swift in Sources */,
+				AA000211 /* PeopleView.swift in Sources */,
+				AA000212 /* PersonDetailView.swift in Sources */,
 				AA00004D /* SignUpView.swift in Sources */,
 				AA00004E /* FamilyGroupsView.swift in Sources */,
 				AA00004F /* EventDetailView.swift in Sources */,
