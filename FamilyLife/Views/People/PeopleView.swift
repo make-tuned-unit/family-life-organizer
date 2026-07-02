@@ -52,30 +52,6 @@ struct PeopleView: View {
                 }
                 .buttonStyle(.plain)
                 .padding(.top, 6)
-
-                NavigationLink { GiftsView() } label: {
-                    HStack(spacing: 12) {
-                        Image(systemName: "gift.fill")
-                            .font(.system(size: 15))
-                            .foregroundStyle(AccentTheme.rose.color)
-                        VStack(alignment: .leading, spacing: 1) {
-                            Text("Occasions & gifts overview")
-                                .font(.system(size: 15, weight: .semibold))
-                                .foregroundStyle(WarmPalette.ink1)
-                            Text("Every upcoming date and idea, across everyone")
-                                .font(.system(size: 12))
-                                .foregroundStyle(WarmPalette.ink3)
-                        }
-                        Spacer()
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundStyle(WarmPalette.ink3)
-                    }
-                    .padding(14)
-                    .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: 16))
-                }
-                .buttonStyle(.plain)
-                .padding(.top, 6)
             }
             .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
             .padding(.top, 10)
