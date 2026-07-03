@@ -23,13 +23,9 @@ struct ConciergeHistoryView: View {
                 if loading {
                     ProgressView().tint(accent)
                 } else if let errorMessage {
-                    ContentUnavailableView("Couldn't load",
-                                           systemImage: "exclamationmark.triangle",
-                                           description: Text(errorMessage))
+                    WarmEmptyState(title: "Couldn't load", systemImage: "exclamationmark.triangle", description: errorMessage)
                 } else if conversations.isEmpty {
-                    ContentUnavailableView("No conversations yet",
-                                           systemImage: "bubble.left.and.bubble.right",
-                                           description: Text("Your past chats with the concierge will appear here."))
+                    WarmEmptyState(title: "No conversations yet", systemImage: "bubble.left.and.bubble.right", description: "Your past chats with the concierge will appear here.")
                 } else {
                     ScrollView {
                         VStack(spacing: 0) {

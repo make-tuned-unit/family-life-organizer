@@ -224,7 +224,7 @@ struct ReceiptScannerView: View {
                         }
                         TextField("YYYY-MM-DD", text: $editableDate)
                             .font(.subheadline)
-                            .foregroundStyle(dateNeedsAttention ? .red : WarmPalette.ink2)
+                            .foregroundStyle(dateNeedsAttention ? WarmPalette.bad : WarmPalette.ink2)
                     }
                     Spacer()
                     VStack(alignment: .trailing, spacing: 6) {

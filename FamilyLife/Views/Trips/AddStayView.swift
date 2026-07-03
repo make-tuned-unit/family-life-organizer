@@ -204,11 +204,7 @@ struct EditStayView: View {
                     .disabled(isSaving)
                 }
             }
-            .alert("Error", isPresented: Binding(get: { error != nil }, set: { if !$0 { error = nil } })) {
-                Button("OK") { error = nil }
-            } message: {
-                Text(error ?? "")
-            }
+            .inlineError(error) { error = nil }
         }
     }
 

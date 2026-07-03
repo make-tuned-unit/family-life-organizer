@@ -68,11 +68,12 @@ struct GiftsView: View {
                 }
 
                 if people.isEmpty && events.isEmpty && !isLoading {
-                    ContentUnavailableView {
-                        Label("Gift Lists", systemImage: "gift.fill")
-                    } description: {
-                        Text("Add people and track gift ideas, birthdays, and special events")
-                    } actions: {
+                    VStack(spacing: 16) {
+                        WarmEmptyState(
+                            title: "Gift Lists",
+                            systemImage: "gift.fill",
+                            description: "Add people and track gift ideas, birthdays, and special events"
+                        )
                         Button { showingAddPerson = true } label: {
                             HStack(spacing: 8) {
                                 Image(systemName: "person.badge.plus")
@@ -135,11 +136,7 @@ struct GiftsView: View {
                 ProgressView()
             }
         }
-        .alert("Couldn’t load gifts", isPresented: errorAlertIsPresented) {
-            Button("OK") { error = nil }
-        } message: {
-            Text(error ?? "An unexpected error occurred.")
-        }
+        .inlineError(error) { error = nil }
         .task {
             await loadAll()
         }
@@ -174,7 +171,7 @@ struct GiftsView: View {
                         Spacer()
                         Text(item.countdown)
                             .font(.subheadline.bold())
-                            .foregroundStyle(item.days <= 7 ? .red : item.days <= 30 ? .orange : .secondary)
+                            .foregroundStyle(item.days <= 7 ? WarmPalette.bad : item.days <= 30 ? WarmPalette.warn : WarmPalette.ink3)
                     }
                     .padding(DesignTokens.Spacing.cardGap)
                     .background(WarmPalette.ink1.opacity(0.06))
@@ -286,9 +283,6 @@ struct GiftsView: View {
         }
     }
 
-    private var errorAlertIsPresented: Binding<Bool> {
-        Binding(get: { error != nil }, set: { if !$0 { error = nil } })
-    }
 }
 
 struct PersonRowRemote: View {

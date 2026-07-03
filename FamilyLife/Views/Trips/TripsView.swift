@@ -125,11 +125,7 @@ struct TripsView: View {
                 ProgressView()
             }
         }
-        .alert("Something went wrong", isPresented: errorAlertIsPresented) {
-            Button("OK") { viewModel.error = nil }
-        } message: {
-            Text(viewModel.error ?? "An unexpected error occurred.")
-        }
+        .inlineError(viewModel.error) { viewModel.error = nil }
         .refreshable {
             await viewModel.loadAll(api: api)
         }
@@ -140,13 +136,6 @@ struct TripsView: View {
         .onChange(of: viewModel.activeTrip?.id) {
             Task { await syncTrackingIfNeeded() }
         }
-    }
-
-    private var errorAlertIsPresented: Binding<Bool> {
-        Binding(
-            get: { viewModel.error != nil },
-            set: { if !$0 { viewModel.error = nil } }
-        )
     }
 
     private func syncTrackingIfNeeded() async {
@@ -349,7 +338,7 @@ struct TripMetricPill: View {
                 .foregroundStyle(WarmPalette.ink3)
             Text(value)
                 .font(.subheadline.weight(.semibold))
-                .foregroundStyle(.primary)
+                .foregroundStyle(WarmPalette.ink1)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(DesignTokens.Spacing.cardGap)
@@ -432,10 +421,10 @@ struct TripLiveMapView: View {
                     await loadRoute()
                 }
             } else {
-                ContentUnavailableView(
-                    "Live Map Unavailable",
+                WarmEmptyState(
+                    title: "Live Map Unavailable",
                     systemImage: "map",
-                    description: Text("Add a saved destination with coordinates to see the route and moving car.")
+                    description: "Add a saved destination with coordinates to see the route and moving car."
                 )
                 .frame(maxWidth: .infinity)
                 .frame(height: 220)

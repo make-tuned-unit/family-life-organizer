@@ -151,11 +151,7 @@ struct NewTripView: View {
             .background { AmbientBackground(style: .trips) }
             .navigationTitle("Start Trip")
             .navigationBarTitleDisplayMode(.inline)
-            .alert("Something went wrong", isPresented: errorAlertIsPresented) {
-                Button("OK") { error = nil }
-            } message: {
-                Text(error ?? "")
-            }
+            .inlineError(error) { error = nil }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
@@ -258,9 +254,6 @@ struct NewTripView: View {
         }
     }
 
-    private var errorAlertIsPresented: Binding<Bool> {
-        Binding(get: { error != nil }, set: { if !$0 { error = nil } })
-    }
 }
 
 #Preview {

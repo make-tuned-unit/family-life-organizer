@@ -53,11 +53,7 @@ struct AddGiftIdeaView: View {
             .background { AmbientBackground(style: .gifts) }
             .navigationTitle("Gift for \(personName)")
             .navigationBarTitleDisplayMode(.inline)
-            .alert("Couldn’t save gift idea", isPresented: errorAlertIsPresented) {
-                Button("OK") { error = nil }
-            } message: {
-                Text(error ?? "An unexpected error occurred.")
-            }
+            .inlineError(error) { error = nil }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
@@ -90,10 +86,6 @@ struct AddGiftIdeaView: View {
             guard !error.isCancellation else { return }
             self.error = error.localizedDescription
         }
-    }
-
-    private var errorAlertIsPresented: Binding<Bool> {
-        Binding(get: { error != nil }, set: { if !$0 { error = nil } })
     }
 }
 

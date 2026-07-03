@@ -83,11 +83,7 @@ struct HouseholdView: View {
         .onChange(of: showingRenameSheet) { _, showing in
             if showing { pendingName = household.householdGroup?.name ?? "" }
         }
-        .alert("Something went wrong", isPresented: errorBinding) {
-            Button("OK") { error = nil }
-        } message: {
-            Text(error ?? "")
-        }
+        .inlineError(error) { error = nil }
         .task {
             await household.reload(api: api, currentUserId: auth.currentUser?.id)
             await loadHouseholdMembers()
@@ -364,10 +360,6 @@ struct HouseholdView: View {
             self.error = error.localizedDescription
         }
     }
-
-    private var errorBinding: Binding<Bool> {
-        Binding(get: { error != nil }, set: { if !$0 { error = nil } })
-    }
 }
 
 // MARK: - Join Household Sheet
@@ -401,14 +393,7 @@ struct JoinHouseholdSheet: View {
             .background { AmbientBackground(style: .settings) }
             .navigationTitle("Join Household")
             .navigationBarTitleDisplayMode(.inline)
-            .alert("Couldn't join", isPresented: Binding(
-                get: { error != nil },
-                set: { if !$0 { error = nil } }
-            )) {
-                Button("OK") { error = nil }
-            } message: {
-                Text(error ?? "")
-            }
+            .inlineError(error) { error = nil }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }

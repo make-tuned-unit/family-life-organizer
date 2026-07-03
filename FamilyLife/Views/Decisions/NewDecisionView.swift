@@ -164,11 +164,7 @@ struct NewDecisionView: View {
             .background { AmbientBackground(style: .decisions) }
             .navigationTitle("Share with Family")
             .navigationBarTitleDisplayMode(.inline)
-            .alert("Couldn’t share decision", isPresented: errorAlertIsPresented) {
-                Button("OK") { error = nil }
-            } message: {
-                Text(error ?? "An unexpected error occurred.")
-            }
+            .inlineError(error) { error = nil }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
@@ -238,12 +234,6 @@ struct NewDecisionView: View {
         }
     }
 
-    private var errorAlertIsPresented: Binding<Bool> {
-        Binding(
-            get: { error != nil },
-            set: { if !$0 { error = nil } }
-        )
-    }
 }
 
 #Preview {

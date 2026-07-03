@@ -164,11 +164,7 @@ struct AddAppointmentView: View {
             }
             .navigationTitle("New Event")
             .navigationBarTitleDisplayMode(.inline)
-            .alert("Couldn't save event", isPresented: errorAlertIsPresented) {
-                Button("OK") { error = nil }
-            } message: {
-                Text(error ?? "An unexpected error occurred.")
-            }
+            .inlineError(error) { error = nil }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
@@ -237,10 +233,6 @@ struct AddAppointmentView: View {
         }
         isSaving = false
         dismiss()
-    }
-
-    private var errorAlertIsPresented: Binding<Bool> {
-        Binding(get: { error != nil }, set: { if !$0 { error = nil } })
     }
 }
 

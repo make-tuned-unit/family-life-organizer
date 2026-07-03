@@ -495,7 +495,7 @@ struct InlinePollCard: View {
         .padding(10)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
-            isOwn ? AnyShapeStyle(Color.white.opacity(0.95)) : AnyShapeStyle(TabAccent.decisions.color.opacity(0.08)),
+            isOwn ? AnyShapeStyle(WarmPalette.cream1.opacity(0.95)) : AnyShapeStyle(TabAccent.decisions.color.opacity(0.08)),
             in: RoundedRectangle(cornerRadius: 12)
         )
         .task { await load() }

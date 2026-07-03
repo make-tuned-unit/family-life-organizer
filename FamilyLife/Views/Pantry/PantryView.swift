@@ -54,17 +54,9 @@ struct PantryView: View {
         .overlay {
             if viewModel.isLoading && viewModel.items.isEmpty { ProgressView() }
         }
-        .alert("Something went wrong", isPresented: errorAlertIsPresented) {
-            Button("OK") { viewModel.error = nil }
-        } message: {
-            Text(viewModel.error ?? "An unexpected error occurred.")
-        }
+        .inlineError(viewModel.error) { viewModel.error = nil }
         .refreshable { await viewModel.load(api: api) }
         .task { await viewModel.load(api: api) }
-    }
-
-    private var errorAlertIsPresented: Binding<Bool> {
-        Binding(get: { viewModel.error != nil }, set: { if !$0 { viewModel.error = nil } })
     }
 
     // MARK: - Header

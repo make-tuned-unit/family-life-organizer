@@ -80,11 +80,7 @@ struct BudgetSettingsView: View {
         .sheet(item: $editingCategory) { cat in
             EditBudgetCategorySheet(category: cat) { await load() }
         }
-        .alert("Something went wrong", isPresented: errorBinding) {
-            Button("OK") { error = nil }
-        } message: {
-            Text(error ?? "")
-        }
+        .inlineError(error) { error = nil }
         .task { await load() }
     }
 
@@ -109,9 +105,6 @@ struct BudgetSettingsView: View {
         }
     }
 
-    private var errorBinding: Binding<Bool> {
-        Binding(get: { error != nil }, set: { if !$0 { error = nil } })
-    }
 }
 
 struct EditBudgetCategorySheet: View {

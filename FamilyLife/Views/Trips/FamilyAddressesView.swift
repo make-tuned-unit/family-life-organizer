@@ -11,11 +11,12 @@ struct FamilyAddressesView: View {
     var body: some View {
         List {
             if addresses.isEmpty && !isLoading {
-                ContentUnavailableView(
-                    "No Saved Addresses",
+                WarmEmptyState(
+                    title: "No Saved Addresses",
                     systemImage: "mappin.slash",
-                    description: Text("Add family addresses for quick trip destinations")
+                    description: "Add family addresses for quick trip destinations"
                 )
+                .listRowBackground(WarmPalette.cardSurface)
             }
             ForEach(addresses) { addr in
                 VStack(alignment: .leading, spacing: 4) {
@@ -37,6 +38,7 @@ struct FamilyAddressesView: View {
                         Label("Delete", systemImage: "trash")
                     }
                 }
+                .listRowBackground(WarmPalette.cardSurface)
             }
         }
         .scrollContentBackground(.hidden)
@@ -51,11 +53,7 @@ struct FamilyAddressesView: View {
                 .accessibilityLabel("Add place")
             }
         }
-        .alert("Couldn’t update addresses", isPresented: errorAlertIsPresented) {
-            Button("OK") { error = nil }
-        } message: {
-            Text(error ?? "An unexpected error occurred.")
-        }
+        .inlineError(error) { error = nil }
         .sheet(isPresented: $showingAdd) {
             AddAddressView { address in
                 Task { await addAddress(address) }
@@ -97,12 +95,6 @@ struct FamilyAddressesView: View {
         }
     }
 
-    private var errorAlertIsPresented: Binding<Bool> {
-        Binding(
-            get: { error != nil },
-            set: { if !$0 { error = nil } }
-        )
-    }
 }
 
 struct AddAddressView: View {

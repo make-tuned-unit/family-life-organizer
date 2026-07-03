@@ -87,11 +87,12 @@ struct RivalriesView: View {
                 }
 
                 if activeRivalries.isEmpty && completedRivalries.isEmpty && !isLoading {
-                    ContentUnavailableView {
-                        Label("No Rivalries Yet", systemImage: "flag.2.crossed.fill")
-                    } description: {
-                        Text("Challenge a family member to a head-to-head competition!")
-                    } actions: {
+                    VStack(spacing: 16) {
+                        WarmEmptyState(
+                            title: "No Rivalries Yet",
+                            systemImage: "flag.2.crossed.fill",
+                            description: "Challenge a family member to a head-to-head competition!"
+                        )
                         Button("Start a Rivalry") {
                             showingStartRivalry = true
                         }
@@ -131,11 +132,7 @@ struct RivalriesView: View {
                 ProgressView()
             }
         }
-        .alert("Couldn’t load rivalries", isPresented: errorAlertIsPresented) {
-            Button("OK") { error = nil }
-        } message: {
-            Text(error ?? "An unexpected error occurred.")
-        }
+        .inlineError(error) { error = nil }
         .task {
             await loadAll()
         }
@@ -180,12 +177,6 @@ struct RivalriesView: View {
         }
     }
 
-    private var errorAlertIsPresented: Binding<Bool> {
-        Binding(
-            get: { error != nil },
-            set: { if !$0 { error = nil } }
-        )
-    }
 }
 
 struct RivalryCardRemote: View {
@@ -357,7 +348,7 @@ struct StatusBadge: View {
         case .pending: AccentTheme.saffron.color
         case .active: TabAccent.home.color
         case .completed: WarmPalette.good
-        case .declined: .secondary
+        case .declined: WarmPalette.ink3
         }
     }
 }
@@ -375,7 +366,7 @@ struct CompetitorScore: View {
                 .foregroundStyle(WarmPalette.ink3)
             Text(valueText)
                 .font(.title3.bold())
-                .foregroundStyle(isLeading ? .primary : .secondary)
+                .foregroundStyle(isLeading ? .primary : WarmPalette.ink3)
             if isLeading {
                 Text("Leading")
                     .font(.caption2.weight(.semibold))
@@ -408,7 +399,7 @@ struct PlayerColumn: View {
                 .foregroundStyle(color)
             Text(isLeading ? "Ahead" : "Chasing")
                 .font(.caption.weight(.semibold))
-                .foregroundStyle(isLeading ? .green : .secondary)
+                .foregroundStyle(isLeading ? WarmPalette.good : WarmPalette.ink3)
         }
         .frame(maxWidth: .infinity)
     }

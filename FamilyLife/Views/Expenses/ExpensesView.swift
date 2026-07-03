@@ -77,11 +77,7 @@ struct ExpensesView: View {
         .overlay {
             if viewModel.isLoading && viewModel.budgetItems.isEmpty { ProgressView() }
         }
-        .alert("Something went wrong", isPresented: errorAlertIsPresented) {
-            Button("OK") { viewModel.error = nil }
-        } message: {
-            Text(viewModel.error ?? "An unexpected error occurred.")
-        }
+        .inlineError(viewModel.error) { viewModel.error = nil }
         .refreshable { await viewModel.loadAll(api: api); await projectStore.loadAll(api: api); await recurringStore.load(api: api) }
         .task { await recurringStore.load(api: api) }
         .task(id: showingScanner) { await viewModel.loadAll(api: api); await projectStore.loadAll(api: api) }
@@ -89,10 +85,6 @@ struct ExpensesView: View {
         .onChange(of: viewModel.displayedMonth) {
             Task { await viewModel.loadAll(api: api) }
         }
-    }
-
-    private var errorAlertIsPresented: Binding<Bool> {
-        Binding(get: { viewModel.error != nil }, set: { if !$0 { viewModel.error = nil } })
     }
 
     // MARK: - Projects Preview

@@ -38,11 +38,7 @@ struct LogProgressView: View {
             .background { AmbientBackground(style: .rivalries) }
             .navigationTitle("Log Progress")
             .navigationBarTitleDisplayMode(.inline)
-            .alert("Couldn’t save progress", isPresented: errorAlertIsPresented) {
-                Button("OK") { error = nil }
-            } message: {
-                Text(error ?? "An unexpected error occurred.")
-            }
+            .inlineError(error) { error = nil }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
@@ -107,9 +103,6 @@ struct LogProgressView: View {
         }
     }
 
-    private var errorAlertIsPresented: Binding<Bool> {
-        Binding(get: { error != nil }, set: { if !$0 { error = nil } })
-    }
 }
 
 #Preview {

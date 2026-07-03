@@ -266,7 +266,7 @@ struct ApproveRequestSheet: View {
                 } label: {
                     HStack(spacing: 8) {
                         if isSaving {
-                            ProgressView().tint(.white)
+                            ProgressView().tint(WarmPalette.cream1)
                         }
                         Text("Confirm availability")
                             .font(.system(size: 16, weight: .semibold))

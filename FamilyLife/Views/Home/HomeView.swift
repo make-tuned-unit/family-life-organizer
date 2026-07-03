@@ -153,15 +153,11 @@ struct HomeView: View {
                 ProgressView()
             }
         }
-        .alert("Something went wrong", isPresented: errorAlertIsPresented) {
-            Button("OK") {
-                if viewModel.error == APIError.unauthorized.localizedDescription {
-                    auth.logout()
-                }
-                viewModel.error = nil
+        .inlineError(viewModel.error) {
+            if viewModel.error == APIError.unauthorized.localizedDescription {
+                auth.logout()
             }
-        } message: {
-            Text(viewModel.error ?? "An unexpected error occurred.")
+            viewModel.error = nil
         }
         .task {
             await viewModel.loadAll(api: api, userName: auth.currentUser?.name, username: auth.currentUser?.username)
@@ -231,10 +227,6 @@ struct HomeView: View {
                 selectedFeedRivalry = rivalry
             }
         } catch {}
-    }
-
-    private var errorAlertIsPresented: Binding<Bool> {
-        Binding(get: { viewModel.error != nil }, set: { if !$0 { viewModel.error = nil } })
     }
 
     // MARK: - Header

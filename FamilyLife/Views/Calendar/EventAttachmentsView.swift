@@ -359,9 +359,7 @@ struct AttachmentDestinationView: View {
             .navigationTitle(list.name)
             .navigationBarTitleDisplayMode(.inline)
         } else if phase == .notFound {
-            ContentUnavailableView("Item Unavailable",
-                                   systemImage: "questionmark.folder",
-                                   description: Text("This attachment may have been deleted."))
+            WarmEmptyState(title: "Item Unavailable", systemImage: "questionmark.folder", description: "This attachment may have been deleted.")
         } else {
             ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
         }
