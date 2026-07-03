@@ -198,4 +198,5 @@ async function handleChatStream(db, { userId, userName, message, conversationId 
   return { conversation_id: conversationId, reply, actions };
 }
 
-module.exports = { handleChat, handleChatStream };
+// buildSystem/sanitizeName exported for the tool-routing eval (scripts/concierge-tool-eval.js).
+module.exports = { handleChat, handleChatStream, buildSystem, sanitizeName };
