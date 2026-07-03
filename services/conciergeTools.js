@@ -785,7 +785,7 @@ const TOOLS = [
   // ---- Memory ----
   {
     name: 'remember',
-    description: "Save a durable fact about the household for future conversations (e.g. preferences, recurring responsibilities, allergies). Use only for genuinely lasting facts.",
+    description: "Save a durable fact about the household for future conversations (e.g. preferences, recurring responsibilities, allergies). Use only for genuinely lasting facts. This is NOT for taking notes — when the user asks to take/jot/write a note, use add_note.",
     write: true,
     input_schema: {
       type: 'object',
@@ -862,7 +862,7 @@ const TOOLS = [
   },
   {
     name: 'add_note',
-    description: 'Create a note. Private by default; set shared=true to share it with the household.',
+    description: 'Take/jot/save a note in the Notes feature — the default tool whenever the user says "take a note", "make a note", "jot down", or "write down". Private to the user by default; set shared=true to share it with the household. (Not for memory or the activity feed.)',
     write: true,
     input_schema: {
       type: 'object',
@@ -1593,7 +1593,7 @@ const TOOLS = [
   // ---- Feed (household activity feed) ----
   {
     name: 'add_feed_post',
-    description: "Post to the household activity feed (a note, update, or shout-out everyone sees).",
+    description: "Post an update or shout-out to the shared household activity feed that everyone sees. For a private note or memo, use add_note instead.",
     write: true,
     input_schema: {
       type: 'object',
