@@ -477,7 +477,7 @@ struct MainTabView: View {
         switch tab {
         case .calendar:  NavigationStack { CalendarView() }
         case .lists:     NavigationStack { FamilyListsView(pendingListName: $pendingListName) }
-        case .home:      NavigationStack { HomeView(selectedTab: $selectedTab, pendingListName: $pendingListName) }
+        case .home:      NavigationStack { HomeView(selectedTab: $selectedTab, pendingListName: $pendingListName, ptt: ptt) }
         case .concierge: NavigationStack { ConciergeView(selectedTab: $selectedTab) }
         case .budget:    NavigationStack { ExpensesView() }
         case .more:      NavigationStack { MoreView() }

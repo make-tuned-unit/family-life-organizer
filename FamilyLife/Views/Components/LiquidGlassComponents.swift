@@ -214,6 +214,7 @@ struct WarmStatTile: View {
             Text(value)
                 .font(.system(size: 22, weight: .bold, design: .default))
                 .foregroundStyle(WarmPalette.ink1)
+                .contentTransition(.numericText())
             Text(sub)
                 .font(.system(size: 11))
                 .foregroundStyle(WarmPalette.ink3)
@@ -232,15 +233,26 @@ struct WarmAgendaRow: View {
     let subtitle: String
     var tagInitial: String? = nil
     var isAuto: Bool = false
+    /// Checked state for task rows — draws the filled dot + strikethrough.
+    var isDone: Bool = false
+    /// When set, the leading circle becomes a tappable check-off button.
+    var onToggle: (() -> Void)? = nil
 
     var body: some View {
         HStack(spacing: 12) {
             if isAuto {
                 // Task rows show a checkable circle in the left column to match the Lists layout.
-                Image(systemName: "circle")
-                    .font(.system(size: 20))
-                    .foregroundStyle(WarmPalette.ink4)
-                    .frame(minWidth: 44, alignment: .leading)
+                Group {
+                    if let onToggle {
+                        Button(action: onToggle) {
+                            checkCircle
+                        }
+                        .buttonStyle(.plain)
+                    } else {
+                        checkCircle
+                    }
+                }
+                .frame(minWidth: 44, alignment: .leading)
             } else {
                 Text(time)
                     .font(.system(size: 15, weight: .semibold, design: .default))
@@ -251,7 +263,8 @@ struct WarmAgendaRow: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
                     .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(WarmPalette.ink1)
+                    .foregroundStyle(isDone ? WarmPalette.ink3 : WarmPalette.ink1)
+                    .strikethrough(isDone, color: WarmPalette.ink4)
                 Text(subtitle)
                     .font(.system(size: 13))
                     .foregroundStyle(WarmPalette.ink3)
@@ -260,17 +273,26 @@ struct WarmAgendaRow: View {
             Spacer()
 
             if isAuto {
-                Image(systemName: "sparkle")
-                    .font(.system(size: 12))
-                    .foregroundStyle(TabAccent.home.color)
-                    .frame(width: 22, height: 22)
-                    .background(TabAccent.home.color.opacity(0.15), in: Circle())
+                if !isDone {
+                    Image(systemName: "sparkle")
+                        .font(.system(size: 12))
+                        .foregroundStyle(TabAccent.home.color)
+                        .frame(width: 22, height: 22)
+                        .background(TabAccent.home.color.opacity(0.15), in: Circle())
+                }
             } else if let initial = tagInitial {
                 FamilyAvatar(initial: initial, size: 22)
             }
         }
         .padding(.vertical, 12)
         .padding(.horizontal, 14)
+    }
+
+    private var checkCircle: some View {
+        Image(systemName: isDone ? "checkmark.circle.fill" : "circle")
+            .font(.system(size: 20))
+            .foregroundStyle(isDone ? WarmPalette.good : WarmPalette.ink4)
+            .scaleEffect(isDone ? 1.1 : 1)
     }
 }
 

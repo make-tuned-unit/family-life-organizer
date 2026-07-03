@@ -54,6 +54,9 @@ final class PushToTalkController {
     private(set) var transcript = ""
     /// Brief status shown after a send (confirmation or error); auto-clears.
     var banner: String?
+    /// Bumped after a note lands successfully so surfaces like Home can
+    /// silently refresh — the concierge may have just added tasks/events/items.
+    private(set) var completedSends = 0
 
     private let recognizer = ConciergeSpeechRecognizer()
     /// Chains repeated dictations into one running thread within a session.
@@ -104,6 +107,7 @@ final class PushToTalkController {
                 if case .done(let response) = event { conversationId = response.conversationId }
             }
             banner = "Sent to your concierge"
+            completedSends += 1
         } catch {
             banner = "Couldn't send — try again"
         }

@@ -3,6 +3,7 @@ import SwiftUI
 struct HomeView: View {
     @Binding var selectedTab: MainTab
     @Binding var pendingListName: String?
+    var ptt: PushToTalkController? = nil
     @Environment(APIService.self) private var api
     @Environment(AuthService.self) private var auth
     @Environment(CalendarService.self) private var calendarService
@@ -23,6 +24,9 @@ struct HomeView: View {
     @State private var showingFeedFilter = false
     @State private var selectedFeedEvent: AppointmentResponse?
     @State private var selectedFeedRivalry: RivalryResponse?
+    /// Tasks mid-checkoff in Up Next — held for the filled-dot + strikethrough
+    /// beat before they poof away.
+    @State private var completingTaskIds: Set<Int> = []
 
     private var greeting: String {
         let hour = Calendar.current.component(.hour, from: Date())
@@ -60,6 +64,15 @@ struct HomeView: View {
             await loadOnThisDay()
         }
         .task { await loadOnThisDay() }
+        .onChange(of: ptt?.completedSends ?? 0) { _, new in
+            // A quick voice note just landed — the concierge may have added
+            // tasks, events, or list items. Silently refresh so the numbers
+            // update in place without a pull-to-refresh.
+            guard new != 0 else { return }
+            Task {
+                await viewModel.loadAll(api: api, userName: auth.currentUser?.name, username: auth.currentUser?.username)
+            }
+        }
         .background { AmbientBackground(style: .home) }
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackgroundVisibility(.hidden, for: .navigationBar)
@@ -457,6 +470,7 @@ struct HomeView: View {
         }
         .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
         .padding(.bottom, 14)
+        .animation(.snappy, value: "\(viewModel.summary?.active_tasks ?? 0)-\(eventCount)-\(viewModel.summary?.groceries_needed ?? 0)-\(viewModel.summary?.overdue_tasks ?? 0)")
     }
 
     // MARK: - On this day (milestone anniversaries)
@@ -541,20 +555,41 @@ struct HomeView: View {
                     }
                     if viewModel.todayAppointments.count < 3 {
                         ForEach(Array(viewModel.activeTasks.prefix(3 - viewModel.todayAppointments.count).enumerated()), id: \.element.id) { _, task in
-                            GlassDivider()
-                            WarmAgendaRow(
-                                time: "",
-                                title: task.title,
-                                subtitle: task.category,
-                                isAuto: true
-                            )
+                            VStack(spacing: 0) {
+                                GlassDivider()
+                                WarmAgendaRow(
+                                    time: "",
+                                    title: task.title,
+                                    subtitle: task.category,
+                                    isAuto: true,
+                                    isDone: completingTaskIds.contains(task.id),
+                                    onToggle: { completeUpNextTask(task) }
+                                )
+                            }
+                            .transition(.scale(scale: 0.85, anchor: .leading).combined(with: .opacity))
                         }
                     }
                 }
                 .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
                 .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
+                .animation(.spring(response: 0.4, dampingFraction: 0.85), value: viewModel.activeTasks.map(\.id))
             }
             .padding(.bottom, 14)
+        }
+    }
+
+    /// Check off a task straight from Up Next — haptic tap, filled dot +
+    /// strikethrough beat, then it poofs away. Mirrors the Lists experience.
+    private func completeUpNextTask(_ task: TaskResponse) {
+        guard !completingTaskIds.contains(task.id) else { return }
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        withAnimation(.easeInOut(duration: 0.2)) {
+            _ = completingTaskIds.insert(task.id)
+        }
+        Task {
+            try? await Task.sleep(for: .milliseconds(650))
+            await viewModel.completeTask(task.id, api: api)
+            completingTaskIds.remove(task.id)
         }
     }
 
