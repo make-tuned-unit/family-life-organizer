@@ -74,11 +74,7 @@ struct EditPantryItemView: View {
             .background { AmbientBackground(style: .pantry) }
             .navigationTitle("Edit Item")
             .navigationBarTitleDisplayMode(.inline)
-            .alert("Couldn’t save changes", isPresented: errorAlertIsPresented) {
-                Button("OK") { error = nil }
-            } message: {
-                Text(error ?? "An unexpected error occurred.")
-            }
+            .inlineError(error) { error = nil }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
@@ -128,12 +124,6 @@ struct EditPantryItemView: View {
         }
     }
 
-    private var errorAlertIsPresented: Binding<Bool> {
-        Binding(
-            get: { error != nil },
-            set: { if !$0 { error = nil } }
-        )
-    }
 }
 
 #Preview {

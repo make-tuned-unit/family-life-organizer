@@ -77,11 +77,7 @@ struct DecisionsView: View {
         .overlay {
             if isLoading && decisions.isEmpty { ProgressView() }
         }
-        .alert("Couldn't load decisions", isPresented: errorAlertIsPresented) {
-            Button("OK") { error = nil }
-        } message: {
-            Text(error ?? "An unexpected error occurred.")
-        }
+        .inlineError(error) { error = nil }
         .task { await loadDecisions() }
         .sheet(item: $sendToDecision) { decision in
             SendToSheet(quotedItem: QuotedItem(
@@ -257,9 +253,6 @@ struct DecisionsView: View {
         }
     }
 
-    private var errorAlertIsPresented: Binding<Bool> {
-        Binding(get: { error != nil }, set: { if !$0 { error = nil } })
-    }
 }
 
 // MARK: - Decision Card (warm glass)

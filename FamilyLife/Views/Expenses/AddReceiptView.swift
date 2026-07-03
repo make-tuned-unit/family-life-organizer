@@ -77,11 +77,7 @@ struct AddReceiptView: View {
             .background { AmbientBackground(style: .expenses) }
             .navigationTitle("Add Receipt")
             .navigationBarTitleDisplayMode(.inline)
-            .alert("Couldn’t save receipt", isPresented: errorAlertIsPresented) {
-                Button("OK") { error = nil }
-            } message: {
-                Text(error ?? "An unexpected error occurred.")
-            }
+            .inlineError(error) { error = nil }
             .task {
                 itineraries = (try? await api.fetchItineraries()) ?? []
                 if let preselectedCategory {
@@ -136,12 +132,6 @@ struct AddReceiptView: View {
         }
     }
 
-    private var errorAlertIsPresented: Binding<Bool> {
-        Binding(
-            get: { error != nil },
-            set: { if !$0 { error = nil } }
-        )
-    }
 }
 
 #Preview {

@@ -84,11 +84,7 @@ struct NewPostView: View {
             .background { AmbientBackground(style: .home) }
             .navigationTitle("New Post")
             .navigationBarTitleDisplayMode(.inline)
-            .alert("Couldn't share post", isPresented: errorBinding) {
-                Button("OK") { error = nil }
-            } message: {
-                Text(error ?? "")
-            }
+            .inlineError(error) { error = nil }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
@@ -191,10 +187,6 @@ struct NewPostView: View {
         case "tribe": "Extended network"
         default: "Group"
         }
-    }
-
-    private var errorBinding: Binding<Bool> {
-        Binding(get: { error != nil }, set: { if !$0 { error = nil } })
     }
 }
 

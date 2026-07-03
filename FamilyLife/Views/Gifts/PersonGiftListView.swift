@@ -48,6 +48,7 @@ struct PersonGiftListView: View {
                     }
                 }
             }
+            .listRowBackground(WarmPalette.cardSurface)
 
             if !activeIdeas.isEmpty {
                 Section("Gift Ideas") {
@@ -59,6 +60,7 @@ struct PersonGiftListView: View {
                         }
                     }
                 }
+                .listRowBackground(WarmPalette.cardSurface)
             }
 
             if !completedIdeas.isEmpty {
@@ -72,16 +74,18 @@ struct PersonGiftListView: View {
                         .opacity(0.6)
                     }
                 }
+                .listRowBackground(WarmPalette.cardSurface)
             }
 
             if ideas.isEmpty {
                 Section {
-                    ContentUnavailableView {
-                        Label("No Gift Ideas", systemImage: "gift")
-                    } description: {
-                        Text("Save ideas for \(person.name)")
-                    }
+                    WarmEmptyState(
+                        title: "No Gift Ideas",
+                        systemImage: "gift",
+                        description: "Save ideas for \(person.name)"
+                    )
                 }
+                .listRowBackground(WarmPalette.cardSurface)
             }
         }
         .scrollContentBackground(.hidden)
@@ -104,11 +108,7 @@ struct PersonGiftListView: View {
         .refreshable {
             await loadIdeas()
         }
-        .alert("Couldn’t update gift list", isPresented: errorAlertIsPresented) {
-            Button("OK") { error = nil }
-        } message: {
-            Text(error ?? "An unexpected error occurred.")
-        }
+        .inlineError(error) { error = nil }
         .task {
             await loadIdeas()
         }
@@ -148,9 +148,6 @@ struct PersonGiftListView: View {
         return DateFormatter.longMonthDay.string(from: date)
     }
 
-    private var errorAlertIsPresented: Binding<Bool> {
-        Binding(get: { error != nil }, set: { if !$0 { error = nil } })
-    }
 }
 
 struct GiftIdeaRowRemote: View {

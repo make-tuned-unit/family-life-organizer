@@ -275,11 +275,7 @@ struct DecisionDetailView: View {
         } message: {
             Text("This will permanently remove the decision and all its reactions and comments.")
         }
-        .alert("Couldn’t update decision", isPresented: errorAlertIsPresented) {
-            Button("OK") { error = nil }
-        } message: {
-            Text(error ?? "An unexpected error occurred.")
-        }
+        .inlineError(error) { error = nil }
         .task {
             await reload()
         }
@@ -369,12 +365,6 @@ struct DecisionDetailView: View {
         }
     }
 
-    private var errorAlertIsPresented: Binding<Bool> {
-        Binding(
-            get: { error != nil },
-            set: { if !$0 { error = nil } }
-        )
-    }
 }
 
 #Preview {

@@ -425,6 +425,53 @@ struct WarmProgressBar: View {
     }
 }
 
+// MARK: - Inline Error
+
+/// The house style for surfacing a failure: a dismissible warm banner shown
+/// in-content, never a modal alert. Pair with the `.inlineError(_:onDismiss:)`
+/// modifier so it drops in from the top of any screen or sheet.
+struct InlineErrorBanner: View {
+    let message: String
+    var onDismiss: () -> Void
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.system(size: 14))
+                .foregroundStyle(WarmPalette.bad)
+            Text(message)
+                .font(.system(size: 13))
+                .foregroundStyle(WarmPalette.ink2)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 8)
+            Button { onDismiss() } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(WarmPalette.ink3)
+            }
+        }
+        .padding(12)
+        .background(WarmPalette.bad.opacity(0.12), in: RoundedRectangle(cornerRadius: 14))
+        .overlay(RoundedRectangle(cornerRadius: 14).stroke(WarmPalette.bad.opacity(0.25), lineWidth: 1))
+    }
+}
+
+extension View {
+    /// Drop-in replacement for error `.alert(...)`: shows `message` as an inline
+    /// banner pinned to the top of the content when non-nil. No-op when nil.
+    @ViewBuilder
+    func inlineError(_ message: String?, onDismiss: @escaping () -> Void) -> some View {
+        safeAreaInset(edge: .top) {
+            if let message {
+                InlineErrorBanner(message: message, onDismiss: onDismiss)
+                    .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
+                    .padding(.top, 8)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+            }
+        }
+    }
+}
+
 // MARK: - Empty State
 
 struct WarmEmptyState: View {

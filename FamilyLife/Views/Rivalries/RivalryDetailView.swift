@@ -291,11 +291,7 @@ struct RivalryDetailView: View {
                 await loadEntries()
             }
         }
-        .alert("Couldn’t update rivalry", isPresented: errorAlertIsPresented) {
-            Button("OK") { error = nil }
-        } message: {
-            Text(error ?? "An unexpected error occurred.")
-        }
+        .inlineError(error) { error = nil }
         .task {
             await loadEntries()
             if currentRivalry.challengeType.isHealthKitSynced && !hasAutoSynced {
@@ -475,9 +471,6 @@ struct RivalryDetailView: View {
         }
     }
 
-    private var errorAlertIsPresented: Binding<Bool> {
-        Binding(get: { error != nil }, set: { if !$0 { error = nil } })
-    }
 }
 
 struct EntryRowRemote: View {

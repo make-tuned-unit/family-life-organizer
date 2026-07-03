@@ -466,22 +466,7 @@ struct PersonDetailView: View {
     // MARK: - Shared bits
 
     private func sectionEmpty(_ icon: String, _ title: String, _ message: String) -> some View {
-        VStack(spacing: 8) {
-            Image(systemName: icon)
-                .font(.system(size: 26))
-                .foregroundStyle(WarmPalette.ink4)
-            Text(title)
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(WarmPalette.ink1)
-            Text(message)
-                .font(.system(size: 12.5))
-                .foregroundStyle(WarmPalette.ink3)
-                .multilineTextAlignment(.center)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 28)
-        .padding(.horizontal, 18)
-        .background(WarmPalette.cardSurface.opacity(0.6), in: RoundedRectangle(cornerRadius: 16))
+        WarmEmptyState(title: title, systemImage: icon, description: message)
     }
 
     private func load() async {
