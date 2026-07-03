@@ -1833,17 +1833,181 @@ const TOOLS = [
 
 const BY_NAME = new Map(TOOLS.map(t => [t.name, t]));
 
-// Anthropic tool definitions (schema only).
-function definitions() {
-  return TOOLS.map(({ name, description, input_schema }) => ({ name, description, input_schema }));
+// ---------------------------------------------------------------------------
+// Tool consolidation (the model-facing surface).
+//
+// The 79 fine-grained handlers above are the IMPLEMENTATION. We do not expose
+// all 79 to the model: a flat list that long hurts tool-selection accuracy on a
+// small model (Haiku) and bloats every request. Instead we present ~20 domain
+// tools, each with an `action` selector that routes to one of the handlers. The
+// model makes an easier two-level choice (domain → action) and the underlying
+// DB logic is reused verbatim. definitions() are cached, so this is one call.
+// ---------------------------------------------------------------------------
+
+// domain -> { desc, actions: { actionName: underlyingToolName } }. Every tool
+// above appears exactly once here or in STANDALONE below (asserted at load).
+const GROUPS = {
+  calendar: { desc: 'Household calendar events.', actions: {
+    list: 'get_calendar', add: 'add_appointment', update: 'update_appointment', delete: 'delete_appointment' } },
+  tasks: { desc: 'To-do tasks for the household.', actions: {
+    list: 'list_tasks', add: 'add_task', complete: 'complete_task' } },
+  lists: { desc: 'Named lists (Groceries, Costco, any shopping/to-do list; use "Tasks" for tasks).', actions: {
+    list_all: 'get_lists', get: 'get_list', add: 'add_list_item', check_off: 'check_off_item' } },
+  budget: { desc: 'Budget spending and categories.', actions: {
+    get: 'get_budget', add_category: 'add_budget_category', update_category: 'update_budget_category', delete_category: 'delete_budget_category' } },
+  pantry: { desc: 'Pantry / fridge inventory.', actions: {
+    list: 'list_pantry', add: 'add_pantry_item', update: 'update_pantry_item', delete: 'delete_pantry_item' } },
+  decisions: { desc: 'Family decisions / polls.', actions: {
+    list: 'list_decisions', vote: 'vote_decision', comment: 'comment_decision' } },
+  trips: { desc: 'Live location / ETA trip shares.', actions: {
+    list: 'get_trips', add: 'add_trip', update: 'update_trip', arrive: 'arrive_trip', cancel: 'cancel_trip' } },
+  itineraries: { desc: 'Multi-day trips/itineraries, their stays and expenses.', actions: {
+    list: 'get_itineraries', add: 'add_itinerary', update: 'update_itinerary', delete: 'delete_itinerary',
+    list_stays: 'get_itinerary_stays', add_stay: 'add_itinerary_stay', update_stay: 'update_itinerary_stay',
+    delete_stay: 'delete_itinerary_stay', add_expense: 'add_itinerary_expense' } },
+  rivalries: { desc: 'Family competitions and their scores.', actions: {
+    list: 'get_rivalries', create: 'create_rivalry', log_score: 'log_rivalry_score' } },
+  gifts: { desc: 'People tracked for gifts and their gift ideas.', actions: {
+    list_people: 'get_gift_people', add_person: 'add_gift_person', list_ideas: 'get_gift_ideas', add_idea: 'add_gift_idea' } },
+  coverage: { desc: 'Childcare / help coverage requests.', actions: {
+    list: 'get_coverage', create: 'create_coverage_request', cancel: 'cancel_coverage_request' } },
+  notes: { desc: 'Private/household notes (take/jot/write a note).', actions: {
+    list: 'list_notes', add: 'add_note', update: 'update_note', delete: 'delete_note' } },
+  people: { desc: 'Household people (adults, kids) and their milestones.', actions: {
+    list: 'list_people', add: 'add_person', update: 'update_person', delete: 'delete_person',
+    list_milestones: 'list_milestones', log_milestone: 'log_milestone' } },
+  contacts: { desc: 'Your personal address book.', actions: {
+    list: 'get_contacts', add: 'add_contact', update: 'update_contact', delete: 'delete_contact' } },
+  recurring_payments: { desc: 'Tracked recurring payments (rent, subscriptions).', actions: {
+    list: 'get_recurring_payments', add: 'add_recurring_payment', update: 'update_recurring_payment', delete: 'delete_recurring_payment' } },
+  projects: { desc: 'Budgeted projects and their expenses.', actions: {
+    list: 'get_projects', add: 'add_project', delete: 'delete_project', add_expense: 'add_project_expense', delete_expense: 'delete_project_expense' } },
+  feed: { desc: 'Shared household activity feed everyone sees.', actions: {
+    post: 'add_feed_post', react: 'add_feed_reaction', comment: 'add_feed_comment' } },
+  special_events: { desc: 'Key dates (birthdays, anniversaries, custom occasions).', actions: {
+    list: 'get_special_events', add: 'add_special_event', update: 'update_special_event', delete: 'delete_special_event' } },
+};
+
+// Distinct enough to stay on their own rather than wrap in a one-action domain.
+const STANDALONE = ['get_addresses', 'remember', 'update_my_name'];
+
+// Reverse index: underlying handler name -> where it now lives in the model
+// surface. Used to rewrite "Use get_calendar first…" style references (which
+// point at bare tools the model no longer sees) into the new action form.
+const REVERSE = new Map();
+for (const [groupName, group] of Object.entries(GROUPS)) {
+  for (const [action, toolName] of Object.entries(group.actions)) REVERSE.set(toolName, { group: groupName, action });
+}
+// Longest names first so "get_lists" wins over "get_list", and a single regex
+// pass so text we insert (which may itself contain a tool name) isn't re-matched.
+const REVERSE_RE = new RegExp(
+  [...REVERSE.keys()].sort((a, b) => b.length - a.length).map(n => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|'),
+  'g');
+
+function humanizeRefs(text, currentGroup) {
+  return text.replace(REVERSE_RE, (match) => {
+    const loc = REVERSE.get(match);
+    return loc.group === currentGroup
+      ? `action "${loc.action}"`
+      : `the ${loc.group} tool (action "${loc.action}")`;
+  });
 }
 
-// Run a tool by name; never throws — errors become a result the model can recover from.
+// Build one model-facing tool per domain: an `action` enum plus the union of its
+// handlers' input properties. Per-action required fields are validated at run
+// time (the merged schema can't express "required only for action X").
+function buildGroupTool(name, group) {
+  const actions = Object.entries(group.actions);
+  const properties = { action: { type: 'string', enum: actions.map(([a]) => a), description: 'Which operation to perform.' } };
+  const requiredByAction = {};
+  const actionLines = [];
+  let write = false;
+  for (const [action, toolName] of actions) {
+    const impl = BY_NAME.get(toolName);
+    if (!impl) throw new Error(`Concierge group "${name}" references unknown tool "${toolName}"`);
+    if (impl.write) write = true;
+    const req = impl.input_schema.required || [];
+    requiredByAction[action] = req;
+    for (const [key, schema] of Object.entries(impl.input_schema.properties || {})) {
+      if (key === 'action') continue;
+      if (!properties[key]) {
+        properties[key] = schema;
+      } else if (JSON.stringify(properties[key]) !== JSON.stringify(schema)) {
+        // Same field name means different things across actions — relax to a
+        // plain type so neither action is over-constrained (enums are only hints;
+        // handlers read the raw value themselves).
+        properties[key] = { type: schema.type || properties[key].type || 'string' };
+      }
+    }
+    actionLines.push(`${action}${req.length ? ` (needs ${req.join(', ')})` : ''}: ${humanizeRefs(impl.description, name)}`);
+  }
+  const description = `${group.desc} Choose action: ${actions.map(([a]) => a).join(' | ')}.\n${actionLines.join('\n')}`;
+  return {
+    name,
+    description,
+    write,
+    input_schema: { type: 'object', properties, required: ['action'] },
+    _actions: group.actions,
+    _requiredByAction: requiredByAction,
+  };
+}
+
+const GROUP_TOOLS = new Map(Object.entries(GROUPS).map(([n, g]) => [n, buildGroupTool(n, g)]));
+
+// Assert full, non-overlapping coverage: every handler is routed exactly once.
+{
+  const routed = new Set();
+  for (const g of Object.values(GROUPS)) {
+    for (const toolName of Object.values(g.actions)) {
+      if (routed.has(toolName)) throw new Error(`Concierge tool "${toolName}" routed by more than one group`);
+      routed.add(toolName);
+    }
+  }
+  for (const n of STANDALONE) routed.add(n);
+  const missing = TOOLS.map(t => t.name).filter(n => !routed.has(n));
+  if (missing.length) throw new Error(`Concierge tools not exposed to the model: ${missing.join(', ')}`);
+}
+
+// Anthropic tool definitions (schema only) — the consolidated surface.
+function definitions() {
+  const groupDefs = [...GROUP_TOOLS.values()].map(({ name, description, input_schema }) => ({ name, description, input_schema }));
+  const standaloneDefs = STANDALONE.map(n => {
+    const { name, description, input_schema } = BY_NAME.get(n);
+    return { name, description: humanizeRefs(description, null), input_schema };
+  });
+  return [...groupDefs, ...standaloneDefs];
+}
+
+// Run a tool by name; never throws — errors become a result the model can
+// recover from. Accepts a domain tool ({action, ...}) or a bare handler name
+// (kept for backward compatibility / internal callers).
 async function run(name, ctx, input) {
+  input = input || {};
+  const group = GROUP_TOOLS.get(name);
+  if (group) {
+    const action = input.action;
+    const toolName = action && group._actions[action];
+    if (!toolName) {
+      return { result: { error: `Unknown action "${action}" for ${name}. Valid actions: ${Object.keys(group._actions).join(', ')}` } };
+    }
+    const missing = (group._requiredByAction[action] || []).filter(k => {
+      const v = input[k];
+      return v === undefined || v === null || v === '';
+    });
+    if (missing.length) {
+      return { result: { error: `Missing required field(s) for ${name} "${action}": ${missing.join(', ')}` } };
+    }
+    const { action: _drop, ...rest } = input;
+    try {
+      return await BY_NAME.get(toolName).run(ctx, rest);
+    } catch (err) {
+      return { result: { error: err.message } };
+    }
+  }
   const tool = BY_NAME.get(name);
   if (!tool) return { result: { error: `Unknown tool: ${name}` } };
   try {
-    return await tool.run(ctx, input || {});
+    return await tool.run(ctx, input);
   } catch (err) {
     return { result: { error: err.message } };
   }
