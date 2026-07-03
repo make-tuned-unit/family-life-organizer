@@ -123,6 +123,7 @@ struct MainTabView: View {
     @State private var deepDecision: DecisionResponse?
     @State private var deepEvent: AppointmentResponse?
     @AppStorage("aiConciergeEnabled") private var aiConciergeEnabled = false
+    @State private var ptt = PushToTalkController()
 
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -168,37 +169,25 @@ struct MainTabView: View {
                 }
             }
 
-            // Floating AI concierge launcher — opt-in, mirrored across from chat
+            // Floating AI concierge launcher — opt-in, mirrored across from chat.
+            // Tap opens the concierge; press-and-hold dictates a quick note that
+            // is sent to the AI in the background without leaving this screen.
             if aiConciergeEnabled {
                 VStack {
                     Spacer()
                     HStack {
-                        Button {
+                        ConciergeLauncherButton(ptt: ptt) {
                             loadedTabs.insert(.concierge)
                             selectedTab = .concierge
-                        } label: {
-                            Image(systemName: "sparkles")
-                                .font(.system(size: 20, weight: .semibold))
-                                .foregroundStyle(.white)
-                                .frame(width: 52, height: 52)
-                                .background(AccentTheme.saffron.color, in: Circle())
-                                .shadow(color: .black.opacity(0.15), radius: 8, y: 4)
                         }
-                        // Long-press jumps straight into voice: opens the concierge
-                        // chat already listening, so you can speak a command without
-                        // navigating in first.
-                        .simultaneousGesture(
-                            LongPressGesture(minimumDuration: 0.4).onEnded { _ in
-                                conciergeLaunch.listen()
-                            }
-                        )
-                        .accessibilityLabel("Open AI concierge")
-                        .accessibilityHint("Double tap to open, or touch and hold to speak a command")
                         .padding(.leading, 20)
                         .padding(.bottom, 80)
                         Spacer()
                     }
                 }
+
+                // Push-to-talk feedback (live transcript / sending / confirmation).
+                PushToTalkOverlay(ptt: ptt)
             }
         }
         .ignoresSafeArea(.keyboard)
