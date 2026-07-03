@@ -39,9 +39,20 @@ final class ConciergeSpeechRecognizer {
         return authorized
     }
 
-    /// Begin live dictation. `onUpdate` fires with the running transcript so the
-    /// caller can mirror it straight into the composer text field.
-    func start(onUpdate: @escaping (String) -> Void) async {
+    /// Warm up permissions and the audio graph ahead of a press so `start()` has
+    /// almost nothing left to do — this is what stops the first word being clipped
+    /// while the mic spins up. Safe to call repeatedly; cheap once warmed.
+    func prewarm() async {
+        if !authorized { _ = await requestAuthorization() }
+        // `prepare()` allocates the engine's render resources without activating
+        // the session or ducking other audio, so a stray tap won't interrupt music.
+        if !audioEngine.isRunning { audioEngine.prepare() }
+    }
+
+    /// Begin live dictation. `onReady` fires the instant the mic is actually
+    /// capturing (so the UI can say "Listening" only when it's true), and
+    /// `onUpdate` fires with the running transcript so the caller can mirror it.
+    func start(onReady: @escaping () -> Void = {}, onUpdate: @escaping (String) -> Void) async {
         guard !isRecording else { return }
         errorMessage = nil
 
@@ -76,6 +87,8 @@ final class ConciergeSpeechRecognizer {
             try audioEngine.start()
             isRecording = true
             transcript = ""
+            // Mic is live — the caller can now safely prompt the user to speak.
+            onReady()
 
             task = recognizer.recognitionTask(with: request) { [weak self] result, error in
                 guard let self else { return }

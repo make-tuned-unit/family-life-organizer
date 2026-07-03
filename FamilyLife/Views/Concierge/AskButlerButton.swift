@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 /// App-wide channel for requesting the concierge chat with a seeded prompt.
 /// Feature views call `ask(_:)`; MainTabView switches to the Concierge tab and
@@ -49,7 +50,7 @@ final class ConciergeLaunch {
 @MainActor
 @Observable
 final class PushToTalkController {
-    enum Phase: Equatable { case idle, listening, sending }
+    enum Phase: Equatable { case idle, starting, listening, sending }
     private(set) var phase: Phase = .idle
     private(set) var transcript = ""
     /// Brief status shown after a send (confirmation or error); auto-clears.
@@ -64,14 +65,30 @@ final class PushToTalkController {
 
     var isActive: Bool { phase != .idle }
 
-    /// Finger held past the tap threshold — start listening.
+    /// Warm the mic + permissions the moment a press begins, before we know if
+    /// it's a tap or a hold — cuts the spin-up lag that clips the first word.
+    func prewarm() {
+        guard phase == .idle else { return }
+        Task { await recognizer.prewarm() }
+    }
+
+    /// Finger held past the tap threshold — start listening. Shows a brief
+    /// "getting ready" state, then flips to a live "listening" cue with a haptic
+    /// only once the mic is actually capturing, so users don't speak too early.
     func begin() {
         guard phase == .idle else { return }
-        phase = .listening
+        phase = .starting
         transcript = ""
         banner = nil
         Task {
-            await recognizer.start { [weak self] text in
+            await recognizer.start { [weak self] in
+                guard let self else { return }
+                // Finger already lifted while the mic was spinning up — tear back
+                // down instead of leaving a live mic with no listener.
+                guard self.phase == .starting else { self.recognizer.stop(); return }
+                self.phase = .listening
+                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+            } onUpdate: { [weak self] text in
                 self?.transcript = text
             }
             // start() surfaces errorMessage only on an immediate failure.
@@ -82,23 +99,26 @@ final class PushToTalkController {
         }
     }
 
-    /// Finger lifted — stop listening and fire the message off to the AI.
+    /// Finger lifted — stop listening and fire the message off to the AI. Also
+    /// handles a release during `.starting` (mic still warming up).
     func end(api: APIService) {
-        guard phase == .listening else { return }
+        guard phase == .listening || phase == .starting else { return }
+        // Flip out of .starting first so a late onReady tears the mic back down.
+        let wasListening = phase == .listening
+        phase = .sending
         recognizer.stop()
         let text = transcript.trimmingCharacters(in: .whitespacesAndNewlines)
         transcript = ""
-        guard !text.isEmpty else { phase = .idle; return }
-        phase = .sending
+        guard wasListening, !text.isEmpty else { phase = .idle; return }
         Task { await send(text, api: api) }
     }
 
     /// Abort a live dictation without sending.
     func cancel() {
-        guard phase == .listening else { return }
+        guard phase == .listening || phase == .starting else { return }
+        phase = .idle
         recognizer.stop()
         transcript = ""
-        phase = .idle
     }
 
     private func send(_ text: String, api: APIService) async {
@@ -130,7 +150,7 @@ struct ConciergeLauncherButton: View {
     @State private var pressStart: Date?
     @State private var listening = false
 
-    private var isListening: Bool { ptt.phase == .listening }
+    private var isListening: Bool { ptt.phase == .listening || ptt.phase == .starting }
 
     var body: some View {
         Image(systemName: isListening ? "waveform" : "sparkles")
@@ -148,6 +168,8 @@ struct ConciergeLauncherButton: View {
                         guard pressStart == nil else { return }
                         let start = Date()
                         pressStart = start
+                        // Warm the mic immediately so a hold starts capturing fast.
+                        ptt.prewarm()
                         // Promote to dictation once held past a tap.
                         Task { @MainActor in
                             try? await Task.sleep(for: .seconds(0.3))
@@ -192,6 +214,15 @@ struct PushToTalkOverlay: View {
 
     @ViewBuilder private var content: some View {
         switch ptt.phase {
+        case .starting:
+            card {
+                HStack(spacing: 10) {
+                    ProgressView().tint(AccentTheme.rose.color)
+                    Text("Getting ready…")
+                        .foregroundStyle(WarmPalette.ink2)
+                        .font(.system(size: 14, weight: .medium))
+                }
+            }
         case .listening:
             card {
                 HStack(spacing: 10) {
