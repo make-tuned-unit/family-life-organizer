@@ -49,6 +49,13 @@ async function assertListAccess(ctx, listId) {
   if (!row) throw new Error(`No list #${listId} in your household`);
 }
 
+// Guard for contacts (owner-scoped by added_by, no group_id column).
+async function assertContactOwner(ctx, id) {
+  const row = await dbGet(ctx, 'SELECT added_by FROM contacts WHERE id = ?', [id]);
+  if (!row) throw new Error(`No contact #${id} found`);
+  if (row.added_by !== ctx.userId) throw new Error(`Contact #${id} is not yours`);
+}
+
 // Names that should be created as grocery-type (checklist) lists.
 const GROCERY_LIST_NAMES = new Set(['groceries', 'grocery', 'costco', 'walmart', 'superstore', 'sobeys', 'loblaws', 'market']);
 const TASKS_ALIASES = new Set(['task', 'tasks', 'to-do', 'todo', 'to do', 'todos']);
@@ -1132,6 +1139,686 @@ const TOOLS = [
       }
       const summary = `Logged milestone "${input.title}" for ${person.name} (${date})`;
       return { result: { ok: true, summary }, action: { tool: 'log_milestone', summary } };
+    },
+  },
+
+  // ---- People registry (add / edit / delete) ----
+  {
+    name: 'add_person',
+    description: "Add a person to the household registry (a dependent kid, relative, or another adult). Use list_people to see who already exists.",
+    write: true,
+    input_schema: {
+      type: 'object',
+      properties: {
+        name: { type: 'string' },
+        relationship: { type: 'string', enum: ['spouse', 'wife', 'husband', 'partner', 'son', 'daughter', 'parent', 'grandparent', 'household', 'other'] },
+        birthday: { type: 'string', description: 'YYYY-MM-DD (optional)' },
+        avatar_color: { type: 'string', description: 'Hex colour, e.g. "#E07A5F" (optional)' },
+        is_dependent: { type: 'boolean', description: 'True for a kid/relative without their own account' },
+      },
+      required: ['name'],
+    },
+    async run(ctx, input) {
+      if (!ctx.groupId) return { result: { ok: false, error: 'Join a household first' } };
+      if (input.birthday) requireDate(input.birthday, 'birthday');
+      const r = await ctx.db.addPerson({
+        name: input.name, relationship: input.relationship || 'other',
+        birthday: input.birthday || null, avatar_color: input.avatar_color || null,
+        is_dependent: !!input.is_dependent, user_id: null, group_id: ctx.groupId,
+      });
+      const summary = `Added ${input.name} to the household`;
+      return { result: { ok: true, id: r.id, summary }, action: { tool: 'add_person', summary } };
+    },
+  },
+  {
+    name: 'update_person',
+    description: 'Edit a person in the household registry (name, relationship, birthday, avatar_color). Use list_people for the id. Only pass fields to change.',
+    write: true,
+    input_schema: {
+      type: 'object',
+      properties: {
+        id: { type: 'integer' },
+        name: { type: 'string' },
+        relationship: { type: 'string', enum: ['spouse', 'wife', 'husband', 'partner', 'son', 'daughter', 'parent', 'grandparent', 'household', 'other'] },
+        birthday: { type: 'string', description: 'YYYY-MM-DD' },
+        avatar_color: { type: 'string', description: 'Hex colour' },
+        is_dependent: { type: 'boolean' },
+      },
+      required: ['id'],
+    },
+    async run(ctx, input) {
+      await assertHousehold(ctx, 'gift_people', input.id);
+      const updates = {};
+      for (const k of ['name', 'relationship', 'birthday', 'avatar_color', 'is_dependent']) {
+        if (input[k] != null) updates[k] = input[k];
+      }
+      if (updates.birthday) requireDate(updates.birthday, 'birthday');
+      if (Object.keys(updates).length === 0) return { result: { ok: false, error: 'no fields to update' } };
+      await ctx.db.updatePerson(input.id, updates);
+      const summary = `Updated person #${input.id}`;
+      return { result: { ok: true, summary }, action: { tool: 'update_person', summary } };
+    },
+  },
+  {
+    name: 'delete_person',
+    description: 'Remove a person from the household registry permanently. Use list_people for the id.',
+    write: true,
+    input_schema: { type: 'object', properties: { id: { type: 'integer' } }, required: ['id'] },
+    async run(ctx, input) {
+      await assertHousehold(ctx, 'gift_people', input.id);
+      await ctx.db.deletePerson(input.id);
+      const summary = `Deleted person #${input.id}`;
+      return { result: { ok: true, summary }, action: { tool: 'delete_person', summary } };
+    },
+  },
+
+  // ---- Contacts (address book — owner-scoped) ----
+  {
+    name: 'get_contacts',
+    description: "List your saved contacts (care team, family, friends).",
+    write: false,
+    input_schema: { type: 'object', properties: {} },
+    async run(ctx) {
+      const rows = await ctx.db.getContactsByUser(ctx.userId);
+      return { result: rows.map(c => ({
+        id: c.id, name: c.name, relationship: c.relationship, phone: c.phone, email: c.email, birthday: c.birthday,
+      })) };
+    },
+  },
+  {
+    name: 'add_contact',
+    description: 'Add a contact to your address book.',
+    write: true,
+    input_schema: {
+      type: 'object',
+      properties: {
+        name: { type: 'string' },
+        relationship: { type: 'string' },
+        phone: { type: 'string' },
+        email: { type: 'string' },
+        birthday: { type: 'string', description: 'YYYY-MM-DD (optional)' },
+        notes: { type: 'string' },
+      },
+      required: ['name'],
+    },
+    async run(ctx, input) {
+      if (input.birthday) requireDate(input.birthday, 'birthday');
+      const r = await ctx.db.addContact({
+        added_by: ctx.userId, name: input.name, relationship: input.relationship || null,
+        phone: input.phone || null, email: input.email || null,
+        birthday: input.birthday || null, notes: input.notes || null,
+      });
+      const summary = `Added contact ${input.name}`;
+      return { result: { ok: true, id: r.id, summary }, action: { tool: 'add_contact', summary } };
+    },
+  },
+  {
+    name: 'update_contact',
+    description: 'Edit one of your contacts. Use get_contacts for the id. Only pass fields to change.',
+    write: true,
+    input_schema: {
+      type: 'object',
+      properties: {
+        id: { type: 'integer' },
+        name: { type: 'string' },
+        relationship: { type: 'string' },
+        phone: { type: 'string' },
+        email: { type: 'string' },
+        birthday: { type: 'string', description: 'YYYY-MM-DD' },
+        notes: { type: 'string' },
+      },
+      required: ['id'],
+    },
+    async run(ctx, input) {
+      await assertContactOwner(ctx, input.id);
+      const updates = {};
+      for (const k of ['name', 'relationship', 'phone', 'email', 'birthday', 'notes']) {
+        if (input[k] != null) updates[k] = input[k];
+      }
+      if (updates.birthday) requireDate(updates.birthday, 'birthday');
+      if (Object.keys(updates).length === 0) return { result: { ok: false, error: 'no fields to update' } };
+      await ctx.db.updateContact(input.id, updates);
+      const summary = `Updated contact #${input.id}`;
+      return { result: { ok: true, summary }, action: { tool: 'update_contact', summary } };
+    },
+  },
+  {
+    name: 'delete_contact',
+    description: 'Delete one of your contacts. Use get_contacts for the id.',
+    write: true,
+    input_schema: { type: 'object', properties: { id: { type: 'integer' } }, required: ['id'] },
+    async run(ctx, input) {
+      await assertContactOwner(ctx, input.id);
+      await ctx.db.deleteContact(input.id);
+      const summary = `Deleted contact #${input.id}`;
+      return { result: { ok: true, summary }, action: { tool: 'delete_contact', summary } };
+    },
+  },
+
+  // ---- Budget categories ----
+  {
+    name: 'add_budget_category',
+    description: 'Create a budget category with an optional monthly spending limit.',
+    write: true,
+    input_schema: {
+      type: 'object',
+      properties: {
+        name: { type: 'string' },
+        monthly_limit: { type: 'number' },
+        color: { type: 'string', description: 'Hex colour (optional)' },
+      },
+      required: ['name'],
+    },
+    async run(ctx, input) {
+      const r = await ctx.db.addBudgetCategory(input.name, input.monthly_limit ?? null, input.color || null, ctx.groupId);
+      const summary = `Added budget category "${input.name}"`;
+      return { result: { ok: true, id: r.id, summary }, action: { tool: 'add_budget_category', summary } };
+    },
+  },
+  {
+    name: 'update_budget_category',
+    description: 'Edit a budget category (name, monthly_limit, color). Use get_budget for the category name; pass the id. Only pass fields to change.',
+    write: true,
+    input_schema: {
+      type: 'object',
+      properties: {
+        id: { type: 'integer' },
+        name: { type: 'string' },
+        monthly_limit: { type: 'number' },
+        color: { type: 'string' },
+      },
+      required: ['id'],
+    },
+    async run(ctx, input) {
+      await assertHousehold(ctx, 'budget_categories', input.id);
+      const updates = {};
+      for (const k of ['name', 'monthly_limit', 'color']) {
+        if (input[k] != null) updates[k] = input[k];
+      }
+      if (Object.keys(updates).length === 0) return { result: { ok: false, error: 'no fields to update' } };
+      await ctx.db.updateBudgetCategory(input.id, updates);
+      const summary = `Updated budget category #${input.id}`;
+      return { result: { ok: true, summary }, action: { tool: 'update_budget_category', summary } };
+    },
+  },
+  {
+    name: 'delete_budget_category',
+    description: 'Delete a budget category. Pass its id.',
+    write: true,
+    input_schema: { type: 'object', properties: { id: { type: 'integer' } }, required: ['id'] },
+    async run(ctx, input) {
+      await assertHousehold(ctx, 'budget_categories', input.id);
+      await ctx.db.deleteBudgetCategory(input.id);
+      const summary = `Deleted budget category #${input.id}`;
+      return { result: { ok: true, summary }, action: { tool: 'delete_budget_category', summary } };
+    },
+  },
+
+  // ---- Recurring payments (rent, subscriptions, …) ----
+  {
+    name: 'get_recurring_payments',
+    description: 'List the household\'s tracked recurring payments (rent, mortgage, subscriptions).',
+    write: false,
+    input_schema: { type: 'object', properties: {} },
+    async run(ctx) {
+      const rows = await ctx.db.getRecurringPayments(ctx.groupId);
+      return { result: rows.map(p => ({
+        id: p.id, name: p.name, amount: p.amount, category: p.category,
+        frequency: p.frequency, due_day: p.due_day, autopay: !!p.autopay,
+      })) };
+    },
+  },
+  {
+    name: 'add_recurring_payment',
+    description: 'Track a recurring payment (rent, mortgage, subscription, …).',
+    write: true,
+    input_schema: {
+      type: 'object',
+      properties: {
+        name: { type: 'string' },
+        amount: { type: 'number' },
+        category: { type: 'string' },
+        frequency: { type: 'string', enum: ['weekly', 'monthly', 'yearly'] },
+        due_day: { type: 'integer', description: 'Day of month it is due (1-31, optional)' },
+        autopay: { type: 'boolean' },
+        notes: { type: 'string' },
+      },
+      required: ['name', 'amount'],
+    },
+    async run(ctx, input) {
+      if (!ctx.groupId) return { result: { ok: false, error: 'Join a household first' } };
+      const r = await ctx.db.addRecurringPayment({
+        name: input.name, amount: input.amount, category: input.category || null,
+        frequency: input.frequency || 'monthly', due_day: input.due_day || null,
+        autopay: !!input.autopay, notes: input.notes || null,
+        created_by: ctx.userName, group_id: ctx.groupId,
+      });
+      const summary = `Added recurring payment "${input.name}"`;
+      return { result: { ok: true, id: r.id, summary }, action: { tool: 'add_recurring_payment', summary } };
+    },
+  },
+  {
+    name: 'update_recurring_payment',
+    description: 'Edit a recurring payment. Use get_recurring_payments for the id. Only pass fields to change.',
+    write: true,
+    input_schema: {
+      type: 'object',
+      properties: {
+        id: { type: 'integer' },
+        name: { type: 'string' },
+        amount: { type: 'number' },
+        category: { type: 'string' },
+        frequency: { type: 'string', enum: ['weekly', 'monthly', 'yearly'] },
+        due_day: { type: 'integer' },
+        autopay: { type: 'boolean' },
+        notes: { type: 'string' },
+      },
+      required: ['id'],
+    },
+    async run(ctx, input) {
+      await assertHousehold(ctx, 'recurring_payments', input.id);
+      const updates = {};
+      for (const k of ['name', 'amount', 'category', 'frequency', 'due_day', 'autopay', 'notes']) {
+        if (input[k] != null) updates[k] = input[k];
+      }
+      if (Object.keys(updates).length === 0) return { result: { ok: false, error: 'no fields to update' } };
+      await ctx.db.updateRecurringPayment(input.id, updates);
+      const summary = `Updated recurring payment #${input.id}`;
+      return { result: { ok: true, summary }, action: { tool: 'update_recurring_payment', summary } };
+    },
+  },
+  {
+    name: 'delete_recurring_payment',
+    description: 'Stop tracking a recurring payment. Use get_recurring_payments for the id.',
+    write: true,
+    input_schema: { type: 'object', properties: { id: { type: 'integer' } }, required: ['id'] },
+    async run(ctx, input) {
+      await assertHousehold(ctx, 'recurring_payments', input.id);
+      await ctx.db.deleteRecurringPayment(input.id);
+      const summary = `Deleted recurring payment #${input.id}`;
+      return { result: { ok: true, summary }, action: { tool: 'delete_recurring_payment', summary } };
+    },
+  },
+
+  // ---- Projects (budgeted projects with expenses) ----
+  {
+    name: 'get_projects',
+    description: 'List the household\'s budgeted projects with spend totals.',
+    write: false,
+    input_schema: { type: 'object', properties: {} },
+    async run(ctx) {
+      const rows = await ctx.db.getProjects(ctx.groupId);
+      return { result: rows.map(p => ({
+        id: p.id, name: p.name, budget: p.budget, spent: p.total_spent, expenses: p.expense_count,
+      })) };
+    },
+  },
+  {
+    name: 'add_project',
+    description: 'Create a budgeted project (e.g. a renovation or trip fund).',
+    write: true,
+    input_schema: {
+      type: 'object',
+      properties: { name: { type: 'string' }, budget: { type: 'number' } },
+      required: ['name'],
+    },
+    async run(ctx, input) {
+      const r = await ctx.db.addProject({ name: input.name, budget: input.budget || 0, created_by: ctx.userName, group_id: ctx.groupId });
+      const summary = `Created project "${input.name}"`;
+      return { result: { ok: true, id: r.id, summary }, action: { tool: 'add_project', summary } };
+    },
+  },
+  {
+    name: 'delete_project',
+    description: 'Delete a budgeted project. Use get_projects for the id.',
+    write: true,
+    input_schema: { type: 'object', properties: { id: { type: 'integer' } }, required: ['id'] },
+    async run(ctx, input) {
+      await assertHousehold(ctx, 'budget_projects', input.id);
+      await ctx.db.deleteProject(input.id);
+      const summary = `Deleted project #${input.id}`;
+      return { result: { ok: true, summary }, action: { tool: 'delete_project', summary } };
+    },
+  },
+  {
+    name: 'add_project_expense',
+    description: 'Add an expense to a budgeted project. Use get_projects for the project_id.',
+    write: true,
+    input_schema: {
+      type: 'object',
+      properties: {
+        project_id: { type: 'integer' },
+        description: { type: 'string' },
+        amount: { type: 'number' },
+        category: { type: 'string' },
+        notes: { type: 'string' },
+      },
+      required: ['project_id', 'description', 'amount'],
+    },
+    async run(ctx, input) {
+      await assertHousehold(ctx, 'budget_projects', input.project_id);
+      const r = await ctx.db.addProjectExpense(input.project_id, {
+        description: input.description, amount: input.amount,
+        category: input.category || 'General', notes: input.notes || null,
+      }, ctx.groupId);
+      const summary = `Added expense "${input.description}" to project #${input.project_id}`;
+      return { result: { ok: true, id: r.id, summary }, action: { tool: 'add_project_expense', summary } };
+    },
+  },
+  {
+    name: 'delete_project_expense',
+    description: 'Delete an expense from a budgeted project. Pass the expense id and its project_id.',
+    write: true,
+    input_schema: {
+      type: 'object',
+      properties: { id: { type: 'integer' }, project_id: { type: 'integer' } },
+      required: ['id', 'project_id'],
+    },
+    async run(ctx, input) {
+      await assertHousehold(ctx, 'budget_projects', input.project_id);
+      await ctx.db.deleteProjectExpense(input.id, input.project_id);
+      const summary = `Deleted project expense #${input.id}`;
+      return { result: { ok: true, summary }, action: { tool: 'delete_project_expense', summary } };
+    },
+  },
+
+  // ---- Coverage (childcare / help requests) ----
+  {
+    name: 'create_coverage_request',
+    description: "Ask your care team for childcare/help coverage. Provide one or more time windows and optionally the contact_ids (from get_contacts) to invite.",
+    write: true,
+    input_schema: {
+      type: 'object',
+      properties: {
+        reason: { type: 'string' },
+        note: { type: 'string' },
+        windows: {
+          type: 'array',
+          description: 'Time windows that need covering',
+          items: {
+            type: 'object',
+            properties: {
+              window_date: { type: 'string', description: 'YYYY-MM-DD' },
+              start_time: { type: 'string', description: 'HH:MM' },
+              end_time: { type: 'string', description: 'HH:MM' },
+              description: { type: 'string' },
+            },
+            required: ['window_date', 'start_time', 'end_time'],
+          },
+        },
+        contact_ids: { type: 'array', items: { type: 'integer' }, description: 'Contact ids to invite (from get_contacts)' },
+      },
+      required: ['reason'],
+    },
+    async run(ctx, input) {
+      const request = await ctx.db.createCoverageRequest({ requester_id: ctx.userId, reason: input.reason, note: input.note || null });
+      for (const w of (input.windows || [])) {
+        requireDate(w.window_date, 'window_date');
+        await ctx.db.addCoverageWindow({
+          request_id: request.id, window_date: w.window_date,
+          start_time: w.start_time, end_time: w.end_time, description: w.description || null,
+        });
+      }
+      const recipients = [];
+      for (const contactId of (input.contact_ids || [])) {
+        await assertContactOwner(ctx, contactId);
+        const rec = await ctx.db.addCoverageRecipient({ request_id: request.id, contact_id: contactId });
+        recipients.push(rec);
+        if (ctx.push) {
+          const helperId = await ctx.db.getUserIdByContactId(contactId);
+          if (helperId) {
+            ctx.push.pushToUser(ctx.db, helperId, `${ctx.userName} needs your help`, input.reason, { type: 'coverage', ref_id: request.id });
+          }
+        }
+      }
+      const summary = `Created a coverage request: ${input.reason}`;
+      return { result: { ok: true, id: request.id, summary }, action: { tool: 'create_coverage_request', summary } };
+    },
+  },
+  {
+    name: 'cancel_coverage_request',
+    description: 'Cancel one of your coverage requests. Use get_coverage or the id you just created.',
+    write: true,
+    input_schema: { type: 'object', properties: { id: { type: 'integer' } }, required: ['id'] },
+    async run(ctx, input) {
+      const req = await dbGet(ctx, 'SELECT requester_id FROM coverage_requests WHERE id = ?', [input.id]);
+      if (!req) throw new Error(`No coverage request #${input.id} found`);
+      if (req.requester_id !== ctx.userId) throw new Error(`Coverage request #${input.id} is not yours`);
+      await ctx.db.cancelCoverageRequest(input.id);
+      const summary = `Cancelled coverage request #${input.id}`;
+      return { result: { ok: true, summary }, action: { tool: 'cancel_coverage_request', summary } };
+    },
+  },
+
+  // ---- Feed (household activity feed) ----
+  {
+    name: 'add_feed_post',
+    description: "Post to the household activity feed (a note, update, or shout-out everyone sees).",
+    write: true,
+    input_schema: {
+      type: 'object',
+      properties: { title: { type: 'string' }, body: { type: 'string' } },
+      required: ['body'],
+    },
+    async run(ctx, input) {
+      if (!ctx.groupId) return { result: { ok: false, error: 'Join a household first' } };
+      const r = await ctx.db.addFeedPost({
+        group_id: ctx.groupId, author_id: ctx.userId, post_type: 'text',
+        title: input.title || null, body: input.body,
+      });
+      if (ctx.push) {
+        ctx.push.pushToGroup(ctx.db, ctx.groupId, ctx.userId, `New from ${ctx.userName}`, input.title || input.body, { type: 'group_message', ref_id: ctx.groupId });
+      }
+      const summary = `Posted to the household feed`;
+      return { result: { ok: true, id: r.id, summary }, action: { tool: 'add_feed_post', summary } };
+    },
+  },
+  {
+    name: 'add_feed_reaction',
+    description: 'React to a household feed post (e.g. like). Pass the post id.',
+    write: true,
+    input_schema: {
+      type: 'object',
+      properties: {
+        post_id: { type: 'integer' },
+        reaction_type: { type: 'string', description: 'e.g. "like", "love", "celebrate" (default like)' },
+      },
+      required: ['post_id'],
+    },
+    async run(ctx, input) {
+      await assertHousehold(ctx, 'feed_posts', input.post_id);
+      await ctx.db.addFeedReaction(input.post_id, ctx.userId, input.reaction_type || 'like');
+      const summary = `Reacted to feed post #${input.post_id}`;
+      return { result: { ok: true, summary }, action: { tool: 'add_feed_reaction', summary } };
+    },
+  },
+  {
+    name: 'add_feed_comment',
+    description: 'Comment on a household feed post. Pass the post id.',
+    write: true,
+    input_schema: {
+      type: 'object',
+      properties: { post_id: { type: 'integer' }, text: { type: 'string' } },
+      required: ['post_id', 'text'],
+    },
+    async run(ctx, input) {
+      await assertHousehold(ctx, 'feed_posts', input.post_id);
+      await ctx.db.addFeedComment(input.post_id, ctx.userId, input.text);
+      const summary = `Commented on feed post #${input.post_id}`;
+      return { result: { ok: true, summary }, action: { tool: 'add_feed_comment', summary } };
+    },
+  },
+
+  // ---- Rivalries (create) ----
+  {
+    name: 'create_rivalry',
+    description: "Start a family rivalry/competition. participants are the member names taking part (defaults to include you). Log scores afterwards with log_rivalry_score.",
+    write: true,
+    input_schema: {
+      type: 'object',
+      properties: {
+        title: { type: 'string' },
+        challenge_type: { type: 'string', description: 'e.g. "steps", "chores", "reading"' },
+        participants: { type: 'array', items: { type: 'string' }, description: 'Member names competing' },
+        start_date: { type: 'string', description: 'YYYY-MM-DD (optional)' },
+        end_date: { type: 'string', description: 'YYYY-MM-DD (optional)' },
+        point_value: { type: 'integer', description: 'Points for the winner (optional)' },
+      },
+      required: ['title'],
+    },
+    async run(ctx, input) {
+      if (!ctx.groupId) return { result: { ok: false, error: 'Join a household first' } };
+      if (input.start_date) requireDate(input.start_date, 'start_date');
+      if (input.end_date) requireDate(input.end_date, 'end_date');
+      let participants = Array.isArray(input.participants) ? input.participants.filter(Boolean) : [];
+      if (!participants.includes(ctx.userName)) participants = [ctx.userName, ...participants];
+      const r = await ctx.db.addRivalry({
+        title: input.title, challenge_type: input.challenge_type || 'challenge',
+        initiator_name: ctx.userName, opponent_name: participants.find(p => p !== ctx.userName) || null,
+        start_date: input.start_date || null, end_date: input.end_date || null,
+        status: 'active', point_value: input.point_value || 100,
+        participants, rivalry_type: 'individual', group_id: ctx.groupId,
+      });
+      const summary = `Started rivalry "${input.title}"`;
+      return { result: { ok: true, id: r.id, summary }, action: { tool: 'create_rivalry', summary } };
+    },
+  },
+
+  // ---- Special events / key dates ----
+  {
+    name: 'get_special_events',
+    description: "List the household's key dates / special events (birthdays, anniversaries, custom occasions).",
+    write: false,
+    input_schema: { type: 'object', properties: {} },
+    async run(ctx) {
+      const rows = await ctx.db.getSpecialEvents(ctx.groupId);
+      return { result: rows.map(e => ({
+        id: e.id, title: e.title, date: e.date, type: e.event_type,
+        recurring: !!e.is_recurring, person_id: e.person_id, notes: e.notes,
+      })) };
+    },
+  },
+  {
+    name: 'add_special_event',
+    description: 'Add a key date / special event. Optionally tie it to a person (use list_people for person_id).',
+    write: true,
+    input_schema: {
+      type: 'object',
+      properties: {
+        title: { type: 'string' },
+        date: { type: 'string', description: 'YYYY-MM-DD' },
+        person_id: { type: 'integer', description: 'Optional person this date is about' },
+        event_type: { type: 'string', description: 'e.g. "birthday", "anniversary", "custom"' },
+        is_recurring: { type: 'boolean', description: 'Repeats every year (default true)' },
+        notes: { type: 'string' },
+      },
+      required: ['title', 'date'],
+    },
+    async run(ctx, input) {
+      requireDate(input.date, 'date');
+      if (input.person_id != null) await assertHousehold(ctx, 'gift_people', input.person_id);
+      const r = await ctx.db.addSpecialEvent({
+        title: input.title, date: input.date, person_id: input.person_id || null,
+        event_type: input.event_type || 'custom', is_recurring: input.is_recurring !== false,
+        notes: input.notes || null, group_id: ctx.groupId,
+      });
+      const summary = `Added key date "${input.title}" (${input.date})`;
+      return { result: { ok: true, id: r.id, summary }, action: { tool: 'add_special_event', summary } };
+    },
+  },
+  {
+    name: 'update_special_event',
+    description: 'Edit a key date / special event. Use get_special_events for the id. Only pass fields to change.',
+    write: true,
+    input_schema: {
+      type: 'object',
+      properties: {
+        id: { type: 'integer' },
+        title: { type: 'string' },
+        date: { type: 'string', description: 'YYYY-MM-DD' },
+        person_id: { type: 'integer' },
+        event_type: { type: 'string' },
+        is_recurring: { type: 'boolean' },
+        notes: { type: 'string' },
+      },
+      required: ['id'],
+    },
+    async run(ctx, input) {
+      await assertHousehold(ctx, 'special_events', input.id);
+      const updates = {};
+      for (const k of ['title', 'date', 'person_id', 'event_type', 'is_recurring', 'notes']) {
+        if (input[k] != null) updates[k] = input[k];
+      }
+      if (updates.date) requireDate(updates.date, 'date');
+      if (updates.person_id != null) await assertHousehold(ctx, 'gift_people', updates.person_id);
+      if (Object.keys(updates).length === 0) return { result: { ok: false, error: 'no fields to update' } };
+      await ctx.db.updateSpecialEvent(input.id, updates);
+      const summary = `Updated key date #${input.id}`;
+      return { result: { ok: true, summary }, action: { tool: 'update_special_event', summary } };
+    },
+  },
+  {
+    name: 'delete_special_event',
+    description: 'Delete a key date / special event. Use get_special_events for the id.',
+    write: true,
+    input_schema: { type: 'object', properties: { id: { type: 'integer' } }, required: ['id'] },
+    async run(ctx, input) {
+      await assertHousehold(ctx, 'special_events', input.id);
+      await ctx.db.deleteSpecialEvent(input.id);
+      const summary = `Deleted key date #${input.id}`;
+      return { result: { ok: true, summary }, action: { tool: 'delete_special_event', summary } };
+    },
+  },
+
+  // ---- Itinerary expenses ----
+  {
+    name: 'add_itinerary_expense',
+    description: 'Log an expense against a trip/itinerary. Use get_itineraries for the itinerary_id.',
+    write: true,
+    input_schema: {
+      type: 'object',
+      properties: {
+        itinerary_id: { type: 'integer' },
+        merchant: { type: 'string' },
+        amount: { type: 'number' },
+        date: { type: 'string', description: 'YYYY-MM-DD (optional, defaults to today)' },
+        category: { type: 'string' },
+        notes: { type: 'string' },
+      },
+      required: ['itinerary_id', 'amount'],
+    },
+    async run(ctx, input) {
+      await assertHousehold(ctx, 'itineraries', input.itinerary_id);
+      const date = input.date || ctx.today;
+      requireDate(date, 'date');
+      const r = await ctx.db.addReceipt({
+        amount: input.amount, merchant: input.merchant || 'Trip expense', date,
+        category: input.category || 'Travel', notes: input.notes || null,
+        added_by: ctx.userName, itinerary_id: input.itinerary_id, group_id: ctx.groupId,
+      });
+      const summary = `Logged a ${input.amount} expense on itinerary #${input.itinerary_id}`;
+      return { result: { ok: true, id: r.id, summary }, action: { tool: 'add_itinerary_expense', summary } };
+    },
+  },
+
+  // ---- User profile ----
+  {
+    name: 'update_my_name',
+    description: "Change your own display name shown across the household.",
+    write: true,
+    input_schema: {
+      type: 'object',
+      properties: { name: { type: 'string' } },
+      required: ['name'],
+    },
+    async run(ctx, input) {
+      const name = String(input.name || '').trim().slice(0, 60);
+      if (!name) return { result: { ok: false, error: 'Name is required' } };
+      await new Promise((resolve, reject) => {
+        ctx.db.db.run('UPDATE users SET name = ? WHERE id = ?', [name, ctx.userId], (err) => err ? reject(err) : resolve());
+      });
+      const summary = `Updated your name to ${name}`;
+      return { result: { ok: true, summary }, action: { tool: 'update_my_name', summary } };
     },
   },
 ];

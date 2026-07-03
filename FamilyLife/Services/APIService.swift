@@ -633,6 +633,10 @@ final class APIService {
         let _: SuccessResponse = try await post("/api/gifts/events", body: event)
     }
 
+    func updateSpecialEvent(id: Int, data: [String: Any]) async throws {
+        let _: SuccessResponse = try await put("/api/gifts/events/\(id)", body: data)
+    }
+
     func deleteSpecialEvent(id: Int) async throws {
         let _: SuccessResponse = try await delete("/api/gifts/events/\(id)")
     }

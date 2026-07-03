@@ -13,6 +13,7 @@ struct ConciergeView: View {
     @State private var showingChat = false
     @State private var showingPaywall = false
     @State private var chatPrompt: String?
+    @State private var chatAutoListen = false
     @AppStorage("cloudAIEnabled") private var cloudAIEnabled = true
 
     var body: some View {
@@ -44,7 +45,7 @@ struct ConciergeView: View {
             }
         }
         .sheet(isPresented: $showingChat) {
-            ConciergeChatView(initialPrompt: chatPrompt)
+            ConciergeChatView(initialPrompt: chatPrompt, autoListen: chatAutoListen)
         }
         .sheet(isPresented: $showingPaywall) {
             PaywallView()
@@ -53,21 +54,23 @@ struct ConciergeView: View {
             if case .idle = viewModel.state { await viewModel.load(api: api) }
             handleLaunchRequest()
         }
-        .onChange(of: launch.requestedPrompt) { handleLaunchRequest() }
+        .onChange(of: launch.requestID) { handleLaunchRequest() }
     }
 
     // Open the chat (premium) or paywall in response to an Ask-the-butler request.
     private func handleLaunchRequest() {
-        guard let prompt = launch.consume() else { return }
+        guard let request = launch.consume() else { return }
         guard cloudAIEnabled else { return }   // chat sends data; respect the privacy toggle
         guard subscription.isPremium else { showingPaywall = true; return }
         if showingChat {
-            // A chat is already open — dismiss and re-present seeded with the new prompt.
+            // A chat is already open — dismiss and re-present seeded with the new request.
             showingChat = false
-            chatPrompt = prompt
+            chatPrompt = request.prompt
+            chatAutoListen = request.autoListen
             Task { @MainActor in showingChat = true }
         } else {
-            chatPrompt = prompt
+            chatPrompt = request.prompt
+            chatAutoListen = request.autoListen
             showingChat = true
         }
     }
