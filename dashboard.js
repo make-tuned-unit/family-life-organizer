@@ -4182,6 +4182,22 @@ app.post('/api/gifts/events', requireAuth, async (req, res) => {
   }
 });
 
+app.put('/api/gifts/events/:id', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    if (!(await requireHouseholdRow(db, 'special_events', req.params.id, req, res))) return;
+    const data = { ...req.body };
+    if (data.date) data.date = normalizeDate(data.date);
+    delete data.group_id;
+    await db.updateSpecialEvent(req.params.id, data);
+    res.json({ success: true });
+  } catch (err) {
+    sendServerError(res, err);
+  } finally {
+    db.close();
+  }
+});
+
 app.delete('/api/gifts/events/:id', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
