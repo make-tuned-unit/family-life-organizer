@@ -490,15 +490,6 @@
 			path = Gifts;
 			sourceTree = "<group>";
 		};
-		EE000022 /* People */ = {
-			isa = PBXGroup;
-			children = (
-				BB000211 /* PeopleView.swift */,
-				BB000212 /* PersonDetailView.swift */,
-			);
-			path = People;
-			sourceTree = "<group>";
-		};
 		EE000012 /* Components */ = {
 			isa = PBXGroup;
 			children = (
@@ -541,6 +532,15 @@
 				BB000095 /* OnDeviceSummarizer.swift */,
 			);
 			path = Concierge;
+			sourceTree = "<group>";
+		};
+		EE000022 /* People */ = {
+			isa = PBXGroup;
+			children = (
+				BB000211 /* PeopleView.swift */,
+				BB000212 /* PersonDetailView.swift */,
+			);
+			path = People;
 			sourceTree = "<group>";
 		};
 		GG000001 /* Care */ = {
@@ -788,7 +788,7 @@
 				CODE_SIGN_ENTITLEMENTS = FamilyLife/FamilyLife.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 203;
+				CURRENT_PROJECT_VERSION = 207;
 				DEVELOPMENT_ASSET_PATHS = "";
 				DEVELOPMENT_TEAM = GANM22MFCH;
 				ENABLE_PREVIEWS = YES;
@@ -833,7 +833,7 @@
 				CODE_SIGN_ENTITLEMENTS = FamilyLife/FamilyLife.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 203;
+				CURRENT_PROJECT_VERSION = 207;
 				DEVELOPMENT_ASSET_PATHS = "";
 				DEVELOPMENT_TEAM = GANM22MFCH;
 				ENABLE_PREVIEWS = YES;
