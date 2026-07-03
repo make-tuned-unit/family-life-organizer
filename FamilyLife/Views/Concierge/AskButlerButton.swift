@@ -5,14 +5,39 @@ import SwiftUI
 /// ConciergeView presents the chat (or the paywall, if not premium).
 @Observable
 final class ConciergeLaunch {
-    var requestedPrompt: String?
+    /// Bumped on every request so observers fire even for a listen-only launch
+    /// (which carries no prompt). Non-zero means a request is pending.
+    private(set) var requestID = 0
+    private(set) var pendingPrompt: String?
+    private(set) var pendingAutoListen = false
 
-    func ask(_ prompt: String) { requestedPrompt = prompt }
+    struct Request {
+        let prompt: String?
+        let autoListen: Bool
+    }
 
-    /// Read and clear the pending prompt.
-    func consume() -> String? {
-        defer { requestedPrompt = nil }
-        return requestedPrompt
+    /// Open the concierge chat seeded with `prompt`.
+    func ask(_ prompt: String) {
+        pendingPrompt = prompt
+        pendingAutoListen = false
+        requestID += 1
+    }
+
+    /// Open the concierge chat straight into voice dictation (no seed prompt).
+    func listen() {
+        pendingPrompt = nil
+        pendingAutoListen = true
+        requestID += 1
+    }
+
+    /// Read and clear the pending request.
+    func consume() -> Request? {
+        guard requestID != 0 else { return nil }
+        let request = Request(prompt: pendingPrompt, autoListen: pendingAutoListen)
+        pendingPrompt = nil
+        pendingAutoListen = false
+        requestID = 0
+        return request
     }
 }
 
