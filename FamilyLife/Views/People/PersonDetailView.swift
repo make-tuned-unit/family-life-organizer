@@ -28,6 +28,7 @@ struct PersonDetailView: View {
     @State private var showingEditPerson = false
     @State private var showingDeleteConfirm = false
     @State private var editingMilestone: MilestoneResponse?
+    @State private var editingKeyDate: SpecialEventResponse?
     /// Live copy of the person — refreshed after edits so the header updates in place.
     @State private var current: PersonResponse?
 
@@ -101,6 +102,12 @@ struct PersonDetailView: View {
         }
         .sheet(item: $editingMilestone) { m in
             EditMilestoneSheet(milestone: m, accent: display.accentColor) {
+                await load()
+                await onChanged?()
+            }
+        }
+        .sheet(item: $editingKeyDate) { ev in
+            EditKeyDateSheet(event: ev, personName: display.name) {
                 await load()
                 await onChanged?()
             }
@@ -406,6 +413,9 @@ struct PersonDetailView: View {
         .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: 14))
         .contextMenu {
             if let event {
+                Button { editingKeyDate = event } label: {
+                    Label("Edit key date", systemImage: "pencil")
+                }
                 Button(role: .destructive) {
                     Task {
                         try? await api.deleteSpecialEvent(id: event.id)
@@ -797,6 +807,85 @@ struct AddKeyDateSheet: View {
     }
 }
 
+// MARK: - Edit key date
+
+struct EditKeyDateSheet: View {
+    @Environment(APIService.self) private var api
+    @Environment(\.dismiss) private var dismiss
+    let event: SpecialEventResponse
+    let personName: String
+    var onSaved: () async -> Void
+
+    @State private var title: String
+    @State private var date: Date
+    @State private var repeatsAnnually: Bool
+    @State private var notes: String
+    @State private var isSaving = false
+    @State private var error: String?
+
+    init(event: SpecialEventResponse, personName: String, onSaved: @escaping () async -> Void) {
+        self.event = event
+        self.personName = personName
+        self.onSaved = onSaved
+        _title = State(initialValue: event.title)
+        _date = State(initialValue: DateFormatter.isoDate.date(from: String(event.date.prefix(10))) ?? Date())
+        _repeatsAnnually = State(initialValue: (event.is_recurring ?? 0) != 0)
+        _notes = State(initialValue: event.notes ?? "")
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("The date") {
+                    TextField("What is it? (e.g. Gotcha day)", text: $title)
+                        .textInputAutocapitalization(.sentences)
+                    DatePicker("When", selection: $date, displayedComponents: .date)
+                    Toggle("Repeats every year", isOn: $repeatsAnnually)
+                }
+                Section("Notes") {
+                    TextField("A little detail (optional)", text: $notes, axis: .vertical)
+                        .lineLimit(2...4)
+                }
+                if let error {
+                    Text(error).foregroundStyle(.red).font(.system(size: 13))
+                }
+            }
+            .navigationTitle("Edit key date")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(isSaving ? "Saving…" : "Save") { save() }
+                        .disabled(title.trimmingCharacters(in: .whitespaces).isEmpty || isSaving)
+                }
+            }
+        }
+    }
+
+    private func save() {
+        isSaving = true
+        var data: [String: Any] = [
+            "title": title.trimmingCharacters(in: .whitespaces),
+            "date": DateFormatter.isoDate.string(from: date),
+            "is_recurring": repeatsAnnually,
+        ]
+        let trimmedNotes = notes.trimmingCharacters(in: .whitespacesAndNewlines)
+        data["notes"] = trimmedNotes.isEmpty ? NSNull() : trimmedNotes
+        Task {
+            do {
+                try await api.updateSpecialEvent(id: event.id, data: data)
+                await onSaved()
+                dismiss()
+            } catch {
+                self.error = "Couldn't save. Try again."
+                isSaving = false
+            }
+        }
+    }
+}
+
 // MARK: - Edit person
 
 struct EditPersonSheet: View {
@@ -813,7 +902,7 @@ struct EditPersonSheet: View {
     @State private var isSaving = false
     @State private var error: String?
 
-    private let relationships = ["son", "daughter", "partner", "parent", "grandparent", "household", "other"]
+    private let relationships = ["wife", "husband", "spouse", "partner", "son", "daughter", "parent", "sibling", "grandparent", "household", "other"]
     private let colors = ["sage", "rose", "ocean", "saffron", "mauve", "terracotta"]
 
     init(person: PersonResponse, onSaved: @escaping () async -> Void) {

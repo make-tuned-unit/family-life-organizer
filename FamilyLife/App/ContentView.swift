@@ -184,7 +184,16 @@ struct MainTabView: View {
                                 .background(AccentTheme.saffron.color, in: Circle())
                                 .shadow(color: .black.opacity(0.15), radius: 8, y: 4)
                         }
+                        // Long-press jumps straight into voice: opens the concierge
+                        // chat already listening, so you can speak a command without
+                        // navigating in first.
+                        .simultaneousGesture(
+                            LongPressGesture(minimumDuration: 0.4).onEnded { _ in
+                                conciergeLaunch.listen()
+                            }
+                        )
                         .accessibilityLabel("Open AI concierge")
+                        .accessibilityHint("Double tap to open, or touch and hold to speak a command")
                         .padding(.leading, 20)
                         .padding(.bottom, 80)
                         Spacer()
@@ -229,8 +238,8 @@ struct MainTabView: View {
             guard let type = deepLinkRouter.pendingType else { return }
             Task { await handleDeepLink(type: type) }
         }
-        .onChange(of: conciergeLaunch.requestedPrompt) {
-            if conciergeLaunch.requestedPrompt != nil {
+        .onChange(of: conciergeLaunch.requestID) {
+            if conciergeLaunch.requestID != 0 {
                 loadedTabs.insert(.concierge)
                 selectedTab = .concierge
             }

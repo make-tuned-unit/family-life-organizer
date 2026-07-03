@@ -7,11 +7,14 @@ struct ConciergeChatView: View {
     @Environment(\.dismiss) private var dismiss
 
     var initialPrompt: String? = nil
+    /// When true, the composer opens straight into voice dictation (long-press launch).
+    var autoListen: Bool = false
 
     @State private var viewModel = ConciergeChatViewModel()
     @State private var speech = ConciergeSpeechRecognizer()
     @State private var draft = ""
     @State private var micBase = ""
+    @State private var didAutoListen = false
     @State private var showingHistory = false
     @FocusState private var inputFocused: Bool
 
@@ -48,6 +51,15 @@ struct ConciergeChatView: View {
             .navigationBarTitleDisplayMode(.inline)
             .onAppear {
                 if draft.isEmpty, let initialPrompt, !initialPrompt.isEmpty { draft = initialPrompt }
+            }
+            .task {
+                // Long-press launch: jump straight into listening so the user can
+                // speak a command without tapping into the chat first.
+                guard autoListen, !didAutoListen else { return }
+                didAutoListen = true
+                micBase = draft.isEmpty ? "" : draft.trimmingCharacters(in: .whitespaces) + " "
+                inputFocused = false
+                await speech.start { transcript in draft = micBase + transcript }
             }
             .toolbar {
                 ToolbarItemGroup(placement: .topBarLeading) {

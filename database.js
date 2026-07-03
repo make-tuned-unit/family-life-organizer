@@ -1935,6 +1935,24 @@ class FamilyDB {
     });
   }
 
+  updateSpecialEvent(id, updates) {
+    const ALLOWED = new Set(['person_id', 'title', 'date', 'is_recurring', 'event_type', 'notes']);
+    return new Promise((resolve, reject) => {
+      const fields = [];
+      const params = [];
+      for (const [key, value] of Object.entries(updates)) {
+        if (!ALLOWED.has(key)) continue;
+        fields.push(`${key} = ?`);
+        params.push(key === 'is_recurring' ? (value ? 1 : 0) : value);
+      }
+      if (!fields.length) return resolve({ id });
+      params.push(id);
+      this.db.run(`UPDATE special_events SET ${fields.join(', ')} WHERE id = ?`, params, (err) => {
+        err ? reject(err) : resolve({ id, ...updates });
+      });
+    });
+  }
+
   deleteSpecialEvent(id) {
     return new Promise((resolve, reject) => {
       this.db.run('DELETE FROM special_events WHERE id = ?', [id], (err) => {
