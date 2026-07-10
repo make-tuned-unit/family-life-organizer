@@ -10,6 +10,21 @@ final class ProfileImageCache {
         images[userId]
     }
 
+    /// Update the cache right after the user picks a new profile image —
+    /// without this, your own new avatar never shows until process restart.
+    func setImage(_ image: UIImage, for userId: Int) {
+        images[userId] = image
+    }
+
+    /// Drop everything on logout so a second account on the same device
+    /// can't see the previous user's cached avatars.
+    func clear() {
+        images = [:]
+        pending = []
+        groupImages = [:]
+        pendingGroups = []
+    }
+
     func loadFromHousehold(_ members: [APIService.GroupMemberResponse]) {
         for member in members {
             guard let userId = member.user_id, images[userId] == nil else { continue }

@@ -166,6 +166,12 @@ struct FamilyLifeApp: App {
                                 }
                             }
                         }
+                    } else {
+                        // Logout: drop all in-memory caches so a second account
+                        // on this device never sees the previous user's data.
+                        messageCache.clear()
+                        profileImageCache.clear()
+                        householdService.clear()
                     }
                 }
                 .onReceive(NotificationCenter.default.publisher(for: APIService.unauthorizedNotification)) { _ in

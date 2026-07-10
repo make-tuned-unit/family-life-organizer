@@ -233,10 +233,17 @@ final class AuthService {
         let username = currentUser?.username
         currentUser = nil
         needsOnboarding = false
+        profileUIImage = nil
+        profileImageData = nil
+        try? FileManager.default.removeItem(at: Self.profileImageURL)
         UserDefaults.standard.removeObject(forKey: "auth_username")
         UserDefaults.standard.removeObject(forKey: "auth_name")
         UserDefaults.standard.removeObject(forKey: "auth_user_id")
         UserDefaults.standard.removeObject(forKey: "household_invite_code")
+        // Per-account notification watermarks — a fresh account must not
+        // inherit (or re-fire against) the previous account's history.
+        UserDefaults.standard.removeObject(forKey: "notified_dm_ids")
+        UserDefaults.standard.removeObject(forKey: "notified_feed_keys")
         if let username { Self.deletePassword(for: username) }
         HTTPCookieStorage.shared.cookies?.forEach { HTTPCookieStorage.shared.deleteCookie($0) }
     }

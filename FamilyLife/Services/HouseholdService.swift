@@ -29,8 +29,10 @@ final class HouseholdService {
             async let contactsReq = api.fetchContacts()
             async let groupsReq = api.fetchGroups()
 
-            let contacts = (try? await contactsReq) ?? []
-            let groups = (try? await groupsReq) ?? []
+            // Real throws: a failed fetch must NOT mark the service loaded with
+            // an empty roster (which silently emptied mention/assignee pickers).
+            let contacts = try await contactsReq
+            let groups = try await groupsReq
 
             // Cache the household group for invite code display
             householdGroup = groups.first { $0.group_type == "household" }
@@ -110,7 +112,9 @@ final class HouseholdService {
             householdMemberNames = householdNames
             householdUsers = householdUserList.sorted { $0.name < $1.name }
         } catch {
-            guard !error.isCancellation else { isLoading = false; return }
+            // Leave isLoaded false so the next appear/foreground retries.
+            isLoading = false
+            return
         }
         isLoaded = true
         isLoading = false
@@ -119,6 +123,17 @@ final class HouseholdService {
     func reload(api: APIService, profileCache: ProfileImageCache? = nil, currentUserId: Int? = nil) async {
         isLoading = false
         await load(api: api, profileCache: profileCache, currentUserId: currentUserId)
+    }
+
+    /// Drop everything on logout so the next account starts from a clean roster.
+    func clear() {
+        members = []
+        householdGroup = nil
+        householdMemberNames = []
+        userIdsByName = [:]
+        householdUsers = []
+        isLoaded = false
+        isLoading = false
     }
 
     func member(named name: String) -> APIService.ContactResponse? {

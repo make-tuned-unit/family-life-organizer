@@ -13,6 +13,14 @@ final class MessageCache {
         cache[partnerId] ?? []
     }
 
+    /// Drop everything on logout so a second account on the same device
+    /// can't see the previous user's cached conversations.
+    func clear() {
+        cache = [:]
+        imageCache = [:]
+        pendingImages = []
+    }
+
     func setMessages(_ messages: [APIService.DirectMessageResponse], for partnerId: Int) {
         cache[partnerId] = messages
     }

@@ -8,6 +8,7 @@ struct SettingsView: View {
     @Environment(HouseholdService.self) private var household
     @Environment(LocationService.self) private var locationService
     @Environment(CalendarService.self) private var calendarService
+    @Environment(ProfileImageCache.self) private var profileCache
     @Environment(\.dismiss) private var dismiss
 
     @State private var showingLogoutConfirm = false
@@ -311,6 +312,11 @@ struct SettingsView: View {
                     auth.setProfileImage(data)
                     if let thumb = auth.profileUIImage {
                         profileImage = Image(uiImage: thumb)
+                        // Update the shared avatar cache too, so your new photo
+                        // shows everywhere immediately (not after a restart).
+                        if let userId = auth.currentUser?.id {
+                            profileCache.setImage(thumb, for: userId)
+                        }
                     }
                 }
             }

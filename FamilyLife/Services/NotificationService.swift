@@ -338,18 +338,22 @@ final class NotificationService {
 
     /// Update feed watermark without firing notifications (used on app launch)
     func syncFeedWatermark(_ items: [APIService.ActivityItem]) {
-        var seen = notifiedFeedKeys
-        for item in items { seen.insert(item.stableKey) }
-        saveNotifiedFeedKeys(seen)
+        var list = notifiedFeedKeyList
+        var seen = Set(list)
+        for item in items where !seen.contains(item.stableKey) {
+            seen.insert(item.stableKey)
+            list.append(item.stableKey)
+        }
+        saveNotifiedFeedKeys(list)
     }
 
     /// Check for new DMs since last check and fire notifications
     func checkForNewMessages(_ conversations: [APIService.ConversationResponse]) {
-        var seen = Set(UserDefaults.standard.stringArray(forKey: "notified_dm_ids") ?? [])
+        var list = UserDefaults.standard.stringArray(forKey: "notified_dm_ids") ?? []
+        var seen = Set(list)
         // First launch — mark all current
         if seen.isEmpty {
-            seen = Set(conversations.map { String($0.id) })
-            UserDefaults.standard.set(Array(seen), forKey: "notified_dm_ids")
+            UserDefaults.standard.set(conversations.map { String($0.id) }, forKey: "notified_dm_ids")
             return
         }
 
@@ -364,19 +368,22 @@ final class NotificationService {
                 userInfo: ["type": "message", "ref_id": convo.partner_id, "name": convo.partner_name]
             )
             seen.insert(key)
+            list.append(key)
             notified += 1
         }
 
-        UserDefaults.standard.set(Array(seen), forKey: "notified_dm_ids")
+        // Ordered append + suffix keeps the NEWEST 500; trimming a Set trimmed
+        // arbitrary keys, which could re-notify old messages.
+        UserDefaults.standard.set(Array(list.suffix(500)), forKey: "notified_dm_ids")
     }
 
     /// Check feed for new items since last check and fire notifications
     func checkForNewFeedItems(_ items: [APIService.ActivityItem], currentUser: String) {
-        var seen = notifiedFeedKeys
+        var list = notifiedFeedKeyList
+        var seen = Set(list)
         // First launch — mark all current, don't spam
         if seen.isEmpty {
-            for item in items { seen.insert(item.stableKey) }
-            saveNotifiedFeedKeys(seen)
+            saveNotifiedFeedKeys(items.map(\.stableKey))
             return
         }
 
@@ -386,6 +393,7 @@ final class NotificationService {
             guard notified < 3 else { break }
             guard item.author?.localizedCaseInsensitiveCompare(currentUser) != .orderedSame else {
                 seen.insert(item.stableKey)
+                list.append(item.stableKey)
                 continue
             }
 
@@ -407,23 +415,25 @@ final class NotificationService {
                 postLocal(title: "\(author) could use your help", body: item.title ?? "Can you help cover?", category: "COVERAGE", userInfo: info)
             default:
                 seen.insert(item.stableKey)
+                list.append(item.stableKey)
                 continue
             }
             seen.insert(item.stableKey)
+            list.append(item.stableKey)
             notified += 1
         }
 
-        saveNotifiedFeedKeys(seen)
+        saveNotifiedFeedKeys(list)
     }
 
-    private var notifiedFeedKeys: Set<String> {
-        Set(UserDefaults.standard.stringArray(forKey: "notified_feed_keys") ?? [])
+    private var notifiedFeedKeyList: [String] {
+        UserDefaults.standard.stringArray(forKey: "notified_feed_keys") ?? []
     }
 
-    private func saveNotifiedFeedKeys(_ keys: Set<String>) {
-        // Keep last 200 to prevent unbounded growth
-        let trimmed = keys.count > 200 ? Set(keys.suffix(200)) : keys
-        UserDefaults.standard.set(Array(trimmed), forKey: "notified_feed_keys")
+    private func saveNotifiedFeedKeys(_ keys: [String]) {
+        // Ordered list, newest appended last — suffix keeps the newest 200.
+        // (Trimming a Set dropped ARBITRARY keys and could re-notify old items.)
+        UserDefaults.standard.set(Array(keys.suffix(200)), forKey: "notified_feed_keys")
     }
 
     // MARK: - Rivalry milestone reminders
