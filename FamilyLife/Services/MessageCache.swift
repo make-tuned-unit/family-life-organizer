@@ -23,19 +23,40 @@ final class MessageCache {
 
     /// Merge the newest page (server-authoritative for its id window) into the
     /// cache WITHOUT discarding older pages already loaded via load-older.
-    /// Refreshes read receipts in the newest window and drops optimistic temps
-    /// once their real rows arrive. Used by polling/refresh.
+    /// Refreshes read receipts in the newest window. Optimistic temps are kept
+    /// until their real row arrives (or they age out) — dropping them on every
+    /// poll made an in-flight send vanish and reappear, and made a FAILED send
+    /// vanish forever with no feedback.
     func mergeNewest(_ fetched: [APIService.DirectMessageResponse], for partnerId: Int) {
         let existing = cache[partnerId] ?? []
+        let temps = existing.filter { $0.id >= Self.tempIdThreshold }
+        let keptTemps = temps.filter { temp in
+            // Confirmed: its real row is in the fetched window now.
+            let confirmed = fetched.contains { $0.sender_id == temp.sender_id && $0.text == temp.text }
+            if confirmed { return false }
+            // Unconfirmed temps age out after 30s (the send failure path
+            // removes its own temp immediately; this is just a backstop).
+            guard let createdAt = temp.created_at,
+                  let created = ISO8601DateFormatter().date(from: createdAt) else { return false }
+            return Date().timeIntervalSince(created) < 30
+        }
         guard let minFetchedId = fetched.map(\.id).min() else {
-            // Nothing returned: keep real history, drop optimistic temps.
-            cache[partnerId] = existing.filter { $0.id < Self.tempIdThreshold }
+            cache[partnerId] = keptTemps + existing.filter { $0.id < Self.tempIdThreshold }
             return
         }
         // Keep only older real pages; the newest window comes from `fetched`
-        // (which is authoritative and contiguous by id), and temps are dropped.
-        let olderRetained = existing.filter { $0.id < minFetchedId }
-        cache[partnerId] = (fetched + olderRetained).sorted { $0.id > $1.id }
+        // (which is authoritative and contiguous by id).
+        let olderRetained = existing.filter { $0.id < minFetchedId && $0.id < Self.tempIdThreshold }
+        cache[partnerId] = (keptTemps + fetched + olderRetained).sorted { $0.id > $1.id }
+    }
+
+    /// Remove the optimistic temp for a failed send so the bubble doesn't lie.
+    func removeOptimistic(partnerId: Int, text: String) {
+        var msgs = cache[partnerId] ?? []
+        if let idx = msgs.firstIndex(where: { $0.id >= Self.tempIdThreshold && $0.text == text }) {
+            msgs.remove(at: idx)
+            cache[partnerId] = msgs
+        }
     }
 
     /// Merge an older page (load-older) into the cache, deduping by id.

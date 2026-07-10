@@ -236,6 +236,7 @@ struct GroupChatView: View {
     @State private var showingNewDecision = false
     @State private var openDecisions: [DecisionResponse] = []
     @State private var fullscreenImage: UIImage?
+    @State private var sendError: String?
 
     private var canSend: Bool {
         !newMessage.trimmingCharacters(in: .whitespaces).isEmpty || pendingImageData != nil
@@ -351,6 +352,7 @@ struct GroupChatView: View {
             }
             .background(.ultraThinMaterial)
         }
+        .inlineError(sendError) { sendError = nil }
         .sheet(isPresented: $showingNewDecision) {
             NewDecisionView(preselectedGroupId: groupId) {
                 await loadDecisions()
@@ -379,7 +381,10 @@ struct GroupChatView: View {
     }
 
     private func loadPosts() async {
-        posts = (try? await api.fetchFeed(groupId: groupId)) ?? []
+        // Never wipe the visible thread because one background poll failed.
+        if let fetched = try? await api.fetchFeed(groupId: groupId) {
+            posts = fetched
+        }
     }
 
     private func loadDecisions() async {
@@ -413,12 +418,19 @@ struct GroupChatView: View {
             ]
             if !text.isEmpty { data["title"] = String(text.prefix(60)) }
             if let imageBase64 { data["photo_url"] = imageBase64 }
-            _ = try? await api.addFeedPost(groupId: groupId, data: data)
-            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-            newMessage = ""
-            pendingImageData = nil
-            selectedPhoto = nil
-            await loadPosts()
+            do {
+                _ = try await api.addFeedPost(groupId: groupId, data: data)
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                newMessage = ""
+                pendingImageData = nil
+                selectedPhoto = nil
+                await loadPosts()
+            } catch {
+                guard !error.isCancellation else { return }
+                // Keep the draft so nothing is lost; say what happened.
+                sendError = "Message didn't send — \(error.localizedDescription)"
+                UINotificationFeedbackGenerator().notificationOccurred(.error)
+            }
         }
     }
 }
@@ -520,7 +532,10 @@ struct InlinePollCard: View {
             ])
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
             reactions = (try? await api.fetchDecisionReactions(id: decisionId)) ?? reactions
-        } catch {}
+        } catch {
+            guard !error.isCancellation else { return }
+            UINotificationFeedbackGenerator().notificationOccurred(.error)
+        }
     }
 }
 

@@ -22,6 +22,7 @@ struct ConversationView: View {
     @State private var fullscreenImage: UIImage?
     @State private var isLoadingOlder = false
     @State private var reachedOldEnd = false
+    @State private var sendError: String?
     private let messagePageSize = 50
 
     private var messages: [APIService.DirectMessageResponse] {
@@ -168,6 +169,7 @@ struct ConversationView: View {
             .background(.ultraThinMaterial)
         }
         .background { AmbientBackground(style: .home) }
+        .inlineError(sendError) { sendError = nil }
         .navigationTitle(partnerName)
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $showingNewDecision) {
@@ -296,7 +298,17 @@ struct ConversationView: View {
                 )
                 // Replace optimistic with server data
                 await refreshMessages()
-            } catch {}
+            } catch {
+                guard !error.isCancellation else { return }
+                // Pull the phantom bubble, restore the draft so nothing is lost,
+                // and say what happened.
+                messageCache.removeOptimistic(partnerId: partnerId, text: sentText)
+                newMessage = text
+                pendingQuote = quote
+                pendingImageData = imageBase64.flatMap { Data(base64Encoded: $0) }
+                sendError = "Message didn't send — \(error.localizedDescription)"
+                UINotificationFeedbackGenerator().notificationOccurred(.error)
+            }
             isSending = false
         }
     }
