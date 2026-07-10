@@ -371,6 +371,7 @@ struct SettingsView: View {
     .environment(HouseholdService())
     .environment(LocationService())
     .environment(CalendarService())
+    .environment(ProfileImageCache())
 }
 
 // MARK: - Calendar Share Picker

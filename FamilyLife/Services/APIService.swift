@@ -8,16 +8,19 @@ final class APIService {
 
     private let session: URLSession
 
+    // Single source of truth is AppConfig.apiBaseURL. The UserDefaults
+    // override ("server_url") is honored in DEBUG only — in a release build a
+    // planted default could silently repoint the app (even to plain http).
     private static var defaultBaseURL: String {
         #if DEBUG
-        return "http://localhost:3456"
+        return UserDefaults.standard.string(forKey: "server_url") ?? AppConfig.apiBaseURL
         #else
-        return "https://family-life-organizer-production.up.railway.app"
+        return AppConfig.apiBaseURL
         #endif
     }
 
     init(baseURL: String = APIService.defaultBaseURL) {
-        self.baseURL = UserDefaults.standard.string(forKey: "server_url") ?? baseURL
+        self.baseURL = baseURL
         let config = URLSessionConfiguration.default
         config.httpCookieAcceptPolicy = .always
         config.httpCookieStorage = .shared
