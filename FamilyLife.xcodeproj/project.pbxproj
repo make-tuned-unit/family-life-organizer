@@ -55,7 +55,6 @@
 		AA00002F /* NewDecisionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00002F /* NewDecisionView.swift */; };
 		AA000030 /* DecisionDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000030 /* DecisionDetailView.swift */; };
 		AA000031 /* Gift.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000031 /* Gift.swift */; };
-		AA000032 /* GiftsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000032 /* GiftsView.swift */; };
 		AA000033 /* PersonGiftListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000033 /* PersonGiftListView.swift */; };
 		AA000034 /* AddGiftPersonView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000034 /* AddGiftPersonView.swift */; };
 		AA000035 /* AddGiftIdeaView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000035 /* AddGiftIdeaView.swift */; };
@@ -74,7 +73,6 @@
 		AA000047 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = BB000047 /* PrivacyInfo.xcprivacy */; };
 		AA000048 /* AppConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000048 /* AppConfig.swift */; };
 		AA00004A /* FamilyListsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00004A /* FamilyListsView.swift */; };
-		AA00004B /* AskAIButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00004B /* AskAIButton.swift */; };
 		AA00004C /* BudgetProjectsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00004C /* BudgetProjectsView.swift */; };
 		AA00004D /* SignUpView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00004D /* SignUpView.swift */; };
 		AA00004E /* FamilyGroupsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00004E /* FamilyGroupsView.swift */; };
@@ -87,7 +85,6 @@
 		AA000055 /* FeedCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000055 /* FeedCardView.swift */; };
 		AA000070 /* ProfileImageCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000070 /* ProfileImageCache.swift */; };
 		AA000071 /* ShareWithSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000071 /* ShareWithSection.swift */; };
-		AA000072 /* MessagesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000072 /* MessagesView.swift */; };
 		AA000073 /* ConversationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000073 /* ConversationView.swift */; };
 		AA000074 /* QuotedItemCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000074 /* QuotedItemCard.swift */; };
 		AA000075 /* ChatSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000075 /* ChatSheet.swift */; };
@@ -176,7 +173,6 @@
 		BB00002F /* NewDecisionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewDecisionView.swift; sourceTree = "<group>"; };
 		BB000030 /* DecisionDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecisionDetailView.swift; sourceTree = "<group>"; };
 		BB000031 /* Gift.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Gift.swift; sourceTree = "<group>"; };
-		BB000032 /* GiftsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GiftsView.swift; sourceTree = "<group>"; };
 		BB000033 /* PersonGiftListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersonGiftListView.swift; sourceTree = "<group>"; };
 		BB000034 /* AddGiftPersonView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddGiftPersonView.swift; sourceTree = "<group>"; };
 		BB000035 /* AddGiftIdeaView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddGiftIdeaView.swift; sourceTree = "<group>"; };
@@ -195,7 +191,6 @@
 		BB000047 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		BB000048 /* AppConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppConfig.swift; sourceTree = "<group>"; };
 		BB00004A /* FamilyListsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FamilyListsView.swift; sourceTree = "<group>"; };
-		BB00004B /* AskAIButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AskAIButton.swift; sourceTree = "<group>"; };
 		BB00004C /* BudgetProjectsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BudgetProjectsView.swift; sourceTree = "<group>"; };
 		BB00004D /* SignUpView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignUpView.swift; sourceTree = "<group>"; };
 		BB00004E /* FamilyGroupsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FamilyGroupsView.swift; sourceTree = "<group>"; };
@@ -208,7 +203,6 @@
 		BB000055 /* FeedCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedCardView.swift; sourceTree = "<group>"; };
 		BB000070 /* ProfileImageCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileImageCache.swift; sourceTree = "<group>"; };
 		BB000071 /* ShareWithSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareWithSection.swift; sourceTree = "<group>"; };
-		BB000072 /* MessagesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessagesView.swift; sourceTree = "<group>"; };
 		BB000073 /* ConversationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConversationView.swift; sourceTree = "<group>"; };
 		BB000074 /* QuotedItemCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuotedItemCard.swift; sourceTree = "<group>"; };
 		BB000075 /* ChatSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatSheet.swift; sourceTree = "<group>"; };
@@ -481,7 +475,6 @@
 		EE000011 /* Gifts */ = {
 			isa = PBXGroup;
 			children = (
-				BB000032 /* GiftsView.swift */,
 				BB000033 /* PersonGiftListView.swift */,
 				BB000034 /* AddGiftPersonView.swift */,
 				BB000035 /* AddGiftIdeaView.swift */,
@@ -500,7 +493,6 @@
 				BB000042 /* DateFormatters.swift */,
 				BB000044 /* LiquidGlassComponents.swift */,
 				BB000071 /* ShareWithSection.swift */,
-				BB00004B /* AskAIButton.swift */,
 			);
 			path = Components;
 			sourceTree = "<group>";
@@ -508,7 +500,6 @@
 		EE000020 /* Messages */ = {
 			isa = PBXGroup;
 			children = (
-				BB000072 /* MessagesView.swift */,
 				BB000073 /* ConversationView.swift */,
 				BB000074 /* QuotedItemCard.swift */,
 				BB000075 /* ChatSheet.swift */,
@@ -727,7 +718,6 @@
 				AA00002F /* NewDecisionView.swift in Sources */,
 				AA000030 /* DecisionDetailView.swift in Sources */,
 				AA000031 /* Gift.swift in Sources */,
-				AA000032 /* GiftsView.swift in Sources */,
 				AA000033 /* PersonGiftListView.swift in Sources */,
 				AA000034 /* AddGiftPersonView.swift in Sources */,
 				AA000035 /* AddGiftIdeaView.swift in Sources */,
@@ -741,7 +731,6 @@
 				AA000042 /* DateFormatters.swift in Sources */,
 				AA000044 /* LiquidGlassComponents.swift in Sources */,
 				AA000071 /* ShareWithSection.swift in Sources */,
-				AA000072 /* MessagesView.swift in Sources */,
 				AA000073 /* ConversationView.swift in Sources */,
 				AA000074 /* QuotedItemCard.swift in Sources */,
 				AA000075 /* ChatSheet.swift in Sources */,
@@ -753,7 +742,6 @@
 				AA000046 /* AIDisclosureView.swift in Sources */,
 				AA000048 /* AppConfig.swift in Sources */,
 				AA00004A /* FamilyListsView.swift in Sources */,
-				AA00004B /* AskAIButton.swift in Sources */,
 				AA00004C /* BudgetProjectsView.swift in Sources */,
 				AA000096 /* BudgetStatsView.swift in Sources */,
 				AA000097 /* RecurringPaymentsView.swift in Sources */,

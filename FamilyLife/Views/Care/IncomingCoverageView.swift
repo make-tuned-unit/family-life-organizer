@@ -1,85 +1,9 @@
 import SwiftUI
 
-// MARK: - Incoming Coverage Requests (helper's view)
-// Shows coverage requests where the current user has been asked to help.
-// Allows approve/decline from within the app — no browser link needed.
-
-struct IncomingCoverageView: View {
-    @Environment(APIService.self) private var api
-    @Environment(AuthService.self) private var auth
-    @State private var requests: [APIService.IncomingCoverageRequest] = []
-    @State private var isLoading = false
-    @State private var selectedRequest: APIService.IncomingCoverageRequest?
-
-    var body: some View {
-        ScrollView(showsIndicators: false) {
-            VStack(spacing: 0) {
-                // Header
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("INCOMING REQUESTS")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(TabAccent.care.color).tracking(0.4)
-                    Text("Help requests")
-                        .font(.system(size: 28, weight: .bold))
-                        .foregroundStyle(WarmPalette.ink1)
-                    Text("Families have asked for your help with these time slots.")
-                        .font(.system(size: 15))
-                        .foregroundStyle(WarmPalette.ink2)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 22).padding(.top, 14).padding(.bottom, 18)
-
-                if isLoading && requests.isEmpty {
-                    ProgressView().padding(.top, 40)
-                } else if requests.isEmpty {
-                    VStack(spacing: 8) {
-                        Image(systemName: "checkmark.shield.fill")
-                            .font(.system(size: 32))
-                            .foregroundStyle(WarmPalette.ink4)
-                        Text("No pending requests")
-                            .font(.system(size: 15))
-                            .foregroundStyle(WarmPalette.ink3)
-                        Text("When someone asks for your help, it will appear here.")
-                            .font(.system(size: 13))
-                            .foregroundStyle(WarmPalette.ink4)
-                            .multilineTextAlignment(.center)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 40)
-                    .padding(.horizontal, 40)
-                } else {
-                    VStack(spacing: 10) {
-                        ForEach(requests) { request in
-                            IncomingRequestCard(request: request) {
-                                selectedRequest = request
-                            }
-                        }
-                    }
-                    .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
-                }
-            }
-            .padding(.bottom, DesignTokens.Spacing.bottomBuffer)
-        }
-        .background { AmbientBackground(style: .care) }
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbarBackgroundVisibility(.hidden, for: .navigationBar)
-        .refreshable { await loadRequests() }
-        .task { await loadRequests() }
-        .sheet(item: $selectedRequest) { request in
-            NavigationStack {
-                ApproveRequestSheet(request: request) {
-                    await loadRequests()
-                }
-            }
-        }
-    }
-
-    private func loadRequests() async {
-        isLoading = true
-        requests = (try? await api.fetchIncomingCoverage()) ?? []
-        isLoading = false
-    }
-}
+// MARK: - Incoming Coverage Components (helper's view)
+// The standalone IncomingCoverageView screen was superseded by the combined
+// MyCoverageRequestsView; this file keeps its live pieces — the request card
+// and the approve sheet.
 
 // MARK: - Incoming Request Card
 
@@ -344,8 +268,16 @@ struct ApproveRequestSheet: View {
     }
 }
 
-#Preview("Incoming Coverage") {
-    NavigationStack { IncomingCoverageView() }
-        .environment(APIService())
-        .environment(AuthService())
+#Preview("Approve Request") {
+    NavigationStack {
+        ApproveRequestSheet(
+            request: APIService.IncomingCoverageRequest(
+                id: 1, reason: "Watch the kids", note: "Back by 9pm!", status: "pending",
+                created_at: nil, requester_name: "Melissa", recipient_id: 1,
+                recipient_status: "pending", invite_token: nil
+            )
+        ) {}
+    }
+    .environment(APIService())
+    .environment(AuthService())
 }

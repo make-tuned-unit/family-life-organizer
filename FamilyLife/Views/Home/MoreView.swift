@@ -38,6 +38,9 @@ struct MoreView: View {
                         NavigationLink { CookView() } label: {
                             moreRow(icon: "fork.knife", title: "Cook", subtitle: "Recipe ideas from what's in your pantry", color: AccentTheme.terracotta.color)
                         }
+                        NavigationLink { PantryView() } label: {
+                            moreRow(icon: "cabinet.fill", title: "Pantry", subtitle: "What's in stock and what's expiring", color: TabAccent.pantry.color)
+                        }
                         NavigationLink { NotesView() } label: {
                             moreRow(icon: "note.text", title: "Notes", subtitle: "Private notes you can share & co-edit", color: AccentTheme.saffron.color)
                         }

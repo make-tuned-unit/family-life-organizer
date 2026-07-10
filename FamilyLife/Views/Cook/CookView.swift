@@ -28,6 +28,13 @@ struct CookView: View {
         .toolbarBackgroundVisibility(.hidden, for: .navigationBar)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
+                NavigationLink { PantryView() } label: {
+                    Image(systemName: "cabinet")
+                        .foregroundStyle(WarmPalette.ink2)
+                }
+                .accessibilityLabel("Pantry")
+            }
+            ToolbarItem(placement: .topBarTrailing) {
                 AskButlerButton(prompt: "What should we make for dinner tonight?")
             }
             if !embedded {
