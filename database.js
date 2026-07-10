@@ -137,6 +137,12 @@ class FamilyDB {
         this.db.run('ALTER TABLE rivalries ADD COLUMN team_b TEXT', () => {});
         this.db.run('ALTER TABLE rivalries ADD COLUMN winner_team TEXT', () => {});
         this.db.run('CREATE INDEX IF NOT EXISTS idx_groceries_group ON groceries(group_id)', () => {});
+        // Dedupe any historical duplicate memberships, then enforce uniqueness
+        // so retried joins/adds can't create duplicate rows.
+        this.db.run(`DELETE FROM group_members WHERE user_id IS NOT NULL AND id NOT IN (
+          SELECT MIN(id) FROM group_members WHERE user_id IS NOT NULL GROUP BY group_id, user_id)`, () => {
+          this.db.run('CREATE UNIQUE INDEX IF NOT EXISTS idx_group_members_unique_user ON group_members(group_id, user_id) WHERE user_id IS NOT NULL', () => {});
+        });
         // Data isolation (round 2): budgets, pantry, trips, gifts, special events
         this.db.run('ALTER TABLE receipts ADD COLUMN group_id INTEGER REFERENCES groups(id)', () => {});
         this.db.run('ALTER TABLE budget_projects ADD COLUMN group_id INTEGER REFERENCES groups(id)', () => {});
@@ -1614,13 +1620,16 @@ class FamilyDB {
             }
           }
 
-          this.db.run('UPDATE rivalries SET status = ?, winner_name = ?, winner_team = ? WHERE id = ?',
-            ['completed', winnerName, winnerTeam, id], (err3) => {
+          // Guard the transition in SQL so two concurrent completes can't both
+          // "win" (which would duplicate the completion feed post and pushes).
+          this.db.run('UPDATE rivalries SET status = ?, winner_name = ?, winner_team = ? WHERE id = ? AND status != ?',
+            ['completed', winnerName, winnerTeam, id, 'completed'], function(err3) {
               if (err3) return reject(err3);
+              const lost = this.changes === 0;
               resolve({
                 rivalry: { ...rivalry, status: 'completed', winner_name: winnerName, winner_team: winnerTeam },
                 initiator_total: iTotal, opponent_total: oTotal,
-                scores, winner_name: winnerName, winner_team: winnerTeam, already_completed: false
+                scores, winner_name: winnerName, winner_team: winnerTeam, already_completed: lost
               });
             });
         });
@@ -2584,7 +2593,16 @@ class FamilyDB {
     });
   }
 
-  addGroupMember(groupId, { user_id, contact_id, role, added_by }) {
+  async addGroupMember(groupId, { user_id, contact_id, role, added_by }) {
+    // Idempotent for app users: a retried add/join returns the existing row
+    // instead of inserting a duplicate membership.
+    if (user_id) {
+      const existing = await new Promise((resolve, reject) => {
+        this.db.get('SELECT id FROM group_members WHERE group_id = ? AND user_id = ? LIMIT 1',
+          [groupId, user_id], (err, row) => err ? reject(err) : resolve(row));
+      });
+      if (existing) return { id: existing.id, existed: true };
+    }
     return new Promise((resolve, reject) => {
       this.db.run(
         'INSERT INTO group_members (group_id, user_id, contact_id, role, added_by) VALUES (?, ?, ?, ?, ?)',
@@ -3166,16 +3184,25 @@ class FamilyDB {
              JOIN groups g ON g.id = gm.group_id
              WHERE gm.user_id = ${safeUid(userId)} AND g.group_type = 'household')`
         : '';
+      // Lists have no group_id — tenancy is derived from created_by, so the
+      // pinned list must be scoped to the household's members (mirrors the
+      // scoping used by POST /api/lists/:id/pin), never the global first pin.
+      const pinnedListFilter = userId
+        ? `AND (created_by = ${safeUid(userId)} OR created_by IN (
+             SELECT gm2.user_id FROM group_members gm2
+             JOIN groups g ON g.id = gm2.group_id AND g.group_type = 'household'
+             WHERE gm2.group_id IN (SELECT group_id FROM group_members WHERE user_id = ${safeUid(userId)})))`
+        : '';
       const sql = `
         SELECT
           (SELECT COUNT(*) FROM tasks WHERE status = 'active' AND date(due_date) = date('now') ${groupFilter}) as tasks_today,
           (SELECT COUNT(*) FROM tasks WHERE status = 'active' ${groupFilter}) as active_tasks,
           (SELECT COUNT(*) FROM appointments WHERE date(appointment_date) = date('now') ${groupFilter}) as appointments_today,
           (SELECT COUNT(*) FROM list_items WHERE is_done = 0 AND list_id IN (
-            SELECT id FROM lists WHERE pinned = 1 LIMIT 1
+            SELECT id FROM lists WHERE pinned = 1 ${pinnedListFilter} LIMIT 1
           )) as groceries_needed,
           (SELECT COUNT(*) FROM tasks WHERE status = 'active' AND due_date < date('now') ${groupFilter}) as overdue_tasks,
-          (SELECT name FROM lists WHERE pinned = 1 LIMIT 1) as pinned_list_name
+          (SELECT name FROM lists WHERE pinned = 1 ${pinnedListFilter} LIMIT 1) as pinned_list_name
       `;
       this.db.get(sql, [], (err, row) => {
         if (err) reject(err);

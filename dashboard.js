@@ -534,6 +534,10 @@ app.post('/api/auth/register', registerLimiter, async (req, res) => {
     if (typeof password !== 'string' || password.length < 8) {
       return res.status(400).json({ error: 'Password must be at least 8 characters' });
     }
+    // bcrypt silently truncates beyond 72 bytes — reject rather than pretend.
+    if (Buffer.byteLength(password, 'utf8') > 72) {
+      return res.status(400).json({ error: 'Password must be at most 72 characters' });
+    }
     if (password === username) {
       return res.status(400).json({ error: 'Password must not equal the username' });
     }
@@ -706,6 +710,9 @@ app.post('/api/auth/change-password', requireAuth, loginLimiter, async (req, res
     const { current_password, new_password } = req.body;
     if (typeof new_password !== 'string' || new_password.length < 8) {
       return res.status(400).json({ error: 'New password must be at least 8 characters' });
+    }
+    if (Buffer.byteLength(new_password, 'utf8') > 72) {
+      return res.status(400).json({ error: 'New password must be at most 72 characters' });
     }
     const user = await db.getUserById(req.session.user.id);
     const full = await db.getUserByUsername(user.username);
@@ -2628,7 +2635,11 @@ app.get('/api/budget-categories', requireAuth, async (req, res) => {
 app.post('/api/budget-categories', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
-    const { name, monthly_limit, color } = req.body;
+    const { name, color } = req.body;
+    const monthly_limit = Number(req.body.monthly_limit ?? 0);
+    if (!Number.isFinite(monthly_limit) || monthly_limit < 0) {
+      return res.status(400).json({ error: 'Invalid monthly limit' });
+    }
     const groupId = await db.getUserHouseholdId(req.session.user?.id);
     const result = await db.addBudgetCategory(name, monthly_limit, color, groupId);
     res.json({ success: true, id: result.id });
@@ -2643,7 +2654,14 @@ app.put('/api/budget-categories/:id', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
     if (!(await requireHouseholdRow(db, 'budget_categories', req.params.id, req, res))) return;
-    await db.updateBudgetCategory(req.params.id, req.body);
+    const updates = { ...req.body };
+    if ('monthly_limit' in updates) {
+      updates.monthly_limit = Number(updates.monthly_limit);
+      if (!Number.isFinite(updates.monthly_limit) || updates.monthly_limit < 0) {
+        return res.status(400).json({ error: 'Invalid monthly limit' });
+      }
+    }
+    await db.updateBudgetCategory(req.params.id, updates);
     res.json({ success: true });
   } catch (err) {
     sendServerError(res, err);
@@ -2677,6 +2695,13 @@ app.post('/api/receipts', requireAuth, async (req, res) => {
       await db.ensureBudgetCategory(req.body.category, groupId);
     }
     const data = { ...req.body, group_id: groupId };
+    if ('amount' in data) {
+      data.amount = Number(String(data.amount).replace(/[$,]/g, ''));
+      if (!Number.isFinite(data.amount) || data.amount < 0) {
+        return res.status(400).json({ error: 'Invalid amount' });
+      }
+    }
+    if (data.itinerary_id && !(await requireItineraryAccess(db, data.itinerary_id, req, res))) return;
     if (data.date) data.date = normalizeDate(data.date);
     if (!data.added_by) data.added_by = req.session.user.username || req.session.user.name;
     const result = await db.addReceipt(data);
@@ -2734,7 +2759,13 @@ app.post('/api/receipts/scan', requireAuth, conciergeLimiter, aiDailyLimiter, as
 app.post('/api/receipts/save', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
-    const { merchant, date, total, category, notes, itinerary_id } = req.body;
+    const { merchant, date, category, notes, itinerary_id } = req.body;
+    // Coerce money to a real number — SQLite happily stores strings, which
+    // SUM() then treats as 0 and silently corrupts budget math.
+    const total = Number(String(req.body.total).replace(/[$,]/g, ''));
+    if (!Number.isFinite(total) || total < 0) {
+      return res.status(400).json({ error: 'Invalid receipt total' });
+    }
     const username = req.session.user.username || req.session.user.name;
     const groupId = await db.getUserHouseholdId(req.session.user?.id);
     // Never write a NULL-group row: the startup backfill would later re-home
@@ -2751,6 +2782,9 @@ app.post('/api/receipts/save', requireAuth, async (req, res) => {
       console.log(`[receipt-save] AI date "${date}" (${normalizedDate}) is ${Math.round(diffDays)} days off — using today`);
       normalizedDate = now.toISOString().split('T')[0];
     }
+
+    // A receipt may only be attached to an itinerary the caller can access.
+    if (itinerary_id && !(await requireItineraryAccess(db, itinerary_id, req, res))) return;
 
     // Ensure budget category exists (auto-create if new)
     if (category) {
@@ -2984,7 +3018,9 @@ app.post('/api/subscription/verify', requireAuth, async (req, res) => {
     _householdEntitlementCache.delete(req.session.user.id); // reflect new/upgraded tier immediately
     res.json(status);
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    // Log the real reason server-side; keep the client message opaque.
+    console.error('[subscription/verify]', err && err.stack ? err.stack : err);
+    res.status(400).json({ error: 'Subscription verification failed' });
   } finally {
     db.close();
   }
@@ -2999,7 +3035,9 @@ app.post('/api/subscription/notifications', async (req, res) => {
     const result = await subscription.verifyAndApplyNotification(db, signedPayload);
     res.json(result);
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    // Apple is the caller; log details server-side, respond opaquely.
+    console.error('[subscription/notifications]', err && err.stack ? err.stack : err);
+    res.status(400).json({ error: 'Notification rejected' });
   } finally {
     db.close();
   }
@@ -3608,6 +3646,11 @@ app.post('/api/rivalries/:id/entries', requireAuth, async (req, res) => {
     if (!(await requireGroupRow(db, 'rivalries', req.params.id, req, res))) return;
     const rivalryId = Number(req.params.id);
     const entry = { ...req.body, rivalry_id: rivalryId };
+    // Scores must be numeric — string values would make SUM() silently drop them.
+    entry.value = Number(entry.value);
+    if (!Number.isFinite(entry.value)) {
+      return res.status(400).json({ error: 'Invalid entry value' });
+    }
     await db.addRivalryEntry(entry);
     res.json({ success: true });
 
@@ -3996,6 +4039,12 @@ app.post('/api/stays/:stayId/respond', requireAuth, async (req, res) => {
 
     if (stay.host_user_id !== req.session.user.id) {
       return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    // Only a requested stay can be responded to — a retried/duplicated POST
+    // would otherwise create a second pair of calendar events.
+    if (stay.status !== 'requested') {
+      return res.status(409).json({ error: `Stay is ${stay.status || 'draft'}, not awaiting a response` });
     }
 
     const { approved } = req.body;
@@ -4526,6 +4575,21 @@ app.post('/api/groups/:id/members', requireAuth, async (req, res) => {
     // Admin-only: adding an outsider to a household exposes its sensitive data.
     // New members are forced to 'member' — no self-promotion to admin.
     if (!(await requireGroupManage(db, req.params.id, req, res))) return;
+    // Consent guard: an admin may only add people they actually know —
+    // a contact they own, or an app user linked to one of their contacts.
+    // Without this, any enumerable user_id could be pulled into the group
+    // (re-routing that user's household writes and exposing both sides' data).
+    if (req.body.contact_id) {
+      const owned = await dbGet(db, 'SELECT 1 FROM contacts WHERE id = ? AND added_by = ?',
+        [req.body.contact_id, userId]);
+      if (!owned) return res.status(403).json({ error: 'You can only add your own contacts' });
+    }
+    if (req.body.user_id) {
+      const known = await dbGet(db, `SELECT 1 FROM contacts c
+        JOIN users u ON LOWER(u.name) = LOWER(c.name)
+        WHERE c.added_by = ? AND u.id = ? LIMIT 1`, [userId, req.body.user_id]);
+      if (!known) return res.status(403).json({ error: 'Add this person to your contacts first, or have them join with an invite code' });
+    }
     const result = await db.addGroupMember(req.params.id, {
       user_id: req.body.user_id, contact_id: req.body.contact_id, role: 'member', added_by: userId,
     });
@@ -5257,6 +5321,14 @@ app.post('/api/coverage', requireAuth, async (req, res) => {
     const userId = req.session.user?.id;
     const { reason, note, windows, contact_ids } = req.body;
 
+    // Recipients must be the requester's own contacts — otherwise another
+    // user's contact names/phones would be disclosed via GET /api/coverage/:id.
+    for (const contactId of (contact_ids || [])) {
+      const owned = await dbGet(db, 'SELECT 1 FROM contacts WHERE id = ? AND added_by = ?',
+        [contactId, userId]);
+      if (!owned) return res.status(403).json({ error: 'You can only send coverage requests to your own contacts' });
+    }
+
     // Create request
     const request = await db.createCoverageRequest({ requester_id: userId, reason, note });
 
@@ -5410,6 +5482,11 @@ app.post('/api/coverage/approve/:token', async (req, res) => {
     if (recipient.status === 'approved') return res.status(409).json({ error: 'Already approved' });
 
     const { window_id, approved_date, approved_start, approved_end, helper_note } = req.body;
+    if (window_id) {
+      const win = await dbGet(db, 'SELECT 1 FROM coverage_windows WHERE id = ? AND request_id = ?',
+        [window_id, recipient.request_id]);
+      if (!win) return res.status(400).json({ error: 'Invalid window for this request' });
+    }
 
     await db.approveCoverage({
       request_id: recipient.request_id,
@@ -5466,6 +5543,11 @@ app.post('/api/coverage/incoming/:id/approve', requireAuth, async (req, res) => 
     if (recipient.status === 'approved') return res.status(409).json({ error: 'Already approved' });
 
     const { window_id, approved_date, approved_start, approved_end, helper_note } = req.body;
+    if (window_id) {
+      const win = await dbGet(db, 'SELECT 1 FROM coverage_windows WHERE id = ? AND request_id = ?',
+        [window_id, requestId]);
+      if (!win) return res.status(400).json({ error: 'Invalid window for this request' });
+    }
 
     await db.approveCoverage({
       request_id: requestId,
