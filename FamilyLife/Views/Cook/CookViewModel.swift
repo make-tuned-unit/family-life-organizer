@@ -80,7 +80,11 @@ struct RecipeSuggestion: Codable, Identifiable {
         case cookTime = "cook_time"
         case difficulty, servings, ingredients, steps
     }
+}
 
+// Lenient decoding lives in an extension so the memberwise init survives
+// (previews and tests construct recipes directly).
+extension RecipeSuggestion {
     // The backend forwards raw AI-extracted JSON: any field may be missing or
     // arrive as a string ("30 min"). One malformed recipe must not sink all three.
     init(from decoder: Decoder) throws {
@@ -108,7 +112,9 @@ struct RecipeIngredient: Codable, Identifiable {
     let name: String
     let quantity: String?
     let available: Bool
+}
 
+extension RecipeIngredient {
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         name = try c.decode(String.self, forKey: .name)

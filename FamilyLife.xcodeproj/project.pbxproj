@@ -31,6 +31,7 @@
 		AA000017 /* AddPantryItemView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000017 /* AddPantryItemView.swift */; };
 		AA000018 /* CookView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000018 /* CookView.swift */; };
 		AA000019 /* CookViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000019 /* CookViewModel.swift */; };
+		AA0000A0 /* CookingModeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000A0 /* CookingModeView.swift */; };
 		AA00001A /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00001A /* SettingsView.swift */; };
 		AA00001B /* AddTaskView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00001B /* AddTaskView.swift */; };
 		AA00001C /* AddReceiptView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00001C /* AddReceiptView.swift */; };
@@ -149,6 +150,7 @@
 		BB000017 /* AddPantryItemView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddPantryItemView.swift; sourceTree = "<group>"; };
 		BB000018 /* CookView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CookView.swift; sourceTree = "<group>"; };
 		BB000019 /* CookViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CookViewModel.swift; sourceTree = "<group>"; };
+		BB0000A0 /* CookingModeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CookingModeView.swift; sourceTree = "<group>"; };
 		BB00001A /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		BB00001B /* AddTaskView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddTaskView.swift; sourceTree = "<group>"; };
 		BB00001C /* AddReceiptView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddReceiptView.swift; sourceTree = "<group>"; };
@@ -428,6 +430,7 @@
 			children = (
 				BB000018 /* CookView.swift */,
 				BB000019 /* CookViewModel.swift */,
+				BB0000A0 /* CookingModeView.swift */,
 				BB000046 /* AIDisclosureView.swift */,
 			);
 			path = Cook;
@@ -673,6 +676,7 @@
 				AA000017 /* AddPantryItemView.swift in Sources */,
 				AA000018 /* CookView.swift in Sources */,
 				AA000019 /* CookViewModel.swift in Sources */,
+				AA0000A0 /* CookingModeView.swift in Sources */,
 				AA000087 /* ConciergeModels.swift in Sources */,
 				AA000088 /* ConciergeViewModel.swift in Sources */,
 				AA000089 /* ConciergeView.swift in Sources */,

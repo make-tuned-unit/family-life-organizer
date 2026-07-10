@@ -7,6 +7,7 @@ struct CookView: View {
     @State private var viewModel = CookViewModel()
     @State private var showingAIDisclosure = false
     @State private var hasAIConsent = AIConsentManager.hasConsented
+    @State private var cookingRecipe: RecipeSuggestion?
     @AppStorage("cloudAIEnabled") private var cloudAIEnabled = true
 
     var body: some View {
@@ -43,6 +44,11 @@ struct CookView: View {
                         showingAIDisclosure = true
                     }
                 }
+            }
+        }
+        .fullScreenCover(item: $cookingRecipe) { recipe in
+            CookingModeView(recipe: recipe) {
+                Task { await viewModel.madeRecipe(recipe, api: api) }
             }
         }
         .sheet(isPresented: $showingAIDisclosure) {
@@ -255,7 +261,7 @@ struct CookView: View {
                     // Actions
                     HStack(spacing: 8) {
                         Button {
-                            Task { await viewModel.madeRecipe(recipe, api: api) }
+                            cookingRecipe = recipe
                         } label: {
                             Text("Start cooking")
                                 .font(.system(size: 14, weight: .semibold))
