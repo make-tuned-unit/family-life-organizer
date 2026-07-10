@@ -7,16 +7,19 @@ final class CookViewModel {
     var recipes: [RecipeSuggestion] = []
     var isLoading = false
     var hasSearched = false
+    var error: String?
 
     func suggest(api: APIService) async {
         guard !query.isEmpty else { return }
         isLoading = true
         hasSearched = true
+        error = nil
         do {
             recipes = try await api.suggestRecipes(query: query)
         } catch {
             guard !error.isCancellation else { return }
-            // Keep previous recipes visible on error
+            // Keep previous recipes visible, but say the search failed.
+            self.error = error.localizedDescription
         }
         isLoading = false
     }
@@ -25,7 +28,10 @@ final class CookViewModel {
         let ingredients = recipe.ingredients.filter(\.available).map { $0.name }
         do {
             try await api.deductIngredients(ingredients: ingredients)
-        } catch {}
+        } catch {
+            guard !error.isCancellation else { return }
+            self.error = "Couldn't update the pantry — \(error.localizedDescription)"
+        }
     }
 
     private var savedRecipeNames: Set<String> {
@@ -45,10 +51,17 @@ final class CookViewModel {
     }
 
     func addMissingToGroceries(_ items: [String], api: APIService) async {
+        var failed: [String] = []
         for item in items {
             do {
                 try await api.addGrocery(item: item)
-            } catch {}
+            } catch {
+                guard !error.isCancellation else { return }
+                failed.append(item)
+            }
+        }
+        if !failed.isEmpty {
+            error = "Couldn't add \(failed.joined(separator: ", ")) to groceries"
         }
     }
 }

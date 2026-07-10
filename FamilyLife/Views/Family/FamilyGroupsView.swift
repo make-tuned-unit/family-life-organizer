@@ -296,6 +296,7 @@ struct GroupDetailView: View {
     @State private var groupImage: UIImage?
     @State private var showingPhotoPicker = false
     @State private var selectedPhoto: PhotosPickerItem?
+    @State private var errorMessage: String?
 
     private var isCreator: Bool {
         group.created_by == auth.currentUser?.id
@@ -406,6 +407,7 @@ struct GroupDetailView: View {
             .padding(.bottom, DesignTokens.Spacing.bottomBuffer)
         }
         .background { AmbientBackground(style: .decisions) }
+        .inlineError(errorMessage) { errorMessage = nil }
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
@@ -450,7 +452,11 @@ struct GroupDetailView: View {
                         UINotificationFeedbackGenerator().notificationOccurred(.success)
                         await onLeft?()
                         dismiss()
-                    } catch {}
+                    } catch {
+                        guard !error.isCancellation else { return }
+                        errorMessage = "\(isCreator ? "Delete" : "Leave") failed — \(error.localizedDescription)"
+                        UINotificationFeedbackGenerator().notificationOccurred(.error)
+                    }
                 }
             }
         } message: {

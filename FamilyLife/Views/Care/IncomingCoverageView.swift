@@ -173,6 +173,7 @@ struct ApproveRequestSheet: View {
     @State private var helperNote = ""
     @State private var isSaving = false
     @State private var isLoading = true
+    @State private var errorMessage: String?
 
     var body: some View {
         ScrollView(showsIndicators: false) {
@@ -283,6 +284,7 @@ struct ApproveRequestSheet: View {
             }
         }
         .background { AmbientBackground(style: .care) }
+        .inlineError(errorMessage) { errorMessage = nil }
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
@@ -316,6 +318,8 @@ struct ApproveRequestSheet: View {
         } catch {
             guard !error.isCancellation else { return }
             isSaving = false
+            errorMessage = "Couldn't confirm — \(error.localizedDescription)"
+            UINotificationFeedbackGenerator().notificationOccurred(.error)
         }
     }
 

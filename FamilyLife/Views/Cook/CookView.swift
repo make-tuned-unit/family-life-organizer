@@ -23,6 +23,7 @@ struct CookView: View {
         .background {
             if !embedded { AmbientBackground(style: .cook) }
         }
+        .inlineError(viewModel.error) { viewModel.error = nil }
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackgroundVisibility(.hidden, for: .navigationBar)
         .toolbar {

@@ -31,6 +31,8 @@ struct CoverageCascadeView: View {
         case ask = 1, pending, confirmed, booking
     }
 
+    @State private var errorMessage: String?
+
     var body: some View {
         Group {
             switch currentStep {
@@ -41,6 +43,7 @@ struct CoverageCascadeView: View {
             }
         }
         .background { AmbientBackground(style: .care) }
+        .inlineError(errorMessage) { errorMessage = nil }
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
@@ -204,6 +207,7 @@ struct CoverageCascadeView: View {
             currentStep = .pending
         } catch {
             guard !error.isCancellation else { return }
+            errorMessage = "Couldn't send the request — \(error.localizedDescription)"
         }
     }
 
@@ -402,6 +406,7 @@ struct CoverageCascadeView: View {
             dismiss()
         } catch {
             guard !error.isCancellation else { return }
+            errorMessage = "Couldn't add it to the calendar — \(error.localizedDescription)"
         }
     }
 

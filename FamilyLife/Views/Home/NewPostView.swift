@@ -140,6 +140,8 @@ struct NewPostView: View {
             }
         } catch {
             guard !error.isCancellation else { return }
+            // Without a group the Post button is a silent no-op — say why.
+            self.error = "Couldn't load your groups — \(error.localizedDescription)"
         }
     }
 

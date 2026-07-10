@@ -444,6 +444,7 @@ struct EditMemberSheet: View {
     @State private var locationCompleter = LocationCompleter()
     @State private var showingWorkSuggestions = false
     @State private var isSaving = false
+    @State private var errorMessage: String?
 
     private let relationships = [
         "wife", "husband", "partner",
@@ -542,6 +543,7 @@ struct EditMemberSheet: View {
             }
             .scrollContentBackground(.hidden)
             .background { AmbientBackground(style: .settings) }
+            .inlineError(errorMessage) { errorMessage = nil }
             .navigationTitle(member == nil ? "Add Member" : "Edit Member")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -599,6 +601,7 @@ struct EditMemberSheet: View {
         } catch {
             guard !error.isCancellation else { return }
             isSaving = false
+            errorMessage = "Couldn't save — \(error.localizedDescription)"
         }
     }
 
@@ -629,6 +632,7 @@ struct EditAddressSheet: View {
     @State private var locationCompleter = LocationCompleter()
     @State private var showingSuggestions = false
     @State private var isSaving = false
+    @State private var errorMessage: String?
 
     init(address: FamilyAddressResponse, onSaved: @escaping () async -> Void) {
         self.address = address
@@ -691,6 +695,7 @@ struct EditAddressSheet: View {
             }
             .scrollContentBackground(.hidden)
             .background { AmbientBackground(style: .settings) }
+            .inlineError(errorMessage) { errorMessage = nil }
             .navigationTitle("Edit Address")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -717,7 +722,9 @@ struct EditAddressSheet: View {
             await onSaved()
             dismiss()
         } catch {
+            guard !error.isCancellation else { return }
             isSaving = false
+            errorMessage = "Couldn't save — \(error.localizedDescription)"
         }
     }
 

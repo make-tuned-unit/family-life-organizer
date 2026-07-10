@@ -682,6 +682,8 @@ struct ListDetailSection: View {
             items.removeAll { $0.id == id }
         } catch {
             guard !error.isCancellation else { return }
+            // Item stays visible (server truth); at least signal the failure.
+            UINotificationFeedbackGenerator().notificationOccurred(.error)
         }
     }
 
