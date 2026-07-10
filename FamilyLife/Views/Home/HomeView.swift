@@ -85,7 +85,7 @@ struct HomeView: View {
             ToolbarItem(placement: .principal) {
                 VStack(spacing: 3) {
                     Text(dateString)
-                        .font(.system(size: 12, weight: .semibold))
+                        .font(.flCaption.weight(.semibold))
                         .foregroundStyle(WarmPalette.ink2)
                     HStack(spacing: 5) {
                         Circle()
@@ -257,11 +257,11 @@ struct HomeView: View {
                 .foregroundStyle(WarmPalette.ink1)
             + Text("\(firstName).")
                 .foregroundStyle(TabAccent.home.color))
-                .font(.system(size: 28, weight: .bold))
+                .font(.flScreenTitle)
             familyStatusSubtitle
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 22)
+        .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
         .padding(.top, 8)
         .padding(.bottom, 18)
     }
@@ -277,7 +277,7 @@ struct HomeView: View {
 
     private var familyStatusSubtitle: some View {
         Text(familyStatusText)
-            .font(.system(size: 15))
+            .font(.flSubheadline)
             .foregroundStyle(WarmPalette.ink2)
     }
 
@@ -346,7 +346,7 @@ struct HomeView: View {
                 }
                 Spacer()
             }
-            .padding(.horizontal, 22)
+            .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
             .padding(.bottom, 16)
         }
     }
@@ -366,23 +366,23 @@ struct HomeView: View {
         VStack(alignment: .leading, spacing: 14) {
             HStack {
                 Text(label)
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(.flOverline)
                     .foregroundStyle(TabAccent.home.color)
                 Spacer()
                 if let subtitle {
                     Text(subtitle)
-                        .font(.system(size: 13))
+                        .font(.flFootnote)
                         .foregroundStyle(WarmPalette.ink3)
                 }
             }
 
             Text(appt.title)
-                .font(.system(size: 28, weight: .bold))
+                .font(.flScreenTitle)
                 .foregroundStyle(WarmPalette.ink1)
 
             if let location = appt.location, !location.isEmpty {
                 Text(location)
-                    .font(.system(size: 15))
+                    .font(.flSubheadline)
                     .foregroundStyle(WarmPalette.ink2)
                     .padding(.bottom, 2)
             }
@@ -396,7 +396,7 @@ struct HomeView: View {
                         }
                     } label: {
                         Text("Get directions")
-                            .font(.system(size: 14, weight: .semibold))
+                            .font(.flSubheadline.weight(.semibold))
                             .foregroundStyle(WarmPalette.cream1)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 10)
@@ -408,7 +408,7 @@ struct HomeView: View {
                         viewModel.dismissHeroCard()
                     } label: {
                         Text("Done")
-                            .font(.system(size: 14, weight: .semibold))
+                            .font(.flSubheadline.weight(.semibold))
                             .foregroundStyle(WarmPalette.ink1)
                             .padding(.horizontal, 18)
                             .padding(.vertical, 10)
@@ -491,11 +491,11 @@ struct HomeView: View {
                         }
                         VStack(alignment: .leading, spacing: 2) {
                             Text("On this day, \(yearsAgoLabel(m))")
-                                .font(.system(size: 11, weight: .semibold))
+                                .font(.flOverline)
                                 .foregroundStyle(WarmPalette.ink3)
                                 .textCase(.uppercase)
                             Text("\(m.person_name ?? "Someone") — \(m.title)")
-                                .font(.system(size: 14.5, weight: .semibold))
+                                .font(.flSubheadline.weight(.semibold))
                                 .foregroundStyle(WarmPalette.ink1)
                         }
                         Spacer()
@@ -548,7 +548,8 @@ struct HomeView: View {
                             time: appt.appointment_time ?? "",
                             title: appt.title,
                             subtitle: appt.location ?? "",
-                            tagInitial: appt.person_tags.flatMap { $0.first.map(String.init) }
+                            tagInitial: appt.person_tags.flatMap { $0.first.map(String.init) },
+                            tagName: appt.person_tags?.components(separatedBy: ",").first?.trimmingCharacters(in: .whitespaces)
                         )
                         .contentShape(Rectangle())
                         .onTapGesture { selectedFeedEvent = appt }
@@ -638,13 +639,13 @@ struct HomeView: View {
             // Feed header with group filter
             HStack {
                 Text("Feed")
-                    .font(.system(size: 17, weight: .bold))
+                    .font(.flHeadline)
                     .foregroundStyle(WarmPalette.ink1)
                 Spacer()
                 Button { showingFeedFilter = true } label: {
                     HStack(spacing: 4) {
                         Text(feedFilterLabel)
-                            .font(.system(size: 13, weight: .medium))
+                            .font(.flFootnote.weight(.medium))
                         Image(systemName: "chevron.down")
                             .font(.system(size: 10, weight: .semibold))
                     }
@@ -688,7 +689,7 @@ struct HomeView: View {
                     }
                 } label: {
                     Text("Show more")
-                        .font(.system(size: 14, weight: .semibold))
+                        .font(.flSubheadline.weight(.semibold))
                         .foregroundStyle(TabAccent.home.color)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 12)

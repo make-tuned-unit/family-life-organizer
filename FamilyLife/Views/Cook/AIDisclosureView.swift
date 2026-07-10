@@ -19,11 +19,11 @@ struct AIDisclosureView: View {
                     )
 
                 Text("AI-Powered Recipes")
-                    .font(.system(size: 22, weight: .bold))
+                    .font(.flTitle)
                     .foregroundStyle(WarmPalette.ink1)
 
                 Text("The recipe suggestion feature sends your pantry items and query to **Claude by Anthropic** to generate personalized recipes.")
-                    .font(.system(size: 15))
+                    .font(.flSubheadline)
                     .foregroundStyle(WarmPalette.ink2)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 8)
@@ -45,7 +45,7 @@ struct AIDisclosureView: View {
             VStack(spacing: 12) {
                 Button(action: onAccept) {
                     Text("Allow AI Suggestions")
-                        .font(.system(size: 16, weight: .semibold))
+                        .font(.flHeadline)
                         .foregroundStyle(WarmPalette.cream1)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 16)
@@ -55,14 +55,14 @@ struct AIDisclosureView: View {
 
                 Button(action: onDecline) {
                     Text("No Thanks")
-                        .font(.system(size: 16, weight: .medium))
+                        .font(.flBody.weight(.medium))
                         .foregroundStyle(WarmPalette.ink2)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 16)
                 }
 
                 Text("You can change this later in Settings.")
-                    .font(.system(size: 13))
+                    .font(.flFootnote)
                     .foregroundStyle(WarmPalette.ink3)
             }
             .padding(.horizontal, 24)
@@ -78,7 +78,7 @@ struct AIDisclosureView: View {
                 .foregroundStyle(TabAccent.cook.color)
                 .frame(width: 20)
             Text(text)
-                .font(.system(size: 14))
+                .font(.flSubheadline)
                 .foregroundStyle(WarmPalette.ink2)
         }
     }

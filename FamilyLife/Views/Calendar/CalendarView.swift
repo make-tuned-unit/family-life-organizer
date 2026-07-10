@@ -172,7 +172,7 @@ struct CalendarView: View {
                     Image(systemName: "line.3.horizontal.decrease.circle")
                         .font(.system(size: 13, weight: .semibold))
                     Text(ownerFilterLabel)
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(.flFootnote.weight(.semibold))
                     Image(systemName: "chevron.down").font(.system(size: 10, weight: .bold))
                 }
                 .foregroundStyle(WarmPalette.ink2)
@@ -215,10 +215,10 @@ struct CalendarView: View {
                         .clipShape(RoundedRectangle(cornerRadius: 10))
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Show your other calendars")
-                            .font(.system(size: 15, weight: .semibold))
+                            .font(.flSubheadline.weight(.semibold))
                             .foregroundStyle(WarmPalette.ink1)
                         Text("Bring iCloud and synced Google events into Kinrows")
-                            .font(.system(size: 12))
+                            .font(.flCaption)
                             .foregroundStyle(WarmPalette.ink3)
                     }
                     Spacer()
@@ -239,7 +239,7 @@ struct CalendarView: View {
                     .font(.system(size: 14))
                     .foregroundStyle(WarmPalette.ink3)
                 Text("Enable Calendar access in Settings to see your other calendars here.")
-                    .font(.system(size: 12))
+                    .font(.flCaption)
                     .foregroundStyle(WarmPalette.ink3)
                 Spacer()
             }
@@ -266,10 +266,10 @@ struct CalendarView: View {
 
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Your coverage requests")
-                            .font(.system(size: 15, weight: .semibold))
+                            .font(.flSubheadline.weight(.semibold))
                             .foregroundStyle(WarmPalette.ink1)
                         Text("\(myRequestCount) active request\(myRequestCount == 1 ? "" : "s")")
-                            .font(.system(size: 13))
+                            .font(.flFootnote)
                             .foregroundStyle(WarmPalette.ink3)
                     }
 
@@ -297,10 +297,10 @@ struct CalendarView: View {
 
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Need coverage?")
-                            .font(.system(size: 15, weight: .semibold))
+                            .font(.flSubheadline.weight(.semibold))
                             .foregroundStyle(WarmPalette.ink1)
                         Text("Ask someone to cover a time slot")
-                            .font(.system(size: 13))
+                            .font(.flFootnote)
                             .foregroundStyle(WarmPalette.ink3)
                     }
 
@@ -333,17 +333,17 @@ struct CalendarView: View {
 
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Someone needs your help")
-                            .font(.system(size: 15, weight: .semibold))
+                            .font(.flSubheadline.weight(.semibold))
                             .foregroundStyle(WarmPalette.ink1)
                         Text("\(incomingCount) pending request\(incomingCount == 1 ? "" : "s")")
-                            .font(.system(size: 13))
+                            .font(.flFootnote)
                             .foregroundStyle(WarmPalette.ink3)
                     }
 
                     Spacer()
 
                     Text("Review")
-                        .font(.system(size: 12, weight: .semibold))
+                        .font(.flCaption.weight(.semibold))
                         .foregroundStyle(AccentTheme.sage.color)
                         .padding(.horizontal, 12).padding(.vertical, 6)
                         .background(AccentTheme.sage.color.opacity(0.12), in: Capsule())
@@ -364,11 +364,11 @@ struct CalendarView: View {
         HStack {
             VStack(alignment: .leading, spacing: 4) {
                 Text(viewModel.monthYearString.uppercased())
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(.flOverline)
                     .foregroundStyle(WarmPalette.ink3)
                     .tracking(0.4)
                 Text("Calendar")
-                    .font(.system(size: 28, weight: .bold))
+                    .font(.flScreenTitle)
                     .foregroundStyle(WarmPalette.ink1)
             }
             Spacer()
@@ -385,7 +385,7 @@ struct CalendarView: View {
                 }
             }
         }
-        .padding(.horizontal, 22)
+        .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
         .padding(.top, 14)
         .padding(.bottom, 14)
     }
@@ -396,7 +396,7 @@ struct CalendarView: View {
         HStack(spacing: 0) {
             ForEach(CalendarDisplayMode.allCases, id: \.self) { mode in
                 Text(mode.rawValue)
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.flFootnote.weight(.semibold))
                     .foregroundStyle(displayMode == mode ? WarmPalette.cream1 : WarmPalette.ink2)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 8)
@@ -407,7 +407,7 @@ struct CalendarView: View {
         }
         .padding(4)
         .background(WarmPalette.cardSurface, in: Capsule())
-        .padding(.horizontal, 22)
+        .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
         .padding(.bottom, 8)
     }
 
@@ -419,7 +419,7 @@ struct CalendarView: View {
             LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 7), spacing: 0) {
                 ForEach(weekdays, id: \.self) { day in
                     Text(day)
-                        .font(.system(size: 10, weight: .semibold))
+                        .font(.flOverline)
                         .foregroundStyle(WarmPalette.ink3)
                         .textCase(.uppercase)
                         .tracking(0.4)
@@ -483,7 +483,7 @@ struct CalendarView: View {
                         .font(.system(size: 32))
                         .foregroundStyle(WarmPalette.ink4)
                     Text("No events")
-                        .font(.system(size: 15))
+                        .font(.flSubheadline)
                         .foregroundStyle(WarmPalette.ink3)
                 }
                 .frame(maxWidth: .infinity)
@@ -548,7 +548,7 @@ struct CalendarView: View {
                         .buttonStyle(.plain)
                     }
                 }
-                .padding(.horizontal, 22)
+                .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
             }
             .padding(.bottom, 12)
 
@@ -575,7 +575,7 @@ struct CalendarView: View {
                         .font(.system(size: 32))
                         .foregroundStyle(WarmPalette.ink4)
                     Text("No events")
-                        .font(.system(size: 15))
+                        .font(.flSubheadline)
                         .foregroundStyle(WarmPalette.ink3)
                 }
                 .frame(maxWidth: .infinity)
@@ -679,7 +679,7 @@ struct CalendarEventCard: View {
             VStack(alignment: .leading, spacing: 4) {
                 HStack {
                     Text(appointment.appointment_time ?? "")
-                        .font(.system(size: 15, weight: .bold))
+                        .font(.flSubheadline.weight(.bold))
                         .foregroundStyle(WarmPalette.ink1)
                     Spacer()
                     HStack(spacing: 4) {
@@ -692,11 +692,11 @@ struct CalendarEventCard: View {
                                 .font(.system(size: 11))
                         }
                     }
-                    .font(.system(size: 13))
+                    .font(.flFootnote)
                     .foregroundStyle(WarmPalette.ink3)
                 }
                 Text(appointment.title)
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(.flSubheadline.weight(.semibold))
                     .foregroundStyle(WarmPalette.ink1)
                 if let location = appointment.location, !location.isEmpty {
                     HStack(spacing: 4) {
@@ -704,17 +704,17 @@ struct CalendarEventCard: View {
                             .font(.system(size: 11))
                         Text(location)
                     }
-                    .font(.system(size: 13))
+                    .font(.flFootnote)
                     .foregroundStyle(WarmPalette.ink3)
                 }
             }
 
             // Attendee avatars (overlapping)
             if let tags = appointment.person_tags, !tags.isEmpty, !tags.contains("[object") {
-                let initials = tags.split(separator: ",").map { String($0.trimmingCharacters(in: .whitespaces).prefix(1)).uppercased() }
+                let names = tags.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
                 HStack(spacing: -8) {
-                    ForEach(Array(initials.enumerated()), id: \.offset) { _, initial in
-                        FamilyAvatar(initial: initial, size: 22)
+                    ForEach(Array(names.enumerated()), id: \.offset) { _, name in
+                        FamilyAvatar(initial: String(name.prefix(1)).uppercased(), size: 22, name: name)
                     }
                 }
             }
@@ -749,16 +749,16 @@ struct ExternalEventCard: View {
             VStack(alignment: .leading, spacing: 4) {
                 HStack {
                     Text(event.timeString)
-                        .font(.system(size: 15, weight: .bold))
+                        .font(.flSubheadline.weight(.bold))
                         .foregroundStyle(WarmPalette.ink1)
                     Spacer()
                     Text(event.calendarTitle)
-                        .font(.system(size: 12))
+                        .font(.flCaption)
                         .foregroundStyle(WarmPalette.ink3)
                         .lineLimit(1)
                 }
                 Text(event.title)
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(.flSubheadline.weight(.semibold))
                     .foregroundStyle(WarmPalette.ink1)
                 if let location = event.location, !location.isEmpty {
                     HStack(spacing: 4) {
@@ -766,7 +766,7 @@ struct ExternalEventCard: View {
                             .font(.system(size: 11))
                         Text(location)
                     }
-                    .font(.system(size: 13))
+                    .font(.flFootnote)
                     .foregroundStyle(WarmPalette.ink3)
                 }
             }
@@ -819,25 +819,25 @@ struct HouseholdEventCard: View {
             VStack(alignment: .leading, spacing: 4) {
                 HStack {
                     Text(timeString)
-                        .font(.system(size: 15, weight: .bold))
+                        .font(.flSubheadline.weight(.bold))
                         .foregroundStyle(WarmPalette.ink1)
                     Spacer()
                     HStack(spacing: 5) {
-                        FamilyAvatar(initial: String((event.owner_name ?? "?").prefix(1)).uppercased(), size: 18)
+                        FamilyAvatar(initial: String((event.owner_name ?? "?").prefix(1)).uppercased(), size: 18, name: event.owner_name)
                         Text(event.owner_name ?? "")
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundStyle(color)
+                            .font(.flCaption.weight(.semibold))
+                            .foregroundStyle(event.owner_name.map { PersonPalette.color(for: $0) } ?? color)
                     }
                 }
                 Text(event.title ?? "(No title)")
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(.flSubheadline.weight(.semibold))
                     .foregroundStyle(WarmPalette.ink1)
                 if let loc = event.location, !loc.isEmpty {
                     HStack(spacing: 4) {
                         Image(systemName: "mappin").font(.system(size: 11))
                         Text(loc)
                     }
-                    .font(.system(size: 13))
+                    .font(.flFootnote)
                     .foregroundStyle(WarmPalette.ink3)
                 }
             }
@@ -905,7 +905,7 @@ struct CoverageBlockCard: View {
             VStack(alignment: .leading, spacing: 4) {
                 HStack {
                     Text("\(block.approved_start) – \(block.approved_end)")
-                        .font(.system(size: 15, weight: .bold))
+                        .font(.flSubheadline.weight(.bold))
                         .foregroundStyle(AccentTheme.sage.color)
                     Spacer()
                     Image(systemName: "checkmark.shield.fill")
@@ -913,11 +913,11 @@ struct CoverageBlockCard: View {
                         .foregroundStyle(AccentTheme.sage.color)
                 }
                 Text("\(block.helper_name) · \(block.reason) confirmed")
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(.flSubheadline.weight(.semibold))
                     .foregroundStyle(WarmPalette.ink1)
                 if let note = block.helper_note, !note.isEmpty {
                     Text(note)
-                        .font(.system(size: 13))
+                        .font(.flFootnote)
                         .foregroundStyle(WarmPalette.ink3)
                 }
             }

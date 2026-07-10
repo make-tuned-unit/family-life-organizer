@@ -85,7 +85,7 @@ struct ConciergeView: View {
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(accent)
                 Text(cloudAIEnabled ? "Ask your concierge…" : "Chat is off (cloud AI disabled)")
-                    .font(.system(size: 16))
+                    .font(.flBody)
                     .foregroundStyle(WarmPalette.ink3)
                 Spacer()
                 if !cloudAIEnabled {
@@ -98,7 +98,7 @@ struct ConciergeView: View {
                         .foregroundStyle(accent)
                 } else {
                     Label("Premium", systemImage: "lock.fill")
-                        .font(.system(size: 12, weight: .semibold))
+                        .font(.flCaption.weight(.semibold))
                         .foregroundStyle(accent)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 5)
@@ -122,11 +122,11 @@ struct ConciergeView: View {
                     .font(.system(size: 20, weight: .semibold))
                     .foregroundStyle(accent)
                 Text("Concierge")
-                    .font(.system(size: 28, weight: .bold))
+                    .font(.flScreenTitle)
                     .foregroundStyle(WarmPalette.ink1)
             }
             Text(greeting)
-                .font(.system(size: 15))
+                .font(.flSubheadline)
                 .foregroundStyle(WarmPalette.ink3)
         }
     }
@@ -163,7 +163,7 @@ struct ConciergeView: View {
                 Image(systemName: onDevice != nil ? "iphone" : (brief.aiEnabled ? "sparkles" : "text.alignleft"))
                     .font(.system(size: 12, weight: .semibold))
                 Text(onDevice != nil ? "On-device brief" : (brief.aiEnabled ? "Your brief" : "Today at a glance"))
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(.flCaption.weight(.semibold))
                     .textCase(.uppercase)
             }
             .foregroundStyle(accent)
@@ -193,7 +193,7 @@ struct ConciergeView: View {
         VStack(alignment: .leading, spacing: 10) {
             if !preamble.isEmpty {
                 Text(preamble.joined(separator: " "))
-                    .font(.system(size: 17, weight: .regular))
+                    .font(.flBody)
                     .foregroundStyle(WarmPalette.ink1)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -202,10 +202,10 @@ struct ConciergeView: View {
                     ForEach(Array(bullets.enumerated()), id: \.offset) { _, bullet in
                         HStack(alignment: .firstTextBaseline, spacing: 8) {
                             Text("•")
-                                .font(.system(size: 16, weight: .bold))
+                                .font(.flHeadline)
                                 .foregroundStyle(accent)
                             Text(bullet)
-                                .font(.system(size: 16, weight: .regular))
+                                .font(.flBody)
                                 .foregroundStyle(WarmPalette.ink1)
                                 .fixedSize(horizontal: false, vertical: true)
                                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -229,11 +229,11 @@ struct ConciergeView: View {
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(card.title)
-                        .font(.system(size: 16, weight: .semibold))
+                        .font(.flHeadline)
                         .foregroundStyle(WarmPalette.ink1)
                         .multilineTextAlignment(.leading)
                     Text(card.subtitle)
-                        .font(.system(size: 13))
+                        .font(.flFootnote)
                         .foregroundStyle(WarmPalette.ink3)
                         .multilineTextAlignment(.leading)
                 }
@@ -257,10 +257,10 @@ struct ConciergeView: View {
                 .font(.system(size: 32))
                 .foregroundStyle(AccentTheme.sage.color)
             Text("All caught up")
-                .font(.system(size: 17, weight: .semibold))
+                .font(.flHeadline)
                 .foregroundStyle(WarmPalette.ink1)
             Text("Nothing needs your attention right now.")
-                .font(.system(size: 14))
+                .font(.flSubheadline)
                 .foregroundStyle(WarmPalette.ink3)
                 .multilineTextAlignment(.center)
         }
@@ -273,7 +273,7 @@ struct ConciergeView: View {
         HStack(spacing: 12) {
             ProgressView().tint(accent)
             Text("Gathering your day…")
-                .font(.system(size: 15))
+                .font(.flSubheadline)
                 .foregroundStyle(WarmPalette.ink3)
         }
         .padding(DesignTokens.Spacing.cardPadding)
@@ -284,10 +284,10 @@ struct ConciergeView: View {
     private func errorCard(_ message: String) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Label("Couldn't load your brief", systemImage: "exclamationmark.triangle")
-                .font(.system(size: 15, weight: .semibold))
+                .font(.flSubheadline.weight(.semibold))
                 .foregroundStyle(WarmPalette.ink1)
             Text(message)
-                .font(.system(size: 13))
+                .font(.flFootnote)
                 .foregroundStyle(WarmPalette.ink3)
             Button("Try again") { Task { await viewModel.load(api: api) } }
                 .buttonStyle(FLSecondaryButtonStyle())

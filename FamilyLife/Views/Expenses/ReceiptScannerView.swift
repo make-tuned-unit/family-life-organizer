@@ -153,10 +153,10 @@ struct ReceiptScannerView: View {
                 .padding(.bottom, 4)
 
             Text(isProjectMode ? "Scan receipt for \(projectName ?? "project")" : "Scan a receipt")
-                .font(.system(size: 22, weight: .bold))
+                .font(.flTitle)
                 .foregroundStyle(WarmPalette.ink1)
             Text("Take a photo or choose from your library. AI will extract the merchant, items, and total.")
-                .font(.system(size: 15))
+                .font(.flSubheadline)
                 .foregroundStyle(WarmPalette.ink3)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 20)
@@ -168,7 +168,7 @@ struct ReceiptScannerView: View {
                     Image(systemName: "camera.fill")
                         .font(.system(size: 20))
                     Text("Take Photo")
-                        .font(.system(size: 16, weight: .semibold))
+                        .font(.flHeadline)
                 }
                 .foregroundStyle(WarmPalette.cream1)
                 .frame(maxWidth: .infinity)
@@ -184,7 +184,7 @@ struct ReceiptScannerView: View {
                     Image(systemName: "photo.on.rectangle")
                         .font(.system(size: 20))
                     Text("Choose from Library")
-                        .font(.system(size: 16, weight: .semibold))
+                        .font(.flHeadline)
                 }
                 .foregroundStyle(WarmPalette.ink1)
                 .frame(maxWidth: .infinity)
@@ -351,7 +351,7 @@ struct ReceiptScannerView: View {
 
                 Button { dismiss() } label: {
                     Text("Done")
-                        .font(.system(size: 14, weight: .medium))
+                        .font(.flSubheadline.weight(.medium))
                         .foregroundStyle(WarmPalette.ink3)
                         .frame(maxWidth: .infinity)
                 }
@@ -376,7 +376,7 @@ struct ReceiptScannerView: View {
                     resetForNextScan()
                 } label: {
                     Text("Discard & Scan Again")
-                        .font(.system(size: 14, weight: .medium))
+                        .font(.flSubheadline.weight(.medium))
                         .foregroundStyle(WarmPalette.ink3)
                         .frame(maxWidth: .infinity)
                 }

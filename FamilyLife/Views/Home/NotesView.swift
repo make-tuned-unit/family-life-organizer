@@ -109,9 +109,9 @@ struct NotesView: View {
             Image(systemName: "note.text")
                 .font(.system(size: 32)).foregroundStyle(WarmPalette.ink4)
             Text("No notes yet")
-                .font(.system(size: 15, weight: .semibold)).foregroundStyle(WarmPalette.ink2)
+                .font(.flSubheadline.weight(.semibold)).foregroundStyle(WarmPalette.ink2)
             Text("Jot something down. Notes are private until you share them.")
-                .font(.system(size: 13)).foregroundStyle(WarmPalette.ink3)
+                .font(.flFootnote).foregroundStyle(WarmPalette.ink3)
                 .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity).padding(.vertical, 50)
@@ -134,7 +134,7 @@ private struct NoteCard: View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
                 Text(note.title?.isEmpty == false ? note.title! : "Untitled")
-                    .font(.system(size: 16, weight: .semibold))
+                    .font(.flHeadline)
                     .foregroundStyle(WarmPalette.ink1)
                     .lineLimit(1)
                 Spacer()
@@ -145,7 +145,7 @@ private struct NoteCard: View {
             }
             if let b = note.body, !b.isEmpty {
                 Text(b)
-                    .font(.system(size: 13))
+                    .font(.flFootnote)
                     .foregroundStyle(WarmPalette.ink3)
                     .lineLimit(3)
                     .multilineTextAlignment(.leading)
@@ -244,7 +244,7 @@ struct NoteEditorView: View {
                     Section {
                         Label(canEdit ? "Shared with you \u{00B7} you can edit" : "Shared with you \u{00B7} view only",
                               systemImage: canEdit ? "pencil" : "eye")
-                            .font(.system(size: 13))
+                            .font(.flFootnote)
                             .foregroundStyle(WarmPalette.ink3)
                     }
                 }

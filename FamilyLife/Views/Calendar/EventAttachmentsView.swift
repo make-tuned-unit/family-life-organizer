@@ -38,10 +38,10 @@ struct EventAttachmentsSection: View {
                             .foregroundStyle(TabAccent.calendar.color)
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Attach something")
-                                .font(.system(size: 15, weight: .semibold))
+                                .font(.flSubheadline.weight(.semibold))
                                 .foregroundStyle(WarmPalette.ink1)
                             Text("Link a task, list, note, decision, receipt, or trip.")
-                                .font(.system(size: 13))
+                                .font(.flFootnote)
                                 .foregroundStyle(WarmPalette.ink3)
                                 .multilineTextAlignment(.leading)
                         }
@@ -89,17 +89,17 @@ struct EventAttachmentsSection: View {
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(att.title ?? kind?.label ?? "Item")
-                        .font(.system(size: 15, weight: .medium))
+                        .font(.flSubheadline.weight(.medium))
                         .foregroundStyle(WarmPalette.ink1)
                         .lineLimit(1)
                     HStack(spacing: 5) {
                         Text(kind?.label ?? att.attachment_type.capitalized)
-                            .font(.system(size: 12, weight: .semibold))
+                            .font(.flCaption.weight(.semibold))
                             .foregroundStyle(kind?.color ?? WarmPalette.ink3)
                         if let sub = att.subtitle, !sub.isEmpty {
                             Text("·").foregroundStyle(WarmPalette.ink3)
                             Text(sub)
-                                .font(.system(size: 12))
+                                .font(.flCaption)
                                 .foregroundStyle(WarmPalette.ink3)
                                 .lineLimit(1)
                         }
@@ -187,7 +187,7 @@ struct AttachmentPickerView: View {
                             .font(.system(size: 32))
                             .foregroundStyle(WarmPalette.ink3)
                         Text("Nothing to attach")
-                            .font(.system(size: 15, weight: .medium))
+                            .font(.flSubheadline.weight(.medium))
                             .foregroundStyle(WarmPalette.ink2)
                     }
                     Spacer()
@@ -205,12 +205,12 @@ struct AttachmentPickerView: View {
                                             .background(kind.color.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
                                         VStack(alignment: .leading, spacing: 2) {
                                             Text(item.title)
-                                                .font(.system(size: 15, weight: .medium))
+                                                .font(.flSubheadline.weight(.medium))
                                                 .foregroundStyle(WarmPalette.ink1)
                                                 .lineLimit(1)
                                             if let sub = item.subtitle, !sub.isEmpty {
                                                 Text(sub)
-                                                    .font(.system(size: 12))
+                                                    .font(.flCaption)
                                                     .foregroundStyle(WarmPalette.ink3)
                                                     .lineLimit(1)
                                             }
@@ -401,7 +401,7 @@ private struct AttachedTaskDetail: View {
                         .font(.system(size: 24))
                         .foregroundStyle(isDone ? WarmPalette.good : WarmPalette.ink4)
                     Text(task.title)
-                        .font(.system(size: 24, weight: .bold))
+                        .font(.flTitle)
                         .foregroundStyle(WarmPalette.ink1)
                         .strikethrough(isDone, color: WarmPalette.ink4)
                 }
@@ -435,7 +435,7 @@ private struct AttachedTaskDetail: View {
                 .foregroundStyle(TabAccent.calendar.color)
                 .frame(width: 22)
             Text(text)
-                .font(.system(size: 15))
+                .font(.flSubheadline)
                 .foregroundStyle(WarmPalette.ink2)
         }
     }
@@ -449,7 +449,7 @@ private struct AttachedTripDetail: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
                 Text(trip.destination)
-                    .font(.system(size: 26, weight: .bold))
+                    .font(.flScreenTitle)
                     .foregroundStyle(WarmPalette.ink1)
 
                 row("person.fill", trip.traveler)
@@ -481,7 +481,7 @@ private struct AttachedTripDetail: View {
                 .foregroundStyle(TabAccent.calendar.color)
                 .frame(width: 22)
             Text(text)
-                .font(.system(size: 15))
+                .font(.flSubheadline)
                 .foregroundStyle(WarmPalette.ink2)
         }
     }

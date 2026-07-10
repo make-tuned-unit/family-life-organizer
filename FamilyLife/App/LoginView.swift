@@ -70,7 +70,7 @@ struct LoginView: View {
                                 .textContentType(.username)
                                 .textInputAutocapitalization(.never)
                                 .autocorrectionDisabled()
-                                .font(.system(size: 16))
+                                .font(.flBody)
                                 .foregroundStyle(.white)
                                 .tint(.white)
                         }
@@ -89,7 +89,7 @@ struct LoginView: View {
                                 .frame(width: 20)
                             SecureField("Password", text: $password)
                                 .textContentType(.password)
-                                .font(.system(size: 16))
+                                .font(.flBody)
                                 .foregroundStyle(.white)
                                 .tint(.white)
                         }
@@ -106,7 +106,7 @@ struct LoginView: View {
                                 Image(systemName: "exclamationmark.circle.fill")
                                     .font(.system(size: 13))
                                 Text(errorMessage)
-                                    .font(.system(size: 13))
+                                    .font(.flFootnote)
                             }
                             .foregroundStyle(WarmPalette.bad)
                             .padding(.top, 2)
@@ -120,7 +120,7 @@ struct LoginView: View {
                                     .frame(maxWidth: .infinity)
                             } else {
                                 Text("Sign In")
-                                    .font(.system(size: 17, weight: .semibold))
+                                    .font(.flHeadline)
                                     .foregroundStyle(.white)
                                     .frame(maxWidth: .infinity)
                             }
@@ -150,7 +150,7 @@ struct LoginView: View {
                                 .foregroundStyle(.white.opacity(0.85))
                                 .fontWeight(.semibold)
                         }
-                        .font(.system(size: 14))
+                        .font(.flSubheadline)
                     }
                     .padding(.top, 16)
                     .padding(.bottom, 40)

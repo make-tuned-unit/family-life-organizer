@@ -21,13 +21,13 @@ struct EventDetailView: View {
                         Spacer()
                         if let time = appointment.appointment_time, !time.isEmpty {
                             Text(time)
-                                .font(.system(size: 15, weight: .semibold))
+                                .font(.flSubheadline.weight(.semibold))
                                 .foregroundStyle(WarmPalette.ink2)
                         }
                     }
 
                     Text(appointment.title)
-                        .font(.system(size: 28, weight: .bold))
+                        .font(.flScreenTitle)
                         .foregroundStyle(WarmPalette.ink1)
                         .tracking(-0.56)
 
@@ -36,7 +36,7 @@ struct EventDetailView: View {
                         Image(systemName: "calendar")
                             .foregroundStyle(TabAccent.calendar.color)
                         Text(formattedDate)
-                            .font(.system(size: 15))
+                            .font(.flSubheadline)
                             .foregroundStyle(WarmPalette.ink2)
                     }
 
@@ -47,12 +47,12 @@ struct EventDetailView: View {
                             Image(systemName: "repeat")
                                 .foregroundStyle(TabAccent.calendar.color)
                             Text(recurrence.displayName)
-                                .font(.system(size: 15))
+                                .font(.flSubheadline)
                                 .foregroundStyle(WarmPalette.ink2)
                             if let endStr = appointment.recurrence_end,
                                let endDate = DateFormatter.isoDate.date(from: endStr) {
                                 Text("until \(DateFormatter.longDate.string(from: endDate))")
-                                    .font(.system(size: 13))
+                                    .font(.flFootnote)
                                     .foregroundStyle(WarmPalette.ink3)
                             }
                         }
@@ -64,7 +64,7 @@ struct EventDetailView: View {
                             Image(systemName: "mappin.circle.fill")
                                 .foregroundStyle(WarmPalette.bad)
                             Text(location)
-                                .font(.system(size: 15))
+                                .font(.flSubheadline)
                                 .foregroundStyle(WarmPalette.ink2)
                         }
 
@@ -78,7 +78,7 @@ struct EventDetailView: View {
                                 Image(systemName: "arrow.triangle.turn.up.right.diamond.fill")
                                     .font(.system(size: 14))
                                 Text("Get Directions")
-                                    .font(.system(size: 14, weight: .semibold))
+                                    .font(.flSubheadline.weight(.semibold))
                             }
                             .foregroundStyle(WarmPalette.cream1)
                             .frame(maxWidth: .infinity)
@@ -92,11 +92,11 @@ struct EventDetailView: View {
                     if let desc = appointment.description, !desc.isEmpty {
                         VStack(alignment: .leading, spacing: 4) {
                             Text("NOTES")
-                                .font(.system(size: 10, weight: .semibold))
+                                .font(.flOverline)
                                 .foregroundStyle(WarmPalette.ink3)
                                 .tracking(0.4)
                             Text(desc)
-                                .font(.system(size: 15))
+                                .font(.flSubheadline)
                                 .foregroundStyle(WarmPalette.ink2)
                         }
                         .padding(.top, 4)
@@ -119,9 +119,9 @@ struct EventDetailView: View {
                         ForEach(Array(names.enumerated()), id: \.offset) { index, name in
                             if index > 0 { GlassDivider() }
                             HStack(spacing: 12) {
-                                FamilyAvatar(initial: String(name.prefix(1)).uppercased(), size: 32)
+                                FamilyAvatar(initial: String(name.prefix(1)).uppercased(), size: 32, name: name)
                                 Text(name)
-                                    .font(.system(size: 15, weight: .medium))
+                                    .font(.flSubheadline.weight(.medium))
                                     .foregroundStyle(WarmPalette.ink1)
                                 Spacer()
                             }
@@ -145,7 +145,7 @@ struct EventDetailView: View {
                             Image(systemName: "square.and.arrow.up")
                                 .font(.system(size: 16))
                             Text("Share Event")
-                                .font(.system(size: 15, weight: .semibold))
+                                .font(.flSubheadline.weight(.semibold))
                         }
                         .foregroundStyle(TabAccent.calendar.color)
                         .frame(maxWidth: .infinity)
@@ -159,7 +159,7 @@ struct EventDetailView: View {
                             Image(systemName: "arrowshape.turn.up.right")
                                 .font(.system(size: 16))
                             Text("Send to...")
-                                .font(.system(size: 15, weight: .semibold))
+                                .font(.flSubheadline.weight(.semibold))
                         }
                         .foregroundStyle(AccentTheme.ocean.color)
                         .frame(maxWidth: .infinity)
@@ -175,7 +175,7 @@ struct EventDetailView: View {
                             Image(systemName: "pencil")
                                 .font(.system(size: 16))
                             Text("Edit Event")
-                                .font(.system(size: 15, weight: .semibold))
+                                .font(.flSubheadline.weight(.semibold))
                         }
                         .foregroundStyle(WarmPalette.ink2)
                         .frame(maxWidth: .infinity)
@@ -196,7 +196,7 @@ struct EventDetailView: View {
                             Image(systemName: "trash")
                                 .font(.system(size: 16))
                             Text("Delete Event")
-                                .font(.system(size: 15, weight: .semibold))
+                                .font(.flSubheadline.weight(.semibold))
                         }
                         .foregroundStyle(WarmPalette.bad)
                         .frame(maxWidth: .infinity)
@@ -263,7 +263,7 @@ struct EventDetailView: View {
     private var categoryBadge: some View {
         let label = appointment.category?.capitalized ?? "Event"
         Text(label)
-            .font(.system(size: 11, weight: .semibold))
+            .font(.flOverline)
             .foregroundStyle(categoryColor)
             .padding(.horizontal, 10)
             .padding(.vertical, 4)

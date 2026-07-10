@@ -43,7 +43,7 @@ struct ConversationView: View {
                                     Image(systemName: "chart.bar.fill")
                                         .font(.system(size: 10))
                                     Text(decision.title)
-                                        .font(.system(size: 12, weight: .medium))
+                                        .font(.flCaption.weight(.medium))
                                         .lineLimit(1)
                                 }
                                 .foregroundStyle(TabAccent.decisions.color)
@@ -368,7 +368,7 @@ struct MessageBubble: View {
 
                 if message.text != "Sent a photo" || (message.has_image != 1 && message.image_data == nil) {
                     Text(message.text)
-                        .font(.system(size: 15))
+                        .font(.flSubheadline)
                         .foregroundStyle(isOwn ? .white : WarmPalette.ink1)
                 }
 

@@ -135,13 +135,13 @@ struct PersonDetailView: View {
                     .fill(display.accentColor.opacity(0.18))
                     .frame(width: 76, height: 76)
                 Text(String(display.name.prefix(1)).uppercased())
-                    .font(.system(size: 30, weight: .bold))
+                    .font(.flScreenTitle)
                     .foregroundStyle(display.accentColor)
             }
             HStack(spacing: 8) {
                 if let rel = display.relationship, rel != "other", rel != "household" {
                     Text(rel.capitalized)
-                        .font(.system(size: 12, weight: .semibold))
+                        .font(.flCaption.weight(.semibold))
                         .foregroundStyle(display.accentColor)
                         .padding(.horizontal, 9)
                         .padding(.vertical, 3)
@@ -152,7 +152,7 @@ struct PersonDetailView: View {
                         Image(systemName: "birthday.cake.fill").font(.system(size: 10))
                         Text(DateFormatter.longMonthDay.string(from: date))
                     }
-                    .font(.system(size: 12, weight: .medium))
+                    .font(.flCaption.weight(.medium))
                     .foregroundStyle(WarmPalette.ink3)
                 }
             }
@@ -166,7 +166,7 @@ struct PersonDetailView: View {
         VStack(spacing: 10) {
             Button { showingAddMilestone = true } label: {
                 Label("Add a milestone", systemImage: "plus")
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(.flSubheadline.weight(.semibold))
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 11)
                     .background(display.accentColor.opacity(0.14), in: RoundedRectangle(cornerRadius: 14))
@@ -197,11 +197,11 @@ struct PersonDetailView: View {
             }
             VStack(alignment: .leading, spacing: 3) {
                 Text(m.title)
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(.flSubheadline.weight(.semibold))
                     .foregroundStyle(WarmPalette.ink1)
                 if let desc = m.description, !desc.isEmpty {
                     Text(desc)
-                        .font(.system(size: 13))
+                        .font(.flFootnote)
                         .foregroundStyle(WarmPalette.ink2)
                 }
                 HStack(spacing: 6) {
@@ -212,7 +212,7 @@ struct PersonDetailView: View {
                         Text("· added by \(by)")
                     }
                 }
-                .font(.system(size: 11.5))
+                .font(.flCaption)
                 .foregroundStyle(WarmPalette.ink3)
             }
             Spacer()
@@ -248,7 +248,7 @@ struct PersonDetailView: View {
         VStack(spacing: 10) {
             Button { showingAddGift = true } label: {
                 Label("Add a gift idea", systemImage: "plus")
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(.flSubheadline.weight(.semibold))
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 11)
                     .background(display.accentColor.opacity(0.14), in: RoundedRectangle(cornerRadius: 14))
@@ -280,12 +280,12 @@ struct PersonDetailView: View {
             }
             VStack(alignment: .leading, spacing: 3) {
                 Text(idea.title)
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(.flSubheadline.weight(.semibold))
                     .foregroundStyle(WarmPalette.ink1)
                     .strikethrough(status == .given)
                 if let notes = idea.notes, !notes.isEmpty {
                     Text(notes)
-                        .font(.system(size: 13))
+                        .font(.flFootnote)
                         .foregroundStyle(WarmPalette.ink2)
                 }
                 HStack(spacing: 6) {
@@ -298,7 +298,7 @@ struct PersonDetailView: View {
                     Text("· \(status.rawValue.capitalized)")
                         .foregroundStyle(giftStatusColor(status))
                 }
-                .font(.system(size: 11.5))
+                .font(.flCaption)
                 .foregroundStyle(WarmPalette.ink3)
             }
             Spacer()
@@ -369,7 +369,7 @@ struct PersonDetailView: View {
         VStack(spacing: 10) {
             Button { showingAddKeyDate = true } label: {
                 Label("Add a key date", systemImage: "plus")
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(.flSubheadline.weight(.semibold))
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 11)
                     .background(display.accentColor.opacity(0.14), in: RoundedRectangle(cornerRadius: 14))
@@ -402,11 +402,11 @@ struct PersonDetailView: View {
                 .foregroundStyle(color)
                 .frame(width: 30)
             Text(title)
-                .font(.system(size: 14, weight: .medium))
+                .font(.flSubheadline.weight(.medium))
                 .foregroundStyle(WarmPalette.ink1)
             Spacer()
             Text(value)
-                .font(.system(size: 13, weight: .medium))
+                .font(.flFootnote.weight(.medium))
                 .foregroundStyle(WarmPalette.ink3)
         }
         .padding(13)
@@ -444,18 +444,18 @@ struct PersonDetailView: View {
                         HStack(spacing: 12) {
                             VStack(alignment: .leading, spacing: 3) {
                                 Text(d.title)
-                                    .font(.system(size: 15, weight: .semibold))
+                                    .font(.flSubheadline.weight(.semibold))
                                     .foregroundStyle(WarmPalette.ink1)
                                     .multilineTextAlignment(.leading)
                                 HStack(spacing: 6) {
                                     Text(d.status == "active" ? "Open" : d.status.capitalized)
-                                        .font(.system(size: 10, weight: .bold))
+                                        .font(.flOverline.weight(.bold))
                                         .foregroundStyle(d.status == "active" ? AccentTheme.sage.color : WarmPalette.ink3)
                                         .padding(.horizontal, 7)
                                         .padding(.vertical, 2)
                                         .background((d.status == "active" ? AccentTheme.sage.color : WarmPalette.ink4).opacity(0.14), in: Capsule())
                                     Text("by \(d.creator_name)")
-                                        .font(.system(size: 11.5))
+                                        .font(.flCaption)
                                         .foregroundStyle(WarmPalette.ink3)
                                 }
                             }
@@ -556,11 +556,11 @@ struct AddMilestoneSheet: View {
 
                 Section {
                     Text("Your household always gets a feed post and a nudge to cheer \(person.name) on. Sharing with a circle celebrates it there too.")
-                        .font(.system(size: 12.5))
+                        .font(.flFootnote)
                         .foregroundStyle(WarmPalette.ink3)
                 }
                 if let error {
-                    Text(error).foregroundStyle(.red).font(.system(size: 13))
+                    Text(error).foregroundStyle(.red).font(.flFootnote)
                 }
             }
             .navigationTitle("New milestone")
@@ -690,7 +690,7 @@ struct EditMilestoneSheet: View {
                     }
                 }
                 if let error {
-                    Text(error).foregroundStyle(.red).font(.system(size: 13))
+                    Text(error).foregroundStyle(.red).font(.flFootnote)
                 }
             }
             .navigationTitle("Edit milestone")
@@ -766,7 +766,7 @@ struct AddKeyDateSheet: View {
                         .lineLimit(2...4)
                 }
                 if let error {
-                    Text(error).foregroundStyle(.red).font(.system(size: 13))
+                    Text(error).foregroundStyle(.red).font(.flFootnote)
                 }
             }
             .navigationTitle("New key date for \(person.name)")
@@ -847,7 +847,7 @@ struct EditKeyDateSheet: View {
                         .lineLimit(2...4)
                 }
                 if let error {
-                    Text(error).foregroundStyle(.red).font(.system(size: 13))
+                    Text(error).foregroundStyle(.red).font(.flFootnote)
                 }
             }
             .navigationTitle("Edit key date")
@@ -950,7 +950,7 @@ struct EditPersonSheet: View {
                     }
                 }
                 if let error {
-                    Text(error).foregroundStyle(.red).font(.system(size: 13))
+                    Text(error).foregroundStyle(.red).font(.flFootnote)
                 }
             }
             .navigationTitle("Edit \(person.name)")

@@ -31,9 +31,9 @@ struct NewTripView: View {
                         ProfileAvatar(size: 36)
                         VStack(alignment: .leading, spacing: 2) {
                             Text(auth.currentUser?.name ?? "Me")
-                                .font(.system(size: 15, weight: .semibold))
+                                .font(.flSubheadline.weight(.semibold))
                             Text("Starting a trip")
-                                .font(.system(size: 12))
+                                .font(.flCaption)
                                 .foregroundStyle(WarmPalette.ink3)
                         }
                     }
@@ -112,7 +112,7 @@ struct NewTripView: View {
                             ProgressView()
                                 .scaleEffect(0.8)
                             Text("Calculating route...")
-                                .font(.system(size: 14))
+                                .font(.flSubheadline)
                                 .foregroundStyle(WarmPalette.ink3)
                         }
                     } else if let eta = etaMinutes {
@@ -120,15 +120,15 @@ struct NewTripView: View {
                             Image(systemName: "car.fill")
                                 .foregroundStyle(TabAccent.home.color)
                             Text("\(TripDisplayHelpers.etaText(eta)) drive")
-                                .font(.system(size: 15, weight: .semibold))
+                                .font(.flSubheadline.weight(.semibold))
                             Spacer()
                             Text("via Apple Maps")
-                                .font(.system(size: 11))
+                                .font(.flCaption)
                                 .foregroundStyle(WarmPalette.ink4)
                         }
                     } else {
                         Text("Select a destination to calculate ETA")
-                            .font(.system(size: 13))
+                            .font(.flFootnote)
                             .foregroundStyle(WarmPalette.ink4)
                     }
 

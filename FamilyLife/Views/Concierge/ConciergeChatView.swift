@@ -96,7 +96,7 @@ struct ConciergeChatView: View {
             HStack {
                 Spacer(minLength: 40)
                 Text(message.text)
-                    .font(.system(size: 16))
+                    .font(.flBody)
                     .foregroundStyle(.white)
                     .padding(.horizontal, 14)
                     .padding(.vertical, 10)
@@ -111,7 +111,7 @@ struct ConciergeChatView: View {
                         .frame(width: 28, height: 28)
                         .background(accent.opacity(0.15), in: Circle())
                     Text(message.text)
-                        .font(.system(size: 16))
+                        .font(.flBody)
                         .foregroundStyle(WarmPalette.ink1)
                         .padding(.horizontal, 14)
                         .padding(.vertical, 10)
@@ -123,7 +123,7 @@ struct ConciergeChatView: View {
                     VStack(alignment: .leading, spacing: 4) {
                         ForEach(message.actions, id: \.self) { action in
                             Label(action.summary, systemImage: "checkmark.circle.fill")
-                                .font(.system(size: 12, weight: .medium))
+                                .font(.flCaption.weight(.medium))
                                 .foregroundStyle(AccentTheme.sage.color)
                         }
                     }
@@ -147,7 +147,7 @@ struct ConciergeChatView: View {
 
     private func errorRow(_ message: String) -> some View {
         Label(message, systemImage: "exclamationmark.triangle")
-            .font(.system(size: 13))
+            .font(.flFootnote)
             .foregroundStyle(AccentTheme.terracotta.color)
     }
 
@@ -158,10 +158,10 @@ struct ConciergeChatView: View {
                     .font(.system(size: 26))
                     .foregroundStyle(accent)
                 Text("How can I help?")
-                    .font(.system(size: 20, weight: .semibold))
+                    .font(.flTitle)
                     .foregroundStyle(WarmPalette.ink1)
                 Text("Ask me to add events or tasks, check your budget, plan dinner, and more.")
-                    .font(.system(size: 14))
+                    .font(.flSubheadline)
                     .foregroundStyle(WarmPalette.ink3)
             }
             FlowChips(items: suggestions) { suggestion in
@@ -178,7 +178,7 @@ struct ConciergeChatView: View {
         VStack(spacing: 6) {
             if let err = speech.errorMessage {
                 Text(err)
-                    .font(.system(size: 12))
+                    .font(.flCaption)
                     .foregroundStyle(WarmPalette.bad)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
@@ -269,7 +269,7 @@ private struct FlowChips: View {
             ForEach(items, id: \.self) { item in
                 Button { onTap(item) } label: {
                     Text(item)
-                        .font(.system(size: 14, weight: .medium))
+                        .font(.flSubheadline.weight(.medium))
                         .foregroundStyle(WarmPalette.ink1)
                         .padding(.horizontal, 14)
                         .padding(.vertical, 8)

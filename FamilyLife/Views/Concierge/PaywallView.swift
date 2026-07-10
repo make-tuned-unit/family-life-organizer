@@ -61,10 +61,10 @@ struct PaywallView: View {
                 .font(.system(size: 34, weight: .semibold))
                 .foregroundStyle(accent)
             Text("Your AI Life Concierge")
-                .font(.system(size: 28, weight: .bold))
+                .font(.flScreenTitle)
                 .foregroundStyle(WarmPalette.ink1)
             Text("A personal butler for your family — always organized, always one step ahead.")
-                .font(.system(size: 16))
+                .font(.flBody)
                 .foregroundStyle(WarmPalette.ink3)
         }
     }
@@ -79,7 +79,7 @@ struct PaywallView: View {
                         .frame(width: 28, height: 28)
                         .background(accent.opacity(0.15), in: Circle())
                     Text(text)
-                        .font(.system(size: 15))
+                        .font(.flSubheadline)
                         .foregroundStyle(WarmPalette.ink1)
                         .fixedSize(horizontal: false, vertical: true)
                     Spacer(minLength: 0)
@@ -105,22 +105,22 @@ struct PaywallView: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .firstTextBaseline) {
                 Text(title)
-                    .font(.system(size: 19, weight: .bold))
+                    .font(.flTitle)
                     .foregroundStyle(WarmPalette.ink1)
                 if recommended {
                     Text("Best value")
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(.flOverline)
                         .foregroundStyle(accent)
                         .padding(.horizontal, 8).padding(.vertical, 3)
                         .background(accent.opacity(0.15), in: Capsule())
                 }
                 Spacer()
                 Text(priceLabel(product))
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(.flSubheadline.weight(.semibold))
                     .foregroundStyle(WarmPalette.ink1)
             }
             Text(blurb)
-                .font(.system(size: 14))
+                .font(.flSubheadline)
                 .foregroundStyle(WarmPalette.ink3)
 
             Button {
@@ -158,7 +158,7 @@ struct PaywallView: View {
 
             if let error = subscription.lastError {
                 Text(error)
-                    .font(.system(size: 12))
+                    .font(.flCaption)
                     .foregroundStyle(AccentTheme.terracotta.color)
                     .multilineTextAlignment(.center)
             }

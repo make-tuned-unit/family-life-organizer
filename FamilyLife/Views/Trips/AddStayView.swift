@@ -43,7 +43,7 @@ struct AddStayView: View {
                             }
                         } label: {
                             HStack {
-                                FamilyAvatar(initial: member.avatar_initial ?? String(member.name.prefix(1)).uppercased(), size: 28)
+                                FamilyAvatar(initial: member.avatar_initial ?? String(member.name.prefix(1)).uppercased(), size: 28, name: member.name)
                                 VStack(alignment: .leading) {
                                     Text(member.name)
                                         .foregroundStyle(.primary)
@@ -169,7 +169,7 @@ struct EditStayView: View {
                 if let host = stay.host_name {
                     Section("Host") {
                         HStack {
-                            FamilyAvatar(initial: String(host.prefix(1)).uppercased(), size: 28)
+                            FamilyAvatar(initial: String(host.prefix(1)).uppercased(), size: 28, name: host)
                             Text(host)
                         }
                     }

@@ -93,7 +93,7 @@ struct RivalryDetailView: View {
                         }
                         if let msg = completionMessage {
                             Text(msg)
-                                .font(.system(size: 13))
+                                .font(.flFootnote)
                                 .foregroundStyle(WarmPalette.ink2)
                                 .multilineTextAlignment(.center)
                                 .padding(.horizontal, 8)
@@ -134,24 +134,23 @@ struct RivalryDetailView: View {
                         // Multi-player scoreboard
                         let maxVal = participantScores.first?.total ?? 0
                         VStack(spacing: 6) {
-                            ForEach(Array(participantScores.enumerated()), id: \.element.name) { index, ps in
-                                let color = index == 0 ? TabAccent.home.color : (index == 1 ? AccentTheme.saffron.color : AccentTheme.ocean.color)
-                                ProgressRow(name: ps.name, value: ps.total, maxValue: maxVal, color: color)
+                            ForEach(Array(participantScores.enumerated()), id: \.element.name) { _, ps in
+                                ProgressRow(name: ps.name, value: ps.total, maxValue: maxVal, color: PersonPalette.color(for: ps.name))
                             }
                         }
                     } else {
                         // Classic 1v1
                         HStack(spacing: 20) {
-                            PlayerColumn(name: currentRivalry.initiator_name, value: initiatorTotal, color: TabAccent.home.color, isLeading: initiatorTotal > opponentTotal)
+                            PlayerColumn(name: currentRivalry.initiator_name, value: initiatorTotal, color: PersonPalette.color(for: currentRivalry.initiator_name), isLeading: initiatorTotal > opponentTotal)
                             Text("vs")
                                 .font(.title3.bold())
                                 .foregroundStyle(WarmPalette.ink3)
-                            PlayerColumn(name: currentRivalry.opponent_name, value: opponentTotal, color: AccentTheme.saffron.color, isLeading: opponentTotal > initiatorTotal)
+                            PlayerColumn(name: currentRivalry.opponent_name, value: opponentTotal, color: PersonPalette.color(for: currentRivalry.opponent_name), isLeading: opponentTotal > initiatorTotal)
                         }
 
                         VStack(spacing: 4) {
-                            ProgressRow(name: currentRivalry.initiator_name, value: initiatorTotal, maxValue: max(initiatorTotal, opponentTotal), color: TabAccent.home.color)
-                            ProgressRow(name: currentRivalry.opponent_name, value: opponentTotal, maxValue: max(initiatorTotal, opponentTotal), color: AccentTheme.saffron.color)
+                            ProgressRow(name: currentRivalry.initiator_name, value: initiatorTotal, maxValue: max(initiatorTotal, opponentTotal), color: PersonPalette.color(for: currentRivalry.initiator_name))
+                            ProgressRow(name: currentRivalry.opponent_name, value: opponentTotal, maxValue: max(initiatorTotal, opponentTotal), color: PersonPalette.color(for: currentRivalry.opponent_name))
                         }
                     }
 
@@ -179,7 +178,7 @@ struct RivalryDetailView: View {
                             ProgressView()
                                 .controlSize(.small)
                             Text("Loading \(currentRivalry.challengeType.healthMetricLabel) from Apple Health...")
-                                .font(.system(size: 13))
+                                .font(.flFootnote)
                                 .foregroundStyle(WarmPalette.ink3)
                         }
                         .frame(maxWidth: .infinity)
@@ -196,11 +195,11 @@ struct RivalryDetailView: View {
                                 Image(systemName: "heart.fill")
                                     .foregroundStyle(.red)
                                 Text("Apple Health: \(Int(hkSteps)) \(currentRivalry.challengeType.healthMetricLabel)")
-                                    .font(.system(size: 14, weight: .semibold))
+                                    .font(.flSubheadline.weight(.semibold))
                                 Spacer()
                                 if delta > 0 {
                                     Text("+\(Int(delta)) to sync")
-                                        .font(.system(size: 12, weight: .medium))
+                                        .font(.flCaption.weight(.medium))
                                         .foregroundStyle(WarmPalette.good)
                                 }
                             }
@@ -215,7 +214,7 @@ struct RivalryDetailView: View {
                                 .disabled(isSyncingSteps)
                             } else {
                                 Text("\(currentRivalry.challengeType.displayName) are up to date")
-                                    .font(.system(size: 12))
+                                    .font(.flCaption)
                                     .foregroundStyle(WarmPalette.ink3)
                             }
                         }
@@ -480,7 +479,7 @@ struct EntryRowRemote: View {
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
             Circle()
-                .fill(entry.member_name == rivalry.initiator_name ? TabAccent.home.color : .orange)
+                .fill(PersonPalette.color(for: entry.member_name))
                 .frame(width: 10, height: 10)
                 .padding(.top, 6)
             VStack(alignment: .leading, spacing: 4) {

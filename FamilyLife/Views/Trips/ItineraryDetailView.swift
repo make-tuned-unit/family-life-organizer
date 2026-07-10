@@ -300,7 +300,7 @@ struct TimelineDayRow: View {
                 // Continuation day — show compact host row
                 HStack(spacing: 8) {
                     if let host = stay.host_name {
-                        FamilyAvatar(initial: String(host.prefix(1)).uppercased(), size: 22)
+                        FamilyAvatar(initial: String(host.prefix(1)).uppercased(), size: 22, name: host)
                         Text(host)
                             .font(.caption.weight(.medium))
                             .foregroundStyle(WarmPalette.ink2)
@@ -366,7 +366,7 @@ struct StayCard: View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
                 if let host = stay.host_name {
-                    FamilyAvatar(initial: String(host.prefix(1)).uppercased(), size: 28)
+                    FamilyAvatar(initial: String(host.prefix(1)).uppercased(), size: 28, name: host)
                     Text(host)
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(WarmPalette.ink1)

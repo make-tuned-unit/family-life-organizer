@@ -221,7 +221,7 @@ struct NewItinerarySheet: View {
                             }
                         } label: {
                             HStack {
-                                FamilyAvatar(initial: member.avatar_initial ?? String(member.name.prefix(1)).uppercased(), size: 28)
+                                FamilyAvatar(initial: member.avatar_initial ?? String(member.name.prefix(1)).uppercased(), size: 28, name: member.name)
                                 Text(member.name)
                                     .foregroundStyle(.primary)
                                 Spacer()
@@ -291,7 +291,7 @@ struct StayRequestCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                FamilyAvatar(initial: String((stay.traveler_name ?? "?").prefix(1)).uppercased(), size: 32)
+                FamilyAvatar(initial: String((stay.traveler_name ?? "?").prefix(1)).uppercased(), size: 32, name: stay.traveler_name)
                 VStack(alignment: .leading, spacing: 2) {
                     Text("\(stay.traveler_name ?? "Someone") wants to stay")
                         .font(.subheadline.weight(.semibold))

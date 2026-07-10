@@ -42,7 +42,7 @@ struct ChangePasswordView: View {
                 Section {
                     Label(errorMessage, systemImage: "exclamationmark.circle.fill")
                         .foregroundStyle(WarmPalette.bad)
-                        .font(.system(size: 14))
+                        .font(.flSubheadline)
                 }
             }
 

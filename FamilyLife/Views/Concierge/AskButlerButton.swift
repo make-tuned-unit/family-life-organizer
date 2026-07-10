@@ -220,7 +220,7 @@ struct PushToTalkOverlay: View {
                     ProgressView().tint(AccentTheme.rose.color)
                     Text("Getting ready…")
                         .foregroundStyle(WarmPalette.ink2)
-                        .font(.system(size: 14, weight: .medium))
+                        .font(.flSubheadline.weight(.medium))
                 }
             }
         case .listening:
@@ -231,7 +231,7 @@ struct PushToTalkOverlay: View {
                         .foregroundStyle(AccentTheme.rose.color)
                     Text(ptt.transcript.isEmpty ? "Listening…" : ptt.transcript)
                         .foregroundStyle(WarmPalette.ink1)
-                        .font(.system(size: 15, weight: .medium))
+                        .font(.flSubheadline.weight(.medium))
                         .lineLimit(3)
                 }
             }
@@ -241,7 +241,7 @@ struct PushToTalkOverlay: View {
                     ProgressView().tint(WarmPalette.ink2)
                     Text("Sending to your concierge…")
                         .foregroundStyle(WarmPalette.ink2)
-                        .font(.system(size: 14, weight: .medium))
+                        .font(.flSubheadline.weight(.medium))
                 }
             }
         case .idle:
@@ -249,7 +249,7 @@ struct PushToTalkOverlay: View {
                 card {
                     Text(banner)
                         .foregroundStyle(WarmPalette.ink1)
-                        .font(.system(size: 14, weight: .medium))
+                        .font(.flSubheadline.weight(.medium))
                 }
             }
         }
@@ -302,22 +302,22 @@ struct ConciergeIntroView: View {
                         .font(.system(size: 32, weight: .semibold))
                         .foregroundStyle(AccentTheme.saffron.color)
                     Text("AI Concierge")
-                        .font(.system(size: 26, weight: .bold))
+                        .font(.flScreenTitle)
                         .foregroundStyle(WarmPalette.ink1)
                     Text("A warm daily brief of what needs you across the family, plus a chat that can look things up and add to your calendar, lists, and budget.")
-                        .font(.system(size: 15))
+                        .font(.flSubheadline)
                         .foregroundStyle(WarmPalette.ink3)
                 }
 
                 Toggle(isOn: $aiConciergeEnabled) {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Enable AI Concierge")
-                            .font(.system(size: 15, weight: .semibold))
+                            .font(.flSubheadline.weight(.semibold))
                             .foregroundStyle(WarmPalette.ink1)
                         Text(aiConciergeEnabled
                              ? "A ✨ button now appears across from chat."
                              : "Adds a discreet ✨ launcher to your home screen.")
-                            .font(.system(size: 13))
+                            .font(.flFootnote)
                             .foregroundStyle(WarmPalette.ink3)
                     }
                 }
@@ -334,7 +334,7 @@ struct ConciergeIntroView: View {
                           systemImage: subscription.isPremium ? "checkmark.seal.fill" : "lock.fill")
                         .foregroundStyle(WarmPalette.ink2)
                 }
-                .font(.system(size: 13, weight: .medium))
+                .font(.flFootnote.weight(.medium))
             }
             .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
             .padding(.top, 8)

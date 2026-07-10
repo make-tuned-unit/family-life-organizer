@@ -36,10 +36,10 @@ struct IncomingRequestCard: View {
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(request.requester_name)
-                        .font(.system(size: 15, weight: .semibold))
+                        .font(.flSubheadline.weight(.semibold))
                         .foregroundStyle(WarmPalette.ink1)
                     Text(request.reason)
-                        .font(.system(size: 13))
+                        .font(.flFootnote)
                         .foregroundStyle(WarmPalette.ink2)
                 }
                 Spacer()
@@ -49,13 +49,13 @@ struct IncomingRequestCard: View {
                         Image(systemName: "checkmark.circle.fill")
                             .font(.system(size: 14))
                         Text("Approved")
-                            .font(.system(size: 12, weight: .semibold))
+                            .font(.flCaption.weight(.semibold))
                     }
                     .foregroundStyle(WarmPalette.good)
                 } else {
                     Button(action: onApprove) {
                         Text("Review")
-                            .font(.system(size: 13, weight: .semibold))
+                            .font(.flFootnote.weight(.semibold))
                             .foregroundStyle(TabAccent.care.color)
                             .padding(.horizontal, 14).padding(.vertical, 8)
                             .background(TabAccent.care.color.opacity(0.12), in: Capsule())
@@ -65,13 +65,13 @@ struct IncomingRequestCard: View {
 
             if let note = request.note, !note.isEmpty {
                 Text("\"\(note)\"")
-                    .font(.system(size: 13)).italic()
+                    .font(.flFootnote).italic()
                     .foregroundStyle(WarmPalette.ink3)
             }
 
             if let date = request.created_at {
                 Text(relativeTime(date))
-                    .font(.system(size: 11))
+                    .font(.flCaption)
                     .foregroundStyle(WarmPalette.ink4)
             }
         }
@@ -105,32 +105,32 @@ struct ApproveRequestSheet: View {
                 // Header
                 VStack(alignment: .leading, spacing: 6) {
                     Text("COVERAGE REQUEST")
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(.flOverline)
                         .foregroundStyle(TabAccent.care.color).tracking(0.4)
                     Text("\(request.requester_name) needs help")
-                        .font(.system(size: 24, weight: .bold))
+                        .font(.flTitle)
                         .foregroundStyle(WarmPalette.ink1)
                     Label(request.reason, systemImage: reasonIcon)
-                        .font(.system(size: 15))
+                        .font(.flSubheadline)
                         .foregroundStyle(WarmPalette.ink2)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 22).padding(.top, 10).padding(.bottom, 18)
+                .padding(.horizontal, DesignTokens.Spacing.horizontalMargin).padding(.top, 10).padding(.bottom, 18)
 
                 if let note = request.note, !note.isEmpty {
                     Text("\"\(note)\"")
-                        .font(.system(size: 15)).italic()
+                        .font(.flSubheadline).italic()
                         .foregroundStyle(WarmPalette.ink2)
                         .padding(14).frame(maxWidth: .infinity, alignment: .leading)
                         .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: 18))
-                        .padding(.horizontal, 22).padding(.bottom, 14)
+                        .padding(.horizontal, DesignTokens.Spacing.horizontalMargin).padding(.bottom, 14)
                 }
 
                 // Window selection
                 Text("PICK A TIME SLOT")
-                    .font(.system(size: 10, weight: .semibold))
+                    .font(.flOverline)
                     .foregroundStyle(WarmPalette.ink3).tracking(0.4)
-                    .padding(.horizontal, 22).padding(.bottom, 8)
+                    .padding(.horizontal, DesignTokens.Spacing.horizontalMargin).padding(.bottom, 8)
 
                 if isLoading {
                     ProgressView().frame(maxWidth: .infinity).padding(.vertical, 20)
@@ -142,14 +142,14 @@ struct ApproveRequestSheet: View {
                                 HStack(spacing: 12) {
                                     VStack(alignment: .leading, spacing: 4) {
                                         Text(friendlyDate(window.window_date))
-                                            .font(.system(size: 15, weight: .semibold))
+                                            .font(.flSubheadline.weight(.semibold))
                                             .foregroundStyle(WarmPalette.ink1)
                                         Text("\(window.start_time) – \(window.end_time)")
-                                            .font(.system(size: 14, weight: .medium))
+                                            .font(.flSubheadline.weight(.medium))
                                             .foregroundStyle(TabAccent.care.color)
                                         if let desc = window.description, !desc.isEmpty {
                                             Text(desc)
-                                                .font(.system(size: 13))
+                                                .font(.flFootnote)
                                                 .foregroundStyle(WarmPalette.ink3)
                                         }
                                     }
@@ -170,20 +170,20 @@ struct ApproveRequestSheet: View {
                             .buttonStyle(.plain)
                         }
                     }
-                    .padding(.horizontal, 22).padding(.bottom, 14)
+                    .padding(.horizontal, DesignTokens.Spacing.horizontalMargin).padding(.bottom, 14)
                 }
 
                 // Note
                 VStack(alignment: .leading, spacing: 6) {
                     Text("ADD A NOTE (OPTIONAL)")
-                        .font(.system(size: 10, weight: .semibold))
+                        .font(.flOverline)
                         .foregroundStyle(WarmPalette.ink3).tracking(0.4)
                     TextField("e.g. We'll bring lunch!", text: $helperNote)
                         .font(.system(size: 15)).foregroundStyle(WarmPalette.ink2)
                 }
                 .padding(14).frame(maxWidth: .infinity, alignment: .leading)
                 .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: 18))
-                .padding(.horizontal, 22).padding(.bottom, 18)
+                .padding(.horizontal, DesignTokens.Spacing.horizontalMargin).padding(.bottom, 18)
 
                 // Approve button
                 Button {
@@ -194,7 +194,7 @@ struct ApproveRequestSheet: View {
                             ProgressView().tint(WarmPalette.cream1)
                         }
                         Text("Confirm availability")
-                            .font(.system(size: 16, weight: .semibold))
+                            .font(.flHeadline)
                         Image(systemName: "checkmark.shield.fill")
                             .font(.system(size: 14))
                     }

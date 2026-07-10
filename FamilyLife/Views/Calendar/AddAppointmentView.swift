@@ -127,7 +127,7 @@ struct AddAppointmentView: View {
                             toggleTag(contact.name)
                         } label: {
                             HStack {
-                                FamilyAvatar(initial: contact.avatar_initial ?? String(contact.name.prefix(1)).uppercased(), size: 24)
+                                FamilyAvatar(initial: contact.avatar_initial ?? String(contact.name.prefix(1)).uppercased(), size: 24, name: contact.name)
                                 Text(contact.name)
                                     .foregroundStyle(.primary)
                                 if let rel = contact.relationship {

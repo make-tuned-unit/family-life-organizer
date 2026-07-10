@@ -65,17 +65,17 @@ struct PantryView: View {
         HStack {
             VStack(alignment: .leading, spacing: 4) {
                 Text("\(viewModel.items.count) items \u{00B7} \(expiringCount) expiring")
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(.flOverline)
                     .foregroundStyle(WarmPalette.ink3)
                     .tracking(0.4)
                     .textCase(.uppercase)
                 Text("Pantry")
-                    .font(.system(size: 28, weight: .bold))
+                    .font(.flScreenTitle)
                     .foregroundStyle(WarmPalette.ink1)
             }
             Spacer()
         }
-        .padding(.horizontal, 22)
+        .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
         .padding(.top, 14)
         .padding(.bottom, 12)
     }
@@ -92,7 +92,7 @@ struct PantryView: View {
         }
         .padding(10)
         .background(WarmPalette.cardSurface, in: Capsule())
-        .padding(.horizontal, 22)
+        .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
         .padding(.bottom, 8)
     }
 
@@ -111,7 +111,7 @@ struct PantryView: View {
                     }
                 }
             }
-            .padding(.horizontal, 22)
+            .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
         }
         .padding(.bottom, 16)
     }
@@ -125,12 +125,12 @@ struct PantryView: View {
             VStack(alignment: .leading, spacing: 10) {
                 HStack {
                     Text("EXPIRING SOON")
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(.flOverline)
                         .foregroundStyle(WarmPalette.warn)
                         .tracking(0.4)
                     Spacer()
                     Text("See all")
-                        .font(.system(size: 13))
+                        .font(.flFootnote)
                         .foregroundStyle(WarmPalette.ink3)
                 }
 
@@ -160,7 +160,7 @@ struct PantryView: View {
                     .font(.system(size: 32))
                     .foregroundStyle(WarmPalette.ink4)
                 Text(viewModel.selectedLocation == "All" ? "Your pantry is empty" : "Nothing in \(viewModel.selectedLocation.lowercased())")
-                    .font(.system(size: 15))
+                    .font(.flSubheadline)
                     .foregroundStyle(WarmPalette.ink3)
             }
             .frame(maxWidth: .infinity)
@@ -226,10 +226,10 @@ struct ExpiringItemCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(item.item)
-                .font(.system(size: 15, weight: .semibold))
+                .font(.flSubheadline.weight(.semibold))
                 .foregroundStyle(WarmPalette.ink1)
             Text(daysLeft < 0 ? "Expired" : daysLeft == 0 ? "Today" : daysLeft == 1 ? "Tomorrow" : "\(daysLeft) days")
-                .font(.system(size: 13, weight: .semibold))
+                .font(.flFootnote.weight(.semibold))
                 .foregroundStyle(daysLeft <= 0 ? WarmPalette.bad : daysLeft <= 1 ? WarmPalette.warn : WarmPalette.warn)
             Text(item.location?.capitalized ?? "")
                 .font(.system(size: 11))
@@ -272,7 +272,7 @@ struct PantryItemTile: View {
                 .padding(.bottom, 6)
 
             Text(item.item)
-                .font(.system(size: 14, weight: .semibold))
+                .font(.flSubheadline.weight(.semibold))
                 .foregroundStyle(WarmPalette.ink1)
                 .lineLimit(2)
 

@@ -224,10 +224,10 @@ struct RivalryCardRemote: View {
                 let total = max(leftTotal + rightTotal, 1)
                 HStack(spacing: 2) {
                     RoundedRectangle(cornerRadius: 4)
-                        .fill(TabAccent.home.color)
+                        .fill(rivalry.isTeam ? TabAccent.home.color : PersonPalette.color(for: rivalry.initiator_name))
                         .frame(width: geo.size.width * (leftTotal / total))
                     RoundedRectangle(cornerRadius: 4)
-                        .fill(AccentTheme.saffron.color)
+                        .fill(rivalry.isTeam ? AccentTheme.saffron.color : PersonPalette.color(for: rivalry.opponent_name))
                         .frame(width: geo.size.width * (rightTotal / total))
                 }
             }
@@ -395,7 +395,7 @@ struct PlayerColumn: View {
                 .font(.subheadline.weight(.medium))
                 .foregroundStyle(WarmPalette.ink3)
             Text(valueText)
-                .font(.system(size: 28, weight: .bold, design: .rounded))
+                .font(.system(.title, design: .rounded, weight: .bold))
                 .foregroundStyle(color)
             Text(isLeading ? "Ahead" : "Chasing")
                 .font(.caption.weight(.semibold))

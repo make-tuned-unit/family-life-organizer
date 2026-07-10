@@ -83,7 +83,7 @@ struct StartRivalryView: View {
                                 updateDefaultTitle()
                             } label: {
                                 HStack {
-                                    FamilyAvatar(initial: member.avatar_initial ?? String(member.name.prefix(1)).uppercased(), size: 28)
+                                    FamilyAvatar(initial: member.avatar_initial ?? String(member.name.prefix(1)).uppercased(), size: 28, name: member.name)
                                     Text(member.name)
                                         .foregroundStyle(.primary)
                                     Spacer()
@@ -179,7 +179,7 @@ struct StartRivalryView: View {
             updateDefaultTitle()
         } label: {
             HStack {
-                FamilyAvatar(initial: String(name.prefix(1)).uppercased(), size: 28)
+                FamilyAvatar(initial: String(name.prefix(1)).uppercased(), size: 28, name: name)
                 Text(name).foregroundStyle(.primary)
                 Spacer()
                 if inA {

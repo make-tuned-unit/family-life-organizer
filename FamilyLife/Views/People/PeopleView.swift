@@ -36,10 +36,10 @@ struct PeopleView: View {
                             .foregroundStyle(AccentTheme.saffron.color)
                         VStack(alignment: .leading, spacing: 1) {
                             Text("Year in milestones")
-                                .font(.system(size: 15, weight: .semibold))
+                                .font(.flSubheadline.weight(.semibold))
                                 .foregroundStyle(WarmPalette.ink1)
                             Text("Everything the family celebrated, year by year")
-                                .font(.system(size: 12))
+                                .font(.flCaption)
                                 .foregroundStyle(WarmPalette.ink3)
                         }
                         Spacer()
@@ -79,10 +79,10 @@ struct PeopleView: View {
                 .font(.system(size: 34))
                 .foregroundStyle(WarmPalette.ink4)
             Text("Your family's people")
-                .font(.system(size: 17, weight: .semibold))
+                .font(.flHeadline)
                 .foregroundStyle(WarmPalette.ink1)
             Text("Household members appear automatically. Add the kids as dependents to track their milestones, dates, and ideas.")
-                .font(.system(size: 13))
+                .font(.flFootnote)
                 .foregroundStyle(WarmPalette.ink3)
                 .multilineTextAlignment(.center)
         }
@@ -97,18 +97,18 @@ struct PeopleView: View {
                     .fill(person.accentColor.opacity(0.18))
                     .frame(width: 52, height: 52)
                 Text(String(person.name.prefix(1)).uppercased())
-                    .font(.system(size: 21, weight: .bold))
+                    .font(.flTitle)
                     .foregroundStyle(person.accentColor)
             }
 
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 7) {
                     Text(person.name)
-                        .font(.system(size: 16, weight: .semibold))
+                        .font(.flHeadline)
                         .foregroundStyle(WarmPalette.ink1)
                     if person.isDependent {
                         Text("Kid")
-                            .font(.system(size: 10, weight: .bold))
+                            .font(.flOverline.weight(.bold))
                             .foregroundStyle(person.accentColor)
                             .padding(.horizontal, 7)
                             .padding(.vertical, 2)
@@ -138,7 +138,7 @@ struct PeopleView: View {
             Image(systemName: icon)
                 .font(.system(size: 9))
             Text("\(count ?? 0)")
-                .font(.system(size: 11, weight: .medium))
+                .font(.flOverline)
         }
         .foregroundStyle(WarmPalette.ink3)
     }
@@ -205,7 +205,7 @@ struct AddPersonSheet: View {
                     }
                 }
                 if let error {
-                    Text(error).foregroundStyle(.red).font(.system(size: 13))
+                    Text(error).foregroundStyle(.red).font(.flFootnote)
                 }
             }
             .navigationTitle("Add a person")
@@ -296,10 +296,10 @@ struct YearRecapView: View {
                             .font(.system(size: 30))
                             .foregroundStyle(WarmPalette.ink4)
                         Text("No milestones in \(String(selectedYear)) yet")
-                            .font(.system(size: 15, weight: .semibold))
+                            .font(.flSubheadline.weight(.semibold))
                             .foregroundStyle(WarmPalette.ink1)
                         Text("Log the family's moments from each person's card, and this page becomes the story of your year.")
-                            .font(.system(size: 12.5))
+                            .font(.flFootnote)
                             .foregroundStyle(WarmPalette.ink3)
                             .multilineTextAlignment(.center)
                     }
@@ -308,7 +308,7 @@ struct YearRecapView: View {
                 } else {
                     HStack {
                         Text("\(yearMilestones.count) moment\(yearMilestones.count == 1 ? "" : "s") in \(String(selectedYear))")
-                            .font(.system(size: 13, weight: .semibold))
+                            .font(.flFootnote.weight(.semibold))
                             .foregroundStyle(WarmPalette.ink3)
                         Spacer()
                     }
@@ -317,10 +317,10 @@ struct YearRecapView: View {
                         VStack(alignment: .leading, spacing: 8) {
                             HStack(spacing: 8) {
                                 Text(group.name)
-                                    .font(.system(size: 16, weight: .bold))
+                                    .font(.flHeadline)
                                     .foregroundStyle(WarmPalette.ink1)
                                 Text("\(group.items.count)")
-                                    .font(.system(size: 11, weight: .bold))
+                                    .font(.flOverline.weight(.bold))
                                     .foregroundStyle(AccentTheme.saffron.color)
                                     .padding(.horizontal, 7)
                                     .padding(.vertical, 2)
@@ -335,11 +335,11 @@ struct YearRecapView: View {
                                         .frame(width: 26)
                                     VStack(alignment: .leading, spacing: 1) {
                                         Text(m.title)
-                                            .font(.system(size: 14, weight: .semibold))
+                                            .font(.flSubheadline.weight(.semibold))
                                             .foregroundStyle(WarmPalette.ink1)
                                         if let date = DateFormatter.isoDate.date(from: String(m.milestone_date.prefix(10))) {
                                             Text(DateFormatter.longMonthDay.string(from: date))
-                                                .font(.system(size: 11.5))
+                                                .font(.flCaption)
                                                 .foregroundStyle(WarmPalette.ink3)
                                         }
                                     }

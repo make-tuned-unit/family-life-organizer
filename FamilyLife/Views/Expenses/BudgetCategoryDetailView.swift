@@ -25,7 +25,7 @@ struct BudgetCategoryDetailView: View {
                 VStack(alignment: .leading, spacing: 12) {
                     HStack {
                         Text(category.category)
-                            .font(.system(size: 24, weight: .bold))
+                            .font(.flTitle)
                             .foregroundStyle(WarmPalette.ink1)
                         Spacer()
                     }
@@ -37,7 +37,7 @@ struct BudgetCategoryDetailView: View {
                             .tracking(-0.8)
                         if let limit = category.monthly_limit {
                             Text("of $\(Int(limit))")
-                                .font(.system(size: 15))
+                                .font(.flSubheadline)
                                 .foregroundStyle(WarmPalette.ink3)
                         }
                     }
@@ -47,7 +47,7 @@ struct BudgetCategoryDetailView: View {
                     if let limit = category.monthly_limit {
                         let remaining = max(0, limit - category.spent)
                         Text("$\(Int(remaining)) remaining this month")
-                            .font(.system(size: 13))
+                            .font(.flFootnote)
                             .foregroundStyle(WarmPalette.ink3)
                     }
                 }
@@ -86,7 +86,7 @@ struct BudgetCategoryDetailView: View {
                             .font(.system(size: 28))
                             .foregroundStyle(WarmPalette.ink4)
                         Text("No receipts in \(category.category)")
-                            .font(.system(size: 14))
+                            .font(.flSubheadline)
                             .foregroundStyle(WarmPalette.ink3)
                     }
                     .frame(maxWidth: .infinity)

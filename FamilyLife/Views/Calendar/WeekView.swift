@@ -22,10 +22,10 @@ struct WeekView: View {
                     } label: {
                         VStack(spacing: 2) {
                             Text(dayName(day))
-                                .font(.system(size: 10, weight: .semibold))
+                                .font(.flOverline)
                                 .foregroundStyle(isSelected ? WarmPalette.cream1.opacity(0.7) : WarmPalette.ink3)
                             Text("\(calendar.component(.day, from: day))")
-                                .font(.system(size: 17, weight: .bold))
+                                .font(.flHeadline)
                                 .foregroundStyle(isSelected ? WarmPalette.cream1 : isToday ? AccentTheme.terracotta.color : WarmPalette.ink1)
                         }
                         .frame(maxWidth: .infinity)
@@ -57,7 +57,7 @@ struct WeekView: View {
                             .font(.system(size: 28))
                             .foregroundStyle(WarmPalette.ink4)
                         Text("Nothing scheduled")
-                            .font(.system(size: 15))
+                            .font(.flSubheadline)
                             .foregroundStyle(WarmPalette.ink3)
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -105,7 +105,7 @@ struct WeekAgendaRow: View {
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(appointment.title)
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(.flSubheadline.weight(.semibold))
                     .foregroundStyle(WarmPalette.ink1)
                 HStack(spacing: 6) {
                     if let time = appointment.appointment_time, !time.isEmpty {
@@ -118,7 +118,7 @@ struct WeekAgendaRow: View {
                         Label(tags, systemImage: "person")
                     }
                 }
-                .font(.system(size: 13))
+                .font(.flFootnote)
                 .foregroundStyle(WarmPalette.ink3)
             }
             Spacer()

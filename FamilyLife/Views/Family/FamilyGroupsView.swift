@@ -94,16 +94,16 @@ struct FamilyGroupsView: View {
         HStack {
             VStack(alignment: .leading, spacing: 4) {
                 Text("YOUR PEOPLE")
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(.flOverline)
                     .foregroundStyle(WarmPalette.ink3)
                     .tracking(0.4)
                 Text("Family")
-                    .font(.system(size: 28, weight: .bold))
+                    .font(.flScreenTitle)
                     .foregroundStyle(WarmPalette.ink1)
             }
             Spacer()
         }
-        .padding(.horizontal, 22)
+        .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
         .padding(.top, 14)
         .padding(.bottom, 16)
     }
@@ -120,10 +120,10 @@ struct FamilyGroupsView: View {
                         GroupAvatar(groupId: hh.id, name: hh.name, size: 36)
                         VStack(alignment: .leading, spacing: 2) {
                             Text(hh.name)
-                                .font(.system(size: 17, weight: .semibold))
+                                .font(.flHeadline)
                                 .foregroundStyle(WarmPalette.ink1)
                             Text("\(hh.member_count ?? 1) members")
-                                .font(.system(size: 13))
+                                .font(.flFootnote)
                                 .foregroundStyle(WarmPalette.ink3)
                         }
                         Spacer()
@@ -197,7 +197,7 @@ struct FamilyGroupsView: View {
                             Image(systemName: "person.badge.plus")
                                 .font(.system(size: 16))
                             Text("Add your first family member")
-                                .font(.system(size: 15, weight: .medium))
+                                .font(.flSubheadline.weight(.medium))
                         }
                         .foregroundStyle(AccentTheme.sage.color)
                         .frame(maxWidth: .infinity)
@@ -222,13 +222,13 @@ struct GroupRow: View {
             GroupAvatar(groupId: group.id, name: group.name, size: 32)
             VStack(alignment: .leading, spacing: 2) {
                 Text(group.name)
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(.flSubheadline.weight(.semibold))
                     .foregroundStyle(WarmPalette.ink1)
                 HStack(spacing: 6) {
                     Text(group.group_type.capitalized)
                     Text("\(group.member_count ?? 0) members")
                 }
-                .font(.system(size: 13))
+                .font(.flFootnote)
                 .foregroundStyle(WarmPalette.ink3)
             }
             Spacer()
@@ -253,11 +253,11 @@ struct ContactRow: View {
             UserAvatar(name: contact.name, userId: household.userId(for: contact.name), size: 36)
             VStack(alignment: .leading, spacing: 2) {
                 Text(contact.name)
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(.flSubheadline.weight(.semibold))
                     .foregroundStyle(WarmPalette.ink1)
                 if let relationship = contact.relationship, !relationship.isEmpty {
                     Text(relationship.capitalized)
-                        .font(.system(size: 13))
+                        .font(.flFootnote)
                         .foregroundStyle(WarmPalette.ink3)
                 }
             }
@@ -315,10 +315,10 @@ struct GroupDetailView: View {
                         .buttonStyle(.plain)
                     VStack(spacing: 4) {
                         Text(group.name)
-                            .font(.system(size: 24, weight: .bold))
+                            .font(.flTitle)
                             .foregroundStyle(WarmPalette.ink1)
                         Text("\(group.group_type.capitalized) \u{00B7} \(members.count) members")
-                            .font(.system(size: 13))
+                            .font(.flFootnote)
                             .foregroundStyle(WarmPalette.ink3)
                     }
                 }
@@ -359,7 +359,7 @@ struct GroupDetailView: View {
                                 Image(systemName: "message.fill")
                                     .font(.system(size: 14))
                                 Text("Send invite")
-                                    .font(.system(size: 14, weight: .semibold))
+                                    .font(.flSubheadline.weight(.semibold))
                             }
                             .foregroundStyle(WarmPalette.cream1)
                             .frame(maxWidth: .infinity)
@@ -383,7 +383,7 @@ struct GroupDetailView: View {
                         ForEach(["Feed", "Members"], id: \.self) { tab in
                             let index = tab == "Feed" ? 0 : 1
                             Text(tab)
-                                .font(.system(size: 13, weight: .semibold))
+                                .font(.flFootnote.weight(.semibold))
                                 .foregroundStyle(selectedTab == index ? WarmPalette.cream1 : WarmPalette.ink2)
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 8)
@@ -394,7 +394,7 @@ struct GroupDetailView: View {
                     }
                     .padding(4)
                     .background(WarmPalette.cardSurface, in: Capsule())
-                    .padding(.horizontal, 22)
+                    .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
                     .padding(.bottom, 14)
 
                     if selectedTab == 0 {
@@ -488,7 +488,7 @@ struct GroupDetailView: View {
                     .clipShape(Circle())
                     .overlay(Circle().stroke(.white.opacity(0.3), lineWidth: 1))
             } else {
-                FamilyAvatar(initial: String(group.name.prefix(1)).uppercased(), size: 72)
+                FamilyAvatar(initial: String(group.name.prefix(1)).uppercased(), size: 72, name: group.name)
             }
         }
         .overlay(alignment: .bottomTrailing) {
@@ -563,10 +563,10 @@ struct GroupDetailView: View {
         VStack(spacing: 8) {
             ForEach(members) { member in
                 HStack(spacing: 12) {
-                    FamilyAvatar(initial: member.initial, size: 36)
+                    FamilyAvatar(initial: member.initial, size: 36, name: member.displayName)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(member.displayName)
-                            .font(.system(size: 15, weight: .semibold))
+                            .font(.flSubheadline.weight(.semibold))
                             .foregroundStyle(WarmPalette.ink1)
                         HStack(spacing: 6) {
                             if let rel = member.relationship {
@@ -574,7 +574,7 @@ struct GroupDetailView: View {
                             }
                             Text(member.role)
                         }
-                        .font(.system(size: 13))
+                        .font(.flFootnote)
                         .foregroundStyle(WarmPalette.ink3)
                     }
                     Spacer()
@@ -595,7 +595,7 @@ struct GroupDetailView: View {
                     Image(systemName: "person.badge.plus")
                         .font(.system(size: 14))
                     Text("Add a family member")
-                        .font(.system(size: 14, weight: .medium))
+                        .font(.flSubheadline.weight(.medium))
                 }
                 .foregroundStyle(TabAccent.home.color)
                 .frame(maxWidth: .infinity)
@@ -610,7 +610,7 @@ struct GroupDetailView: View {
                     Image(systemName: isCreator ? "trash" : "rectangle.portrait.and.arrow.right")
                         .font(.system(size: 14))
                     Text(isCreator ? "Delete this group" : "Leave this group")
-                        .font(.system(size: 14, weight: .medium))
+                        .font(.flSubheadline.weight(.medium))
                 }
                 .foregroundStyle(WarmPalette.bad)
                 .frame(maxWidth: .infinity)
@@ -707,14 +707,15 @@ struct AddGroupMemberSheet: View {
                                 HStack(spacing: 10) {
                                     FamilyAvatar(
                                         initial: contact.avatar_initial ?? String(contact.name.prefix(1)).uppercased(),
-                                        size: 28
+                                        size: 28,
+                                        name: contact.name
                                     )
                                     Text(contact.name)
-                                        .font(.system(size: 15))
+                                        .font(.flSubheadline)
                                         .foregroundStyle(.primary)
                                     if let rel = contact.relationship {
                                         Text(rel.capitalized)
-                                            .font(.system(size: 12))
+                                            .font(.flCaption)
                                             .foregroundStyle(WarmPalette.ink3)
                                     }
                                 }
@@ -772,11 +773,11 @@ struct FeedPostCard: View {
                 UserAvatar(name: post.author_name ?? "?", userId: post.author_id, size: 32)
                 VStack(alignment: .leading, spacing: 1) {
                     Text(post.author_name ?? "Unknown")
-                        .font(.system(size: 14, weight: .semibold))
+                        .font(.flSubheadline.weight(.semibold))
                         .foregroundStyle(WarmPalette.ink1)
                     if let date = post.created_at {
                         Text(String(date.prefix(10)))
-                            .font(.system(size: 11))
+                            .font(.flCaption)
                             .foregroundStyle(WarmPalette.ink3)
                     }
                 }
@@ -787,12 +788,12 @@ struct FeedPostCard: View {
             // Content
             if let title = post.title, !title.isEmpty {
                 Text(title)
-                    .font(.system(size: 16, weight: .semibold))
+                    .font(.flHeadline)
                     .foregroundStyle(WarmPalette.ink1)
             }
             if let body = post.body, !body.isEmpty {
                 Text(body)
-                    .font(.system(size: 15))
+                    .font(.flSubheadline)
                     .foregroundStyle(WarmPalette.ink2)
             }
             if let url = post.link_url, !url.isEmpty {
@@ -800,7 +801,7 @@ struct FeedPostCard: View {
                     Image(systemName: "link")
                         .font(.system(size: 12))
                     Text(url)
-                        .font(.system(size: 13))
+                        .font(.flFootnote)
                         .lineLimit(1)
                 }
                 .foregroundStyle(AccentTheme.ocean.color)
@@ -812,13 +813,13 @@ struct FeedPostCard: View {
                     Image(systemName: "heart")
                         .font(.system(size: 13))
                     Text("\(post.reaction_count)")
-                        .font(.system(size: 13))
+                        .font(.flFootnote)
                 }
                 HStack(spacing: 4) {
                     Image(systemName: "bubble.right")
                         .font(.system(size: 13))
                     Text("\(post.comment_count)")
-                        .font(.system(size: 13))
+                        .font(.flFootnote)
                 }
                 Spacer()
             }
@@ -843,7 +844,7 @@ struct FeedPostCard: View {
             Image(systemName: icon)
                 .font(.system(size: 10))
             Text(label)
-                .font(.system(size: 10, weight: .semibold))
+                .font(.flOverline)
         }
         .foregroundStyle(color)
         .padding(.horizontal, 8)
@@ -957,10 +958,10 @@ struct NewGroupSheet: View {
                                     .frame(width: 32)
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(type.1)
-                                        .font(.system(size: 15, weight: .medium))
+                                        .font(.flSubheadline.weight(.medium))
                                         .foregroundStyle(.primary)
                                     Text(type.3)
-                                        .font(.system(size: 12))
+                                        .font(.flCaption)
                                         .foregroundStyle(WarmPalette.ink3)
                                 }
                                 Spacer()

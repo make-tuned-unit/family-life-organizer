@@ -18,16 +18,16 @@ struct TripsView: View {
                 HStack {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(viewModel.activeTrip != nil ? "IN PROGRESS" : "NO ACTIVE TRIP")
-                            .font(.system(size: 11, weight: .semibold))
+                            .font(.flOverline)
                             .foregroundStyle(WarmPalette.ink3)
                             .tracking(0.4)
                         Text("Trips")
-                            .font(.system(size: 28, weight: .bold))
+                            .font(.flScreenTitle)
                             .foregroundStyle(WarmPalette.ink1)
                     }
                     Spacer()
                 }
-                .padding(.horizontal, 22)
+                .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
                 .padding(.top, 14)
                 .padding(.bottom, 16)
 
@@ -48,7 +48,7 @@ struct TripsView: View {
                             Image(systemName: "car.fill")
                                 .font(.system(size: 16))
                             Text("Start a Trip")
-                                .font(.system(size: 16, weight: .semibold))
+                                .font(.flHeadline)
                         }
                         .foregroundStyle(WarmPalette.cream1)
                         .frame(maxWidth: .infinity)
@@ -234,7 +234,7 @@ struct TripStatusHeader: View {
                     if isCurrentUser {
                         ProfileAvatar(size: 28)
                     } else {
-                        FamilyAvatar(initial: String(trip.traveler.prefix(1)).uppercased(), size: 28)
+                        FamilyAvatar(initial: String(trip.traveler.prefix(1)).uppercased(), size: 28, name: trip.traveler)
                     }
                     Text("\(trip.traveler.capitalized) is on the way to \(trip.destination)")
                         .font(.headline)
@@ -601,11 +601,11 @@ struct LocationPermissionBanner: View {
                     .font(.system(size: 20))
                     .foregroundStyle(AccentTheme.saffron.color)
                 Text("Background tracking limited")
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(.flSubheadline.weight(.semibold))
                     .foregroundStyle(WarmPalette.ink1)
             }
             Text("Enable \"Always\" location so your trip stays tracked even when you switch apps or lock your phone.")
-                .font(.system(size: 12))
+                .font(.flCaption)
                 .foregroundStyle(WarmPalette.ink3)
 
             if locationService.canRequestAlways {
@@ -613,7 +613,7 @@ struct LocationPermissionBanner: View {
                     locationService.requestTripTrackingPermission()
                 } label: {
                     Text("Enable Always Location")
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(.flFootnote.weight(.semibold))
                         .foregroundStyle(.white)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 8)
@@ -627,7 +627,7 @@ struct LocationPermissionBanner: View {
                         Image(systemName: "gear")
                             .font(.system(size: 12))
                         Text("Open Settings")
-                            .font(.system(size: 13, weight: .semibold))
+                            .font(.flFootnote.weight(.semibold))
                     }
                     .foregroundStyle(AccentTheme.saffron.color)
                     .frame(maxWidth: .infinity)

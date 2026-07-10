@@ -120,10 +120,10 @@ struct HouseholdView: View {
                         .frame(width: 28)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(household.householdGroup?.name ?? "My Household")
-                            .font(.system(size: 17, weight: .semibold))
+                            .font(.flHeadline)
                             .foregroundStyle(WarmPalette.ink1)
                         Text("Tap to rename")
-                            .font(.system(size: 12))
+                            .font(.flCaption)
                             .foregroundStyle(WarmPalette.ink4)
                     }
                     Spacer()
@@ -155,7 +155,7 @@ struct HouseholdView: View {
                     HStack {
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Invite Code")
-                                .font(.system(size: 13, weight: .medium))
+                                .font(.flFootnote.weight(.medium))
                                 .foregroundStyle(WarmPalette.ink3)
                             Text(code)
                                 .font(.system(size: 22, weight: .bold, design: .monospaced))
@@ -220,15 +220,15 @@ struct HouseholdView: View {
                         ProfileAvatar(size: 36)
                         VStack(alignment: .leading, spacing: 2) {
                             Text(user.name)
-                                .font(.system(size: 15, weight: .semibold))
+                                .font(.flSubheadline.weight(.semibold))
                                 .foregroundStyle(WarmPalette.ink1)
                             if let phone = myContact?.phone, !phone.isEmpty {
                                 Text(phone)
-                                    .font(.system(size: 12))
+                                    .font(.flCaption)
                                     .foregroundStyle(WarmPalette.ink3)
                             } else {
                                 Text("Tap to add your contact info")
-                                    .font(.system(size: 12))
+                                    .font(.flCaption)
                                     .foregroundStyle(WarmPalette.ink4)
                             }
                         }
@@ -258,10 +258,10 @@ struct HouseholdView: View {
                         .font(.system(size: 28))
                         .foregroundStyle(WarmPalette.ink4)
                     Text("No family members yet")
-                        .font(.system(size: 14))
+                        .font(.flSubheadline)
                         .foregroundStyle(WarmPalette.ink3)
                     Text("Share your invite code or add family members manually.")
-                        .font(.system(size: 12))
+                        .font(.flCaption)
                         .foregroundStyle(WarmPalette.ink4)
                         .multilineTextAlignment(.center)
                 }
@@ -287,11 +287,11 @@ struct HouseholdView: View {
                     HStack {
                         VStack(alignment: .leading, spacing: 4) {
                             Text(addr.name)
-                                .font(.system(size: 15, weight: .medium))
+                                .font(.flSubheadline.weight(.medium))
                                 .foregroundStyle(WarmPalette.ink1)
                             if let address = addr.address, !address.isEmpty {
                                 Text(address)
-                                    .font(.system(size: 13))
+                                    .font(.flFootnote)
                                     .foregroundStyle(WarmPalette.ink3)
                             }
                         }
@@ -526,7 +526,7 @@ struct EditMemberSheet: View {
                                 workLng = 0
                             } label: {
                                 Label("Remove office address", systemImage: "trash")
-                                    .font(.system(size: 14))
+                                    .font(.flSubheadline)
                             }
                         }
                     } header: {
@@ -761,15 +761,15 @@ struct HouseholdMemberRow: View {
                         .frame(width: 36, height: 36)
                         .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
                 } else {
-                    FamilyAvatar(initial: member.initial, size: 36)
+                    FamilyAvatar(initial: member.initial, size: 36, name: member.displayName)
                 }
                 VStack(alignment: .leading, spacing: 2) {
                     Text(member.displayName)
-                        .font(.system(size: 15, weight: .semibold))
+                        .font(.flSubheadline.weight(.semibold))
                         .foregroundStyle(WarmPalette.ink1)
                     if let rel = contact?.relationship ?? member.relationship {
                         Text(rel.capitalized)
-                            .font(.system(size: 12))
+                            .font(.flCaption)
                             .foregroundStyle(WarmPalette.ink3)
                     }
                 }
@@ -809,15 +809,16 @@ struct MemberRow: View {
             HStack(spacing: 12) {
                 FamilyAvatar(
                     initial: member.avatar_initial ?? String(member.name.prefix(1)).uppercased(),
-                    size: 36
+                    size: 36,
+                    name: member.name
                 )
                 VStack(alignment: .leading, spacing: 2) {
                     Text(member.name)
-                        .font(.system(size: 15, weight: .semibold))
+                        .font(.flSubheadline.weight(.semibold))
                         .foregroundStyle(WarmPalette.ink1)
                     if let rel = member.relationship {
                         Text(rel.capitalized)
-                            .font(.system(size: 12))
+                            .font(.flCaption)
                             .foregroundStyle(WarmPalette.ink3)
                     }
                 }

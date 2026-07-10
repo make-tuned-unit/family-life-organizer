@@ -115,16 +115,16 @@ struct FamilyListsView: View {
         HStack {
             VStack(alignment: .leading, spacing: 4) {
                 Text("\(lists.count) LISTS")
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(.flOverline)
                     .foregroundStyle(WarmPalette.ink3)
                     .tracking(0.4)
                 Text("Lists")
-                    .font(.system(size: 28, weight: .bold))
+                    .font(.flScreenTitle)
                     .foregroundStyle(WarmPalette.ink1)
             }
             Spacer()
         }
-        .padding(.horizontal, 22)
+        .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
         .padding(.top, 14)
         .padding(.bottom, 8)
     }
@@ -145,10 +145,10 @@ struct FamilyListsView: View {
                         Image(systemName: "checkmark.circle.fill")
                             .font(.system(size: 12))
                         Text("Tasks")
-                            .font(.system(size: 13, weight: .semibold))
+                            .font(.flFootnote.weight(.semibold))
                         if activeTaskCount > 0 {
                             Text("\(activeTaskCount)")
-                                .font(.system(size: 11, weight: .bold))
+                                .font(.flOverline.weight(.bold))
                                 .foregroundStyle(tasksSelected ? WarmPalette.cream1.opacity(0.7) : WarmPalette.ink3)
                         }
                     }
@@ -173,10 +173,10 @@ struct FamilyListsView: View {
                             Image(systemName: list.isPinned ? "pin.fill" : (list.icon ?? "list.bullet"))
                                 .font(.system(size: 12))
                             Text(list.name)
-                                .font(.system(size: 13, weight: .semibold))
+                                .font(.flFootnote.weight(.semibold))
                             if let count = list.active_count, count > 0 {
                                 Text("\(count)")
-                                    .font(.system(size: 11, weight: .bold))
+                                    .font(.flOverline.weight(.bold))
                                     .foregroundStyle(isActive ? WarmPalette.cream1.opacity(0.7) : WarmPalette.ink3)
                             }
                         }
@@ -219,14 +219,14 @@ struct FamilyListsView: View {
                 Button { showingNewList = true } label: {
                     HStack(spacing: 4) {
                         Image(systemName: "plus").font(.system(size: 11))
-                        Text("New").font(.system(size: 13, weight: .medium))
+                        Text("New").font(.flFootnote.weight(.medium))
                     }
                     .foregroundStyle(WarmPalette.ink3)
                     .padding(.horizontal, 12).padding(.vertical, 8)
                     .overlay(Capsule().strokeBorder(style: StrokeStyle(lineWidth: 1, dash: [4])).foregroundStyle(WarmPalette.ink1.opacity(0.08)))
                 }
             }
-            .padding(.horizontal, 22)
+            .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
         }
         .padding(.bottom, 12)
     }
@@ -310,7 +310,7 @@ struct ListDetailSection: View {
                     }
                 }
             }
-            .padding(.horizontal, 22)
+            .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
             .padding(.bottom, 14)
 
             if list.isGrocery {
@@ -353,10 +353,10 @@ struct ListDetailSection: View {
                     } label: {
                         HStack {
                             Text("Completed")
-                                .font(.system(size: 13, weight: .semibold))
+                                .font(.flFootnote.weight(.semibold))
                                 .foregroundStyle(WarmPalette.ink3)
                             Text("\(doneItems.count)")
-                                .font(.system(size: 12, weight: .bold))
+                                .font(.flCaption.weight(.bold))
                                 .foregroundStyle(WarmPalette.ink4)
                             Spacer()
                             Image(systemName: "chevron.right")
@@ -402,10 +402,10 @@ struct ListDetailSection: View {
                                 .font(.system(size: 12))
                                 .foregroundStyle(TabAccent.home.color)
                             Text(group.category)
-                                .font(.system(size: 13, weight: .bold))
+                                .font(.flFootnote.weight(.bold))
                                 .foregroundStyle(WarmPalette.ink2)
                             Text("\(group.items.count)")
-                                .font(.system(size: 11, weight: .semibold))
+                                .font(.flOverline)
                                 .foregroundStyle(WarmPalette.ink4)
                             Spacer()
                         }
@@ -432,10 +432,10 @@ struct ListDetailSection: View {
                     } label: {
                         HStack {
                             Text("Completed")
-                                .font(.system(size: 13, weight: .semibold))
+                                .font(.flFootnote.weight(.semibold))
                                 .foregroundStyle(WarmPalette.ink3)
                             Text("\(doneItems.count)")
-                                .font(.system(size: 12, weight: .bold))
+                                .font(.flCaption.weight(.bold))
                                 .foregroundStyle(WarmPalette.ink4)
                             Spacer()
                             Image(systemName: "chevron.right")
@@ -489,7 +489,7 @@ struct ListDetailSection: View {
                     .onSubmit { commitEdit(item) }
             } else {
                 Text(item.title)
-                    .font(.system(size: 15))
+                    .font(.flSubheadline)
                     .foregroundStyle(item.isDone ? WarmPalette.ink3 : WarmPalette.ink1)
                     .strikethrough(item.isDone)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -557,7 +557,7 @@ struct ListDetailSection: View {
                     .onSubmit { commitEdit(item) }
             } else {
                 Text(item.title)
-                    .font(.system(size: 15))
+                    .font(.flSubheadline)
                     .foregroundStyle(item.isDone ? WarmPalette.ink3 : WarmPalette.ink1)
                     .strikethrough(item.isDone)
                     .onTapGesture {
@@ -583,7 +583,7 @@ struct ListDetailSection: View {
                 }
             } else if let by = item.added_by, !by.isEmpty, !item.isDone {
                 Text(by)
-                    .font(.system(size: 11))
+                    .font(.flCaption)
                     .foregroundStyle(WarmPalette.ink4)
             }
         }
@@ -756,9 +756,9 @@ struct NewListSheet: View {
                                 .foregroundStyle(TabAccent.home.color)
                             VStack(alignment: .leading, spacing: 2) {
                                 Text("Grocery List")
-                                    .font(.system(size: 15, weight: .medium))
+                                    .font(.flSubheadline.weight(.medium))
                                 Text("Auto-sort items into categories like Produce, Dairy, Meat")
-                                    .font(.system(size: 12))
+                                    .font(.flCaption)
                                     .foregroundStyle(WarmPalette.ink3)
                             }
                         }
@@ -889,7 +889,7 @@ struct TasksDetailSection: View {
                     }
                 }
             }
-            .padding(.horizontal, 22)
+            .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
             .padding(.bottom, 14)
 
             ScrollView(showsIndicators: false) {
@@ -907,10 +907,10 @@ struct TasksDetailSection: View {
                         VStack(spacing: 0) {
                             HStack(spacing: 8) {
                                 Text(group.category)
-                                    .font(.system(size: 13, weight: .bold))
+                                    .font(.flFootnote.weight(.bold))
                                     .foregroundStyle(WarmPalette.ink2)
                                 Text("\(group.items.count)")
-                                    .font(.system(size: 11, weight: .semibold))
+                                    .font(.flOverline)
                                     .foregroundStyle(WarmPalette.ink4)
                                 Spacer()
                             }
@@ -936,10 +936,10 @@ struct TasksDetailSection: View {
                         } label: {
                             HStack {
                                 Text("Completed")
-                                    .font(.system(size: 13, weight: .semibold))
+                                    .font(.flFootnote.weight(.semibold))
                                     .foregroundStyle(WarmPalette.ink3)
                                 Text("\(doneTasks.count)")
-                                    .font(.system(size: 12, weight: .bold))
+                                    .font(.flCaption.weight(.bold))
                                     .foregroundStyle(WarmPalette.ink4)
                                 Spacer()
                                 Image(systemName: "chevron.right")
@@ -981,12 +981,12 @@ struct TasksDetailSection: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(task.title)
-                    .font(.system(size: 15))
+                    .font(.flSubheadline)
                     .foregroundStyle(isDone ? WarmPalette.ink4 : WarmPalette.ink1)
                     .strikethrough(isDone, color: WarmPalette.ink4)
                 if let due = dueLabel(task) {
                     Text(due.text)
-                        .font(.system(size: 12, weight: .medium))
+                        .font(.flCaption.weight(.medium))
                         .foregroundStyle(due.overdue ? WarmPalette.bad : WarmPalette.ink3)
                 }
             }

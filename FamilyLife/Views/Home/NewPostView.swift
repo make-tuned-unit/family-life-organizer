@@ -31,10 +31,11 @@ struct NewPostView: View {
                                         HStack(spacing: 8) {
                                             FamilyAvatar(
                                                 initial: member.avatar_initial ?? String(member.name.prefix(1)).uppercased(),
-                                                size: 24
+                                                size: 24,
+                                                name: member.name
                                             )
                                             Text(member.name)
-                                                .font(.system(size: 14, weight: .medium))
+                                                .font(.flSubheadline.weight(.medium))
                                                 .foregroundStyle(WarmPalette.ink1)
                                         }
                                         .padding(.vertical, 6)
@@ -63,10 +64,10 @@ struct NewPostView: View {
                                         .frame(width: 24)
                                     VStack(alignment: .leading, spacing: 2) {
                                         Text(group.name)
-                                            .font(.system(size: 15, weight: .medium))
+                                            .font(.flSubheadline.weight(.medium))
                                             .foregroundStyle(.primary)
                                         Text(groupLabel(group.group_type))
-                                            .font(.system(size: 12))
+                                            .font(.flCaption)
                                             .foregroundStyle(WarmPalette.ink3)
                                     }
                                     Spacer()

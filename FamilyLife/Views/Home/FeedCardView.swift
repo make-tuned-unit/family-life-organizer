@@ -46,7 +46,7 @@ struct FeedCard: View {
                     let bodyFollows = prepared.body != nil || (item.body.map { !$0.isEmpty } ?? false)
                     let countsFollow = prepared.isPost && !isExpanded
                     Text(title)
-                        .font(.system(size: 15, weight: .semibold))
+                        .font(.flSubheadline.weight(.semibold))
                         .foregroundStyle(WarmPalette.ink1)
                         .padding(.horizontal, 14)
                         .padding(.bottom, (bodyFollows || countsFollow) ? 4 : 14)
@@ -56,14 +56,14 @@ struct FeedCard: View {
             // Body text — for posts (attributed) and non-posts (plain)
             if let body = prepared.body {
                 Text(body)
-                    .font(.system(size: 15))
+                    .font(.flSubheadline)
                     .foregroundStyle(WarmPalette.ink1)
                     .lineSpacing(3)
                     .padding(.horizontal, 14)
                     .padding(.bottom, 12)
             } else if let bodyText = item.body, !bodyText.isEmpty {
                 Text(bodyText)
-                    .font(.system(size: 14))
+                    .font(.flSubheadline)
                     .foregroundStyle(WarmPalette.ink2)
                     .lineSpacing(2)
                     .padding(.horizontal, 14)
@@ -134,10 +134,10 @@ struct FeedCard: View {
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
                     Text(item.author ?? "Someone")
-                        .font(.system(size: 14, weight: .semibold))
+                        .font(.flSubheadline.weight(.semibold))
                         .foregroundStyle(WarmPalette.ink1)
                     Text(typeBadge)
-                        .font(.system(size: 10, weight: .semibold))
+                        .font(.flOverline)
                         .foregroundStyle(prepared.accentColor)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
@@ -222,7 +222,7 @@ struct FeedCard: View {
                         .foregroundStyle(isLiked ? WarmPalette.bad : WarmPalette.ink3)
                     if displayLikeCount > 0 {
                         Text("\(displayLikeCount)")
-                            .font(.system(size: 12, weight: .medium))
+                            .font(.flCaption.weight(.medium))
                             .foregroundStyle(isLiked ? WarmPalette.bad : WarmPalette.ink3)
                     }
                 }
@@ -244,7 +244,7 @@ struct FeedCard: View {
                         .font(.system(size: 12))
                         .foregroundStyle(WarmPalette.ink3)
                     Text("Close")
-                        .font(.system(size: 12, weight: .medium))
+                        .font(.flCaption.weight(.medium))
                         .foregroundStyle(WarmPalette.ink3)
                 }
                 .frame(maxWidth: .infinity)
@@ -280,10 +280,11 @@ struct FeedCard: View {
                             HStack(spacing: 8) {
                                 FamilyAvatar(
                                     initial: member.avatar_initial ?? String(member.name.prefix(1)).uppercased(),
-                                    size: 20
+                                    size: 20,
+                                    name: member.name
                                 )
                                 Text(member.name)
-                                    .font(.system(size: 13, weight: .medium))
+                                    .font(.flFootnote.weight(.medium))
                                     .foregroundStyle(WarmPalette.ink1)
                             }
                             .padding(.horizontal, 14)
@@ -328,7 +329,7 @@ struct FeedCard: View {
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 6) {
                     Text(comment.user_name ?? "Someone")
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(.flFootnote.weight(.semibold))
                         .foregroundStyle(WarmPalette.ink1)
                     if let created = comment.created_at {
                         Text(HomeViewModel.formatRelativeTime(created))
@@ -337,7 +338,7 @@ struct FeedCard: View {
                     }
                 }
                 Text(Self.buildCommentBody(comment.text, accent: prepared.accentColor))
-                    .font(.system(size: 14))
+                    .font(.flSubheadline)
                     .foregroundStyle(WarmPalette.ink2)
                     .lineSpacing(2)
             }

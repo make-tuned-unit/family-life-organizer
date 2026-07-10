@@ -22,10 +22,10 @@ struct SignUpView: View {
                             .foregroundStyle(AccentTheme.sage.color)
                             .padding(.bottom, 8)
                         Text("Create Account")
-                            .font(.system(size: 28, weight: .bold))
+                            .font(.flScreenTitle)
                             .foregroundStyle(WarmPalette.ink1)
                         Text("Set up your family hub")
-                            .font(.system(size: 15))
+                            .font(.flSubheadline)
                             .foregroundStyle(WarmPalette.ink3)
                     }
                     .padding(.top, 30)
@@ -49,7 +49,7 @@ struct SignUpView: View {
                                 Image(systemName: hasInviteCode ? "checkmark.circle.fill" : "envelope.badge")
                                     .foregroundStyle(hasInviteCode ? AccentTheme.sage.color : WarmPalette.ink3)
                                 Text("I have an invite code")
-                                    .font(.system(size: 14, weight: .medium))
+                                    .font(.flSubheadline.weight(.medium))
                                     .foregroundStyle(WarmPalette.ink2)
                                 Spacer()
                             }
@@ -72,7 +72,7 @@ struct SignUpView: View {
                                 Image(systemName: "exclamationmark.circle.fill")
                                     .font(.system(size: 13))
                                 Text(errorMessage)
-                                    .font(.system(size: 13))
+                                    .font(.flFootnote)
                             }
                             .foregroundStyle(WarmPalette.bad)
                             .padding(.top, 2)
@@ -83,7 +83,7 @@ struct SignUpView: View {
                                 ProgressView().tint(.white).frame(maxWidth: .infinity)
                             } else {
                                 Text(hasInviteCode ? "Join Household" : "Create Household")
-                                    .font(.system(size: 17, weight: .semibold))
+                                    .font(.flHeadline)
                                     .foregroundStyle(.white)
                                     .frame(maxWidth: .infinity)
                             }
@@ -99,7 +99,7 @@ struct SignUpView: View {
                     if !hasInviteCode {
                         VStack(spacing: 6) {
                             Text("Name your household and invite your partner after signing up.")
-                                .font(.system(size: 13))
+                                .font(.flFootnote)
                                 .foregroundStyle(WarmPalette.ink3)
                                 .multilineTextAlignment(.center)
                         }
@@ -127,10 +127,10 @@ struct SignUpView: View {
                 .frame(width: 20)
             if isSecure {
                 SecureField(placeholder, text: text)
-                    .font(.system(size: 16))
+                    .font(.flBody)
             } else {
                 TextField(placeholder, text: text)
-                    .font(.system(size: 16))
+                    .font(.flBody)
             }
         }
         .padding(16)

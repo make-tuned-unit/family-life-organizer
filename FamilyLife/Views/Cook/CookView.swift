@@ -82,7 +82,7 @@ struct CookView: View {
                 .font(.system(size: 16))
                 .foregroundStyle(WarmPalette.ink3)
             Text("Recipe suggestions are off. Turn on cloud AI in Settings → Privacy to use them.")
-                .font(.system(size: 13))
+                .font(.flFootnote)
                 .foregroundStyle(WarmPalette.ink3)
             Spacer(minLength: 0)
         }
@@ -97,15 +97,15 @@ struct CookView: View {
     private var headerSection: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text("TONIGHT'S DINNER")
-                .font(.system(size: 11, weight: .semibold))
+                .font(.flOverline)
                 .foregroundStyle(WarmPalette.ink3)
                 .tracking(0.4)
             Text("What can I make?")
-                .font(.system(size: 28, weight: .bold))
+                .font(.flScreenTitle)
                 .foregroundStyle(WarmPalette.ink1)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 22)
+        .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
         .padding(.top, 14)
         .padding(.bottom, 14)
     }
@@ -151,7 +151,7 @@ struct CookView: View {
                 WarmChip(label: "Family-friendly")
                 WarmChip(label: "Vegetarian")
             }
-            .padding(.horizontal, 22)
+            .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
         }
         .padding(.bottom, 14)
     }
@@ -164,7 +164,7 @@ struct CookView: View {
             VStack(spacing: 12) {
                 ProgressView()
                 Text("Checking your pantry and finding recipes...")
-                    .font(.system(size: 13))
+                    .font(.flFootnote)
                     .foregroundStyle(WarmPalette.ink3)
             }
             .frame(maxWidth: .infinity)
@@ -206,7 +206,7 @@ struct CookView: View {
                         HStack {
                             Spacer()
                             Text(missing == 0 ? "You have it all" : "\(missing) to buy")
-                                .font(.system(size: 11, weight: .bold))
+                                .font(.flOverline.weight(.bold))
                                 .foregroundStyle(.white)
                                 .textCase(.uppercase)
                                 .tracking(0.4)
@@ -223,10 +223,10 @@ struct CookView: View {
                 // Recipe details
                 VStack(alignment: .leading, spacing: 4) {
                     Text(recipe.name)
-                        .font(.system(size: 22, weight: .semibold))
+                        .font(.flTitle)
                         .foregroundStyle(WarmPalette.ink1)
                     Text("\(recipe.servings) servings \u{00B7} Henry's pick")
-                        .font(.system(size: 13))
+                        .font(.flFootnote)
                         .foregroundStyle(WarmPalette.ink3)
                         .padding(.bottom, 14)
 
@@ -242,14 +242,14 @@ struct CookView: View {
                                     .clipShape(Circle())
 
                                 Text(ingredient.name)
-                                    .font(.system(size: 15))
+                                    .font(.flSubheadline)
                                     .foregroundStyle(WarmPalette.ink1)
 
                                 Spacer()
 
                                 if let qty = ingredient.quantity {
                                     Text(qty)
-                                        .font(.system(size: 13))
+                                        .font(.flFootnote)
                                         .foregroundStyle(WarmPalette.ink3)
                                 }
                             }
@@ -264,7 +264,7 @@ struct CookView: View {
                             cookingRecipe = recipe
                         } label: {
                             Text("Start cooking")
-                                .font(.system(size: 14, weight: .semibold))
+                                .font(.flSubheadline.weight(.semibold))
                                 .foregroundStyle(WarmPalette.cream1)
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 12)
@@ -275,7 +275,7 @@ struct CookView: View {
                             viewModel.saveRecipe(recipe)
                         } label: {
                             Text(viewModel.isRecipeSaved(recipe) ? "Saved" : "Save")
-                                .font(.system(size: 14, weight: .semibold))
+                                .font(.flSubheadline.weight(.semibold))
                                 .foregroundStyle(viewModel.isRecipeSaved(recipe) ? WarmPalette.good : WarmPalette.ink1)
                                 .padding(.horizontal, 18)
                                 .padding(.vertical, 12)
@@ -295,7 +295,7 @@ struct CookView: View {
                     .font(.system(size: 32))
                     .foregroundStyle(WarmPalette.ink4)
                 Text("No recipes found. Try a different query.")
-                    .font(.system(size: 15))
+                    .font(.flSubheadline)
                     .foregroundStyle(WarmPalette.ink3)
             }
             .frame(maxWidth: .infinity)
@@ -332,7 +332,7 @@ struct RecipeTag: View {
     let text: String
     var body: some View {
         Text(text)
-            .font(.system(size: 11, weight: .semibold))
+            .font(.flOverline)
             .foregroundStyle(.white)
             .padding(.horizontal, 10)
             .padding(.vertical, 5)
@@ -367,11 +367,11 @@ struct RecipeRowCard: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(recipe.name)
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(.flSubheadline.weight(.semibold))
                     .foregroundStyle(WarmPalette.ink1)
                 let missing = recipe.ingredients.filter { !$0.available }.count
                 Text("\(recipe.cookTime) min \u{00B7} \(missing == 0 ? "all ingredients" : "\(missing) to buy")")
-                    .font(.system(size: 13))
+                    .font(.flFootnote)
                     .foregroundStyle(WarmPalette.ink3)
             }
 

@@ -21,7 +21,7 @@ struct QuotedItemCard: View {
                 .foregroundStyle(accentColor)
 
             Text(title)
-                .font(.system(size: 13))
+                .font(.flFootnote)
                 .foregroundStyle(WarmPalette.ink2)
                 .lineLimit(2)
         }

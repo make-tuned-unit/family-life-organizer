@@ -54,15 +54,16 @@ struct SendToSheet: View {
                                 } else {
                                     FamilyAvatar(
                                         initial: member.avatar_initial ?? String(member.name.prefix(1)).uppercased(),
-                                        size: 36
+                                        size: 36,
+                                        name: member.name
                                     )
                                 }
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(member.name)
-                                        .font(.system(size: 15, weight: .medium))
+                                        .font(.flSubheadline.weight(.medium))
                                     if let rel = member.relationship {
                                         Text(rel.capitalized)
-                                            .font(.system(size: 12))
+                                            .font(.flCaption)
                                             .foregroundStyle(WarmPalette.ink3)
                                     }
                                 }

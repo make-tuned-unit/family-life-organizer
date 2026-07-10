@@ -94,16 +94,16 @@ struct DecisionsView: View {
         HStack {
             VStack(alignment: .leading, spacing: 4) {
                 Text("\(activeDecisions.count) ACTIVE")
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(.flOverline)
                     .foregroundStyle(WarmPalette.ink3)
                     .tracking(0.4)
                 Text("Decisions")
-                    .font(.system(size: 28, weight: .bold))
+                    .font(.flScreenTitle)
                     .foregroundStyle(WarmPalette.ink1)
             }
             Spacer()
         }
-        .padding(.horizontal, 22)
+        .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
         .padding(.top, 14)
         .padding(.bottom, 12)
     }
@@ -122,7 +122,7 @@ struct DecisionsView: View {
                     }
                 }
             }
-            .padding(.horizontal, 22)
+            .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
         }
         .padding(.bottom, 14)
     }
@@ -141,10 +141,10 @@ struct DecisionsView: View {
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text("What's for dinner?")
-                        .font(.system(size: 15, weight: .semibold))
+                        .font(.flSubheadline.weight(.semibold))
                         .foregroundStyle(WarmPalette.ink1)
                     Text("Post a recipe idea or ask AI for suggestions")
-                        .font(.system(size: 13))
+                        .font(.flFootnote)
                         .foregroundStyle(WarmPalette.ink3)
                 }
 
@@ -277,11 +277,11 @@ struct DecisionCard: View {
             HStack(spacing: 8) {
                 UserAvatar(name: decision.creator_name, size: 22)
                 Text(decision.creator_name)
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.flFootnote.weight(.semibold))
                     .foregroundStyle(WarmPalette.ink1)
                 if let createdAt = decision.relativeCreatedAtText {
                     Text(createdAt)
-                        .font(.system(size: 11))
+                        .font(.flCaption)
                         .foregroundStyle(WarmPalette.ink3)
                 }
                 if let aboutName {
@@ -289,7 +289,7 @@ struct DecisionCard: View {
                         Image(systemName: "person")
                             .font(.system(size: 9, weight: .semibold))
                         Text(aboutName)
-                            .font(.system(size: 11, weight: .semibold))
+                            .font(.flOverline)
                     }
                     .foregroundStyle(AccentTheme.mauve.color)
                     .padding(.horizontal, 8)
@@ -299,7 +299,7 @@ struct DecisionCard: View {
                 Spacer()
                 if decision.status == DecisionStatus.resolved.rawValue {
                     Text("Resolved")
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(.flOverline)
                         .foregroundStyle(WarmPalette.good)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 3)
@@ -309,14 +309,14 @@ struct DecisionCard: View {
 
             // Title
             Text(decision.title)
-                .font(.system(size: 15, weight: .semibold))
+                .font(.flSubheadline.weight(.semibold))
                 .foregroundStyle(WarmPalette.ink1)
                 .multilineTextAlignment(.leading)
 
             // Body
             if let body = decision.body, !body.isEmpty {
                 Text(body)
-                    .font(.system(size: 13))
+                    .font(.flFootnote)
                     .foregroundStyle(WarmPalette.ink2)
                     .lineLimit(2)
             }
@@ -328,7 +328,7 @@ struct DecisionCard: View {
                     Text(url)
                         .lineLimit(1)
                 }
-                .font(.system(size: 13))
+                .font(.flFootnote)
                 .foregroundStyle(AccentTheme.ocean.color)
             }
 
@@ -348,15 +348,15 @@ struct DecisionCard: View {
                 let thumbsDown = reactions.filter { $0.reaction_type == "thumbsDown" }.count
                 let hearts = reactions.filter { $0.reaction_type == "heart" }.count
 
-                if thumbsUp > 0 { Label("\(thumbsUp)", systemImage: "hand.thumbsup.fill").font(.system(size: 11)) }
-                if thumbsDown > 0 { Label("\(thumbsDown)", systemImage: "hand.thumbsdown.fill").font(.system(size: 11)) }
-                if hearts > 0 { Label("\(hearts)", systemImage: "heart.fill").font(.system(size: 11)).foregroundStyle(AccentTheme.rose.color) }
+                if thumbsUp > 0 { Label("\(thumbsUp)", systemImage: "hand.thumbsup.fill").font(.flCaption) }
+                if thumbsDown > 0 { Label("\(thumbsDown)", systemImage: "hand.thumbsdown.fill").font(.flCaption) }
+                if hearts > 0 { Label("\(hearts)", systemImage: "heart.fill").font(.flCaption).foregroundStyle(AccentTheme.rose.color) }
 
                 Spacer()
 
                 if !comments.isEmpty {
                     Label("\(comments.count)", systemImage: "bubble.left.fill")
-                        .font(.system(size: 11))
+                        .font(.flCaption)
                         .foregroundStyle(WarmPalette.ink3)
                 }
             }
@@ -410,11 +410,11 @@ struct PollOptionRow: View {
         VStack(alignment: .leading, spacing: 4) {
             HStack {
                 Text(option)
-                    .font(.system(size: 13, weight: .medium))
+                    .font(.flFootnote.weight(.medium))
                     .foregroundStyle(WarmPalette.ink1)
                 Spacer()
                 Text("\(votes)")
-                    .font(.system(size: 11, weight: .bold))
+                    .font(.flOverline.weight(.bold))
                     .foregroundStyle(WarmPalette.ink3)
             }
             WarmProgressBar(progress: fillFraction, color: TabAccent.decisions.color, height: 6)
@@ -441,7 +441,7 @@ struct ReactionButton: View {
                 Image(systemName: emoji)
                     .font(.system(size: 14, weight: .semibold))
                 Text("\(count)")
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(.flSubheadline.weight(.semibold))
             }
             .foregroundStyle(isSelected ? WarmPalette.cream1 : TabAccent.decisions.color)
             .padding(.horizontal, 14)

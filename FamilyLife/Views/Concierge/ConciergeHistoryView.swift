@@ -62,12 +62,12 @@ struct ConciergeHistoryView: View {
                     .background(accent.opacity(0.15), in: Circle())
                 VStack(alignment: .leading, spacing: 2) {
                     Text(convo.displayTitle)
-                        .font(.system(size: 15, weight: .medium))
+                        .font(.flSubheadline.weight(.medium))
                         .foregroundStyle(WarmPalette.ink1)
                         .lineLimit(1)
                     if let last = convo.lastMessage, !last.isEmpty {
                         Text(last)
-                            .font(.system(size: 13))
+                            .font(.flFootnote)
                             .foregroundStyle(WarmPalette.ink3)
                             .lineLimit(1)
                     }
@@ -75,7 +75,7 @@ struct ConciergeHistoryView: View {
                 Spacer()
                 if convo.id == currentId {
                     Text("Current")
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(.flOverline)
                         .foregroundStyle(accent)
                 } else {
                     Image(systemName: "chevron.right")

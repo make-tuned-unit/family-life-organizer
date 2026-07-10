@@ -44,7 +44,7 @@ struct ChatSheet: View {
                                     .background(AccentTheme.mauve.color.opacity(0.12), in: Circle())
                                     .overlay(Circle().strokeBorder(AccentTheme.mauve.color.opacity(0.35), style: StrokeStyle(lineWidth: 1, dash: [3])))
                                 Text("New")
-                                    .font(.system(size: 11))
+                                    .font(.flCaption)
                                     .foregroundStyle(WarmPalette.ink3)
                             }
                             .frame(width: 60)
@@ -67,7 +67,7 @@ struct ChatSheet: View {
                                             in: Circle()
                                         )
                                     Text(group.name.components(separatedBy: " ").first ?? group.name)
-                                        .font(.system(size: 11, weight: isSelected ? .bold : .regular))
+                                        .font(.flCaption.weight(isSelected ? .bold : .regular))
                                         .foregroundStyle(isSelected ? groupColor(group.group_type) : WarmPalette.ink3)
                                         .lineLimit(1)
                                 }
@@ -105,7 +105,8 @@ struct ChatSheet: View {
                                         } else {
                                             FamilyAvatar(
                                                 initial: member.avatar_initial ?? String(member.name.prefix(1)).uppercased(),
-                                                size: 44
+                                                size: 44,
+                                                name: member.name
                                             )
                                         }
                                         if unread > 0 {
@@ -118,7 +119,7 @@ struct ChatSheet: View {
                                         }
                                     }
                                     Text(member.name.components(separatedBy: " ").first ?? member.name)
-                                        .font(.system(size: 11, weight: isSelected ? .bold : .regular))
+                                        .font(.flCaption.weight(isSelected ? .bold : .regular))
                                         .foregroundStyle(isSelected ? TabAccent.home.color : WarmPalette.ink3)
                                         .lineLimit(1)
                                 }
@@ -149,7 +150,7 @@ struct ChatSheet: View {
                             .font(.system(size: 32))
                             .foregroundStyle(WarmPalette.ink4)
                         Text("Select a chat")
-                            .font(.system(size: 14))
+                            .font(.flSubheadline)
                             .foregroundStyle(WarmPalette.ink3)
                     }
                     Spacer()
@@ -256,7 +257,7 @@ struct GroupChatView: View {
                                     Image(systemName: "chart.bar.fill")
                                         .font(.system(size: 10))
                                     Text(decision.title)
-                                        .font(.system(size: 12, weight: .medium))
+                                        .font(.flCaption.weight(.medium))
                                         .lineLimit(1)
                                 }
                                 .foregroundStyle(TabAccent.decisions.color)
@@ -460,7 +461,7 @@ struct InlinePollCard: View {
                     .font(.system(size: 12))
                     .foregroundStyle(TabAccent.decisions.color)
                 Text(title)
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(.flSubheadline.weight(.semibold))
                     .foregroundStyle(WarmPalette.ink1)
             }
 
@@ -473,11 +474,11 @@ struct InlinePollCard: View {
                     } label: {
                         HStack {
                             Text(option)
-                                .font(.system(size: 13))
+                                .font(.flFootnote)
                                 .foregroundStyle(WarmPalette.ink1)
                             Spacer()
                             Text("\(count)")
-                                .font(.system(size: 13, weight: .bold))
+                                .font(.flFootnote.weight(.bold))
                                 .foregroundStyle(TabAccent.home.color)
                             if myVote == idx {
                                 Image(systemName: "checkmark.circle.fill")
@@ -550,7 +551,7 @@ struct GroupMessageBubble: View {
             VStack(alignment: isOwn ? .trailing : .leading, spacing: 4) {
                 if !isOwn {
                     Text(post.author_name ?? "Someone")
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(.flOverline)
                         .foregroundStyle(WarmPalette.ink3)
                 }
 
@@ -574,7 +575,7 @@ struct GroupMessageBubble: View {
 
                 if let body = post.body, !body.isEmpty, body != "Shared a photo" {
                     Text(body)
-                        .font(.system(size: 15))
+                        .font(.flSubheadline)
                         .foregroundStyle(isOwn ? .white : WarmPalette.ink1)
                 }
 

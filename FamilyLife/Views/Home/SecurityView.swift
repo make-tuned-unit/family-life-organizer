@@ -55,7 +55,7 @@ struct SecurityView: View {
                         .disabled(!newEmail.contains("@") || isWorking)
                 } else {
                     Text("Code sent to \(emailHint ?? newEmail).")
-                        .font(.system(size: 13)).foregroundStyle(WarmPalette.ink3)
+                        .font(.flFootnote).foregroundStyle(WarmPalette.ink3)
                     TextField("123456", text: $code)
                         .textContentType(.oneTimeCode)
                         .keyboardType(.numberPad)
@@ -69,7 +69,7 @@ struct SecurityView: View {
                 Section {
                     Label(message, systemImage: isError ? "exclamationmark.circle.fill" : "checkmark.circle.fill")
                         .foregroundStyle(isError ? WarmPalette.bad : AccentTheme.sage.color)
-                        .font(.system(size: 14))
+                        .font(.flSubheadline)
                 }
             }
         }

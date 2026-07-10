@@ -17,14 +17,14 @@ struct MyCoverageRequestsView: View {
             VStack(spacing: 0) {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("COVERAGE")
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(.flOverline)
                         .foregroundStyle(TabAccent.care.color).tracking(0.4)
                     Text("Care Cascade")
-                        .font(.system(size: 28, weight: .bold))
+                        .font(.flScreenTitle)
                         .foregroundStyle(WarmPalette.ink1)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 22).padding(.top, 14).padding(.bottom, 18)
+                .padding(.horizontal, DesignTokens.Spacing.horizontalMargin).padding(.top, 14).padding(.bottom, 18)
 
                 if isLoading && myRequests.isEmpty && incoming.isEmpty {
                     ProgressView().padding(.top, 40)
@@ -51,11 +51,11 @@ struct MyCoverageRequestsView: View {
                                 .font(.system(size: 32))
                                 .foregroundStyle(WarmPalette.ink4)
                             Text("No requests yet")
-                                .font(.system(size: 15))
+                                .font(.flSubheadline)
                                 .foregroundStyle(WarmPalette.ink3)
                             Button { showingCareCascade = true } label: {
                                 Text("Send a coverage request")
-                                    .font(.system(size: 14, weight: .semibold))
+                                    .font(.flSubheadline.weight(.semibold))
                                     .foregroundStyle(TabAccent.care.color)
                                     .padding(.horizontal, 16).padding(.vertical, 10)
                                     .background(TabAccent.care.color.opacity(0.12), in: Capsule())
@@ -139,10 +139,10 @@ struct MyCoverageRequestsView: View {
 
     private func sectionHeader(_ title: String) -> some View {
         Text(title.uppercased())
-            .font(.system(size: 10, weight: .semibold))
+            .font(.flOverline)
             .foregroundStyle(WarmPalette.ink3).tracking(0.4)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 22).padding(.bottom, 8)
+            .padding(.horizontal, DesignTokens.Spacing.horizontalMargin).padding(.bottom, 8)
     }
 }
 
@@ -183,22 +183,22 @@ struct MyCoverageRequestCard: View {
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(request.reason)
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(.flSubheadline.weight(.semibold))
                     .foregroundStyle(WarmPalette.ink1)
                 HStack(spacing: 8) {
                     HStack(spacing: 4) {
                         Circle().fill(statusColor).frame(width: 6, height: 6)
                         Text(statusLabel)
-                            .font(.system(size: 12, weight: .medium))
+                            .font(.flCaption.weight(.medium))
                             .foregroundStyle(WarmPalette.ink3)
                     }
                     if let count = request.approval_count, count > 0 {
                         Text("\(count)/\(request.recipient_count ?? 0) approved")
-                            .font(.system(size: 12))
+                            .font(.flCaption)
                             .foregroundStyle(WarmPalette.ink3)
                     } else {
                         Text("\(request.recipient_count ?? 0) asked")
-                            .font(.system(size: 12))
+                            .font(.flCaption)
                             .foregroundStyle(WarmPalette.ink3)
                     }
                 }
@@ -231,20 +231,20 @@ struct CoverageDetailSheet: View {
                     HStack(spacing: 4) {
                         Circle().fill(statusColor).frame(width: 8, height: 8)
                         Text(detail.status.uppercased())
-                            .font(.system(size: 11, weight: .semibold))
+                            .font(.flOverline)
                             .foregroundStyle(statusColor).tracking(0.4)
                     }
                     Text(detail.reason)
-                        .font(.system(size: 24, weight: .bold))
+                        .font(.flTitle)
                         .foregroundStyle(WarmPalette.ink1)
                     if let note = detail.note, !note.isEmpty {
                         Text(note)
-                            .font(.system(size: 15))
+                            .font(.flSubheadline)
                             .foregroundStyle(WarmPalette.ink2)
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 22).padding(.top, 10).padding(.bottom, 18)
+                .padding(.horizontal, DesignTokens.Spacing.horizontalMargin).padding(.top, 10).padding(.bottom, 18)
 
                 // Windows
                 sectionLabel("TIME WINDOWS")
@@ -253,10 +253,10 @@ struct CoverageDetailSheet: View {
                         HStack(spacing: 12) {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(friendlyDate(window.window_date))
-                                    .font(.system(size: 14, weight: .semibold))
+                                    .font(.flSubheadline.weight(.semibold))
                                     .foregroundStyle(WarmPalette.ink1)
                                 Text("\(window.start_time) – \(window.end_time)")
-                                    .font(.system(size: 13, weight: .medium))
+                                    .font(.flFootnote.weight(.medium))
                                     .foregroundStyle(TabAccent.care.color)
                             }
                             Spacer()
@@ -265,16 +265,16 @@ struct CoverageDetailSheet: View {
                         .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: 14))
                     }
                 }
-                .padding(.horizontal, 22).padding(.bottom, 18)
+                .padding(.horizontal, DesignTokens.Spacing.horizontalMargin).padding(.bottom, 18)
 
                 // Recipients
                 sectionLabel("CARE TEAM")
                 VStack(spacing: 6) {
                     ForEach(detail.recipients) { recipient in
                         HStack(spacing: 12) {
-                            FamilyAvatar(initial: recipient.avatar_initial ?? String((recipient.contact_name ?? "?").prefix(1)).uppercased(), size: 32)
+                            FamilyAvatar(initial: recipient.avatar_initial ?? String((recipient.contact_name ?? "?").prefix(1)).uppercased(), size: 32, name: recipient.contact_name)
                             Text(recipient.contact_name ?? "Helper")
-                                .font(.system(size: 14, weight: .semibold))
+                                .font(.flSubheadline.weight(.semibold))
                                 .foregroundStyle(WarmPalette.ink1)
                             Spacer()
                             recipientStatusBadge(recipient.status)
@@ -283,7 +283,7 @@ struct CoverageDetailSheet: View {
                         .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: 14))
                     }
                 }
-                .padding(.horizontal, 22).padding(.bottom, 18)
+                .padding(.horizontal, DesignTokens.Spacing.horizontalMargin).padding(.bottom, 18)
 
                 // Approvals
                 if !detail.approvals.isEmpty {
@@ -293,7 +293,7 @@ struct CoverageDetailSheet: View {
                             VStack(alignment: .leading, spacing: 6) {
                                 HStack {
                                     Text(approval.helper_name ?? "Helper")
-                                        .font(.system(size: 14, weight: .semibold))
+                                        .font(.flSubheadline.weight(.semibold))
                                         .foregroundStyle(WarmPalette.ink1)
                                     Spacer()
                                     Image(systemName: "checkmark.shield.fill")
@@ -301,11 +301,11 @@ struct CoverageDetailSheet: View {
                                         .foregroundStyle(WarmPalette.good)
                                 }
                                 Text("\(approval.approved_date) · \(approval.approved_start) – \(approval.approved_end)")
-                                    .font(.system(size: 13, weight: .medium))
+                                    .font(.flFootnote.weight(.medium))
                                     .foregroundStyle(AccentTheme.sage.color)
                                 if let note = approval.helper_note, !note.isEmpty {
                                     Text("\"\(note)\"")
-                                        .font(.system(size: 13)).italic()
+                                        .font(.flFootnote).italic()
                                         .foregroundStyle(WarmPalette.ink3)
                                 }
                             }
@@ -313,7 +313,7 @@ struct CoverageDetailSheet: View {
                             .background(AccentTheme.sage.color.opacity(0.08), in: RoundedRectangle(cornerRadius: 14))
                         }
                     }
-                    .padding(.horizontal, 22).padding(.bottom, 18)
+                    .padding(.horizontal, DesignTokens.Spacing.horizontalMargin).padding(.bottom, 18)
                 }
 
                 // Cancel button
@@ -326,12 +326,12 @@ struct CoverageDetailSheet: View {
                         }
                     } label: {
                         Text("Cancel request")
-                            .font(.system(size: 14, weight: .semibold))
+                            .font(.flSubheadline.weight(.semibold))
                             .foregroundStyle(AccentTheme.rose.color)
                             .frame(maxWidth: .infinity).padding(.vertical, 14)
                             .background(AccentTheme.rose.color.opacity(0.1), in: RoundedRectangle(cornerRadius: 18))
                     }
-                    .padding(.horizontal, 22)
+                    .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
                 }
             }
             .padding(.bottom, 40)
@@ -357,16 +357,16 @@ struct CoverageDetailSheet: View {
         HStack(spacing: 4) {
             Circle().fill(status == "approved" ? WarmPalette.good : WarmPalette.warn).frame(width: 6, height: 6)
             Text(status.capitalized)
-                .font(.system(size: 11, weight: .semibold))
+                .font(.flOverline)
                 .foregroundStyle(status == "approved" ? WarmPalette.good : WarmPalette.ink3)
         }
     }
 
     private func sectionLabel(_ text: String) -> some View {
         Text(text)
-            .font(.system(size: 10, weight: .semibold))
+            .font(.flOverline)
             .foregroundStyle(WarmPalette.ink3).tracking(0.4)
-            .padding(.horizontal, 22).padding(.bottom, 8)
+            .padding(.horizontal, DesignTokens.Spacing.horizontalMargin).padding(.bottom, 8)
     }
 
     private func friendlyDate(_ dateStr: String) -> String {

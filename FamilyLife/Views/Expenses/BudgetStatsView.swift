@@ -92,7 +92,7 @@ struct BudgetStatsView: View {
     private func hero(_ s: BudgetStats) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             Text("SPENT THIS MONTH")
-                .font(.system(size: 10, weight: .semibold))
+                .font(.flOverline)
                 .foregroundStyle(WarmPalette.ink3)
                 .tracking(0.4)
             HStack(alignment: .firstTextBaseline, spacing: 10) {
@@ -106,7 +106,7 @@ struct BudgetStatsView: View {
                         Image(systemName: up ? "arrow.up.right" : "arrow.down.right")
                             .font(.system(size: 11, weight: .bold))
                         Text("\(abs(pct))%")
-                            .font(.system(size: 13, weight: .semibold))
+                            .font(.flFootnote.weight(.semibold))
                     }
                     .foregroundStyle(up ? WarmPalette.bad : WarmPalette.good)
                     .padding(.horizontal, 8).padding(.vertical, 4)
@@ -115,7 +115,7 @@ struct BudgetStatsView: View {
             }
             .padding(.top, 8)
             Text("Projected month-end \u{00B7} $\(Int(s.projectedMonthEnd).formatted())")
-                .font(.system(size: 13))
+                .font(.flFootnote)
                 .foregroundStyle(WarmPalette.ink3)
                 .padding(.top, 6)
         }
@@ -198,10 +198,10 @@ struct BudgetStatsView: View {
                             .frame(width: 32, height: 32)
                             .background(card.tint.opacity(0.15), in: RoundedRectangle(cornerRadius: 10))
                         Text(card.title)
-                            .font(.system(size: 13, weight: .semibold))
+                            .font(.flFootnote.weight(.semibold))
                             .foregroundStyle(WarmPalette.ink1)
                         Text(card.detail)
-                            .font(.system(size: 12))
+                            .font(.flCaption)
                             .foregroundStyle(WarmPalette.ink3)
                             .fixedSize(horizontal: false, vertical: true)
                     }
@@ -226,7 +226,7 @@ struct BudgetStatsView: View {
                     .cornerRadius(6)
                     .annotation(position: .trailing, alignment: .leading) {
                         Text("$\(Int(c.spent).formatted())")
-                            .font(.system(size: 11, weight: .semibold))
+                            .font(.flOverline)
                             .foregroundStyle(WarmPalette.ink3)
                     }
             }
@@ -260,7 +260,7 @@ struct BudgetStatsView: View {
                 Spacer()
                 legendDot(AccentTheme.saffron.color, "Variable \u{00B7} $\(Int(s.variableThisMonth).formatted())")
             }
-            .font(.system(size: 12))
+            .font(.flCaption)
             .foregroundStyle(WarmPalette.ink3)
         }
         .padding(16)
@@ -281,10 +281,10 @@ struct BudgetStatsView: View {
                 .font(.system(size: 32))
                 .foregroundStyle(WarmPalette.ink4)
             Text("No spending yet")
-                .font(.system(size: 15, weight: .semibold))
+                .font(.flSubheadline.weight(.semibold))
                 .foregroundStyle(WarmPalette.ink2)
             Text("Add receipts to see trends and insights.")
-                .font(.system(size: 13))
+                .font(.flFootnote)
                 .foregroundStyle(WarmPalette.ink3)
         }
         .frame(maxWidth: .infinity)

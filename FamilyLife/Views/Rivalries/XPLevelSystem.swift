@@ -105,7 +105,7 @@ struct LevelBadge: View {
                     .font(.system(size: 10))
                     .foregroundStyle(tier.color)
                 Text(tier.name)
-                    .font(.system(size: 10, weight: .bold))
+                    .font(.flOverline.weight(.bold))
                     .foregroundStyle(tier.color)
             }
             .padding(.horizontal, 6)
@@ -117,10 +117,10 @@ struct LevelBadge: View {
                     .font(.system(size: 28))
                     .foregroundStyle(tier.color)
                 Text(tier.name)
-                    .font(.system(size: 16, weight: .bold))
+                    .font(.flHeadline)
                     .foregroundStyle(tier.color)
                 Text("\(xp) XP")
-                    .font(.system(size: 12))
+                    .font(.flCaption)
                     .foregroundStyle(WarmPalette.ink3)
 
                 if let needed = FamilyTier.xpToNextLevel(for: xp) {
@@ -128,12 +128,12 @@ struct LevelBadge: View {
                         ProgressView(value: FamilyTier.progress(for: xp))
                             .tint(tier.color)
                         Text("\(needed) XP to \(FamilyTier(rawValue: tier.rawValue + 1)?.name ?? "next")")
-                            .font(.system(size: 10))
+                            .font(.flCaption)
                             .foregroundStyle(WarmPalette.ink4)
                     }
                 } else {
                     Text("Max level reached")
-                        .font(.system(size: 10))
+                        .font(.flCaption)
                         .foregroundStyle(tier.color)
                 }
             }
@@ -156,7 +156,7 @@ struct LevelUpCelebration: View, Identifiable {
                 Spacer()
 
                 Text("LEVEL UP!")
-                    .font(.system(size: 14, weight: .heavy))
+                    .font(.flSubheadline.weight(.heavy))
                     .tracking(4)
                     .foregroundStyle(WarmPalette.ink3)
 
@@ -170,7 +170,7 @@ struct LevelUpCelebration: View, Identifiable {
                     .foregroundStyle(.white)
 
                 Text("You've reached a new tier!")
-                    .font(.system(size: 15))
+                    .font(.flSubheadline)
                     .foregroundStyle(.white.opacity(0.7))
 
                 Spacer()
@@ -179,7 +179,7 @@ struct LevelUpCelebration: View, Identifiable {
                     dismiss()
                 } label: {
                     Text("Let's Go")
-                        .font(.system(size: 16, weight: .bold))
+                        .font(.flHeadline)
                         .foregroundStyle(.white)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 14)

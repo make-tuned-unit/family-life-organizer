@@ -106,10 +106,10 @@ struct ExpensesView: View {
                                 .clipShape(RoundedRectangle(cornerRadius: 8))
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(project.name)
-                                    .font(.system(size: 14, weight: .semibold))
+                                    .font(.flSubheadline.weight(.semibold))
                                     .foregroundStyle(WarmPalette.ink1)
                                 Text("$\(Int(project.total_spent).formatted()) of $\(Int(project.budget).formatted())")
-                                    .font(.system(size: 12))
+                                    .font(.flCaption)
                                     .foregroundStyle(WarmPalette.ink3)
                             }
                             Spacer()
@@ -133,7 +133,7 @@ struct ExpensesView: View {
                         BudgetProjectsView()
                     } label: {
                         Text("View all \(projectStore.projects.count) projects")
-                            .font(.system(size: 13, weight: .medium))
+                            .font(.flFootnote.weight(.medium))
                             .foregroundStyle(WarmPalette.ink3)
                     }
                 }
@@ -153,10 +153,10 @@ struct ExpensesView: View {
                         .clipShape(Circle())
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Project budgets")
-                            .font(.system(size: 15, weight: .semibold))
+                            .font(.flSubheadline.weight(.semibold))
                             .foregroundStyle(WarmPalette.ink1)
                         Text("Track spending on renovations, events, and more")
-                            .font(.system(size: 13))
+                            .font(.flFootnote)
                             .foregroundStyle(WarmPalette.ink3)
                     }
                     Spacer()
@@ -199,12 +199,12 @@ struct ExpensesView: View {
                     .clipShape(Circle())
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Recurring payments")
-                        .font(.system(size: 15, weight: .semibold))
+                        .font(.flSubheadline.weight(.semibold))
                         .foregroundStyle(WarmPalette.ink1)
                     Text(recurringStore.items.isEmpty
                          ? "Rent, subscriptions, insurance & more"
                          : "$\(Int(recurringStore.monthlyTotal).formatted())/mo \u{00B7} \(recurringStore.items.count) payment\(recurringStore.items.count == 1 ? "" : "s")")
-                        .font(.system(size: 13))
+                        .font(.flFootnote)
                         .foregroundStyle(WarmPalette.ink3)
                 }
                 Spacer()
@@ -226,12 +226,12 @@ struct ExpensesView: View {
         HStack {
             VStack(alignment: .leading, spacing: 4) {
                 Text("\(viewModel.displayMonthString) \u{00B7} halfway through")
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(.flOverline)
                     .foregroundStyle(WarmPalette.ink3)
                     .tracking(0.4)
                     .textCase(.uppercase)
                 Text("Budget")
-                    .font(.system(size: 28, weight: .bold))
+                    .font(.flScreenTitle)
                     .foregroundStyle(WarmPalette.ink1)
             }
             Spacer()
@@ -248,7 +248,7 @@ struct ExpensesView: View {
                 }
             }
         }
-        .padding(.horizontal, 22)
+        .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
         .padding(.top, 14)
         .padding(.bottom, 14)
     }
@@ -271,19 +271,18 @@ struct ExpensesView: View {
 
             VStack(alignment: .leading, spacing: 0) {
                 Text("SPENT THIS MONTH")
-                    .font(.system(size: 10, weight: .semibold))
+                    .font(.flOverline)
                     .foregroundStyle(WarmPalette.ink3)
                     .tracking(0.4)
 
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Text("$\(Int(totalSpent).formatted())")
-                        .font(.system(size: 44, weight: .bold))
+                        .font(.flHero)
                         .foregroundStyle(WarmPalette.ink1)
-                        .tracking(-0.88)
                         .contentTransition(.numericText())
                         .animation(.snappy, value: totalSpent)
                     Text("of $\(Int(totalBudget).formatted())")
-                        .font(.system(size: 13))
+                        .font(.flFootnote)
                         .foregroundStyle(WarmPalette.ink3)
                 }
                 .padding(.top, 8)
@@ -307,16 +306,16 @@ struct ExpensesView: View {
 
                 HStack {
                     Text("$\(Int(remaining).formatted()) remaining")
-                        .font(.system(size: 13))
+                        .font(.flFootnote)
                         .foregroundStyle(WarmPalette.ink3)
                     Spacer()
                     if totalSpent < totalBudget {
                         Text("\u{2193} on track")
-                            .font(.system(size: 13, weight: .semibold))
+                            .font(.flFootnote.weight(.semibold))
                             .foregroundStyle(WarmPalette.good)
                     } else {
                         Text("\u{2191} over budget")
-                            .font(.system(size: 13, weight: .semibold))
+                            .font(.flFootnote.weight(.semibold))
                             .foregroundStyle(WarmPalette.bad)
                     }
                 }
@@ -406,16 +405,16 @@ struct BudgetCategoryCard: View {
             VStack(alignment: .leading, spacing: 6) {
                 HStack {
                     Text(item.category)
-                        .font(.system(size: 15, weight: .semibold))
+                        .font(.flSubheadline.weight(.semibold))
                         .foregroundStyle(WarmPalette.ink1)
                     Spacer()
                     HStack(spacing: 4) {
                         Text("$\(Int(item.spent))")
-                            .font(.system(size: 15, weight: .bold))
+                            .font(.flSubheadline.weight(.bold))
                             .foregroundStyle(WarmPalette.ink1)
                         if let limit = item.monthly_limit {
                             Text("/ $\(Int(limit))")
-                                .font(.system(size: 13))
+                                .font(.flFootnote)
                                 .foregroundStyle(WarmPalette.ink3)
                         }
                     }
@@ -454,7 +453,7 @@ struct ReceiptListRow: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(receipt.merchant)
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(.flSubheadline.weight(.semibold))
                     .foregroundStyle(WarmPalette.ink1)
                 HStack(spacing: 4) {
                     if let cat = receipt.category {
@@ -463,14 +462,14 @@ struct ReceiptListRow: View {
                     Text("\u{00B7}")
                     Text(receipt.date)
                 }
-                .font(.system(size: 13))
+                .font(.flFootnote)
                 .foregroundStyle(WarmPalette.ink3)
             }
 
             Spacer()
 
             Text("$\(receipt.amount, specifier: "%.2f")")
-                .font(.system(size: 15, weight: .bold))
+                .font(.flSubheadline.weight(.bold))
                 .foregroundStyle(WarmPalette.ink1)
 
             Image(systemName: "chevron.right")
@@ -495,7 +494,7 @@ struct ReceiptDetailView: View {
                 // Hero
                 VStack(alignment: .leading, spacing: 8) {
                     Text(receipt.merchant)
-                        .font(.system(size: 24, weight: .bold))
+                        .font(.flTitle)
                         .foregroundStyle(WarmPalette.ink1)
                     Text("$\(receipt.amount, specifier: "%.2f")")
                         .font(.system(size: 40, weight: .bold))
@@ -506,7 +505,7 @@ struct ReceiptDetailView: View {
                             Image(systemName: "sparkles")
                                 .font(.system(size: 11))
                             Text("Scanned with AI")
-                                .font(.system(size: 12, weight: .medium))
+                                .font(.flCaption.weight(.medium))
                         }
                         .foregroundStyle(AccentTheme.saffron.color)
                     }
@@ -552,12 +551,12 @@ struct ReceiptDetailView: View {
                                 let parts = line.components(separatedBy: " — $")
                                 HStack {
                                     Text(parts.first ?? line)
-                                        .font(.system(size: 14))
+                                        .font(.flSubheadline)
                                         .foregroundStyle(WarmPalette.ink1)
                                     Spacer()
                                     if parts.count > 1 {
                                         Text("$\(parts[1])")
-                                            .font(.system(size: 14, weight: .semibold))
+                                            .font(.flSubheadline.weight(.semibold))
                                             .foregroundStyle(WarmPalette.ink2)
                                     }
                                 }
@@ -570,7 +569,7 @@ struct ReceiptDetailView: View {
                         .padding(.bottom, 14)
                     } else {
                         Text(notes)
-                            .font(.system(size: 14))
+                            .font(.flSubheadline)
                             .foregroundStyle(WarmPalette.ink2)
                             .padding(16)
                             .frame(maxWidth: .infinity, alignment: .leading)
@@ -587,7 +586,7 @@ struct ReceiptDetailView: View {
                 } label: {
                     HStack(spacing: 8) {
                         Image(systemName: "trash").font(.system(size: 14))
-                        Text("Delete Receipt").font(.system(size: 15, weight: .semibold))
+                        Text("Delete Receipt").font(.flSubheadline.weight(.semibold))
                     }
                     .foregroundStyle(WarmPalette.bad)
                     .frame(maxWidth: .infinity)
@@ -605,9 +604,9 @@ struct ReceiptDetailView: View {
 
     private func detailRow(label: String, value: String) -> some View {
         HStack {
-            Text(label).font(.system(size: 13)).foregroundStyle(WarmPalette.ink3)
+            Text(label).font(.flFootnote).foregroundStyle(WarmPalette.ink3)
             Spacer()
-            Text(value).font(.system(size: 15, weight: .medium)).foregroundStyle(WarmPalette.ink1)
+            Text(value).font(.flSubheadline.weight(.medium)).foregroundStyle(WarmPalette.ink1)
         }
         .padding(.vertical, 12)
         .padding(.horizontal, 14)

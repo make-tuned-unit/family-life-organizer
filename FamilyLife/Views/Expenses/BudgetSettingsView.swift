@@ -18,16 +18,16 @@ struct BudgetSettingsView: View {
                                 .fill(cat.color.map { Color(hex: $0) } ?? TabAccent.expenses.color)
                                 .frame(width: 12, height: 12)
                             Text(cat.name)
-                                .font(.system(size: 15, weight: .medium))
+                                .font(.flSubheadline.weight(.medium))
                                 .foregroundStyle(WarmPalette.ink1)
                             Spacer()
                             if let limit = cat.monthly_limit {
                                 Text("$\(Int(limit))/mo")
-                                    .font(.system(size: 13))
+                                    .font(.flFootnote)
                                     .foregroundStyle(WarmPalette.ink3)
                             } else {
                                 Text("No limit")
-                                    .font(.system(size: 13))
+                                    .font(.flFootnote)
                                     .foregroundStyle(WarmPalette.ink4)
                             }
                         }
@@ -49,7 +49,7 @@ struct BudgetSettingsView: View {
                             .font(.system(size: 28))
                             .foregroundStyle(WarmPalette.ink4)
                         Text("No budget categories")
-                            .font(.system(size: 14))
+                            .font(.flSubheadline)
                             .foregroundStyle(WarmPalette.ink3)
                     }
                     .frame(maxWidth: .infinity)

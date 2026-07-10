@@ -167,13 +167,13 @@ struct RecurringPaymentsView: View {
     private var totalCard: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text("MONTHLY COMMITTED")
-                .font(.system(size: 10, weight: .semibold))
+                .font(.flOverline)
                 .foregroundStyle(WarmPalette.ink3).tracking(0.4)
             Text("$\(Int(store.monthlyTotal).formatted())")
                 .font(.system(size: 36, weight: .bold))
                 .foregroundStyle(WarmPalette.ink1).tracking(-0.7)
             Text("\(store.items.count) recurring payment\(store.items.count == 1 ? "" : "s")")
-                .font(.system(size: 13)).foregroundStyle(WarmPalette.ink3)
+                .font(.flFootnote).foregroundStyle(WarmPalette.ink3)
         }
         .padding(20)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -185,9 +185,9 @@ struct RecurringPaymentsView: View {
             Image(systemName: "arrow.triangle.2.circlepath")
                 .font(.system(size: 32)).foregroundStyle(WarmPalette.ink4)
             Text("No recurring payments yet")
-                .font(.system(size: 15, weight: .semibold)).foregroundStyle(WarmPalette.ink2)
+                .font(.flSubheadline.weight(.semibold)).foregroundStyle(WarmPalette.ink2)
             Text("Add rent, subscriptions, insurance and more to see your fixed monthly costs.")
-                .font(.system(size: 13)).foregroundStyle(WarmPalette.ink3)
+                .font(.flFootnote).foregroundStyle(WarmPalette.ink3)
                 .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity).padding(.vertical, 40)
@@ -207,22 +207,22 @@ private struct RecurringRow: View {
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 6) {
                     Text(item.name)
-                        .font(.system(size: 15, weight: .semibold))
+                        .font(.flSubheadline.weight(.semibold))
                         .foregroundStyle(WarmPalette.ink1)
                     if item.isAutopay {
                         Text("Autopay")
-                            .font(.system(size: 10, weight: .semibold))
+                            .font(.flOverline)
                             .foregroundStyle(AccentTheme.sage.color)
                             .padding(.horizontal, 6).padding(.vertical, 2)
                             .background(AccentTheme.sage.color.opacity(0.15), in: Capsule())
                     }
                 }
                 Text(item.cadenceLabel)
-                    .font(.system(size: 12)).foregroundStyle(WarmPalette.ink3)
+                    .font(.flCaption).foregroundStyle(WarmPalette.ink3)
             }
             Spacer()
             Text("$\(Int(item.amount).formatted())")
-                .font(.system(size: 15, weight: .bold))
+                .font(.flSubheadline.weight(.bold))
                 .foregroundStyle(WarmPalette.ink1)
         }
         .padding(14)
@@ -265,7 +265,7 @@ struct RecurringPaymentEditor: View {
                                         category = preset.category
                                     } label: {
                                         Text(preset.name)
-                                            .font(.system(size: 13, weight: .medium))
+                                            .font(.flFootnote.weight(.medium))
                                             .padding(.horizontal, 12).padding(.vertical, 7)
                                             .background(AccentTheme.ocean.color.opacity(0.12), in: Capsule())
                                             .foregroundStyle(AccentTheme.ocean.color)

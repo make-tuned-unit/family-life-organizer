@@ -62,7 +62,7 @@ struct CoverageCascadeView: View {
             }
             ToolbarItem(placement: .principal) {
                 Text("Step \(currentStep.rawValue) of 4")
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(.flOverline)
                     .foregroundStyle(WarmPalette.ink3)
                     .textCase(.uppercase).tracking(0.4)
             }
@@ -77,21 +77,21 @@ struct CoverageCascadeView: View {
                 // Header
                 VStack(alignment: .leading, spacing: 6) {
                     Text("NEW COVERAGE REQUEST")
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(.flOverline)
                         .foregroundStyle(TabAccent.care.color).tracking(0.4)
                     Text("Ask your care team\nto cover a time slot.")
-                        .font(.system(size: 28, weight: .bold)).foregroundStyle(WarmPalette.ink1)
+                        .font(.flScreenTitle).foregroundStyle(WarmPalette.ink1)
                     Text("Pick contacts, propose windows, and send. They'll get a link to approve.")
-                        .font(.system(size: 15)).foregroundStyle(WarmPalette.ink2).padding(.top, 4)
+                        .font(.flSubheadline).foregroundStyle(WarmPalette.ink2).padding(.top, 4)
                 }
-                .padding(.horizontal, 22).padding(.top, 10).padding(.bottom, 18)
+                .padding(.horizontal, DesignTokens.Spacing.horizontalMargin).padding(.top, 10).padding(.bottom, 18)
 
                 // Care team selection
                 sectionLabel("Who to ask")
                 if household.members.isEmpty {
                     Text("Add family members in Family > Add Family Member first.")
-                        .font(.system(size: 13)).foregroundStyle(WarmPalette.ink3)
-                        .padding(.horizontal, 22).padding(.bottom, 14)
+                        .font(.flFootnote).foregroundStyle(WarmPalette.ink3)
+                        .padding(.horizontal, DesignTokens.Spacing.horizontalMargin).padding(.bottom, 14)
                 } else {
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 8) {
@@ -102,9 +102,9 @@ struct CoverageCascadeView: View {
                                     else { selectedContactIds.insert(contact.id) }
                                 } label: {
                                     HStack(spacing: 8) {
-                                        FamilyAvatar(initial: contact.avatar_initial ?? String(contact.name.prefix(1)).uppercased(), size: 28)
+                                        FamilyAvatar(initial: contact.avatar_initial ?? String(contact.name.prefix(1)).uppercased(), size: 28, name: contact.name)
                                         Text(contact.name)
-                                            .font(.system(size: 13, weight: .semibold))
+                                            .font(.flFootnote.weight(.semibold))
                                         if selected {
                                             Image(systemName: "checkmark.circle.fill")
                                                 .font(.system(size: 14))
@@ -118,7 +118,7 @@ struct CoverageCascadeView: View {
                                 .buttonStyle(.plain)
                             }
                         }
-                        .padding(.horizontal, 22)
+                        .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
                     }
                     .padding(.bottom, 14)
                 }
@@ -139,7 +139,7 @@ struct CoverageCascadeView: View {
                     .padding(12)
                     .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: 16))
                 }
-                .padding(.horizontal, 22).padding(.bottom, 18)
+                .padding(.horizontal, DesignTokens.Spacing.horizontalMargin).padding(.bottom, 18)
 
                 // Windows
                 sectionLabel("Candidate windows")
@@ -150,7 +150,7 @@ struct CoverageCascadeView: View {
                     Button { addWindow() } label: {
                         HStack(spacing: 8) {
                             Image(systemName: "plus").font(.system(size: 16))
-                            Text("Add a window").font(.system(size: 13))
+                            Text("Add a window").font(.flFootnote)
                         }
                         .foregroundStyle(WarmPalette.ink3)
                         .frame(maxWidth: .infinity).padding(.vertical, 12)
@@ -161,7 +161,7 @@ struct CoverageCascadeView: View {
 
                 // Note
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("OPTIONAL NOTE").font(.system(size: 10, weight: .semibold)).foregroundStyle(WarmPalette.ink3).tracking(0.4)
+                    Text("OPTIONAL NOTE").font(.flOverline).foregroundStyle(WarmPalette.ink3).tracking(0.4)
                     TextField("Add a note for them...", text: $noteText)
                         .font(.system(size: 15)).foregroundStyle(WarmPalette.ink2)
                 }
@@ -172,7 +172,7 @@ struct CoverageCascadeView: View {
                 // Send
                 Button { Task { await sendRequest() } } label: {
                     HStack(spacing: 8) {
-                        Text("Send request").font(.system(size: 16, weight: .semibold))
+                        Text("Send request").font(.flHeadline)
                         Image(systemName: "paperplane.fill").font(.system(size: 14))
                     }
                     .foregroundStyle(WarmPalette.cream1).frame(maxWidth: .infinity).padding(.vertical, 16)
@@ -183,7 +183,7 @@ struct CoverageCascadeView: View {
                 .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
 
                 Text("They'll get a shareable link to approve.")
-                    .font(.system(size: 13)).foregroundStyle(WarmPalette.ink3)
+                    .font(.flFootnote).foregroundStyle(WarmPalette.ink3)
                     .frame(maxWidth: .infinity).padding(.top, 10).padding(.bottom, 40)
             }
         }
@@ -217,29 +217,29 @@ struct CoverageCascadeView: View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 0) {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("COVERAGE REQUEST SENT").font(.system(size: 11, weight: .semibold)).foregroundStyle(WarmPalette.ink3).tracking(0.4)
-                    Text("Waiting for reply").font(.system(size: 28, weight: .bold)).foregroundStyle(WarmPalette.ink1)
+                    Text("COVERAGE REQUEST SENT").font(.flOverline).foregroundStyle(WarmPalette.ink3).tracking(0.4)
+                    Text("Waiting for reply").font(.flScreenTitle).foregroundStyle(WarmPalette.ink1)
                 }
-                .padding(.horizontal, 22).padding(.top, 10).padding(.bottom, 12)
+                .padding(.horizontal, DesignTokens.Spacing.horizontalMargin).padding(.top, 10).padding(.bottom, 12)
 
                 // Recipients with share buttons
                 let selectedContacts = household.members.filter { selectedContactIds.contains($0.id) }
                 ForEach(selectedContacts) { contact in
                     let token = inviteTokens.values.first // simplified - in production would map per contact
                     HStack(spacing: 12) {
-                        FamilyAvatar(initial: contact.avatar_initial ?? String(contact.name.prefix(1)).uppercased(), size: 36)
+                        FamilyAvatar(initial: contact.avatar_initial ?? String(contact.name.prefix(1)).uppercased(), size: 36, name: contact.name)
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(contact.name).font(.system(size: 15, weight: .semibold))
+                            Text(contact.name).font(.flSubheadline.weight(.semibold))
                             HStack(spacing: 6) {
                                 Circle().fill(WarmPalette.warn).frame(width: 6, height: 6)
-                                Text("Pending").font(.system(size: 13)).foregroundStyle(WarmPalette.ink3)
+                                Text("Pending").font(.flFootnote).foregroundStyle(WarmPalette.ink3)
                             }
                         }
                         Spacer()
                         if let token, let url = approvalURL(token: token) {
                             ShareLink(item: url) {
                                 Text("Share Link")
-                                    .font(.system(size: 12, weight: .semibold))
+                                    .font(.flCaption.weight(.semibold))
                                     .padding(.horizontal, 12).padding(.vertical, 8)
                                     .background(WarmPalette.cardSurface, in: Capsule())
                             }
@@ -256,7 +256,7 @@ struct CoverageCascadeView: View {
                 } label: {
                     HStack(spacing: 8) {
                         Image(systemName: "arrow.clockwise").font(.system(size: 14))
-                        Text("Check for approvals").font(.system(size: 14, weight: .semibold))
+                        Text("Check for approvals").font(.flSubheadline.weight(.semibold))
                     }
                     .foregroundStyle(TabAccent.care.color).frame(maxWidth: .infinity).padding(.vertical, 14)
                     .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: 22))
@@ -288,12 +288,12 @@ struct CoverageCascadeView: View {
                     // Hero
                     VStack(alignment: .leading, spacing: 14) {
                         HStack(spacing: 10) {
-                            FamilyAvatar(initial: approval.avatar_initial ?? "?", size: 36)
+                            FamilyAvatar(initial: approval.avatar_initial ?? "?", size: 36, name: approval.helper_name)
                             VStack(alignment: .leading, spacing: 2) {
                                 Text("\(approval.helper_name ?? "Someone") confirmed")
-                                    .font(.system(size: 15, weight: .semibold))
+                                    .font(.flSubheadline.weight(.semibold))
                                 Text("Coverage approved")
-                                    .font(.system(size: 13)).foregroundStyle(WarmPalette.ink3)
+                                    .font(.flFootnote).foregroundStyle(WarmPalette.ink3)
                             }
                             Spacer()
                             Image(systemName: "checkmark")
@@ -302,13 +302,13 @@ struct CoverageCascadeView: View {
                         }
 
                         VStack(alignment: .leading, spacing: 6) {
-                            Text("CONFIRMED WINDOW").font(.system(size: 10, weight: .semibold)).foregroundStyle(WarmPalette.good).tracking(0.4)
+                            Text("CONFIRMED WINDOW").font(.flOverline).foregroundStyle(WarmPalette.good).tracking(0.4)
                             Text("\(approval.approved_date)")
-                                .font(.system(size: 22, weight: .bold)).foregroundStyle(WarmPalette.ink1)
+                                .font(.flTitle).foregroundStyle(WarmPalette.ink1)
                             Text("\(approval.approved_start) - \(approval.approved_end)")
-                                .font(.system(size: 17, weight: .semibold)).foregroundStyle(TabAccent.care.color)
+                                .font(.flHeadline).foregroundStyle(TabAccent.care.color)
                             if let note = approval.helper_note, !note.isEmpty {
-                                Text("\"\(note)\"").font(.system(size: 15)).foregroundStyle(WarmPalette.ink2).italic().padding(.top, 4)
+                                Text("\"\(note)\"").font(.flSubheadline).foregroundStyle(WarmPalette.ink2).italic().padding(.top, 4)
                             }
                         }
                         .padding(14).frame(maxWidth: .infinity, alignment: .leading)
@@ -328,7 +328,7 @@ struct CoverageCascadeView: View {
 
                     Button { currentStep = .booking } label: {
                         Text("Book into this window")
-                            .font(.system(size: 16, weight: .semibold)).foregroundStyle(WarmPalette.cream1)
+                            .font(.flHeadline).foregroundStyle(WarmPalette.cream1)
                             .frame(maxWidth: .infinity).padding(.vertical, 16)
                             .background(WarmPalette.ink1).clipShape(RoundedRectangle(cornerRadius: 22))
                     }
@@ -352,9 +352,9 @@ struct CoverageCascadeView: View {
                         Image(systemName: "lock.open.fill").font(.system(size: 18)).foregroundStyle(WarmPalette.good)
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Coverage confirmed - \(approval.approved_start) to \(approval.approved_end)")
-                                .font(.system(size: 15, weight: .semibold)).foregroundStyle(WarmPalette.good)
+                                .font(.flSubheadline.weight(.semibold)).foregroundStyle(WarmPalette.good)
                             Text("\(approval.helper_name ?? "Helper") - \(approval.approved_date)")
-                                .font(.system(size: 13)).foregroundStyle(WarmPalette.ink3)
+                                .font(.flFootnote).foregroundStyle(WarmPalette.ink3)
                         }
                     }
                     .padding(14).frame(maxWidth: .infinity, alignment: .leading)
@@ -366,7 +366,7 @@ struct CoverageCascadeView: View {
 
                     // Booking form
                     VStack(alignment: .leading, spacing: 0) {
-                        Text("BOOK YOUR APPOINTMENT").font(.system(size: 11, weight: .semibold)).foregroundStyle(TabAccent.care.color).tracking(0.4).padding(.bottom, 12)
+                        Text("BOOK YOUR APPOINTMENT").font(.flOverline).foregroundStyle(TabAccent.care.color).tracking(0.4).padding(.bottom, 12)
                         VStack(spacing: 0) {
                             BookingFormField(label: "What", placeholder: "e.g. Dental cleaning", text: $bookingTitle)
                             GlassDivider()
@@ -375,7 +375,7 @@ struct CoverageCascadeView: View {
                         HStack(spacing: 8) {
                             Button { Task { await bookAppointment(approval: approval) } } label: {
                                 Text("Add to calendar")
-                                    .font(.system(size: 14, weight: .semibold)).foregroundStyle(WarmPalette.cream1)
+                                    .font(.flSubheadline.weight(.semibold)).foregroundStyle(WarmPalette.cream1)
                                     .frame(maxWidth: .infinity).padding(.vertical, 12)
                                     .background(WarmPalette.ink1).clipShape(Capsule())
                             }
@@ -439,14 +439,14 @@ struct CoverageCascadeView: View {
 
     private func sectionLabel(_ text: String) -> some View {
         Text(text.uppercased())
-            .font(.system(size: 10, weight: .semibold)).foregroundStyle(WarmPalette.ink3).tracking(0.4)
-            .padding(.horizontal, 22).padding(.bottom, 8)
+            .font(.flOverline).foregroundStyle(WarmPalette.ink3).tracking(0.4)
+            .padding(.horizontal, DesignTokens.Spacing.horizontalMargin).padding(.bottom, 8)
     }
 
     private func reasonChip(label: String, icon: String, selected: Bool) -> some View {
         HStack(spacing: 10) {
             Image(systemName: icon).font(.system(size: 16)).foregroundStyle(selected ? TabAccent.care.color : WarmPalette.ink3).frame(width: 28)
-            Text(label).font(.system(size: 15, weight: selected ? .semibold : .regular)).foregroundStyle(selected ? WarmPalette.ink1 : WarmPalette.ink2)
+            Text(label).font(.flSubheadline.weight(selected ? .semibold : .regular)).foregroundStyle(selected ? WarmPalette.ink1 : WarmPalette.ink2)
             Spacer()
             if selected {
                 Image(systemName: "checkmark.circle.fill").font(.system(size: 18)).foregroundStyle(TabAccent.care.color)
@@ -460,7 +460,7 @@ struct CoverageCascadeView: View {
     private func windowEditor(index: Int) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text("Window \(index + 1)").font(.system(size: 13, weight: .semibold))
+                Text("Window \(index + 1)").font(.flFootnote.weight(.semibold))
                 Spacer()
                 Button { candidateWindows.remove(at: index) } label: {
                     Image(systemName: "xmark.circle.fill").font(.system(size: 16)).foregroundStyle(WarmPalette.ink4)
@@ -468,21 +468,21 @@ struct CoverageCascadeView: View {
             }
             HStack(spacing: 8) {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Date").font(.system(size: 10, weight: .semibold)).foregroundStyle(WarmPalette.ink3)
+                    Text("Date").font(.flOverline).foregroundStyle(WarmPalette.ink3)
                     TextField("YYYY-MM-DD", text: $candidateWindows[index].date)
                         .font(.system(size: 14, design: .monospaced))
                         .padding(8)
                         .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: 10))
                 }
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Start").font(.system(size: 10, weight: .semibold)).foregroundStyle(WarmPalette.ink3)
+                    Text("Start").font(.flOverline).foregroundStyle(WarmPalette.ink3)
                     TextField("HH:MM", text: $candidateWindows[index].startTime)
                         .font(.system(size: 14, design: .monospaced))
                         .padding(8)
                         .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: 10))
                 }
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("End").font(.system(size: 10, weight: .semibold)).foregroundStyle(WarmPalette.ink3)
+                    Text("End").font(.flOverline).foregroundStyle(WarmPalette.ink3)
                     TextField("HH:MM", text: $candidateWindows[index].endTime)
                         .font(.system(size: 14, design: .monospaced))
                         .padding(8)
@@ -516,7 +516,7 @@ struct BookingFormField: View {
 
     var body: some View {
         HStack {
-            Text(label).font(.system(size: 13)).foregroundStyle(WarmPalette.ink3).frame(width: 70, alignment: .leading)
+            Text(label).font(.flFootnote).foregroundStyle(WarmPalette.ink3).frame(width: 70, alignment: .leading)
             TextField(placeholder, text: $text).font(.system(size: 15, weight: .medium)).foregroundStyle(WarmPalette.ink1)
         }
         .padding(.vertical, 10)

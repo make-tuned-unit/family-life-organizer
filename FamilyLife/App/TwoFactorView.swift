@@ -35,11 +35,11 @@ struct TwoFactorView: View {
                         .foregroundStyle(.white)
 
                     Text(mode == .email ? "Verify your email" : "Enter your code")
-                        .font(.system(size: 26, weight: .bold))
+                        .font(.flScreenTitle)
                         .foregroundStyle(.white)
 
                     Text(subtitle)
-                        .font(.system(size: 15))
+                        .font(.flSubheadline)
                         .foregroundStyle(.white.opacity(0.85))
                         .multilineTextAlignment(.center)
                         .padding(.horizontal, 32)
@@ -85,13 +85,13 @@ struct TwoFactorView: View {
 
                     if mode == .code {
                         Button { resend() } label: {
-                            Text("Resend code").font(.system(size: 14)).foregroundStyle(.white.opacity(0.85))
+                            Text("Resend code").font(.flSubheadline).foregroundStyle(.white.opacity(0.85))
                         }
                         .disabled(isWorking)
                     }
 
                     Button { dismiss() } label: {
-                        Text("Back").font(.system(size: 14)).foregroundStyle(.white.opacity(0.6))
+                        Text("Back").font(.flSubheadline).foregroundStyle(.white.opacity(0.6))
                     }
                     .padding(.top, 4)
                 }
@@ -161,7 +161,7 @@ struct TwoFactorView: View {
         content()
             .foregroundStyle(.white)
             .tint(.white)
-            .font(.system(size: 18))
+            .font(.flBody)
             .padding(16)
             .frame(maxWidth: .infinity)
             .background(.ultraThinMaterial.opacity(0.85), in: RoundedRectangle(cornerRadius: 16))
@@ -172,7 +172,7 @@ struct TwoFactorView: View {
     private func label(_ text: String, icon: String, color: Color) -> some View {
         HStack(spacing: 6) {
             Image(systemName: icon).font(.system(size: 13))
-            Text(text).font(.system(size: 13))
+            Text(text).font(.flFootnote)
         }
         .foregroundStyle(color)
     }

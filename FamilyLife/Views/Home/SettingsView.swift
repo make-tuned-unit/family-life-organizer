@@ -76,14 +76,14 @@ struct SettingsView: View {
                             VStack(alignment: .leading, spacing: 2) {
                                 HStack(spacing: 6) {
                                     Text(user.name)
-                                        .font(.system(size: 17, weight: .semibold))
+                                        .font(.flHeadline)
                                         .foregroundStyle(WarmPalette.ink1)
                                     Image(systemName: "pencil")
                                         .font(.system(size: 12, weight: .semibold))
                                         .foregroundStyle(WarmPalette.ink3)
                                 }
                                 Text(user.username)
-                                    .font(.system(size: 13))
+                                    .font(.flFootnote)
                                     .foregroundStyle(WarmPalette.ink3)
                             }
                         }
@@ -148,7 +148,7 @@ struct SettingsView: View {
                 if let code = household.householdGroup?.invite_code {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Invite Code")
-                            .font(.system(size: 13, weight: .medium))
+                            .font(.flFootnote.weight(.medium))
                             .foregroundStyle(WarmPalette.ink3)
                         HStack {
                             Text(code)
