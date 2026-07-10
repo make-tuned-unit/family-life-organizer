@@ -45,8 +45,12 @@ extension View {
 
     /// True Liquid Glass — only use on fixed UI chrome (tab bar, floating buttons).
     /// NEVER use inside a ScrollView.
+    /// The compiler guard lets the project build with Xcode 16 (iOS 18 SDK,
+    /// the newest Xcode that runs on Intel Macs), where glassEffect doesn't
+    /// exist; Xcode 26 builds keep the real Liquid Glass path.
     @ViewBuilder
     func flGlassChrome<S: Shape>(tint: Color = .clear, strokeOpacity: Double = 0.08, in shape: S) -> some View {
+        #if compiler(>=6.2)
         if #available(iOS 26.0, *) {
             self.glassEffect(.regular.tint(tint), in: shape)
         } else {
@@ -54,6 +58,11 @@ extension View {
                 .background(.ultraThinMaterial, in: shape)
                 .overlay(shape.stroke(tint.opacity(strokeOpacity), lineWidth: 0.5))
         }
+        #else
+        self
+            .background(.ultraThinMaterial, in: shape)
+            .overlay(shape.stroke(tint.opacity(strokeOpacity), lineWidth: 0.5))
+        #endif
     }
 }
 
