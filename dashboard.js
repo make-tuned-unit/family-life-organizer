@@ -315,6 +315,26 @@ function sendServerError(res, err) {
   if (!res.headersSent) res.status(500).json({ error: 'Internal server error' });
 }
 
+// ── Device refresh tokens ────────────────────────────────────────────────────
+// Long-lived, revocable credentials so the iOS app never stores the account
+// password. Opaque 256-bit values; only SHA-256 hashes are stored server-side.
+// Rotated on every token-login, so a stolen-then-replayed token is rejected.
+const hashAuthToken = (t) => crypto.createHash('sha256').update(t).digest('hex');
+
+async function issueAuthToken(db, userId, deviceName) {
+  const token = crypto.randomBytes(32).toString('hex');
+  await dbRun(db, 'INSERT INTO auth_tokens (user_id, token_hash, device_name) VALUES (?, ?, ?)',
+    [userId, hashAuthToken(token), deviceName || null]);
+  return token;
+}
+
+// Promisified write against the shared connection.
+function dbRun(db, sql, params = []) {
+  return new Promise((resolve, reject) => {
+    db.db.run(sql, params, function (err) { err ? reject(err) : resolve(this); });
+  });
+}
+
 // Promisified single-row read against the shared connection.
 function dbGet(db, sql, params = []) {
   return new Promise((resolve, reject) => {
@@ -575,10 +595,12 @@ app.post('/api/auth/register', registerLimiter, async (req, res) => {
 
     // Set session (regenerated to avoid fixation)
     await establishSession(req, { username, name: user.name, id: user.id });
+    const refresh_token = await issueAuthToken(db, user.id, req.body.device_name);
     res.json({
       success: true,
       user: { id: user.id, username, name, avatar: null },
-      household: { id: household.id, invite_code: household.invite_code }
+      household: { id: household.id, invite_code: household.invite_code },
+      refresh_token
     });
   } catch (err) {
     sendServerError(res, err);
@@ -606,7 +628,8 @@ app.post('/api/auth/login', loginLimiter, async (req, res) => {
     // Password OK. With 2FA off, establish the session immediately.
     if (!TWO_FA_ENABLED) {
       await establishSession(req, { username: dbUser.username, name: dbUser.name, id: dbUser.id });
-      return res.json({ success: true, user: { id: dbUser.id, username: dbUser.username, name: dbUser.name, avatar: dbUser.avatar } });
+      const refresh_token = await issueAuthToken(db, dbUser.id, req.body.device_name);
+      return res.json({ success: true, refresh_token, user: { id: dbUser.id, username: dbUser.username, name: dbUser.name, avatar: dbUser.avatar } });
     }
 
     // 2FA required. Issue a challenge; NO session yet. If the user already has a
@@ -673,7 +696,8 @@ app.post('/api/auth/login/verify', loginLimiter, async (req, res) => {
     await db.markEmailVerifiedAndEnable(ch.user_id);
     const user = await db.getUserById(ch.user_id);
     await establishSession(req, { username: user.username, name: user.name, id: user.id });
-    res.json({ success: true, user: { id: user.id, username: user.username, name: user.name, avatar: user.avatar } });
+    const refresh_token = await issueAuthToken(db, user.id, req.body.device_name);
+    res.json({ success: true, refresh_token, user: { id: user.id, username: user.username, name: user.name, avatar: user.avatar } });
   } catch (err) {
     sendServerError(res, err);
   } finally {
@@ -703,6 +727,51 @@ app.post('/api/auth/login/resend', loginLimiter, async (req, res) => {
   }
 });
 
+// Silent re-login with a device refresh token (no password on device).
+// Bypasses 2FA by design: the token was earned by a full (2FA-complete) login
+// on this device. Rotates the token on every success.
+app.post('/api/auth/token-login', loginLimiter, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const { refresh_token } = req.body;
+    if (typeof refresh_token !== 'string' || refresh_token.length < 32) {
+      return res.status(400).json({ error: 'refresh_token required' });
+    }
+    const row = await dbGet(db,
+      'SELECT * FROM auth_tokens WHERE token_hash = ? AND revoked = 0',
+      [hashAuthToken(refresh_token)]);
+    const user = row && await db.getUserById(row.user_id);
+    if (!row || !user) {
+      return res.status(401).json({ error: 'Invalid token' });
+    }
+    // Rotate before answering: the presented token dies, a fresh one replaces it.
+    await dbRun(db, 'UPDATE auth_tokens SET revoked = 1, last_used_at = CURRENT_TIMESTAMP WHERE id = ?', [row.id]);
+    const fresh = await issueAuthToken(db, user.id, row.device_name);
+    await establishSession(req, { username: user.username, name: user.name, id: user.id });
+    res.json({ success: true, refresh_token: fresh, user: { id: user.id, username: user.username, name: user.name, avatar: user.avatar } });
+  } catch (err) {
+    sendServerError(res, err);
+  } finally {
+    db.close();
+  }
+});
+
+// Logout: revoke the presented device token and destroy the session.
+app.post('/api/auth/logout', async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const { refresh_token } = req.body || {};
+    if (typeof refresh_token === 'string' && refresh_token.length >= 32) {
+      await dbRun(db, 'UPDATE auth_tokens SET revoked = 1 WHERE token_hash = ?', [hashAuthToken(refresh_token)]);
+    }
+    req.session.destroy(() => res.json({ success: true }));
+  } catch (err) {
+    sendServerError(res, err);
+  } finally {
+    db.close();
+  }
+});
+
 // Change the authenticated user's password. Requires the current password.
 app.post('/api/auth/change-password', requireAuth, loginLimiter, async (req, res) => {
   const db = new FamilyDB();
@@ -723,7 +792,11 @@ app.post('/api/auth/change-password', requireAuth, loginLimiter, async (req, res
     }
     const password_hash = await bcrypt.hash(new_password, 12);
     await db.updateUserPassword(req.session.user.id, password_hash);
-    res.json({ success: true });
+    // Password change = sign out every other device: revoke all outstanding
+    // tokens, then hand THIS device a fresh one so it stays signed in.
+    await dbRun(db, 'UPDATE auth_tokens SET revoked = 1 WHERE user_id = ?', [req.session.user.id]);
+    const refresh_token = await issueAuthToken(db, req.session.user.id, req.body.device_name);
+    res.json({ success: true, refresh_token });
   } catch (err) {
     sendServerError(res, err);
   } finally {

@@ -470,6 +470,21 @@ CREATE TABLE IF NOT EXISTS login_challenges (
 );
 CREATE INDEX IF NOT EXISTS idx_login_challenges_token ON login_challenges(token);
 
+-- Long-lived, revocable device tokens for silent re-login. The app stores the
+-- opaque token; only its SHA-256 hash lives here. Tokens rotate on every use,
+-- so a replayed (already-rotated) token is rejected and "log out everywhere"
+-- is possible by revoking rows.
+CREATE TABLE IF NOT EXISTS auth_tokens (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    token_hash TEXT NOT NULL UNIQUE,
+    device_name TEXT,
+    revoked INTEGER DEFAULT 0,
+    last_used_at DATETIME,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
 -- Groups: household (core couple), family (one side), tribe (merged)
 CREATE TABLE IF NOT EXISTS groups (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

@@ -1,4 +1,5 @@
 import Foundation
+import UIKit
 
 @Observable
 final class APIService {
@@ -34,6 +35,8 @@ final class APIService {
     struct LoginResponse: Codable {
         let success: Bool?
         let user: UserInfo?
+        /// Revocable device token — replaces storing the password on device.
+        let refresh_token: String?
         // Two-factor fields (present when a code challenge is issued)
         let two_factor_required: Bool?
         let challenge: String?
@@ -50,8 +53,25 @@ final class APIService {
     }
 
     func login(username: String, password: String) async throws -> LoginResponse {
-        let body = ["username": username, "password": password]
+        let body = ["username": username, "password": password, "device_name": Self.deviceName]
         return try await post("/api/auth/login", body: body)
+    }
+
+    /// Silent re-login with the stored device token (no password on device).
+    /// The server rotates the token; persist the one in the response.
+    func tokenLogin(refreshToken: String) async throws -> LoginResponse {
+        try await post("/api/auth/token-login", body: ["refresh_token": refreshToken])
+    }
+
+    /// Revoke this device's token server-side and destroy the session.
+    func serverLogout(refreshToken: String?) async throws {
+        var body: [String: Any] = [:]
+        if let refreshToken { body["refresh_token"] = refreshToken }
+        let _: SuccessResponse = try await post("/api/auth/logout", body: body)
+    }
+
+    private static var deviceName: String {
+        UIDevice.current.name
     }
 
     /// First-login enrollment: set the email a 2FA code should be sent to.
@@ -712,6 +732,7 @@ final class APIService {
     struct RegisterResponse: Codable {
         let success: Bool
         let user: UserInfo?
+        let refresh_token: String?
         let household: RegisterHousehold?
 
         struct RegisterHousehold: Codable {
@@ -735,7 +756,7 @@ final class APIService {
     }
 
     func register(username: String, password: String, name: String, inviteCode: String? = nil, householdName: String? = nil) async throws -> RegisterResponse {
-        var body: [String: Any] = ["username": username, "password": password, "name": name]
+        var body: [String: Any] = ["username": username, "password": password, "name": name, "device_name": Self.deviceName]
         if let inviteCode { body["invite_code"] = inviteCode }
         if let householdName { body["household_name"] = householdName }
         return try await post("/api/auth/register", body: body)
@@ -1110,10 +1131,18 @@ final class APIService {
         let _: SuccessResponse = try await put("/api/users/me/name", body: ["name": name])
     }
 
-    func changePassword(currentPassword: String, newPassword: String) async throws {
-        let _: SuccessResponse = try await post("/api/auth/change-password", body: [
+    struct ChangePasswordResponse: Codable {
+        let success: Bool?
+        /// Fresh device token — the server revokes all others on password change.
+        let refresh_token: String?
+    }
+
+    @discardableResult
+    func changePassword(currentPassword: String, newPassword: String) async throws -> ChangePasswordResponse {
+        try await post("/api/auth/change-password", body: [
             "current_password": currentPassword,
             "new_password": newPassword,
+            "device_name": Self.deviceName,
         ])
     }
 
