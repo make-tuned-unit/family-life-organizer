@@ -27,9 +27,11 @@ struct PersonGiftListView: View {
                         VStack(alignment: .leading) {
                             Text(person.name)
                                 .font(.title3.bold())
-                            Text(person.relationship.capitalized)
-                                .font(.caption)
-                                .foregroundStyle(WarmPalette.ink3)
+                            if let relationship = person.relationship, !relationship.isEmpty {
+                                Text(relationship.capitalized)
+                                    .font(.caption)
+                                    .foregroundStyle(WarmPalette.ink3)
+                            }
                         }
                     }
                     if let birthday = person.birthday {

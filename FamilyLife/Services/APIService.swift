@@ -353,6 +353,26 @@ final class APIService {
 
     struct CookResponse: Codable {
         let recipes: [RecipeSuggestion]
+
+        // Lossy array decode: skip AI-generated recipes that fail to decode
+        // (e.g. missing name) instead of failing the whole response.
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            var arr = try c.nestedUnkeyedContainer(forKey: .recipes)
+            var out: [RecipeSuggestion] = []
+            while !arr.isAtEnd {
+                if let recipe = try? arr.decode(RecipeSuggestion.self) {
+                    out.append(recipe)
+                } else {
+                    _ = try? arr.decode(AnyIgnored.self)  // advance past the bad element
+                }
+            }
+            recipes = out
+        }
+    }
+
+    private struct AnyIgnored: Decodable {
+        init(from decoder: Decoder) throws {}  // consumes any element without reading it
     }
 
     func suggestRecipes(query: String) async throws -> [RecipeSuggestion] {
@@ -1400,7 +1420,7 @@ final class APIService {
         request.httpMethod = "GET"
         if let timeout { request.timeoutInterval = timeout }
         let (data, response) = try await session.data(for: request)
-        try checkResponse(response)
+        try checkResponse(response, data: data)
         return try JSONDecoder().decode(T.self, from: data)
     }
 
@@ -1412,7 +1432,7 @@ final class APIService {
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
         if let timeout { request.timeoutInterval = timeout }
         let (data, response) = try await session.data(for: request)
-        try checkResponse(response)
+        try checkResponse(response, data: data)
         return try JSONDecoder().decode(T.self, from: data)
     }
 
@@ -1423,7 +1443,7 @@ final class APIService {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
         let (data, response) = try await session.data(for: request)
-        try checkResponse(response)
+        try checkResponse(response, data: data)
         return try JSONDecoder().decode(T.self, from: data)
     }
 
@@ -1432,11 +1452,11 @@ final class APIService {
         var request = URLRequest(url: url)
         request.httpMethod = "DELETE"
         let (data, response) = try await session.data(for: request)
-        try checkResponse(response)
+        try checkResponse(response, data: data)
         return try JSONDecoder().decode(T.self, from: data)
     }
 
-    private func checkResponse(_ response: URLResponse) throws {
+    private func checkResponse(_ response: URLResponse, data: Data? = nil) throws {
         guard let http = response as? HTTPURLResponse else {
             throw APIError.invalidResponse
         }
@@ -1445,15 +1465,25 @@ final class APIService {
             throw APIError.unauthorized
         }
         guard (200...299).contains(http.statusCode) else {
+            // Surface the server's own {error: "..."} message when it sent one —
+            // "You can only add your own contacts" beats "Server error (403)".
+            if let data,
+               let body = try? JSONDecoder().decode(ServerErrorBody.self, from: data),
+               let message = body.error, !message.isEmpty {
+                throw APIError.serverMessage(http.statusCode, message)
+            }
             throw APIError.serverError(http.statusCode)
         }
     }
+
+    private struct ServerErrorBody: Decodable { let error: String? }
 }
 
 enum APIError: LocalizedError {
     case invalidResponse
     case unauthorized
     case serverError(Int)
+    case serverMessage(Int, String)
     case cloudAIDisabled
     case streamError(String)
 
@@ -1462,6 +1492,7 @@ enum APIError: LocalizedError {
         case .invalidResponse: "Invalid server response"
         case .unauthorized: "Please sign in again"
         case .serverError(let code): "Server error (\(code))"
+        case .serverMessage(_, let message): message
         case .cloudAIDisabled: "Cloud AI is off. Turn it on in Settings → Privacy to use this feature."
         case .streamError(let msg): msg
         }

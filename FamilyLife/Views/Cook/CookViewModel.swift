@@ -67,6 +67,27 @@ struct RecipeSuggestion: Codable, Identifiable {
         case cookTime = "cook_time"
         case difficulty, servings, ingredients, steps
     }
+
+    // The backend forwards raw AI-extracted JSON: any field may be missing or
+    // arrive as a string ("30 min"). One malformed recipe must not sink all three.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        name = try c.decode(String.self, forKey: .name)
+        cookTime = Self.lenientInt(c, .cookTime) ?? 0
+        difficulty = (try? c.decode(String.self, forKey: .difficulty)) ?? "Easy"
+        servings = Self.lenientInt(c, .servings) ?? 0
+        ingredients = (try? c.decode([RecipeIngredient].self, forKey: .ingredients)) ?? []
+        steps = (try? c.decode([String].self, forKey: .steps)) ?? []
+    }
+
+    private static func lenientInt(_ c: KeyedDecodingContainer<CodingKeys>, _ key: CodingKeys) -> Int? {
+        if let i = try? c.decode(Int.self, forKey: key) { return i }
+        if let d = try? c.decode(Double.self, forKey: key) { return Int(d) }
+        if let s = try? c.decode(String.self, forKey: key) {
+            return Int(s.filter(\.isNumber))
+        }
+        return nil
+    }
 }
 
 struct RecipeIngredient: Codable, Identifiable {
@@ -74,4 +95,12 @@ struct RecipeIngredient: Codable, Identifiable {
     let name: String
     let quantity: String?
     let available: Bool
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        name = try c.decode(String.self, forKey: .name)
+        quantity = try? c.decode(String.self, forKey: .quantity)
+        available = (try? c.decode(Bool.self, forKey: .available))
+            ?? ((try? c.decode(Int.self, forKey: .available)).map { $0 != 0 } ?? false)
+    }
 }

@@ -10,7 +10,8 @@ enum GiftIdeaStatus: String, Codable {
 struct GiftPersonResponse: Codable, Identifiable {
     let id: Int
     let name: String
-    let relationship: String
+    // Nullable in the DB — a single NULL row must not brick the whole list decode.
+    let relationship: String?
     let birthday: String?
     let anniversary: String?
     let notes: String?

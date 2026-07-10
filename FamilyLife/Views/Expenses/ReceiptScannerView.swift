@@ -590,10 +590,45 @@ struct ScanResult: Codable {
     var items: [ScanItem]
 }
 
+// The scan endpoint returns raw AI-extracted JSON — any key may be missing or
+// mistyped (total as "$42.10"). Decode leniently so a scan never hard-fails;
+// the review sheet lets the user correct whatever the AI got wrong.
+extension ScanResult {
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        merchant = (try? c.decode(String.self, forKey: .merchant)) ?? "Unknown"
+        date = (try? c.decode(String.self, forKey: .date))
+            ?? DateFormatter.isoDate.string(from: Date())
+        category = (try? c.decode(String.self, forKey: .category)) ?? "Other"
+        items = (try? c.decode([ScanItem].self, forKey: .items)) ?? []
+        if let d = try? c.decode(Double.self, forKey: .total) {
+            total = d
+        } else if let s = try? c.decode(String.self, forKey: .total),
+                  let d = Double(s.replacingOccurrences(of: "$", with: "").replacingOccurrences(of: ",", with: "")) {
+            total = d
+        } else {
+            total = 0
+        }
+    }
+}
+
 struct ScanItem: Codable {
     let name: String
     let price: Double?
     let quantity: String?
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        name = (try? c.decode(String.self, forKey: .name)) ?? "Item"
+        quantity = try? c.decode(String.self, forKey: .quantity)
+        if let d = try? c.decode(Double.self, forKey: .price) {
+            price = d
+        } else if let s = try? c.decode(String.self, forKey: .price) {
+            price = Double(s.replacingOccurrences(of: "$", with: ""))
+        } else {
+            price = nil
+        }
+    }
 }
 
 #Preview {
