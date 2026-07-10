@@ -52,6 +52,20 @@ struct FLDestructiveButtonStyle: ButtonStyle {
     }
 }
 
+// MARK: - FLCardPressStyle
+// Press feedback for tappable CARDS (whole-card buttons / navigation rows):
+// a gentle scale + dim, matching Apple's own card-press behavior. Use with
+// content that already draws its own .flCard() surface.
+
+struct FLCardPressStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.98 : 1.0)
+            .opacity(configuration.isPressed ? 0.88 : 1.0)
+            .animation(.spring(response: 0.25, dampingFraction: 0.75), value: configuration.isPressed)
+    }
+}
+
 // MARK: - Convenience accessors
 
 extension ButtonStyle where Self == FLPrimaryButtonStyle {
@@ -65,6 +79,10 @@ extension ButtonStyle where Self == FLSecondaryButtonStyle {
 
 extension ButtonStyle where Self == FLDestructiveButtonStyle {
     static var flDestructive: FLDestructiveButtonStyle { .init() }
+}
+
+extension ButtonStyle where Self == FLCardPressStyle {
+    static var flCardPress: FLCardPressStyle { .init() }
 }
 
 // MARK: - Preview

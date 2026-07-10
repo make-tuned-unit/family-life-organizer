@@ -110,7 +110,7 @@ struct ConciergeView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .flCard(tint: accent, interactive: true)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.flCardPress)
     }
 
     // MARK: - Header
@@ -248,7 +248,7 @@ struct ConciergeView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .flCard(tint: tint(for: card.kind), interactive: true)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.flCardPress)
     }
 
     private var allClearCard: some View {

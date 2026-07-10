@@ -280,6 +280,8 @@ struct ExpensesView: View {
                         .font(.system(size: 44, weight: .bold))
                         .foregroundStyle(WarmPalette.ink1)
                         .tracking(-0.88)
+                        .contentTransition(.numericText())
+                        .animation(.snappy, value: totalSpent)
                     Text("of $\(Int(totalBudget).formatted())")
                         .font(.system(size: 13))
                         .foregroundStyle(WarmPalette.ink3)

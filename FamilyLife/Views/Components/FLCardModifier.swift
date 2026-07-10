@@ -15,19 +15,11 @@ struct FLCardModifier: ViewModifier {
     var interactive: Bool = false
 
     func body(content: Content) -> some View {
-        if interactive {
-            content
-                .flGlassSurface(
-                    tint: tint,
-                    in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card)
-                )
-        } else {
-            content
-                .flGlassSurface(
-                    tint: tint,
-                    in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card)
-                )
-        }
+        content
+            .flGlassSurface(
+                tint: tint,
+                in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card)
+            )
     }
 }
 
@@ -35,7 +27,9 @@ extension View {
     /// Apply the standard FamilyLife glass card surface.
     /// - Parameters:
     ///   - tint: The tab accent color to tint the glass surface. Pass `.clear` for untinted.
-    ///   - interactive: If true, adds `.interactive()` for scale/shimmer on press. Use for tappable rows.
+    ///   - interactive: Marker for tappable cards. The surface is identical —
+    ///     pair the enclosing Button with `.buttonStyle(.flCardPress)` to get
+    ///     the press scale/dim feedback.
     func flCard(tint: Color = .clear, interactive: Bool = false) -> some View {
         modifier(FLCardModifier(tint: tint, interactive: interactive))
     }

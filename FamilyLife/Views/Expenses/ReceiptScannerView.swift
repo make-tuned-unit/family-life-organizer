@@ -465,8 +465,10 @@ struct ReceiptScannerView: View {
                     categories.sort()
                 }
                 selectedCategory = category
+                UINotificationFeedbackGenerator().notificationOccurred(.success)
             } catch {
                 self.error = "Could not scan receipt. Try adding manually."
+                UINotificationFeedbackGenerator().notificationOccurred(.error)
             }
             isScanning = false
         }
@@ -515,10 +517,12 @@ struct ReceiptScannerView: View {
                 }
                 currentScanSaved = true
                 savedCount += 1
+                UINotificationFeedbackGenerator().notificationOccurred(.success)
                 await onReceiptSaved?()
             }
         } catch {
             self.error = "Failed to save: \(error.localizedDescription)"
+            UINotificationFeedbackGenerator().notificationOccurred(.error)
         }
     }
 

@@ -59,6 +59,7 @@ struct MoreView: View {
                         }
                     }
                 }
+                .buttonStyle(.flCardPress)  // press scale/dim on every row
                 .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
             }
             .padding(.bottom, DesignTokens.Spacing.bottomBuffer)

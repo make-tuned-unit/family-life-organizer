@@ -51,6 +51,8 @@ struct LeaderboardCard: View {
                             Text("\(member.totalPoints) pts")
                                 .font(.subheadline.bold())
                                 .foregroundStyle(TabAccent.home.color)
+                                .contentTransition(.numericText())
+                                .animation(.snappy, value: member.totalPoints)
                         }
                     }
                     .padding(.vertical, DesignTokens.Spacing.rowVertical)

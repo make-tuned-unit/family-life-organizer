@@ -672,6 +672,13 @@ struct HomeView: View {
                 )
                 .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
                 .padding(.bottom, 10)
+                // Subtle entrance as cards scroll into view — respects Reduce
+                // Motion automatically (scrollTransition is disabled by it).
+                .scrollTransition(.animated(.smooth)) { content, phase in
+                    content
+                        .opacity(phase.isIdentity ? 1 : 0.6)
+                        .scaleEffect(phase.isIdentity ? 1 : 0.97)
+                }
             }
 
             if filteredFeed.count > viewModel.visibleFeedCount {
