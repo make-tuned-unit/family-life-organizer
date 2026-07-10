@@ -7,10 +7,13 @@ import AVFoundation
 struct FamilyAvatar: View {
     let initial: String
     var size: CGFloat = 32
+    /// Full name for identity color. Pass it whenever you have it — hashing
+    /// the initial alone gives everyone starting with "J" the same color.
+    var name: String? = nil
 
     var body: some View {
         Circle()
-            .fill(Self.gradient(for: initial))
+            .fill(PersonPalette.gradient(for: name ?? initial.uppercased()))
             .frame(width: size, height: size)
             .overlay {
                 Text(initial)
@@ -20,23 +23,6 @@ struct FamilyAvatar: View {
             .overlay {
                 Circle().stroke(.white.opacity(0.7), lineWidth: 1.5)
             }
-    }
-
-    private static let palette: [(Color, Color)] = [
-        (Color(hex: "#c46a4a"), Color(hex: "#8a3e2a")),
-        (Color(hex: "#d99a3c"), Color(hex: "#a86a1c")),
-        (Color(hex: "#7ba05b"), Color(hex: "#4a6a35")),
-        (Color(hex: "#6b8aa0"), Color(hex: "#3a5870")),
-        (Color(hex: "#b97090"), Color(hex: "#7a4868")),
-        (Color(hex: "#8a7468"), Color(hex: "#5a463a")),
-        (Color(hex: "#6a9a8a"), Color(hex: "#3a6a5a")),
-        (Color(hex: "#9a6ab0"), Color(hex: "#6a3a80")),
-    ]
-
-    private static func gradient(for initial: String) -> LinearGradient {
-        let hash = initial.uppercased().unicodeScalars.reduce(0) { $0 &+ Int($1.value) }
-        let pair = palette[abs(hash) % palette.count]
-        return LinearGradient(colors: [pair.0, pair.1], startPoint: .topLeading, endPoint: .bottomTrailing)
     }
 }
 
@@ -114,7 +100,7 @@ struct UserAvatar: View {
         } else if let uid = userId, let img = profileCache.image(for: uid) {
             profileImage(img)
         } else {
-            FamilyAvatar(initial: String(name.prefix(1)).uppercased(), size: size)
+            FamilyAvatar(initial: String(name.prefix(1)).uppercased(), size: size, name: name)
         }
     }
 
@@ -173,16 +159,16 @@ struct PresenceChip: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            FamilyAvatar(initial: initial, size: 28)
+            FamilyAvatar(initial: initial, size: 28, name: name)
             VStack(alignment: .leading, spacing: 1) {
                 Text(name)
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.flFootnote.weight(.semibold))
                 HStack(spacing: 4) {
                     Circle()
                         .fill(statusColor)
                         .frame(width: 5, height: 5)
                     Text(status)
-                        .font(.system(size: 11))
+                        .font(.flOverline)
                         .foregroundStyle(WarmPalette.ink3)
                 }
             }
@@ -209,14 +195,15 @@ struct WarmStatTile: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(label.uppercased())
-                .font(.system(size: 10, weight: .semibold))
+                .font(.flOverline)
                 .foregroundStyle(WarmPalette.ink3)
+                .tracking(0.4)
             Text(value)
-                .font(.system(size: 22, weight: .bold, design: .default))
+                .font(.flTitle)
                 .foregroundStyle(WarmPalette.ink1)
                 .contentTransition(.numericText())
             Text(sub)
-                .font(.system(size: 11))
+                .font(.flCaption)
                 .foregroundStyle(WarmPalette.ink3)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -232,6 +219,8 @@ struct WarmAgendaRow: View {
     let title: String
     let subtitle: String
     var tagInitial: String? = nil
+    /// Full name behind tagInitial — gives the avatar its per-person color.
+    var tagName: String? = nil
     var isAuto: Bool = false
     /// Checked state for task rows — draws the filled dot + strikethrough.
     var isDone: Bool = false
@@ -255,18 +244,18 @@ struct WarmAgendaRow: View {
                 .frame(minWidth: 44, alignment: .leading)
             } else {
                 Text(time)
-                    .font(.system(size: 15, weight: .semibold, design: .default))
+                    .font(.flSubheadline.weight(.semibold))
                     .foregroundStyle(WarmPalette.ink1)
                     .frame(minWidth: 44, alignment: .leading)
             }
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(.flSubheadline.weight(.semibold))
                     .foregroundStyle(isDone ? WarmPalette.ink3 : WarmPalette.ink1)
                     .strikethrough(isDone, color: WarmPalette.ink4)
                 Text(subtitle)
-                    .font(.system(size: 13))
+                    .font(.flFootnote)
                     .foregroundStyle(WarmPalette.ink3)
             }
 
@@ -281,7 +270,7 @@ struct WarmAgendaRow: View {
                         .background(TabAccent.home.color.opacity(0.15), in: Circle())
                 }
             } else if let initial = tagInitial {
-                FamilyAvatar(initial: initial, size: 22)
+                FamilyAvatar(initial: initial, size: 22, name: tagName)
             }
         }
         .padding(.vertical, 12)
@@ -335,12 +324,12 @@ struct WarmSectionHeader: View {
     var body: some View {
         HStack {
             Text(title)
-                .font(.system(size: 18, weight: .semibold, design: .default))
+                .font(.flHeadline)
                 .foregroundStyle(WarmPalette.ink1)
             Spacer()
             if let trailing {
                 Text(trailing)
-                    .font(.system(size: 13))
+                    .font(.flFootnote)
                     .foregroundStyle(WarmPalette.ink3)
             }
         }
@@ -382,6 +371,8 @@ struct EventCard: View {
     let location: String
     let color: Color
     var attendees: [String] = []
+    /// Full names parallel to `attendees` — gives each avatar its person color.
+    var attendeeNames: [String] = []
     var recurring: Bool = false
 
     var body: some View {
@@ -393,28 +384,31 @@ struct EventCard: View {
             VStack(alignment: .leading, spacing: 4) {
                 HStack {
                     Text(time)
-                        .font(.system(size: 15, weight: .bold, design: .default))
+                        .font(.flSubheadline.weight(.bold))
                         .foregroundStyle(WarmPalette.ink1)
                     Spacer()
                     Text(duration + (recurring ? " recurring" : ""))
-                        .font(.system(size: 13))
+                        .font(.flFootnote)
                         .foregroundStyle(WarmPalette.ink3)
                 }
                 Text(title)
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(.flSubheadline.weight(.semibold))
                 HStack(spacing: 4) {
                     Image(systemName: "mappin")
                         .font(.system(size: 11))
                     Text(location)
                 }
-                .font(.system(size: 13))
+                .font(.flFootnote)
                 .foregroundStyle(WarmPalette.ink3)
             }
 
             if !attendees.isEmpty {
                 HStack(spacing: -8) {
-                    ForEach(Array(attendees.enumerated()), id: \.offset) { _, initial in
-                        FamilyAvatar(initial: initial, size: 22)
+                    ForEach(Array(attendees.enumerated()), id: \.offset) { index, initial in
+                        FamilyAvatar(
+                            initial: initial, size: 22,
+                            name: index < attendeeNames.count ? attendeeNames[index] : nil
+                        )
                     }
                 }
             }
@@ -496,10 +490,15 @@ extension View {
 
 // MARK: - Empty State
 
+// Action-first: an empty state should offer the next step, not a dead end.
+// Frame copy as possibility ("Plan your first trip"), not absence ("No trips").
 struct WarmEmptyState: View {
     let title: String
     let systemImage: String
     var description: String? = nil
+    /// Primary path out of the empty state (e.g. "Add an item").
+    var actionLabel: String? = nil
+    var action: (() -> Void)? = nil
 
     var body: some View {
         VStack(spacing: 10) {
@@ -507,13 +506,22 @@ struct WarmEmptyState: View {
                 .font(.system(size: 36))
                 .foregroundStyle(WarmPalette.ink4)
             Text(title)
-                .font(.system(size: 17, weight: .semibold))
+                .font(.flHeadline)
                 .foregroundStyle(WarmPalette.ink2)
             if let description {
                 Text(description)
-                    .font(.system(size: 14))
+                    .font(.flSubheadline)
                     .foregroundStyle(WarmPalette.ink3)
                     .multilineTextAlignment(.center)
+                    .padding(.horizontal, DesignTokens.Spacing.large)
+            }
+            if let actionLabel, let action {
+                Button(action: action) {
+                    Label(actionLabel, systemImage: "plus")
+                        .font(.flSubheadline.weight(.semibold))
+                }
+                .buttonStyle(.flSecondary)
+                .padding(.top, 6)
             }
         }
         .frame(maxWidth: .infinity)

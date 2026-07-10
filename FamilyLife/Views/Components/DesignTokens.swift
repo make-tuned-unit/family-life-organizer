@@ -39,6 +39,70 @@ enum DesignTokens {
     }
 }
 
+// MARK: - Typography
+// Semantic type scale on Dynamic Type styles — never hardcode point sizes in
+// views. Each token names a ROLE; the underlying style scales with the user's
+// text size setting (test at AX sizes: rows must grow, not truncate).
+//
+//   flScreenTitle   28  bold        screen headers ("More", "Budget")
+//   flTitle         22  bold        card hero titles, stat values
+//   flHeadline      17  semibold    card titles, row titles
+//   flBody          17  regular     primary content
+//   flSubheadline   15  regular     row subtitles, secondary content
+//   flFootnote      13  regular     metadata, timestamps
+//   flCaption       12  regular     dense annotations
+//   flOverline      11  semibold    UPPERCASE section eyebrows (pair with .tracking(0.4))
+//   flHero          44  bold rounded  the one big dashboard number per screen
+
+extension Font {
+    static let flScreenTitle: Font = .system(.title, weight: .bold)
+    static let flTitle: Font = .system(.title2, weight: .bold)
+    static let flHeadline: Font = .system(.headline)
+    static let flBody: Font = .system(.body)
+    static let flSubheadline: Font = .system(.subheadline)
+    static let flFootnote: Font = .system(.footnote)
+    static let flCaption: Font = .system(.caption)
+    static let flOverline: Font = .system(.caption2, weight: .semibold)
+    static let flHero: Font = .system(size: 44, weight: .bold, design: .rounded)
+}
+
+// MARK: - Person Palette
+// Deterministic per-person identity color, hashed from the FULL name (a
+// single-initial hash collides constantly in a family: "Jesse"/"Jack").
+// Use everywhere a person appears — avatar fills, assignee dots, calendar
+// tags, leaderboard accents — so each family member reads as one color
+// across every feature. Always pair with a non-color cue (initial/name).
+
+enum PersonPalette {
+    static let pairs: [(Color, Color)] = [
+        (Color(hex: "#c46a4a"), Color(hex: "#8a3e2a")),  // terracotta
+        (Color(hex: "#d99a3c"), Color(hex: "#a86a1c")),  // saffron
+        (Color(hex: "#7ba05b"), Color(hex: "#4a6a35")),  // sage
+        (Color(hex: "#6b8aa0"), Color(hex: "#3a5870")),  // ocean
+        (Color(hex: "#b97090"), Color(hex: "#7a4868")),  // rose
+        (Color(hex: "#8a7468"), Color(hex: "#5a463a")),  // taupe
+        (Color(hex: "#6a9a8a"), Color(hex: "#3a6a5a")),  // teal
+        (Color(hex: "#9a6ab0"), Color(hex: "#6a3a80")),  // violet
+    ]
+
+    static func index(for name: String) -> Int {
+        let normalized = name.lowercased().trimmingCharacters(in: .whitespaces)
+        let hash = normalized.unicodeScalars.reduce(0) { $0 &* 31 &+ Int($1.value) }
+        return abs(hash) % pairs.count
+    }
+
+    /// Flat identity color (dots, tags, bars).
+    static func color(for name: String) -> Color {
+        pairs[index(for: name)].0
+    }
+
+    /// Avatar-fill gradient (matches FamilyAvatar).
+    static func gradient(for name: String) -> LinearGradient {
+        let pair = pairs[index(for: name)]
+        return LinearGradient(colors: [pair.0, pair.1], startPoint: .topLeading, endPoint: .bottomTrailing)
+    }
+}
+
 // MARK: - Warm Palette
 
 enum WarmPalette {
