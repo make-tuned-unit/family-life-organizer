@@ -145,7 +145,6 @@ a:focus-visible, button:focus-visible{outline:2px solid var(--terracotta);outlin
 }
 .hero-copy h1{margin-top:18px}
 .hero-copy .lede b{color:var(--ink-1);font-weight:600}
-.hero-actions{display:flex;gap:14px;margin-top:18px;flex-wrap:wrap}
 .hero-meta{display:flex;align-items:center;gap:18px;margin-top:26px;flex-wrap:wrap}
 
 /* Hero waitlist capture — the primary action, above the fold */
@@ -154,9 +153,10 @@ a:focus-visible, button:focus-visible{outline:2px solid var(--terracotta);outlin
   background:rgba(255,255,255,.92);font-family:var(--sans);font-size:1rem;color:var(--ink-1);
   box-shadow:var(--shadow-sm);min-width:0}
 .notify-form.hero-form input:focus{outline:none;border-color:var(--terracotta);box-shadow:0 0 0 4px rgba(196,106,74,.12)}
-.hero-note{margin-top:12px;font-size:.88rem;color:var(--ink-3);display:flex;align-items:center;gap:8px}
-.hero-note::before{content:"";width:7px;height:7px;border-radius:50%;flex:none;
-  background:var(--saffron);box-shadow:0 0 0 4px rgba(217,158,58,.16)}
+/* Secondary action — a quiet text link, not a competing button */
+.hero-link{display:inline-block;margin-top:16px;font-weight:600;font-size:.95rem;
+  color:var(--terracotta);text-decoration:none}
+.hero-link:hover{text-decoration:underline}
 .hero-copy .notify-status{text-align:left;margin:10px 0 0;max-width:460px}
 .hero-trust{display:flex;align-items:center;gap:9px;color:var(--ink-3);font-size:.9rem}
 .hero-trust .dot{width:8px;height:8px;border-radius:50%;background:var(--sage);box-shadow:0 0 0 4px rgba(123,160,91,.18)}
@@ -533,8 +533,6 @@ a:focus-visible, button:focus-visible{outline:2px solid var(--terracotta);outlin
   .band,.feature,.privacy{padding:64px 0}
   .grid-features{grid-template-columns:1fr 1fr;gap:12px}
   .gf{padding:16px 14px}
-  .hero-actions{flex-direction:column;align-items:stretch}
-  .hero-actions .btn{width:100%}
   .notify-form{flex-direction:column}
   .footer-cols{gap:36px}
   .phone{width:270px}
@@ -987,8 +985,8 @@ body::before{
   }
 }
 
-/* ---------- Hero fine print: glass chips so they stay readable on the photo ---------- */
-.hero-note,.hero-trust{
+/* ---------- Hero fine print: one glass chip, readable on the photo ---------- */
+.hero-trust{
   width:fit-content;padding:7px 14px;border-radius:999px;
   background:rgba(253,247,231,.55);
   -webkit-backdrop-filter:blur(14px) saturate(160%);backdrop-filter:blur(14px) saturate(160%);
