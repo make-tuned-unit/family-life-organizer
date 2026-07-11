@@ -317,15 +317,88 @@ function sendServerError(res, err) {
 
 // ── Device refresh tokens ────────────────────────────────────────────────────
 // Long-lived, revocable credentials so the iOS app never stores the account
-// password. Opaque 256-bit values; only SHA-256 hashes are stored server-side.
-// Rotated on every token-login, so a stolen-then-replayed token is rejected.
-const hashAuthToken = (t) => crypto.createHash('sha256').update(t).digest('hex');
+// password. Opaque 256-bit values; only SHA-256 hashes are stored server-side
+// (same helper as the 2FA codes). Rotated on every token-login; a short grace
+// window tolerates a lost rotation response without stranding the device.
+const hashAuthToken = hashCode;
+const AUTH_TOKEN_GRACE_SECONDS = Number(process.env.AUTH_TOKEN_GRACE_SECONDS ?? 60);
 
 async function issueAuthToken(db, userId, deviceName) {
   const token = crypto.randomBytes(32).toString('hex');
+  // Prune this user's stale rotation tombstones so the table doesn't grow
+  // forever (grace only needs recently-rotated rows).
+  await dbRun(db, "DELETE FROM auth_tokens WHERE user_id = ? AND revoked = 1 AND (last_used_at IS NULL OR last_used_at < datetime('now','-1 day'))", [userId]);
   await dbRun(db, 'INSERT INTO auth_tokens (user_id, token_hash, device_name) VALUES (?, ?, ?)',
     [userId, hashAuthToken(token), deviceName || null]);
   return token;
+}
+
+// Money-ish input ("$1,299.00", 42.1) → finite number, or null. SQLite stores
+// strings verbatim and SUM() treats them as 0, silently corrupting budget
+// math — every money-bearing route must coerce through here.
+function parseMoney(value) {
+  const n = Number(String(value).replace(/[$,\s]/g, ''));
+  return Number.isFinite(n) ? n : null;
+}
+
+// The caller may only act on contacts they created (contacts are owner-scoped).
+async function userOwnsContact(db, contactId, userId) {
+  return !!(await dbGet(db, 'SELECT 1 FROM contacts WHERE id = ? AND added_by = ?', [contactId, userId]));
+}
+
+// Two users are "known" to each other when they share any group membership.
+async function usersShareGroup(db, userA, userB) {
+  return !!(await dbGet(db, `SELECT 1 FROM group_members a
+    JOIN group_members b ON a.group_id = b.group_id
+    WHERE a.user_id = ? AND b.user_id = ? LIMIT 1`, [userA, userB]));
+}
+
+// A coverage approval must reference a window, and only one belonging to its
+// own request (coverage_approvals.window_id is NOT NULL — a missing window
+// used to surface as a 500).
+async function requireWindowInRequest(db, windowId, requestId, res) {
+  if (!windowId) {
+    res.status(400).json({ error: 'Pick a time window to confirm' });
+    return false;
+  }
+  const win = await dbGet(db, 'SELECT 1 FROM coverage_windows WHERE id = ? AND request_id = ?',
+    [windowId, requestId]);
+  if (!win) { res.status(400).json({ error: 'Invalid window for this request' }); return false; }
+  return true;
+}
+
+// The iOS household roster shows group members who aren't contact rows as
+// pseudo-contacts with id = -(user_id). Resolve those to a REAL contact row
+// owned by the caller (find-or-create by name) so downstream joins (incoming
+// coverage, pushes) work, gated on actually sharing a group with the person.
+// Returns the resolved positive contact id, or null (a 403 was sent).
+async function resolveOwnedContactId(db, rawId, userId, res) {
+  const cid = Number(rawId);
+  if (!Number.isInteger(cid) || cid === 0) {
+    res.status(400).json({ error: 'Invalid contact' });
+    return null;
+  }
+  if (cid > 0) {
+    if (!(await userOwnsContact(db, cid, userId))) {
+      res.status(403).json({ error: 'You can only use your own contacts' });
+      return null;
+    }
+    return cid;
+  }
+  const targetUserId = -cid;
+  if (!(await usersShareGroup(db, userId, targetUserId))) {
+    res.status(403).json({ error: 'You can only ask people in your groups' });
+    return null;
+  }
+  const target = await db.getUserById(targetUserId);
+  if (!target) { res.status(403).json({ error: 'Unknown person' }); return null; }
+  const existing = await dbGet(db, 'SELECT id FROM contacts WHERE added_by = ? AND LOWER(name) = LOWER(?)',
+    [userId, target.name]);
+  if (existing) return existing.id;
+  const ins = await dbRun(db,
+    'INSERT INTO contacts (added_by, name, relationship, avatar_initial) VALUES (?, ?, ?, ?)',
+    [userId, target.name, 'household', String(target.name || '?').slice(0, 1).toUpperCase()]);
+  return ins.lastID;
 }
 
 // Promisified write against the shared connection.
@@ -737,14 +810,22 @@ app.post('/api/auth/token-login', loginLimiter, async (req, res) => {
     if (typeof refresh_token !== 'string' || refresh_token.length < 32) {
       return res.status(400).json({ error: 'refresh_token required' });
     }
-    const row = await dbGet(db,
-      'SELECT * FROM auth_tokens WHERE token_hash = ? AND revoked = 0',
-      [hashAuthToken(refresh_token)]);
-    const user = row && await db.getUserById(row.user_id);
-    if (!row || !user) {
+    // Live tokens are usable; so is a token ROTATED within the grace window
+    // (revoked=1 with a recent last_used_at — logout/change-password revoke
+    // without touching last_used_at, so those get no grace). Without grace,
+    // a lost rotation response would strand the device: the server rotated
+    // but the client never received the replacement.
+    const row = await dbGet(db, `SELECT *,
+        (revoked = 0 OR (last_used_at IS NOT NULL
+          AND last_used_at > datetime('now', ?))) AS usable
+      FROM auth_tokens WHERE token_hash = ?`,
+      [`-${AUTH_TOKEN_GRACE_SECONDS} seconds`, hashAuthToken(refresh_token)]);
+    const user = row?.usable ? await db.getUserById(row.user_id) : null;
+    if (!user) {
       return res.status(401).json({ error: 'Invalid token' });
     }
-    // Rotate before answering: the presented token dies, a fresh one replaces it.
+    // Rotate before answering: the presented token dies (after grace), a
+    // fresh one replaces it.
     await dbRun(db, 'UPDATE auth_tokens SET revoked = 1, last_used_at = CURRENT_TIMESTAMP WHERE id = ?', [row.id]);
     const fresh = await issueAuthToken(db, user.id, row.device_name);
     await establishSession(req, { username: user.username, name: user.name, id: user.id });
@@ -762,7 +843,8 @@ app.post('/api/auth/logout', async (req, res) => {
   try {
     const { refresh_token } = req.body || {};
     if (typeof refresh_token === 'string' && refresh_token.length >= 32) {
-      await dbRun(db, 'UPDATE auth_tokens SET revoked = 1 WHERE token_hash = ?', [hashAuthToken(refresh_token)]);
+      // Hard delete: a logged-out token gets no grace window and no tombstone.
+      await dbRun(db, 'DELETE FROM auth_tokens WHERE token_hash = ?', [hashAuthToken(refresh_token)]);
     }
     req.session.destroy(() => res.json({ success: true }));
   } catch (err) {
@@ -792,9 +874,9 @@ app.post('/api/auth/change-password', requireAuth, loginLimiter, async (req, res
     }
     const password_hash = await bcrypt.hash(new_password, 12);
     await db.updateUserPassword(req.session.user.id, password_hash);
-    // Password change = sign out every other device: revoke all outstanding
-    // tokens, then hand THIS device a fresh one so it stays signed in.
-    await dbRun(db, 'UPDATE auth_tokens SET revoked = 1 WHERE user_id = ?', [req.session.user.id]);
+    // Password change = sign out every other device: hard-delete all
+    // outstanding tokens (no grace), then hand THIS device a fresh one.
+    await dbRun(db, 'DELETE FROM auth_tokens WHERE user_id = ?', [req.session.user.id]);
     const refresh_token = await issueAuthToken(db, req.session.user.id, req.body.device_name);
     res.json({ success: true, refresh_token });
   } catch (err) {
@@ -2716,8 +2798,8 @@ app.post('/api/budget-categories', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
     const { name, color } = req.body;
-    const monthly_limit = Number(req.body.monthly_limit ?? 0);
-    if (!Number.isFinite(monthly_limit) || monthly_limit < 0) {
+    const monthly_limit = parseMoney(req.body.monthly_limit ?? 0);
+    if (monthly_limit === null || monthly_limit < 0) {
       return res.status(400).json({ error: 'Invalid monthly limit' });
     }
     const groupId = await db.getUserHouseholdId(req.session.user?.id);
@@ -2736,8 +2818,8 @@ app.put('/api/budget-categories/:id', requireAuth, async (req, res) => {
     if (!(await requireHouseholdRow(db, 'budget_categories', req.params.id, req, res))) return;
     const updates = { ...req.body };
     if ('monthly_limit' in updates) {
-      updates.monthly_limit = Number(updates.monthly_limit);
-      if (!Number.isFinite(updates.monthly_limit) || updates.monthly_limit < 0) {
+      updates.monthly_limit = parseMoney(updates.monthly_limit);
+      if (updates.monthly_limit === null || updates.monthly_limit < 0) {
         return res.status(400).json({ error: 'Invalid monthly limit' });
       }
     }
@@ -2776,8 +2858,8 @@ app.post('/api/receipts', requireAuth, async (req, res) => {
     }
     const data = { ...req.body, group_id: groupId };
     if ('amount' in data) {
-      data.amount = Number(String(data.amount).replace(/[$,]/g, ''));
-      if (!Number.isFinite(data.amount) || data.amount < 0) {
+      data.amount = parseMoney(data.amount);
+      if (data.amount === null || data.amount < 0) {
         return res.status(400).json({ error: 'Invalid amount' });
       }
     }
@@ -2840,10 +2922,8 @@ app.post('/api/receipts/save', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
     const { merchant, date, category, notes, itinerary_id } = req.body;
-    // Coerce money to a real number — SQLite happily stores strings, which
-    // SUM() then treats as 0 and silently corrupts budget math.
-    const total = Number(String(req.body.total).replace(/[$,]/g, ''));
-    if (!Number.isFinite(total) || total < 0) {
+    const total = parseMoney(req.body.total);
+    if (total === null || total < 0) {
       return res.status(400).json({ error: 'Invalid receipt total' });
     }
     const username = req.session.user.username || req.session.user.name;
@@ -3727,8 +3807,8 @@ app.post('/api/rivalries/:id/entries', requireAuth, async (req, res) => {
     const rivalryId = Number(req.params.id);
     const entry = { ...req.body, rivalry_id: rivalryId };
     // Scores must be numeric — string values would make SUM() silently drop them.
-    entry.value = Number(entry.value);
-    if (!Number.isFinite(entry.value)) {
+    entry.value = parseMoney(entry.value);
+    if (entry.value === null) {
       return res.status(400).json({ error: 'Invalid entry value' });
     }
     await db.addRivalryEntry(entry);
@@ -4656,22 +4736,30 @@ app.post('/api/groups/:id/members', requireAuth, async (req, res) => {
     // New members are forced to 'member' — no self-promotion to admin.
     if (!(await requireGroupManage(db, req.params.id, req, res))) return;
     // Consent guard: an admin may only add people they actually know —
-    // a contact they own, or an app user linked to one of their contacts.
+    // a contact they own, or an app user they already share a group with.
     // Without this, any enumerable user_id could be pulled into the group
     // (re-routing that user's household writes and exposing both sides' data).
-    if (req.body.contact_id) {
-      const owned = await dbGet(db, 'SELECT 1 FROM contacts WHERE id = ? AND added_by = ?',
-        [req.body.contact_id, userId]);
-      if (!owned) return res.status(403).json({ error: 'You can only add your own contacts' });
+    let addUserId = req.body.user_id ? Number(req.body.user_id) : null;
+    let addContactId = req.body.contact_id ? Number(req.body.contact_id) : null;
+    if (addContactId && addContactId < 0) {
+      // Household-roster pseudo-contact (id = -(user_id)) — treat as a user add.
+      addUserId = -addContactId;
+      addContactId = null;
     }
-    if (req.body.user_id) {
-      const known = await dbGet(db, `SELECT 1 FROM contacts c
-        JOIN users u ON LOWER(u.name) = LOWER(c.name)
-        WHERE c.added_by = ? AND u.id = ? LIMIT 1`, [userId, req.body.user_id]);
+    if (addContactId && !(await userOwnsContact(db, addContactId, userId))) {
+      return res.status(403).json({ error: 'You can only add your own contacts' });
+    }
+    if (addUserId) {
+      // Sharing a group is the robust consent link; the owned-contact name
+      // match remains as a fallback for people not yet in any shared group.
+      const known = (await usersShareGroup(db, userId, addUserId))
+        || !!(await dbGet(db, `SELECT 1 FROM contacts c
+              JOIN users u ON LOWER(u.name) = LOWER(c.name)
+              WHERE c.added_by = ? AND u.id = ? LIMIT 1`, [userId, addUserId]));
       if (!known) return res.status(403).json({ error: 'Add this person to your contacts first, or have them join with an invite code' });
     }
     const result = await db.addGroupMember(req.params.id, {
-      user_id: req.body.user_id, contact_id: req.body.contact_id, role: 'member', added_by: userId,
+      user_id: addUserId, contact_id: addContactId, role: 'member', added_by: userId,
     });
     res.json({ success: true, id: result.id });
   } catch (err) {
@@ -5399,14 +5487,19 @@ app.post('/api/coverage', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
     const userId = req.session.user?.id;
-    const { reason, note, windows, contact_ids } = req.body;
+    const { reason, note, windows } = req.body;
 
-    // Recipients must be the requester's own contacts — otherwise another
-    // user's contact names/phones would be disclosed via GET /api/coverage/:id.
-    for (const contactId of (contact_ids || [])) {
-      const owned = await dbGet(db, 'SELECT 1 FROM contacts WHERE id = ? AND added_by = ?',
-        [contactId, userId]);
-      if (!owned) return res.status(403).json({ error: 'You can only send coverage requests to your own contacts' });
+    // Recipients must resolve to contacts the requester owns — otherwise
+    // another user's contact names/phones would be disclosed via
+    // GET /api/coverage/:id. Household members arrive as negative pseudo-ids
+    // and are materialized into real owned contact rows (see helper).
+    const rawIds = Array.isArray(req.body.contact_ids) ? req.body.contact_ids : [];
+    if (rawIds.length > 20) return res.status(400).json({ error: 'Too many recipients' });
+    const contact_ids = [];
+    for (const rawId of rawIds) {
+      const resolved = await resolveOwnedContactId(db, rawId, userId, res);
+      if (resolved === null) return;  // 4xx already sent
+      if (!contact_ids.includes(resolved)) contact_ids.push(resolved);
     }
 
     // Create request
@@ -5562,11 +5655,7 @@ app.post('/api/coverage/approve/:token', async (req, res) => {
     if (recipient.status === 'approved') return res.status(409).json({ error: 'Already approved' });
 
     const { window_id, approved_date, approved_start, approved_end, helper_note } = req.body;
-    if (window_id) {
-      const win = await dbGet(db, 'SELECT 1 FROM coverage_windows WHERE id = ? AND request_id = ?',
-        [window_id, recipient.request_id]);
-      if (!win) return res.status(400).json({ error: 'Invalid window for this request' });
-    }
+    if (!(await requireWindowInRequest(db, window_id, recipient.request_id, res))) return;
 
     await db.approveCoverage({
       request_id: recipient.request_id,
@@ -5623,11 +5712,7 @@ app.post('/api/coverage/incoming/:id/approve', requireAuth, async (req, res) => 
     if (recipient.status === 'approved') return res.status(409).json({ error: 'Already approved' });
 
     const { window_id, approved_date, approved_start, approved_end, helper_note } = req.body;
-    if (window_id) {
-      const win = await dbGet(db, 'SELECT 1 FROM coverage_windows WHERE id = ? AND request_id = ?',
-        [window_id, requestId]);
-      if (!win) return res.status(400).json({ error: 'Invalid window for this request' });
-    }
+    if (!(await requireWindowInRequest(db, window_id, requestId, res))) return;
 
     await db.approveCoverage({
       request_id: requestId,

@@ -51,6 +51,7 @@ before(async () => {
       SESSION_SECRET: 'test-secret',
       NODE_ENV: 'test',
       ANTHROPIC_API_KEY: '',
+      AUTH_TOKEN_GRACE_SECONDS: '2',  // short grace so the replay test can outlive it
     },
     stdio: 'ignore',
   });
@@ -85,9 +86,15 @@ test('login issues a refresh token; token-login works and rotates it', async () 
   const me = await device('GET', '/api/auth/me');
   assert.equal(me.status, 200);
 
-  // Replaying the rotated (old) token fails.
+  // Within the grace window a rotated token still works (lost-response
+  // tolerance): the device that never got the rotation reply can retry.
+  const graceReplay = await makeClient()('POST', '/api/auth/token-login', { refresh_token: token1 });
+  assert.equal(graceReplay.status, 200, 'rotated token honored within grace window');
+
+  // After the grace window the rotated token is dead.
+  await new Promise(r => setTimeout(r, 2600));
   const replay = await makeClient()('POST', '/api/auth/token-login', { refresh_token: token1 });
-  assert.equal(replay.status, 401);
+  assert.equal(replay.status, 401, 'rotated token rejected after grace');
 
   // The fresh token still works.
   const tl2 = await makeClient()('POST', '/api/auth/token-login', { refresh_token: token2 });

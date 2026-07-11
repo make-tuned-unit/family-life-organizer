@@ -484,6 +484,7 @@ CREATE TABLE IF NOT EXISTS auth_tokens (
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
+CREATE INDEX IF NOT EXISTS idx_auth_tokens_user ON auth_tokens(user_id);
 
 -- Groups: household (core couple), family (one side), tribe (merged)
 CREATE TABLE IF NOT EXISTS groups (
