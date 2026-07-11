@@ -149,7 +149,7 @@ struct PantryView: View {
                 title: viewModel.selectedLocation == "All"
                     ? "Stock your pantry"
                     : "Nothing in \(viewModel.selectedLocation.lowercased()) yet",
-                systemImage: "cabinet",
+                systemImage: emptyStateIcon,
                 description: "Add what you have on hand to track quantities and expiry dates.",
                 actionLabel: "Add an item",
                 action: { showingAddItem = true },
@@ -178,6 +178,17 @@ struct PantryView: View {
     }
 
     // MARK: - Helpers
+
+    /// Icon matches the active location filter so "Nothing in fridge yet" isn't
+    /// captioned with a cabinet.
+    private var emptyStateIcon: String {
+        switch viewModel.selectedLocation.lowercased() {
+        case "fridge": "refrigerator"
+        case "freezer": "snowflake"
+        case "counter": "takeoutbag.and.cup.and.straw"
+        default: "cabinet"
+        }
+    }
 
     private var expiringCount: Int {
         viewModel.items.filter { item in

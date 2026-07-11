@@ -137,7 +137,7 @@ struct MainTabView: View {
 
             VStack {
                 Spacer()
-                FloatingTabBar(selectedTab: $selectedTab)
+                FloatingTabBar(selectedTab: $selectedTab, onSelect: switchTab)
             }
 
             // Floating chat button — visible on all tabs
@@ -178,7 +178,7 @@ struct MainTabView: View {
                     HStack {
                         ConciergeLauncherButton(ptt: ptt) {
                             loadedTabs.insert(.concierge)
-                            selectedTab = .concierge
+                            switchTab(to: .concierge)
                         }
                         .padding(.leading, 20)
                         .padding(.bottom, 80)
@@ -192,7 +192,7 @@ struct MainTabView: View {
         }
         .ignoresSafeArea(.keyboard)
         .onChange(of: selectedTab) {
-            loadedTabs.insert(selectedTab)
+            loadedTabs.insert(selectedTab)  // backstop for non-switchTab writers
         }
         .sheet(isPresented: $showingChat) {
             ChatSheet(initialThread: chatInitialThread)
@@ -230,11 +230,22 @@ struct MainTabView: View {
         .onChange(of: conciergeLaunch.requestID) {
             if conciergeLaunch.requestID != 0 {
                 loadedTabs.insert(.concierge)
-                selectedTab = .concierge
+                switchTab(to: .concierge)
             }
         }
         .task {
             await pollUnread()
+        }
+    }
+
+    /// Single entry point for changing tabs: preloads the destination BEFORE
+    /// the animated transaction so its view is present to crossfade in, and
+    /// animates the selection pill + content together. All programmatic tab
+    /// changes (deep links, concierge launch) route through here too.
+    private func switchTab(to tab: MainTab) {
+        loadedTabs.insert(tab)
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+            selectedTab = tab
         }
     }
 
@@ -445,14 +456,14 @@ struct MainTabView: View {
                     deepRivalry = rivalry
                 }
             }
-            selectedTab = .home
+            switchTab(to: .home)
         case "decision":
             if let refId {
                 deepDecision = try? await api.fetchDecision(id: refId)
             }
-            selectedTab = .home
+            switchTab(to: .home)
         case "event", "appointment":
-            selectedTab = .calendar
+            switchTab(to: .calendar)
         case "message":
             if let refId, let name {
                 chatInitialThread = .dm(partnerId: refId, name: name)
@@ -464,11 +475,11 @@ struct MainTabView: View {
             }
             showingChat = true
         case "coverage":
-            selectedTab = .home
+            switchTab(to: .home)
         case "concierge":
-            selectedTab = .concierge
+            switchTab(to: .concierge)
         default:
-            selectedTab = .home
+            switchTab(to: .home)
         }
     }
 

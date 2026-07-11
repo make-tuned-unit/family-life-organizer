@@ -360,8 +360,9 @@ struct WarmAgendaRow: View {
             .font(.system(size: 20))
             .foregroundStyle(isDone ? WarmPalette.good : WarmPalette.ink4)
             .scaleEffect(isDone ? 1.1 : 1)
-            // One-shot bounce on completion — the small win should feel won.
-            .symbolEffect(.bounce, value: isDone)
+            // Bounce the filled checkmark when a task completes. (A bounce on
+            // un-check is a negligible edge; the symbol is a circle there anyway.)
+            .symbolEffect(.bounce, options: .speed(1.5), value: isDone)
             .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isDone)
     }
 }
@@ -590,6 +591,9 @@ struct WarmEmptyState: View {
 
     @Environment(ConciergeLaunch.self) private var conciergeLaunch: ConciergeLaunch?
     @AppStorage("aiConciergeEnabled") private var aiConciergeEnabled = false
+    // The concierge only acts when cloud AI is also on — without this the
+    // button would navigate to the concierge tab and silently drop the prompt.
+    @AppStorage("cloudAIEnabled") private var cloudAIEnabled = true
 
     var body: some View {
         VStack(spacing: 10) {
@@ -615,7 +619,7 @@ struct WarmEmptyState: View {
                 .buttonStyle(.flSecondary)
                 .padding(.top, 6)
             }
-            if let conciergePrompt, aiConciergeEnabled, let conciergeLaunch {
+            if let conciergePrompt, aiConciergeEnabled, cloudAIEnabled, let conciergeLaunch {
                 Button {
                     conciergeLaunch.ask(conciergePrompt)
                 } label: {
