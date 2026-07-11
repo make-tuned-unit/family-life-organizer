@@ -84,6 +84,7 @@ struct MoreView: View {
             Image(systemName: icon)
                 .font(.system(size: 18, weight: .medium))
                 .foregroundStyle(color)
+                .symbolRenderingMode(.hierarchical)
                 .frame(width: 36, height: 36)
                 .background(color.opacity(0.15))
                 .clipShape(Circle())

@@ -269,7 +269,8 @@ struct CookView: View {
             WarmEmptyState(
                 title: "Let's try another idea",
                 systemImage: "frying.pan",
-                description: "Ask for a different dish or ingredient — your pantry has more in it than you think."
+                description: "Ask for a different dish or ingredient — your pantry has more in it than you think.",
+                conciergePrompt: "What should we make for dinner tonight with what's in the pantry?"
             )
         }
     }

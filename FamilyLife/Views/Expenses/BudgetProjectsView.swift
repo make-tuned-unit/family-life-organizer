@@ -401,9 +401,8 @@ struct ExpenseDetailView: View {
                         .font(.flTitle)
                         .foregroundStyle(WarmPalette.ink1)
                     Text("$\(expense.amount, specifier: "%.2f")")
-                        .font(.system(size: 40, weight: .bold))
+                        .font(.flStat)
                         .foregroundStyle(WarmPalette.ink1)
-                        .tracking(-0.8)
                 }
                 .padding(22)
                 .frame(maxWidth: .infinity, alignment: .leading)

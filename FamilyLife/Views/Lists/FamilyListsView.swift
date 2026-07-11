@@ -37,7 +37,8 @@ struct FamilyListsView: View {
                     systemImage: "list.bullet.rectangle",
                     description: "Groceries, packing, projects — keep them all in one place",
                     actionLabel: "New list",
-                    action: { showingNewList = true }
+                    action: { showingNewList = true },
+                    conciergePrompt: "Start a grocery list with our usual weekly staples"
                 )
                 .padding(.top, 40)
             }

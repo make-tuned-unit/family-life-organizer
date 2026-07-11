@@ -97,9 +97,10 @@ struct BudgetStatsView: View {
                 .tracking(0.4)
             HStack(alignment: .firstTextBaseline, spacing: 10) {
                 Text("$\(Int(s.currentTotal).formatted())")
-                    .font(.system(size: 40, weight: .bold))
+                    .font(.flStat)
                     .foregroundStyle(WarmPalette.ink1)
-                    .tracking(-0.8)
+                    .contentTransition(.numericText())
+                    .animation(.snappy, value: s.currentTotal)
                 if let pct = s.momPct {
                     let up = pct > 0
                     HStack(spacing: 2) {

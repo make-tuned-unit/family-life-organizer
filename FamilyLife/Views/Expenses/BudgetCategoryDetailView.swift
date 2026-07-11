@@ -32,9 +32,8 @@ struct BudgetCategoryDetailView: View {
 
                     HStack(alignment: .firstTextBaseline, spacing: 6) {
                         Text("$\(Int(category.spent))")
-                            .font(.system(size: 40, weight: .bold))
+                            .font(.flStat)
                             .foregroundStyle(WarmPalette.ink1)
-                            .tracking(-0.8)
                         if let limit = category.monthly_limit {
                             Text("of $\(Int(limit))")
                                 .font(.flSubheadline)

@@ -489,12 +489,15 @@ struct MainTabView: View {
 
 struct FloatingTabBar: View {
     @Binding var selectedTab: MainTab
+    @Namespace private var pill
 
     var body: some View {
         HStack(spacing: 0) {
             ForEach(MainTab.barTabs, id: \.self) { tab in
                 Button {
-                    selectedTab = tab
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                        selectedTab = tab
+                    }
                 } label: {
                     Image(systemName: tab.icon)
                         .font(.system(size: 18, weight: .medium))
@@ -503,9 +506,12 @@ struct FloatingTabBar: View {
                         .contentShape(Rectangle())
                         .background {
                             if selectedTab == tab {
+                                // One pill that slides between tabs rather than
+                                // blinking in per-tab.
                                 Circle()
                                     .fill(accentColor(for: tab).opacity(0.15))
                                     .frame(width: 40, height: 40)
+                                    .matchedGeometryEffect(id: "tab-pill", in: pill)
                             }
                         }
                 }

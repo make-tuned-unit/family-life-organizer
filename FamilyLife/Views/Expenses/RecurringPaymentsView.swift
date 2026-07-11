@@ -170,8 +170,10 @@ struct RecurringPaymentsView: View {
                 .font(.flOverline)
                 .foregroundStyle(WarmPalette.ink3).tracking(0.4)
             Text("$\(Int(store.monthlyTotal).formatted())")
-                .font(.system(size: 36, weight: .bold))
-                .foregroundStyle(WarmPalette.ink1).tracking(-0.7)
+                .font(.flStat)
+                .foregroundStyle(WarmPalette.ink1)
+                .contentTransition(.numericText())
+                .animation(.snappy, value: store.monthlyTotal)
             Text("\(store.items.count) recurring payment\(store.items.count == 1 ? "" : "s")")
                 .font(.flFootnote).foregroundStyle(WarmPalette.ink3)
         }

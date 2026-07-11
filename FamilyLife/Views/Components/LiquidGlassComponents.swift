@@ -359,6 +359,9 @@ struct WarmAgendaRow: View {
             .font(.system(size: 20))
             .foregroundStyle(isDone ? WarmPalette.good : WarmPalette.ink4)
             .scaleEffect(isDone ? 1.1 : 1)
+            // One-shot bounce on completion — the small win should feel won.
+            .symbolEffect(.bounce, value: isDone)
+            .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isDone)
     }
 }
 
@@ -425,7 +428,7 @@ struct WarmChip: View {
     var body: some View {
         Button(action: action) {
             Text(label)
-                .font(.system(size: 13, weight: .medium))
+                .font(.flFootnote.weight(.medium))
                 .foregroundStyle(isActive ? WarmPalette.cream1 : WarmPalette.ink2)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
@@ -434,6 +437,7 @@ struct WarmChip: View {
                     Capsule()
                         .stroke(isActive ? Color.clear : WarmPalette.ink1.opacity(0.08), lineWidth: 0.5)
                 )
+                .animation(.snappy(duration: 0.2), value: isActive)
         }
         .buttonStyle(.plain)
     }
@@ -512,6 +516,9 @@ struct WarmProgressBar: View {
                 RoundedRectangle(cornerRadius: 999)
                     .fill(color)
                     .frame(width: geo.size.width * min(progress, 1.0))
+                    // Fills glide to their new value instead of jumping —
+                    // budget updates and rivalry scores read as motion.
+                    .animation(.spring(response: 0.5, dampingFraction: 0.8), value: progress)
             }
         }
         .frame(height: height)
@@ -576,12 +583,19 @@ struct WarmEmptyState: View {
     /// Primary path out of the empty state (e.g. "Add an item").
     var actionLabel: String? = nil
     var action: (() -> Void)? = nil
+    /// Conversational path: a pre-seeded concierge prompt ("What should we
+    /// make for dinner?"). Renders only when the concierge is enabled.
+    var conciergePrompt: String? = nil
+
+    @Environment(ConciergeLaunch.self) private var conciergeLaunch: ConciergeLaunch?
+    @AppStorage("aiConciergeEnabled") private var aiConciergeEnabled = false
 
     var body: some View {
         VStack(spacing: 10) {
             Image(systemName: systemImage)
                 .font(.system(size: 36))
                 .foregroundStyle(WarmPalette.ink4)
+                .symbolRenderingMode(.hierarchical)
             Text(title)
                 .font(.flHeadline)
                 .foregroundStyle(WarmPalette.ink2)
@@ -599,6 +613,17 @@ struct WarmEmptyState: View {
                 }
                 .buttonStyle(.flSecondary)
                 .padding(.top, 6)
+            }
+            if let conciergePrompt, aiConciergeEnabled, let conciergeLaunch {
+                Button {
+                    conciergeLaunch.ask(conciergePrompt)
+                } label: {
+                    Label("Ask the concierge", systemImage: "sparkles")
+                        .font(.flFootnote.weight(.medium))
+                        .foregroundStyle(AccentTheme.saffron.color)
+                }
+                .buttonStyle(.plain)
+                .padding(.top, 2)
             }
         }
         .frame(maxWidth: .infinity)

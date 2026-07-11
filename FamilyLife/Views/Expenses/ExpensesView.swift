@@ -499,9 +499,8 @@ struct ReceiptDetailView: View {
                         .font(.flTitle)
                         .foregroundStyle(WarmPalette.ink1)
                     Text("$\(receipt.amount, specifier: "%.2f")")
-                        .font(.system(size: 40, weight: .bold))
+                        .font(.flStat)
                         .foregroundStyle(WarmPalette.ink1)
-                        .tracking(-0.8)
                     if receipt.processed_by == "scan" {
                         HStack(spacing: 4) {
                             Image(systemName: "sparkles")

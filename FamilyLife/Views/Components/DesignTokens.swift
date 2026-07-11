@@ -64,6 +64,9 @@ extension Font {
     static let flCaption: Font = .system(.caption)
     static let flOverline: Font = .system(.caption2, weight: .semibold)
     static let flHero: Font = .system(size: 44, weight: .bold, design: .rounded)
+    /// Secondary big number (detail-screen totals) — rounded numerals are the
+    /// friendly-but-adult signature for money/stats; scales with Dynamic Type.
+    static let flStat: Font = .system(.largeTitle, design: .rounded, weight: .bold)
 }
 
 // MARK: - Person Palette
