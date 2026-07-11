@@ -9,6 +9,8 @@
 // (assertHousehold / assertListAccess). Notes are owner-scoped at the DB layer.
 // This prevents the model from being talked into touching another household's data.
 
+const { announceRivalryCompletion } = require('./rivalryAnnounce');
+
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 function requireDate(value, field) {
@@ -2138,6 +2140,11 @@ const TOOLS = [
       const outcome = await ctx.db.completeRivalryWithTotals(input.id);
       if (outcome.already_completed) {
         return { result: { ok: false, error: `Rivalry #${input.id} was already completed (winner: ${outcome.winner_name || 'tie'})` } };
+      }
+      // Same celebration as the UI Finalize button: feed post + win/loss pushes.
+      if (ctx.push) {
+        try { await announceRivalryCompletion(ctx.db, ctx.push, outcome, ctx.userId); }
+        catch (_) { /* announcement is best-effort */ }
       }
       const summary = outcome.winner_name
         ? `Completed the rivalry — ${outcome.winner_name} wins!`

@@ -15,6 +15,7 @@ const { generateBrief } = require('./services/conciergeBrief');
 const { handleChat, handleChatStream } = require('./services/conciergeChat');
 const subscription = require('./services/subscription');
 const { runProactiveSweep } = require('./services/conciergeNudge');
+const { announceRivalryCompletion } = require('./services/rivalryAnnounce');
 const { createRateLimiter } = require('./services/rateLimit');
 const email = require('./services/email');
 const crypto = require('crypto');
@@ -4004,35 +4005,8 @@ const RIVALRY_CLOSE_PUSH = [
   (name, diff, ct) => `It's neck and neck with ${name} — only ${diff} ${ct} apart!`,
   (name, diff, ct) => `You and ${name} are just ${diff} ${ct} apart. Every bit counts!`,
 ];
-const RIVALRY_WINNER_MESSAGES = [
-  (w, l, ws, ls, ct) => `${w} absolutely CRUSHED it with ${fmt(ws)} ${ct}! ${l} managed ${fmt(ls)}... we'll pretend that didn't happen`,
-  (w, l, ws, ls, ct) => `Breaking news: ${w} defeats ${l} in an EPIC ${ct} showdown! Final score: ${fmt(ws)} to ${fmt(ls)}`,
-  (w, l, ws, ls, ct) => `${w} walked circles around ${l}! ${fmt(ws)} ${ct} to ${fmt(ls)}. Maybe ${l} should try harder next time?`,
-  (w, l, ws, ls, ct) => `It's official: ${w} is the ${ct} champion with ${fmt(ws)}! ${l} came in at ${fmt(ls)} - not bad, but not good enough`,
-  (w, l, ws, ls, ct) => `${w}: ${fmt(ws)} ${ct}. ${l}: ${fmt(ls)} ${ct}. The math speaks for itself.`,
-  (w, l, ws, ls, ct) => `Somebody call the newspaper! ${w} just dominated with ${fmt(ws)} ${ct}! ${l}... are those really your numbers? (${fmt(ls)})`,
-  (w, l, ws, ls, ct) => `${w} put in WORK and earned ${fmt(ws)} ${ct}. ${l} put in... ${fmt(ls)}. Maybe a nap next time?`,
-  (w, l, ws, ls, ct) => `And the crown goes to ${w}! ${fmt(ws)} vs ${fmt(ls)} - that gap is wider than ${l}'s excuses`,
-  (w, l, ws, ls, ct) => `${w} wins by ${fmt(ws - ls)} ${ct}! That's the sound of ${l}'s pride taking a hit`,
-  (w, l, ws, ls, ct) => `Rivalry over! ${w} (${fmt(ws)}) absolutely smoked ${l} (${fmt(ls)}). Rematch? ${l} probably needs one`,
-  (w, l, ws, ls, ct) => `${w} said "watch this" and dropped ${fmt(ws)} ${ct}. ${l} said "I tried" with ${fmt(ls)}. Narrator: they did not try hard enough.`,
-  (w, l, ws, ls, ct) => `Hold the trophy - ${w} just logged ${fmt(ws)} ${ct}! ${l}'s ${fmt(ls)} was... a participation award`,
-];
-const RIVALRY_TIE_MESSAGES = [
-  (p1, p2, total, ct) => `It's a DEAD TIE! ${p1} and ${p2} both hit ${fmt(total)} ${ct}. Respect!`,
-  (p1, p2, total, ct) => `Unbelievable! ${p1} and ${p2} tied at ${fmt(total)} ${ct} each. Run it back!`,
-  (p1, p2, total, ct) => `Nobody wins, nobody loses. ${p1} and ${p2}: ${fmt(total)} ${ct} each. Are you two... the same person?`,
-];
-const RIVALRY_WINNER_PUSH = [
-  (l) => `You won! ${l} never stood a chance`,
-  (l) => `Victory is yours! ${l} will need therapy after this one`,
-  (l) => `Champion status: confirmed. You absolutely cooked ${l}`,
-];
-const RIVALRY_LOSER_PUSH = [
-  (w) => `${w} beat you this time... Rematch?`,
-  (w) => `Tough loss! ${w} took this one. Respectable effort... barely`,
-  (w) => `Looks like you'll have to step it up next time! ${w} came out on top`,
-];
+// Winner/tie completion messages + win/loss pushes moved to
+// services/rivalryAnnounce.js (shared with the concierge tool).
 function fmt(n) { return Number(n).toLocaleString('en-US', { maximumFractionDigits: 0 }); }
 function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
 
@@ -4041,65 +4015,9 @@ app.post('/api/rivalries/:id/complete', requireAuth, async (req, res) => {
   try {
     if (!(await requireGroupRow(db, 'rivalries', req.params.id, req, res))) return;
     const result = await db.completeRivalryWithTotals(Number(req.params.id));
-    const { rivalry, initiator_total, opponent_total, winner_name, winner_team, already_completed } = result;
-    const ct = rivalry.challenge_type === 'steps' ? 'steps' : rivalry.challenge_type;
-
-    const parseRoster = (s) => { try { const p = JSON.parse(s || '[]'); return Array.isArray(p) ? p.filter(Boolean) : []; } catch (_) { return []; } };
-    let message;
-    if (winner_name) {
-      let loser, ws, ls;
-      if (rivalry.rivalry_type === 'team' && winner_team) {
-        // Team mode: winner_name is the winning roster ("X & Y"); the loser is
-        // the other roster, and the totals are the TEAM totals.
-        loser = parseRoster(winner_team === 'a' ? rivalry.team_b : rivalry.team_a).join(' & ')
-          || (winner_team === 'a' ? rivalry.opponent_name : rivalry.initiator_name);
-        ws = winner_team === 'a' ? initiator_total : opponent_total;
-        ls = winner_team === 'a' ? opponent_total : initiator_total;
-      } else {
-        loser = winner_name === rivalry.initiator_name ? rivalry.opponent_name : rivalry.initiator_name;
-        ws = winner_name === rivalry.initiator_name ? initiator_total : opponent_total;
-        ls = winner_name === rivalry.initiator_name ? opponent_total : initiator_total;
-      }
-      message = pick(RIVALRY_WINNER_MESSAGES)(winner_name, loser, ws, ls, ct);
-    } else {
-      message = pick(RIVALRY_TIE_MESSAGES)(rivalry.initiator_name, rivalry.opponent_name, initiator_total, ct);
-    }
-
-    if (!already_completed) {
-      // Feed post
-      if (rivalry.group_id) {
-        try {
-          await db.addFeedPost({
-            group_id: rivalry.group_id,
-            author_id: req.session.user.id,
-            post_type: 'rivalry',
-            title: winner_name ? `${winner_name} wins: ${rivalry.title}` : `Tie: ${rivalry.title}`,
-            body: message,
-            reference_type: 'rivalry',
-            reference_id: rivalry.id
-          });
-        } catch (e) { console.error('Feed post error:', e.message); }
-      }
-
-      // Push notifications
-      try {
-        if (winner_name) {
-          const loser = winner_name === rivalry.initiator_name ? rivalry.opponent_name : rivalry.initiator_name;
-          const winnerId = await db.getUserIdByName(winner_name);
-          const loserId = await db.getUserIdByName(loser);
-          if (winnerId) push.pushToUser(db, winnerId, 'You Won!', pick(RIVALRY_WINNER_PUSH)(loser), { type: 'rivalry', ref_id: rivalry.id });
-          if (loserId) push.pushToUser(db, loserId, 'Better Luck Next Time', pick(RIVALRY_LOSER_PUSH)(winner_name), { type: 'rivalry', ref_id: rivalry.id });
-        } else {
-          // Tie — notify both
-          const id1 = await db.getUserIdByName(rivalry.initiator_name);
-          const id2 = await db.getUserIdByName(rivalry.opponent_name);
-          const tieMsg = `It's a tie in "${rivalry.title}"! Run it back?`;
-          if (id1) push.pushToUser(db, id1, 'Rivalry Tied!', tieMsg, { type: 'rivalry', ref_id: rivalry.id });
-          if (id2) push.pushToUser(db, id2, 'Rivalry Tied!', tieMsg, { type: 'rivalry', ref_id: rivalry.id });
-        }
-      } catch (e) { console.error('Push error:', e.message); }
-    }
-
+    const { initiator_total, opponent_total, winner_name, winner_team } = result;
+    // Shared with the concierge's complete_rivalry tool (feed post + pushes).
+    const message = await announceRivalryCompletion(db, push, result, req.session.user.id);
     const scores = result.scores || [];
     res.json({ success: true, winner_name, winner_team: winner_team || null, initiator_total, opponent_total, scores, message, is_tie: !winner_name });
   } catch (err) {
