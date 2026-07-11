@@ -148,6 +148,62 @@ struct GroupAvatar: View {
     }
 }
 
+// MARK: - Screen Header
+// THE branded screen opener: accent eyebrow, big warm title, optional
+// subtitle. Every full-screen surface opens with this so the app reads as
+// one product, not sixteen features.
+
+struct FLScreenHeader: View {
+    let eyebrow: String
+    let title: String
+    var subtitle: String? = nil
+    var accent: Color = WarmPalette.ink3
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(eyebrow.uppercased())
+                .font(.flOverline)
+                .foregroundStyle(accent)
+                .tracking(0.4)
+            Text(title)
+                .font(.flScreenTitle)
+                .foregroundStyle(WarmPalette.ink1)
+            if let subtitle {
+                Text(subtitle)
+                    .font(.flSubheadline)
+                    .foregroundStyle(WarmPalette.ink2)
+                    .padding(.top, 2)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
+        .padding(.top, 14)
+        .padding(.bottom, 18)
+    }
+}
+
+// MARK: - Loading State
+// The branded stand-in for a bare ProgressView: warm-tinted spinner with an
+// optional quiet line of copy, centered in the content area.
+
+struct FLLoadingState: View {
+    var message: String? = nil
+
+    var body: some View {
+        VStack(spacing: 12) {
+            ProgressView()
+                .tint(WarmPalette.ink2)
+            if let message {
+                Text(message)
+                    .font(.flFootnote)
+                    .foregroundStyle(WarmPalette.ink3)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 40)
+    }
+}
+
 // MARK: - Presence Chip
 
 struct PresenceChip: View {

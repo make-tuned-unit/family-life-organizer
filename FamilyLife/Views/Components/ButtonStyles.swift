@@ -52,6 +52,30 @@ struct FLDestructiveButtonStyle: ButtonStyle {
     }
 }
 
+// MARK: - FLCTAButtonStyle
+// THE primary call-to-action: full-width warm-ink bar with cream text,
+// card-radius corners, press scale. One CTA look everywhere — "Send request",
+// "Start cooking", "Confirm availability" — so the eye always knows the main
+// move. Pass a fill for semantic variants (e.g. WarmPalette.good for a
+// final confirm).
+
+struct FLCTAButtonStyle: ButtonStyle {
+    var fill: Color = WarmPalette.ink1
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.flSubheadline.weight(.semibold))
+            .foregroundStyle(WarmPalette.cream1)
+            .tint(WarmPalette.cream1)  // inner ProgressView spinners read cream
+            .frame(maxWidth: .infinity)
+            .frame(minHeight: 52)
+            .background(fill, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
+            .scaleEffect(configuration.isPressed ? 0.98 : 1.0)
+            .opacity(configuration.isPressed ? 0.9 : 1.0)
+            .animation(.spring(response: 0.25, dampingFraction: 0.75), value: configuration.isPressed)
+    }
+}
+
 // MARK: - FLCardPressStyle
 // Press feedback for tappable CARDS (whole-card buttons / navigation rows):
 // a gentle scale + dim, matching Apple's own card-press behavior. Use with
@@ -83,6 +107,11 @@ extension ButtonStyle where Self == FLDestructiveButtonStyle {
 
 extension ButtonStyle where Self == FLCardPressStyle {
     static var flCardPress: FLCardPressStyle { .init() }
+}
+
+extension ButtonStyle where Self == FLCTAButtonStyle {
+    static var flCTA: FLCTAButtonStyle { .init() }
+    static func flCTA(fill: Color) -> FLCTAButtonStyle { .init(fill: fill) }
 }
 
 // MARK: - Preview
