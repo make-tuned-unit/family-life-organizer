@@ -51,7 +51,8 @@ final class AuthService {
         let compressed = UIImage(data: data)?.jpegData(compressionQuality: 0.6) ?? data
         profileImageData = compressed
         profileUIImage = Self.thumbnail(from: compressed)
-        try? compressed.write(to: Self.profileImageURL)
+        // Encrypt at rest — unreadable while the device is locked.
+        try? compressed.write(to: Self.profileImageURL, options: [.completeFileProtection])
         UserDefaults.standard.removeObject(forKey: "profile_image")
 
         // Sync to server so other users can see our profile picture

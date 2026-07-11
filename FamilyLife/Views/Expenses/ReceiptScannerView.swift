@@ -30,6 +30,8 @@ struct ReceiptScannerView: View {
     @State private var editableDate = ""
     @State private var selectedItinerary: ItineraryResponse?
     @State private var itineraries: [ItineraryResponse] = []
+    @State private var showingReceiptDisclosure = false
+    @State private var pendingScanData: Data?
 
     private var isProjectMode: Bool { projectId != nil }
 
@@ -132,6 +134,22 @@ struct ReceiptScannerView: View {
                     scanImage(data)
                 }
                 .ignoresSafeArea()
+            }
+            .sheet(isPresented: $showingReceiptDisclosure) {
+                AIDisclosureView(
+                    title: "Scan with AI",
+                    detail: "Scanning sends a photo of your receipt to **Claude by Anthropic** to read the merchant, items, and total.",
+                    sentDescription: "The receipt photo is sent to Anthropic's API to extract the details",
+                    onAccept: {
+                        AIConsentManager.grantReceipt()
+                        showingReceiptDisclosure = false
+                        if let data = pendingScanData { pendingScanData = nil; scanImage(data) }
+                    },
+                    onDecline: {
+                        showingReceiptDisclosure = false
+                        pendingScanData = nil
+                    }
+                )
             }
         }
     }
@@ -427,6 +445,13 @@ struct ReceiptScannerView: View {
         // Receipt scanning sends the image to cloud vision AI — respect the toggle.
         guard cloudAIEnabled else {
             error = "Cloud AI is off. Turn it on in Settings → Privacy to scan receipts, or enter the receipt manually."
+            return
+        }
+        // First-use disclosure (5.1.2(i)): a photo of financial data goes to
+        // Anthropic. Hold the image and show consent; the scan resumes on accept.
+        guard AIConsentManager.hasReceiptConsent else {
+            pendingScanData = data
+            showingReceiptDisclosure = true
             return
         }
         isScanning = true

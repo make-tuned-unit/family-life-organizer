@@ -791,11 +791,10 @@
 				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "Kinrows shows your existing calendar events (including synced Google calendars) alongside your family schedule.";
 				INFOPLIST_KEY_NSCameraUsageDescription = "Kinrows uses your camera to scan receipts.";
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "Kinrows uses your step count to track fitness rivalries and show daily activity on your dashboard.";
-				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Kinrows records fitness activity for family rivalries and challenges.";
 				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "Kinrows can keep sharing your trip location in the background until you arrive or cancel the trip.";
-				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Kinrows uses your location during trips to share ETA with family members.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Kinrows uses your location during active trips to share your ETA, and (only if you turn it on) to show your approximate place on your family's presence row.";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Kinrows uses the microphone so you can talk to your Concierge instead of typing.";
-				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Kinrows transcribes your voice on your device so you can dictate messages to your Concierge.";
+				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Kinrows transcribes your voice (on your device when supported) so you can dictate to your Concierge.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UIBackgroundModes = "location fetch";
@@ -836,11 +835,10 @@
 				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "Kinrows shows your existing calendar events (including synced Google calendars) alongside your family schedule.";
 				INFOPLIST_KEY_NSCameraUsageDescription = "Kinrows uses your camera to scan receipts.";
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "Kinrows uses your step count to track fitness rivalries and show daily activity on your dashboard.";
-				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Kinrows records fitness activity for family rivalries and challenges.";
 				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "Kinrows can keep sharing your trip location in the background until you arrive or cancel the trip.";
-				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Kinrows uses your location during trips to share ETA with family members.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Kinrows uses your location during active trips to share your ETA, and (only if you turn it on) to show your approximate place on your family's presence row.";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Kinrows uses the microphone so you can talk to your Concierge instead of typing.";
-				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Kinrows transcribes your voice on your device so you can dictate messages to your Concierge.";
+				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Kinrows transcribes your voice (on your device when supported) so you can dictate to your Concierge.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UIBackgroundModes = "location fetch";

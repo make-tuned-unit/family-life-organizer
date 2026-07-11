@@ -107,6 +107,18 @@ final class LocationService: NSObject, CLLocationManagerDelegate {
         return currentLocation
     }
 
+    /// Read the current location WITHOUT ever prompting — returns nil unless
+    /// permission was already granted. Used by the background presence report
+    /// so the OS dialog can never appear from the poll loop.
+    func currentLocationIfAuthorized() async -> CLLocationCoordinate2D? {
+        guard authorizationStatus == .authorizedWhenInUse || authorizationStatus == .authorizedAlways else {
+            return nil
+        }
+        manager.requestLocation()
+        try? await Task.sleep(for: .seconds(2))
+        return currentLocation
+    }
+
     // MARK: - CLLocationManagerDelegate
 
     nonisolated func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {

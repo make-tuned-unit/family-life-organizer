@@ -287,11 +287,15 @@ struct MainTabView: View {
                 }
             }
 
-            // Report location every ~5 minutes (every 20th poll cycle)
+            // Report location every ~5 minutes (every 20th poll cycle) — ONLY
+            // if the user explicitly opted into household presence sharing.
+            // Without this gate the app silently shared coordinates whenever OS
+            // permission was granted, contradicting the "trips only" disclosure.
             locationReportCounter += 1
             if locationReportCounter >= 20 {
                 locationReportCounter = 0
-                if let coord = await locationService.getCurrentLocation() {
+                if UserDefaults.standard.bool(forKey: "sharePresenceEnabled"),
+                   let coord = await locationService.currentLocationIfAuthorized() {
                     _ = try? await api.reportLocation(lat: coord.latitude, lng: coord.longitude)
                 }
             }

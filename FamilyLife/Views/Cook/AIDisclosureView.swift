@@ -4,6 +4,9 @@ import SwiftUI
 /// will be shared with third-party AI and obtain explicit permission.
 /// This view must be shown before first use of the Cook/recipe suggestion feature.
 struct AIDisclosureView: View {
+    var title: String = "AI-Powered Recipes"
+    var detail: String = "The recipe suggestion feature sends your pantry items and query to **Claude by Anthropic** to generate personalized recipes."
+    var sentDescription: String = "Your pantry items and food query are sent to Anthropic's API"
     let onAccept: () -> Void
     let onDecline: () -> Void
 
@@ -18,18 +21,18 @@ struct AIDisclosureView: View {
                         LinearGradient(colors: [WarmPalette.peach, AccentTheme.terracotta.color], startPoint: .topLeading, endPoint: .bottomTrailing)
                     )
 
-                Text("AI-Powered Recipes")
+                Text(title)
                     .font(.flTitle)
                     .foregroundStyle(WarmPalette.ink1)
 
-                Text("The recipe suggestion feature sends your pantry items and query to **Claude by Anthropic** to generate personalized recipes.")
+                Text(detail)
                     .font(.flSubheadline)
                     .foregroundStyle(WarmPalette.ink2)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 8)
 
                 VStack(alignment: .leading, spacing: 12) {
-                    disclosureRow(icon: "arrow.up.doc", text: "Your pantry items and food query are sent to Anthropic's API")
+                    disclosureRow(icon: "arrow.up.doc", text: sentDescription)
                     disclosureRow(icon: "shield.checkered", text: "Data is not stored by Anthropic after generating your response")
                     disclosureRow(icon: "person.crop.circle.badge.xmark", text: "No personal identifiers (name, location) are shared")
                     disclosureRow(icon: "xmark.circle", text: "You can use the app without this feature")
@@ -83,6 +86,7 @@ struct AIDisclosureView: View {
 
 enum AIConsentManager {
     private static let key = "ai_recipe_consent_granted"
+    private static let receiptKey = "ai_receipt_consent_granted"
 
     static var hasConsented: Bool {
         UserDefaults.standard.bool(forKey: key)
@@ -94,6 +98,16 @@ enum AIConsentManager {
 
     static func revoke() {
         UserDefaults.standard.set(false, forKey: key)
+    }
+
+    // Receipt scanning sends a photo of financial data to cloud vision AI —
+    // its own explicit first-use consent (Guideline 5.1.2(i)).
+    static var hasReceiptConsent: Bool {
+        UserDefaults.standard.bool(forKey: receiptKey)
+    }
+
+    static func grantReceipt() {
+        UserDefaults.standard.set(true, forKey: receiptKey)
     }
 }
 

@@ -27,6 +27,8 @@ struct SettingsView: View {
     @State private var editingName = ""
     @State private var nameError: String?
     @AppStorage("cloudAIEnabled") private var cloudAIEnabled = true
+    // Off by default — household presence sharing is strictly opt-in.
+    @AppStorage("sharePresenceEnabled") private var sharePresenceEnabled = false
     @AppStorage(AppleCalendarSyncMode.storageKey) private var calendarSyncMode: AppleCalendarSyncMode = .off
 
     var body: some View {
@@ -129,7 +131,7 @@ struct SettingsView: View {
                 }
             }
 
-            Section("Location") {
+            Section {
                 HStack {
                     Image(systemName: "location.fill")
                         .foregroundStyle(AccentTheme.ocean.color)
@@ -138,9 +140,15 @@ struct SettingsView: View {
                     Text(locationEnabled ? "Enabled" : "Disabled")
                         .foregroundStyle(WarmPalette.ink3)
                 }
-                Text("Used for trip tracking and ETA calculation.")
-                    .font(.caption)
-                    .foregroundStyle(WarmPalette.ink3)
+                Toggle(isOn: $sharePresenceEnabled) {
+                    Label("Share my location with my household", systemImage: "person.2.wave.2")
+                        .foregroundStyle(AccentTheme.ocean.color)
+                }
+                .tint(AccentTheme.sage.color)
+            } header: {
+                Text("Location")
+            } footer: {
+                Text("Trip ETAs always use your location only while a trip is active. Turn this on to also show your approximate place (home, work, out) on the family's presence row — off by default, and you can turn it off anytime.")
             }
 
             Section("Household") {
