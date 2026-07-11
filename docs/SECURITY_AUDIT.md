@@ -135,9 +135,10 @@ The system moved on substantially since the 2026-06-25 log. Current state:
   hard-deletes the device's refresh + APNs tokens. See `test/auth-token.test.js`.
 - Deploy target is **Railway** — the iOS app's production URL is
   `family-life-organizer-production.up.railway.app` (`AppConfig.swift`). The
-  `render.yaml` in the repo appears **unused/aspirational**; the go-live steps
-  above that say "Railway" are correct. (An earlier addendum wrongly flipped
-  this to Render — corrected 2026-07-11.)
+  stray `render.yaml` (unused; owner confirmed no Render) was **removed
+  2026-07-11**; the go-live steps above that say "Railway" are correct. Earlier
+  "Render dashboard" mentions in this log's original body mean the Railway
+  dashboard.
 - Per the owner (2026-07-11): **email 2FA is already configured on Railway**
   (`AUTH_2FA_ENABLED=1` + `RESEND_API_KEY`). Remaining action is just to verify
   one real end-to-end login on the live server.

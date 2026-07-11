@@ -9,7 +9,11 @@ const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
 
-// Use an explicit override (tests), else the Render disk path, else local path.
+// DB location. Set FAMILY_DB_DIR to an explicit path in production — on the
+// current host (Railway) it MUST point at a mounted persistent volume, or the
+// DB lands on the default path below (ephemeral on a fresh container = data
+// lost on redeploy). The RENDER_DISK_PATH branch is legacy (Render is unused)
+// and kept only so an existing deploy that relied on it isn't silently moved.
 const DB_DIR = process.env.FAMILY_DB_DIR
   ? process.env.FAMILY_DB_DIR
   : process.env.RENDER_DISK_PATH
