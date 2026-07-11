@@ -12,6 +12,10 @@ struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var showingLogoutConfirm = false
+    @State private var showingDeleteAccount = false
+    @State private var deletePassword = ""
+    @State private var isDeletingAccount = false
+    @State private var deleteError: String?
     @State private var notificationsEnabled = false
     @State private var locationEnabled = false
     @State private var showingHousehold = false
@@ -200,6 +204,11 @@ struct SettingsView: View {
                     Label("Security & 2FA", systemImage: "lock.shield.fill")
                         .foregroundStyle(TabAccent.home.color)
                 }
+                Button(role: .destructive) {
+                    showingDeleteAccount = true
+                } label: {
+                    Label("Delete Account", systemImage: "trash")
+                }
             }
 
             Section {
@@ -275,6 +284,14 @@ struct SettingsView: View {
                     Text(AppConfig.appVersion)
                         .foregroundStyle(WarmPalette.ink3)
                 }
+                Link(destination: URL(string: "https://kinrows.com/privacy.html")!) {
+                    Label("Privacy Policy", systemImage: "hand.raised")
+                        .foregroundStyle(TabAccent.home.color)
+                }
+                Link(destination: URL(string: "https://kinrows.com/terms.html")!) {
+                    Label("Terms of Use", systemImage: "doc.text")
+                        .foregroundStyle(TabAccent.home.color)
+                }
             }
 
             Section {
@@ -332,6 +349,18 @@ struct SettingsView: View {
                 dismiss()
             }
         }
+        .alert("Delete Account", isPresented: $showingDeleteAccount) {
+            SecureField("Your password", text: $deletePassword)
+            Button("Cancel", role: .cancel) { deletePassword = "" }
+            Button("Delete Forever", role: .destructive) {
+                let password = deletePassword
+                deletePassword = ""
+                Task { await deleteAccount(password: password) }
+            }
+        } message: {
+            Text("This permanently deletes your account and your personal data (messages, concierge history, contacts). Shared household data stays with the family. This can't be undone. Enter your password to confirm.")
+        }
+        .inlineError(deleteError) { deleteError = nil }
         .alert("Edit Name", isPresented: $showingNameEdit) {
             TextField("Your name", text: $editingName)
                 .textInputAutocapitalization(.words)
@@ -358,6 +387,25 @@ struct SettingsView: View {
             let settings = await UNUserNotificationCenter.current().notificationSettings()
             notificationsEnabled = settings.authorizationStatus == .authorized
             locationEnabled = locationService.authorizationStatus == .authorizedWhenInUse || locationService.authorizationStatus == .authorizedAlways
+        }
+    }
+
+    private func deleteAccount(password: String) async {
+        guard !password.isEmpty else {
+            deleteError = "Enter your password to confirm."
+            return
+        }
+        isDeletingAccount = true
+        do {
+            try await api.deleteAccount(currentPassword: password)
+            // Server erased everything + destroyed the session; clear local state.
+            auth.logout()
+            dismiss()
+        } catch {
+            guard !error.isCancellation else { return }
+            isDeletingAccount = false
+            deleteError = error.localizedDescription
+            UINotificationFeedbackGenerator().notificationOccurred(.error)
         }
     }
 }

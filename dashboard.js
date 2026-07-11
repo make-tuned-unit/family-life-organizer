@@ -860,6 +860,24 @@ app.post('/api/auth/logout', async (req, res) => {
 });
 
 // Change the authenticated user's password. Requires the current password.
+// Permanently delete the signed-in user's account and personal data.
+// Re-authentication (current password) is required — irreversible.
+app.post('/api/account/delete', requireAuth, loginLimiter, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const user = await db.getUserById(req.session.user.id);
+    const full = user && await db.getUserByUsername(user.username);
+    const valid = await bcrypt.compare(String(req.body.current_password || ''), full?.password_hash || DUMMY_BCRYPT_HASH);
+    if (!valid) return res.status(401).json({ error: 'Password is incorrect' });
+    await db.deleteUserAccount(req.session.user.id);
+    req.session.destroy(() => res.json({ success: true }));
+  } catch (err) {
+    sendServerError(res, err);
+  } finally {
+    db.close();
+  }
+});
+
 app.post('/api/auth/change-password', requireAuth, loginLimiter, async (req, res) => {
   const db = new FamilyDB();
   try {
@@ -3344,6 +3362,52 @@ app.get('/api/concierge/conversations/:id/messages', requireAuth, conciergeLimit
   }
 });
 
+// Concierge - list the household's remembered facts (so they can be reviewed/cleared)
+app.get('/api/concierge/memory', requireAuth, requirePremium, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const groupId = await db.getUserHouseholdId(req.session.user.id);
+    const rows = groupId ? await db.getConciergeMemory(groupId) : [];
+    res.json(rows.map(r => ({ id: r.id, content: r.content, created_at: r.created_at })));
+  } catch (err) {
+    sendServerError(res, err);
+  } finally {
+    db.close();
+  }
+});
+
+// Concierge - forget one remembered fact (must be in the caller's household)
+app.delete('/api/concierge/memory/:id', requireAuth, requirePremium, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const groupId = await db.getUserHouseholdId(req.session.user.id);
+    const row = await dbGet(db, 'SELECT group_id FROM concierge_memory WHERE id = ?', [req.params.id]);
+    if (!row || groupId == null || row.group_id !== groupId) return res.status(404).json({ error: 'Not found' });
+    await dbRun(db, 'DELETE FROM concierge_memory WHERE id = ?', [req.params.id]);
+    res.json({ success: true });
+  } catch (err) {
+    sendServerError(res, err);
+  } finally {
+    db.close();
+  }
+});
+
+// Concierge - delete one of the caller's own conversations (and its messages)
+app.delete('/api/concierge/conversations/:id', requireAuth, requirePremium, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const convo = await db.getConciergeConversation(req.params.id);
+    if (!convo || convo.user_id !== req.session.user.id) return res.status(404).json({ error: 'Not found' });
+    await dbRun(db, 'DELETE FROM concierge_messages WHERE conversation_id = ?', [req.params.id]);
+    await dbRun(db, 'DELETE FROM concierge_conversations WHERE id = ?', [req.params.id]);
+    res.json({ success: true });
+  } catch (err) {
+    sendServerError(res, err);
+  } finally {
+    db.close();
+  }
+});
+
 // Cook - recipe suggestions (requires ANTHROPIC_API_KEY env var)
 app.post('/api/cook/suggest', requireAuth, conciergeLimiter, aiDailyLimiter, async (req, res) => {
   const db = new FamilyDB();
@@ -5231,6 +5295,19 @@ app.post('/api/messages/:partnerId/read', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
     await db.markRead(req.session.user.id, parseInt(req.params.partnerId));
+    res.json({ success: true });
+  } catch (err) { sendServerError(res, err); }
+  finally { db.close(); }
+});
+
+// Delete a direct message the caller SENT (removes its stored text/photo).
+app.delete('/api/messages/:id', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const row = await dbGet(db, 'SELECT sender_id FROM direct_messages WHERE id = ?', [req.params.id]);
+    if (!row) return res.status(404).json({ error: 'Not found' });
+    if (row.sender_id !== req.session.user.id) return res.status(403).json({ error: 'You can only delete your own messages' });
+    await dbRun(db, 'DELETE FROM direct_messages WHERE id = ?', [req.params.id]);
     res.json({ success: true });
   } catch (err) { sendServerError(res, err); }
   finally { db.close(); }

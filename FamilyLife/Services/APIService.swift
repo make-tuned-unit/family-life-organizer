@@ -1129,6 +1129,11 @@ final class APIService {
         let _: SuccessResponse = try await put("/api/users/me/avatar", body: ["image": base64])
     }
 
+    /// Permanently delete the signed-in account. Re-auth with the password.
+    func deleteAccount(currentPassword: String) async throws {
+        let _: SuccessResponse = try await post("/api/account/delete", body: ["current_password": currentPassword])
+    }
+
     func updateName(_ name: String) async throws {
         let _: SuccessResponse = try await put("/api/users/me/name", body: ["name": name])
     }

@@ -2690,6 +2690,94 @@ class FamilyDB {
       'synced_calendar_events', 'milestones'];
   }
 
+  // Permanently erase a user and their personal data (App Store 5.1.1(v)).
+  // Household-shared data (calendar, lists, budget) belongs to the family, so:
+  //   - a household where this user is the LAST member is deleted entirely;
+  //   - households with other members keep their shared data, the user is just
+  //     removed and their PERSONAL rows (DMs, concierge, contacts, tokens,
+  //     coverage requests) are erased everywhere.
+  // Transactional: either the whole account is gone or nothing changes.
+  deleteUserAccount(userId) {
+    const uid = parseInt(userId);
+    return new Promise((resolve, reject) => {
+      if (!uid) return reject(new Error('Invalid user id'));
+      const get = (sql, p = []) => new Promise((r, j) => this.db.get(sql, p, (e, x) => e ? j(e) : r(x)));
+      const all = (sql, p = []) => new Promise((r, j) => this.db.all(sql, p, (e, x) => e ? j(e) : r(x || [])));
+      const run = (sql, p = []) => new Promise((r, j) => this.db.run(sql, p, function (e) { e ? j(e) : r(this); }));
+      (async () => {
+        const user = await get('SELECT id FROM users WHERE id = ?', [uid]);
+        if (!user) throw new Error('User not found');
+        // This is a per-request connection; disabling FK enforcement here (only
+        // possible OUTSIDE a transaction) makes deletion resilient — an
+        // informational reference we don't explicitly clear becomes a harmless
+        // orphan instead of failing the whole erase. Restored before we return.
+        await run('PRAGMA foreign_keys = OFF');
+        await run('BEGIN');
+        try {
+          // The user's own lists (household-visible but owner-scoped) + items.
+          await run('DELETE FROM list_items WHERE list_id IN (SELECT id FROM lists WHERE created_by = ?)', [uid]);
+          await run('DELETE FROM lists WHERE created_by = ?', [uid]);
+          // Detach authorship from shared content the FAMILY keeps.
+          for (const [table, col] of [['feed_posts', 'author_id'], ['appointments', 'created_by'],
+            ['trips', 'traveler_id'], ['itinerary_stays', 'host_user_id']]) {
+            const cols = await all(`PRAGMA table_info(${table})`);
+            if (cols.some(c => c.name === col)) {
+              await run(`UPDATE ${table} SET ${col} = NULL WHERE ${col} = ?`, [uid]);
+            }
+          }
+          // Households where this user is the only remaining member → wipe.
+          const households = await all(
+            `SELECT g.id FROM groups g JOIN group_members gm ON gm.group_id = g.id
+             WHERE gm.user_id = ? AND g.group_type = 'household'`, [uid]);
+          for (const h of households) {
+            const others = await get(
+              'SELECT COUNT(*) AS n FROM group_members WHERE group_id = ? AND user_id IS NOT NULL AND user_id != ?',
+              [h.id, uid]);
+            if ((others?.n || 0) === 0) {
+              for (const t of FamilyDB.HOUSEHOLD_TABLES) {
+                const cols = await all(`PRAGMA table_info(${t})`);
+                if (!cols.some(c => c.name === 'group_id')) continue;
+                await run(`DELETE FROM ${t} WHERE group_id = ?`, [h.id]);
+              }
+              await run('DELETE FROM feed_posts WHERE group_id = ?', [h.id]);
+              await run('DELETE FROM group_members WHERE group_id = ?', [h.id]);
+              await run('DELETE FROM groups WHERE id = ?', [h.id]);
+            }
+          }
+          // Personal data, erased everywhere regardless of household.
+          await run('DELETE FROM direct_messages WHERE sender_id = ? OR recipient_id = ?', [uid, uid]);
+          await run('DELETE FROM concierge_messages WHERE conversation_id IN (SELECT id FROM concierge_conversations WHERE user_id = ?)', [uid]);
+          await run('DELETE FROM concierge_conversations WHERE user_id = ?', [uid]);
+          await run('DELETE FROM concierge_memory WHERE user_id = ?', [uid]);
+          await run('DELETE FROM feed_reactions WHERE user_id = ?', [uid]);
+          await run('DELETE FROM feed_comments WHERE user_id = ?', [uid]);
+          await run('DELETE FROM contacts WHERE added_by = ?', [uid]);
+          // Coverage requests this user raised (+ their windows/recipients/approvals).
+          const reqs = await all('SELECT id FROM coverage_requests WHERE requester_id = ?', [uid]);
+          for (const r of reqs) {
+            await run('DELETE FROM coverage_approvals WHERE request_id = ?', [r.id]);
+            await run('DELETE FROM coverage_recipients WHERE request_id = ?', [r.id]);
+            await run('DELETE FROM coverage_windows WHERE request_id = ?', [r.id]);
+            await run('DELETE FROM coverage_requests WHERE id = ?', [r.id]);
+          }
+          // Credentials, devices, membership.
+          await run('DELETE FROM auth_tokens WHERE user_id = ?', [uid]);
+          await run('DELETE FROM device_tokens WHERE user_id = ?', [uid]);
+          await run('DELETE FROM login_challenges WHERE user_id = ?', [uid]);
+          await run('DELETE FROM group_members WHERE user_id = ?', [uid]);
+          await run('DELETE FROM users WHERE id = ?', [uid]);
+          await run('COMMIT');
+          await run('PRAGMA foreign_keys = ON').catch(() => {});
+          resolve({ ok: true });
+        } catch (e) {
+          await run('ROLLBACK').catch(() => {});
+          await run('PRAGMA foreign_keys = ON').catch(() => {});
+          reject(e);
+        }
+      })().catch(reject);
+    });
+  }
+
   // Merge one household into another: re-point all household-scoped data and
   // members from sourceId to targetId, then delete the (now empty) source group.
   // Both must be group_type='household'. Idempotent-ish and transactional.
