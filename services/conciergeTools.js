@@ -1803,6 +1803,538 @@ const TOOLS = [
 
   // ---- User profile ----
   {
+    name: 'update_task',
+    description: 'Edit a task: retitle, reschedule (move to another day), reprioritize, or reassign. Use list_tasks first to get the id.',
+    write: true,
+    input_schema: {
+      type: 'object',
+      properties: {
+        id: { type: 'integer', description: 'Task id from list_tasks' },
+        title: { type: 'string' },
+        due_date: { type: 'string', description: 'YYYY-MM-DD; new date to move the task to' },
+        due_time: { type: 'string', description: 'HH:MM (optional)' },
+        priority: { type: 'string', enum: ['low', 'medium', 'high'] },
+        assigned_to: { type: 'string', description: 'Name of who it is for' },
+        category: { type: 'string' },
+      },
+      required: ['id'],
+    },
+    async run(ctx, input) {
+      if (input.due_date) requireDate(input.due_date, 'due_date');
+      const { id, ...updates } = input;
+      const r = await ctx.db.updateTask(id, updates, ctx.groupId);
+      if (!r.changed) return { result: { ok: false, error: `No task #${id} in this household (or nothing to change)` } };
+      const summary = `Updated task #${id}`;
+      return { result: { ok: true, summary }, action: { tool: 'update_task', summary } };
+    },
+  },
+  {
+    name: 'delete_task',
+    description: 'Delete a task entirely (not just complete it). Use list_tasks first to get the id.',
+    write: true,
+    input_schema: {
+      type: 'object',
+      properties: { id: { type: 'integer', description: 'Task id from list_tasks' } },
+      required: ['id'],
+    },
+    async run(ctx, input) {
+      const r = await ctx.db.deleteTask(input.id, ctx.groupId);
+      if (!r.changed) return { result: { ok: false, error: `No task #${input.id} in this household` } };
+      const summary = `Deleted task #${input.id}`;
+      return { result: { ok: true, summary }, action: { tool: 'delete_task', summary } };
+    },
+  },
+
+  // ---- Lists (create / rename / delete / item edit / move) ----
+  {
+    name: 'create_list',
+    description: 'Create a new named list (shopping list, packing list, to-do list).',
+    write: true,
+    input_schema: {
+      type: 'object',
+      properties: {
+        name: { type: 'string' },
+        type: { type: 'string', enum: ['standard', 'grocery'], description: 'grocery lists get check-off shopping behavior' },
+      },
+      required: ['name'],
+    },
+    async run(ctx, input) {
+      const name = String(input.name || '').trim();
+      if (!name) return { result: { ok: false, error: 'List name is required' } };
+      const existing = await resolveListByName(ctx, name);
+      if (existing && !existing.reserved) {
+        return { result: { ok: false, error: `A list named "${existing.name}" already exists` } };
+      }
+      const type = input.type || (GROCERY_LIST_NAMES.has(name.toLowerCase()) ? 'grocery' : 'standard');
+      await ctx.db.createList({ name, list_type: type, created_by: ctx.userId });
+      const summary = `Created the "${name}" list`;
+      return { result: { ok: true, summary }, action: { tool: 'create_list', summary } };
+    },
+  },
+  {
+    name: 'rename_list',
+    description: 'Rename a list. Identify it by its current name.',
+    write: true,
+    input_schema: {
+      type: 'object',
+      properties: {
+        list: { type: 'string', description: 'Current list name' },
+        new_name: { type: 'string' },
+      },
+      required: ['list', 'new_name'],
+    },
+    async run(ctx, input) {
+      const list = await resolveListByName(ctx, input.list);
+      if (!list || list.reserved) return { result: { ok: false, error: `No list named "${input.list}"` } };
+      const newName = String(input.new_name || '').trim();
+      if (!newName) return { result: { ok: false, error: 'New name is required' } };
+      await ctx.db.updateList(list.id, { name: newName });
+      const summary = `Renamed "${list.name}" to "${newName}"`;
+      return { result: { ok: true, summary }, action: { tool: 'rename_list', summary } };
+    },
+  },
+  {
+    name: 'delete_list',
+    description: 'Delete an entire list and its items. Identify it by name.',
+    write: true,
+    input_schema: {
+      type: 'object',
+      properties: { list: { type: 'string', description: 'List name' } },
+      required: ['list'],
+    },
+    async run(ctx, input) {
+      const list = await resolveListByName(ctx, input.list);
+      if (!list || list.reserved) return { result: { ok: false, error: `No list named "${input.list}"` } };
+      await ctx.db.deleteList(list.id);
+      const summary = `Deleted the "${list.name}" list`;
+      return { result: { ok: true, summary }, action: { tool: 'delete_list', summary } };
+    },
+  },
+  {
+    name: 'update_list_item',
+    description: 'Rename or recategorize an item on a list. Use get_list first to get the id.',
+    write: true,
+    input_schema: {
+      type: 'object',
+      properties: {
+        id: { type: 'integer', description: 'Item id from get_list' },
+        title: { type: 'string', description: 'New text for the item' },
+        category: { type: 'string' },
+      },
+      required: ['id'],
+    },
+    async run(ctx, input) {
+      const item = await dbGet(ctx, 'SELECT id, list_id FROM list_items WHERE id = ?', [input.id]);
+      if (!item) return { result: { ok: false, error: `No list item #${input.id} found` } };
+      await assertListAccess(ctx, item.list_id);
+      const updates = {};
+      if (input.title) updates.title = input.title;
+      if (input.category) updates.category = input.category;
+      if (!Object.keys(updates).length) return { result: { ok: false, error: 'Nothing to change' } };
+      await ctx.db.updateListItem(input.id, updates);
+      const summary = `Updated item #${input.id}`;
+      return { result: { ok: true, summary }, action: { tool: 'update_list_item', summary } };
+    },
+  },
+  {
+    name: 'delete_list_item',
+    description: 'Remove an item from a list entirely (not check it off). Use get_list first to get the id.',
+    write: true,
+    input_schema: {
+      type: 'object',
+      properties: { id: { type: 'integer', description: 'Item id from get_list' } },
+      required: ['id'],
+    },
+    async run(ctx, input) {
+      const item = await dbGet(ctx, 'SELECT id, list_id, title FROM list_items WHERE id = ?', [input.id]);
+      if (!item) return { result: { ok: false, error: `No list item #${input.id} found` } };
+      await assertListAccess(ctx, item.list_id);
+      await ctx.db.deleteListItem(input.id);
+      const summary = `Removed "${item.title}" from the list`;
+      return { result: { ok: true, summary }, action: { tool: 'delete_list_item', summary } };
+    },
+  },
+  {
+    name: 'move_list_item',
+    description: 'Move an item from one list to another (e.g. from Groceries to Costco). Use get_list first to get the item id. The target list is created if it does not exist.',
+    write: true,
+    input_schema: {
+      type: 'object',
+      properties: {
+        id: { type: 'integer', description: 'Item id from get_list' },
+        to_list: { type: 'string', description: 'Target list name' },
+      },
+      required: ['id', 'to_list'],
+    },
+    async run(ctx, input) {
+      const item = await dbGet(ctx, 'SELECT id, list_id, title, category FROM list_items WHERE id = ?', [input.id]);
+      if (!item) return { result: { ok: false, error: `No list item #${input.id} found` } };
+      await assertListAccess(ctx, item.list_id);
+      const target = await resolveListByName(ctx, input.to_list, { create: true });
+      if (!target || target.reserved) return { result: { ok: false, error: `Could not find or create a list named "${input.to_list}"` } };
+      if (target.id === item.list_id) return { result: { ok: false, error: `That item is already on "${target.name}"` } };
+      await ctx.db.addListItem({ list_id: target.id, title: item.title, added_by: ctx.userName, category: item.category || null });
+      await ctx.db.deleteListItem(item.id);
+      const summary = `Moved "${item.title}" to ${target.name}`;
+      return { result: { ok: true, summary }, action: { tool: 'move_list_item', summary } };
+    },
+  },
+
+  // ---- Expenses / receipts ----
+  {
+    name: 'list_receipts',
+    description: 'List recent expenses/receipts, optionally for one month.',
+    write: false,
+    input_schema: {
+      type: 'object',
+      properties: { month: { type: 'string', description: 'YYYY-MM (optional, defaults to recent)' } },
+    },
+    async run(ctx, input) {
+      const rows = await ctx.db.getReceipts(input.month ? { month: input.month } : {}, ctx.groupId);
+      const result = rows.slice(0, 40).map(r => ({
+        id: r.id, merchant: r.merchant, amount: r.amount, date: r.date, category: r.category,
+      }));
+      return { result };
+    },
+  },
+  {
+    name: 'add_expense',
+    description: 'Log an expense/receipt against the budget (e.g. "I spent $40 at Costco"). The category is created if new.',
+    write: true,
+    input_schema: {
+      type: 'object',
+      properties: {
+        amount: { type: 'number', description: 'Dollar amount' },
+        merchant: { type: 'string', description: 'Where the money was spent' },
+        category: { type: 'string', description: 'Budget category, e.g. Groceries, Gas, Dining' },
+        date: { type: 'string', description: 'YYYY-MM-DD (optional, defaults to today)' },
+        notes: { type: 'string' },
+      },
+      required: ['amount', 'merchant'],
+    },
+    async run(ctx, input) {
+      const amount = Number(String(input.amount).replace(/[$,\s]/g, ''));
+      if (!Number.isFinite(amount) || amount < 0) return { result: { ok: false, error: 'Invalid amount' } };
+      if (input.date) requireDate(input.date, 'date');
+      const category = input.category || 'Other';
+      await ctx.db.ensureBudgetCategory(category, ctx.groupId);
+      await ctx.db.addReceipt({
+        amount, merchant: input.merchant, date: input.date || ctx.today,
+        category, notes: input.notes || null, processed_by: 'concierge',
+        added_by: ctx.userName, group_id: ctx.groupId,
+      });
+      const summary = `Logged $${amount.toFixed(2)} at ${input.merchant} (${category})`;
+      return { result: { ok: true, summary }, action: { tool: 'add_expense', summary } };
+    },
+  },
+  {
+    name: 'delete_receipt',
+    description: 'Delete an expense/receipt. Use list_receipts first to get the id.',
+    write: true,
+    input_schema: {
+      type: 'object',
+      properties: { id: { type: 'integer', description: 'Receipt id from list_receipts' } },
+      required: ['id'],
+    },
+    async run(ctx, input) {
+      await assertHousehold(ctx, 'receipts', input.id);
+      await ctx.db.deleteReceipt(input.id);
+      const summary = `Deleted receipt #${input.id}`;
+      return { result: { ok: true, summary }, action: { tool: 'delete_receipt', summary } };
+    },
+  },
+
+  // ---- Decisions (create / delete) ----
+  {
+    name: 'add_decision',
+    description: 'Create a new family decision or poll for the household to vote on.',
+    write: true,
+    input_schema: {
+      type: 'object',
+      properties: {
+        title: { type: 'string', description: 'The question to decide' },
+        options: { type: 'array', items: { type: 'string' }, description: 'Poll choices (2+; omit for an open discussion)' },
+        body: { type: 'string', description: 'Extra context (optional)' },
+        expires_at: { type: 'string', description: 'YYYY-MM-DD when voting closes (optional)' },
+      },
+      required: ['title'],
+    },
+    async run(ctx, input) {
+      if (input.expires_at) requireDate(input.expires_at, 'expires_at');
+      const options = Array.isArray(input.options) ? input.options.filter(o => String(o).trim()) : [];
+      await ctx.db.addDecision({
+        title: input.title,
+        decision_type: options.length ? 'poll' : 'discussion',
+        body: input.body || null,
+        poll_options: options,
+        creator_name: ctx.userName,
+        status: 'active',
+        expires_at: input.expires_at || null,
+        group_id: ctx.groupId,
+      });
+      const summary = `Created decision "${input.title}"${options.length ? ` with ${options.length} options` : ''}`;
+      return { result: { ok: true, summary }, action: { tool: 'add_decision', summary } };
+    },
+  },
+  {
+    name: 'delete_decision',
+    description: 'Delete a decision/poll and its votes and comments. Use list_decisions first to get the id.',
+    write: true,
+    input_schema: {
+      type: 'object',
+      properties: { id: { type: 'integer', description: 'Decision id from list_decisions' } },
+      required: ['id'],
+    },
+    async run(ctx, input) {
+      await assertHousehold(ctx, 'decisions', input.id);
+      const run = (sql, params) => new Promise((resolve, reject) =>
+        ctx.db.db.run(sql, params, (err) => err ? reject(err) : resolve()));
+      await run('DELETE FROM decision_reactions WHERE decision_id = ?', [input.id]);
+      await run('DELETE FROM decision_comments WHERE decision_id = ?', [input.id]);
+      await run('DELETE FROM decisions WHERE id = ?', [input.id]);
+      const summary = `Deleted decision #${input.id}`;
+      return { result: { ok: true, summary }, action: { tool: 'delete_decision', summary } };
+    },
+  },
+
+  // ---- Trips (delete) ----
+  {
+    name: 'delete_trip',
+    description: 'Delete a trip record entirely. Use get_trips first to get the id. (Prefer cancel_trip for an in-progress trip.)',
+    write: true,
+    input_schema: {
+      type: 'object',
+      properties: { id: { type: 'integer', description: 'Trip id from get_trips' } },
+      required: ['id'],
+    },
+    async run(ctx, input) {
+      await assertHousehold(ctx, 'trips', input.id);
+      await ctx.db.deleteTrip(input.id);
+      const summary = `Deleted trip #${input.id}`;
+      return { result: { ok: true, summary }, action: { tool: 'delete_trip', summary } };
+    },
+  },
+
+  // ---- Rivalries (complete / delete) ----
+  {
+    name: 'complete_rivalry',
+    description: 'End a rivalry now and declare the winner from current totals. Use get_rivalries first to get the id.',
+    write: true,
+    input_schema: {
+      type: 'object',
+      properties: { id: { type: 'integer', description: 'Rivalry id from get_rivalries' } },
+      required: ['id'],
+    },
+    async run(ctx, input) {
+      await assertHousehold(ctx, 'rivalries', input.id);
+      const outcome = await ctx.db.completeRivalryWithTotals(input.id);
+      if (outcome.already_completed) {
+        return { result: { ok: false, error: `Rivalry #${input.id} was already completed (winner: ${outcome.winner_name || 'tie'})` } };
+      }
+      const summary = outcome.winner_name
+        ? `Completed the rivalry — ${outcome.winner_name} wins!`
+        : 'Completed the rivalry — it ended in a tie';
+      return { result: { ok: true, summary, winner: outcome.winner_name || null }, action: { tool: 'complete_rivalry', summary } };
+    },
+  },
+  {
+    name: 'delete_rivalry',
+    description: 'Delete a rivalry and its logged scores. Use get_rivalries first to get the id.',
+    write: true,
+    input_schema: {
+      type: 'object',
+      properties: { id: { type: 'integer', description: 'Rivalry id from get_rivalries' } },
+      required: ['id'],
+    },
+    async run(ctx, input) {
+      await assertHousehold(ctx, 'rivalries', input.id);
+      await ctx.db.deleteRivalry(input.id);
+      const summary = `Deleted rivalry #${input.id}`;
+      return { result: { ok: true, summary }, action: { tool: 'delete_rivalry', summary } };
+    },
+  },
+
+  // ---- Gift ideas (update / delete) ----
+  {
+    name: 'update_gift_idea',
+    description: 'Update a gift idea — mark it purchased/wrapped/given, or edit its title, price, or notes. Use get_gift_ideas first to get the id.',
+    write: true,
+    input_schema: {
+      type: 'object',
+      properties: {
+        id: { type: 'integer', description: 'Gift idea id from get_gift_ideas' },
+        status: { type: 'string', enum: ['idea', 'purchased', 'wrapped', 'given'] },
+        title: { type: 'string' },
+        estimated_price: { type: 'number' },
+        notes: { type: 'string' },
+      },
+      required: ['id'],
+    },
+    async run(ctx, input) {
+      await assertHousehold(ctx, 'gift_ideas', input.id);
+      const { id, ...updates } = input;
+      if (!Object.keys(updates).length) return { result: { ok: false, error: 'Nothing to change' } };
+      await ctx.db.updateGiftIdea(id, updates);
+      const summary = updates.status ? `Marked gift idea #${id} as ${updates.status}` : `Updated gift idea #${id}`;
+      return { result: { ok: true, summary }, action: { tool: 'update_gift_idea', summary } };
+    },
+  },
+  {
+    name: 'delete_gift_idea',
+    description: 'Delete a gift idea. Use get_gift_ideas first to get the id.',
+    write: true,
+    input_schema: {
+      type: 'object',
+      properties: { id: { type: 'integer', description: 'Gift idea id from get_gift_ideas' } },
+      required: ['id'],
+    },
+    async run(ctx, input) {
+      await assertHousehold(ctx, 'gift_ideas', input.id);
+      await ctx.db.deleteGiftIdea(input.id);
+      const summary = `Deleted gift idea #${input.id}`;
+      return { result: { ok: true, summary }, action: { tool: 'delete_gift_idea', summary } };
+    },
+  },
+
+  // ---- Milestones (update / delete) ----
+  {
+    name: 'update_milestone',
+    description: "Edit a logged milestone's title, date, description, or category. Use list_milestones first to get the id.",
+    write: true,
+    input_schema: {
+      type: 'object',
+      properties: {
+        id: { type: 'integer', description: 'Milestone id from list_milestones' },
+        title: { type: 'string' },
+        milestone_date: { type: 'string', description: 'YYYY-MM-DD' },
+        description: { type: 'string' },
+        category: { type: 'string', enum: ['first', 'school', 'sports', 'growth', 'moment'] },
+      },
+      required: ['id'],
+    },
+    async run(ctx, input) {
+      if (input.milestone_date) requireDate(input.milestone_date, 'milestone_date');
+      await assertHousehold(ctx, 'milestones', input.id);
+      const { id, ...updates } = input;
+      if (!Object.keys(updates).length) return { result: { ok: false, error: 'Nothing to change' } };
+      await ctx.db.updateMilestone(id, updates);
+      const summary = `Updated milestone #${id}`;
+      return { result: { ok: true, summary }, action: { tool: 'update_milestone', summary } };
+    },
+  },
+  {
+    name: 'delete_milestone',
+    description: 'Delete a logged milestone. Use list_milestones first to get the id.',
+    write: true,
+    input_schema: {
+      type: 'object',
+      properties: { id: { type: 'integer', description: 'Milestone id from list_milestones' } },
+      required: ['id'],
+    },
+    async run(ctx, input) {
+      await assertHousehold(ctx, 'milestones', input.id);
+      await ctx.db.deleteMilestone(input.id);
+      const summary = `Deleted milestone #${input.id}`;
+      return { result: { ok: true, summary }, action: { tool: 'delete_milestone', summary } };
+    },
+  },
+
+  // ---- Coverage (incoming / approve) ----
+  {
+    name: 'get_incoming_coverage',
+    description: 'List coverage/help requests OTHER people have sent to you, with their proposed time windows.',
+    write: false,
+    input_schema: { type: 'object', properties: {} },
+    async run(ctx) {
+      const rows = await ctx.db.getIncomingCoverageRequests(ctx.userId);
+      const result = [];
+      for (const r of rows.slice(0, 10)) {
+        const windows = await ctx.db.getCoverageWindows(r.id);
+        result.push({
+          request_id: r.id, from: r.requester_name, reason: r.reason, note: r.note,
+          status: r.recipient_status,
+          windows: windows.map(w => ({ window_id: w.id, date: w.window_date, start: w.start_time, end: w.end_time })),
+        });
+      }
+      return { result };
+    },
+  },
+  {
+    name: 'approve_incoming_coverage',
+    description: "Confirm you can help with an incoming coverage request for one of its time windows. Use get_incoming_coverage first for the request_id and window_id (window_id may be omitted when there's exactly one window).",
+    write: true,
+    input_schema: {
+      type: 'object',
+      properties: {
+        request_id: { type: 'integer' },
+        window_id: { type: 'integer', description: 'Which proposed window works (optional if only one)' },
+        note: { type: 'string', description: 'Optional note to the requester' },
+      },
+      required: ['request_id'],
+    },
+    async run(ctx, input) {
+      const recipient = await ctx.db.getRecipientByUserId(input.request_id, ctx.userId);
+      if (!recipient) return { result: { ok: false, error: `No incoming request #${input.request_id} for you` } };
+      if (recipient.status === 'approved') return { result: { ok: false, error: 'You already approved this request' } };
+      const windows = await ctx.db.getCoverageWindows(input.request_id);
+      const window = input.window_id
+        ? windows.find(w => w.id === input.window_id)
+        : (windows.length === 1 ? windows[0] : null);
+      if (!window) {
+        return { result: { ok: false, error: `Pick one of the proposed windows: ${windows.map(w => `#${w.id} ${w.window_date} ${w.start_time}-${w.end_time}`).join(', ')}` } };
+      }
+      await ctx.db.approveCoverage({
+        request_id: input.request_id, recipient_id: recipient.id, window_id: window.id,
+        approved_date: window.window_date, approved_start: window.start_time,
+        approved_end: window.end_time, helper_note: input.note || null,
+      });
+      const request = await ctx.db.getCoverageRequestById(input.request_id);
+      if (request && ctx.push) {
+        ctx.push.pushToUser(ctx.db, request.requester_id, 'Coverage Confirmed',
+          `${ctx.userName} approved ${window.start_time}–${window.end_time}`,
+          { type: 'coverage', ref_id: input.request_id });
+      }
+      const summary = `Confirmed you can help ${request?.requester_name || 'them'} on ${window.window_date} ${window.start_time}–${window.end_time}`;
+      return { result: { ok: true, summary }, action: { tool: 'approve_incoming_coverage', summary } };
+    },
+  },
+
+  // ---- Messages ----
+  {
+    name: 'send_message',
+    description: 'Send a direct message from you to another household/group member (e.g. "tell Melissa I\'ll be late"). Resolves the person by first name.',
+    write: true,
+    input_schema: {
+      type: 'object',
+      properties: {
+        to: { type: 'string', description: 'Recipient name (first name is fine)' },
+        text: { type: 'string', description: 'The message to send' },
+      },
+      required: ['to', 'text'],
+    },
+    async run(ctx, input) {
+      const name = String(input.to || '').trim();
+      const text = String(input.text || '').trim();
+      if (!name || !text) return { result: { ok: false, error: 'Both recipient and message are required' } };
+      // Only people you share a group with — same rule as the messages API.
+      const recipient = await dbGet(ctx, `
+        SELECT u.id, u.name FROM users u
+        JOIN group_members gm ON gm.user_id = u.id
+        WHERE gm.group_id IN (SELECT group_id FROM group_members WHERE user_id = ?)
+          AND u.id != ?
+          AND (LOWER(u.name) = LOWER(?) OR LOWER(u.name) LIKE LOWER(?) || ' %' OR LOWER(u.username) = LOWER(?))
+        LIMIT 1`, [ctx.userId, ctx.userId, name, name, name]);
+      if (!recipient) return { result: { ok: false, error: `No one named "${name}" in your groups` } };
+      await ctx.db.sendMessage({ sender_id: ctx.userId, recipient_id: recipient.id, text });
+      if (ctx.push) {
+        ctx.push.pushToUser(ctx.db, recipient.id, `Message from ${ctx.userName}`, text,
+          { type: 'message', ref_id: ctx.userId, name: ctx.userName });
+      }
+      const summary = `Sent "${text.length > 40 ? text.slice(0, 40) + '…' : text}" to ${recipient.name}`;
+      return { result: { ok: true, summary }, action: { tool: 'send_message', summary } };
+    },
+  },
+  {
     name: 'update_my_name',
     description: "Change your own display name shown across the household.",
     write: true,
@@ -1850,32 +2382,38 @@ const GROUPS = {
   calendar: { desc: 'Household calendar events.', actions: {
     list: 'get_calendar', add: 'add_appointment', update: 'update_appointment', delete: 'delete_appointment' } },
   tasks: { desc: 'To-do tasks for the household.', actions: {
-    list: 'list_tasks', add: 'add_task', complete: 'complete_task' } },
+    list: 'list_tasks', add: 'add_task', complete: 'complete_task', update: 'update_task', delete: 'delete_task' } },
   lists: { desc: 'Named lists (Groceries, Costco, any shopping/to-do list; use "Tasks" for tasks).', actions: {
-    list_all: 'get_lists', get: 'get_list', add: 'add_list_item', check_off: 'check_off_item' } },
-  budget: { desc: 'Budget spending and categories.', actions: {
-    get: 'get_budget', add_category: 'add_budget_category', update_category: 'update_budget_category', delete_category: 'delete_budget_category' } },
+    list_all: 'get_lists', get: 'get_list', add: 'add_list_item', check_off: 'check_off_item',
+    create: 'create_list', rename: 'rename_list', delete: 'delete_list',
+    update_item: 'update_list_item', delete_item: 'delete_list_item', move_item: 'move_list_item' } },
+  budget: { desc: 'Budget spending, expense logging, and categories.', actions: {
+    get: 'get_budget', list_expenses: 'list_receipts', log_expense: 'add_expense', delete_expense: 'delete_receipt',
+    add_category: 'add_budget_category', update_category: 'update_budget_category', delete_category: 'delete_budget_category' } },
   pantry: { desc: 'Pantry / fridge inventory.', actions: {
     list: 'list_pantry', add: 'add_pantry_item', update: 'update_pantry_item', delete: 'delete_pantry_item' } },
   decisions: { desc: 'Family decisions / polls.', actions: {
-    list: 'list_decisions', vote: 'vote_decision', comment: 'comment_decision' } },
+    list: 'list_decisions', create: 'add_decision', vote: 'vote_decision', comment: 'comment_decision', delete: 'delete_decision' } },
   trips: { desc: 'Live location / ETA trip shares.', actions: {
-    list: 'get_trips', add: 'add_trip', update: 'update_trip', arrive: 'arrive_trip', cancel: 'cancel_trip' } },
+    list: 'get_trips', add: 'add_trip', update: 'update_trip', arrive: 'arrive_trip', cancel: 'cancel_trip', delete: 'delete_trip' } },
   itineraries: { desc: 'Multi-day trips/itineraries, their stays and expenses.', actions: {
     list: 'get_itineraries', add: 'add_itinerary', update: 'update_itinerary', delete: 'delete_itinerary',
     list_stays: 'get_itinerary_stays', add_stay: 'add_itinerary_stay', update_stay: 'update_itinerary_stay',
     delete_stay: 'delete_itinerary_stay', add_expense: 'add_itinerary_expense' } },
   rivalries: { desc: 'Family competitions and their scores.', actions: {
-    list: 'get_rivalries', create: 'create_rivalry', log_score: 'log_rivalry_score' } },
+    list: 'get_rivalries', create: 'create_rivalry', log_score: 'log_rivalry_score', complete: 'complete_rivalry', delete: 'delete_rivalry' } },
   gifts: { desc: 'People tracked for gifts and their gift ideas.', actions: {
-    list_people: 'get_gift_people', add_person: 'add_gift_person', list_ideas: 'get_gift_ideas', add_idea: 'add_gift_idea' } },
-  coverage: { desc: 'Childcare / help coverage requests.', actions: {
-    list: 'get_coverage', create: 'create_coverage_request', cancel: 'cancel_coverage_request' } },
+    list_people: 'get_gift_people', add_person: 'add_gift_person', list_ideas: 'get_gift_ideas', add_idea: 'add_gift_idea',
+    update_idea: 'update_gift_idea', delete_idea: 'delete_gift_idea' } },
+  coverage: { desc: 'Childcare / help coverage requests (yours and ones sent to you).', actions: {
+    list: 'get_coverage', create: 'create_coverage_request', cancel: 'cancel_coverage_request',
+    incoming: 'get_incoming_coverage', approve: 'approve_incoming_coverage' } },
   notes: { desc: 'Private/household notes (take/jot/write a note).', actions: {
     list: 'list_notes', add: 'add_note', update: 'update_note', delete: 'delete_note' } },
   people: { desc: 'Household people (adults, kids) and their milestones.', actions: {
     list: 'list_people', add: 'add_person', update: 'update_person', delete: 'delete_person',
-    list_milestones: 'list_milestones', log_milestone: 'log_milestone' } },
+    list_milestones: 'list_milestones', log_milestone: 'log_milestone',
+    update_milestone: 'update_milestone', delete_milestone: 'delete_milestone' } },
   contacts: { desc: 'Your personal address book.', actions: {
     list: 'get_contacts', add: 'add_contact', update: 'update_contact', delete: 'delete_contact' } },
   recurring_payments: { desc: 'Tracked recurring payments (rent, subscriptions).', actions: {
@@ -1889,7 +2427,7 @@ const GROUPS = {
 };
 
 // Distinct enough to stay on their own rather than wrap in a one-action domain.
-const STANDALONE = ['get_addresses', 'remember', 'update_my_name'];
+const STANDALONE = ['get_addresses', 'remember', 'update_my_name', 'send_message'];
 
 // Reverse index: underlying handler name -> where it now lives in the model
 // surface. Used to rewrite "Use get_calendar first…" style references (which

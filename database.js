@@ -585,6 +585,37 @@ class FamilyDB {
   }
 
   // Scoped to the user's household when groupId is provided (prevents cross-household completion).
+  updateTask(id, updates, groupId = null) {
+    const ALLOWED = new Set(['title', 'description', 'category', 'priority', 'due_date', 'due_time', 'assigned_to', 'status']);
+    const keys = Object.keys(updates).filter(k => ALLOWED.has(k));
+    if (!keys.length) return Promise.resolve({ id, changed: 0 });
+    return new Promise((resolve, reject) => {
+      const sets = keys.map(k => `${k} = ?`).join(', ');
+      const params = [...keys.map(k => updates[k]), id];
+      const sql = groupId
+        ? `UPDATE tasks SET ${sets} WHERE id = ? AND group_id = ?`
+        : `UPDATE tasks SET ${sets} WHERE id = ?`;
+      if (groupId) params.push(groupId);
+      this.db.run(sql, params, function(err) {
+        if (err) reject(err);
+        else resolve({ id, changed: this.changes });
+      });
+    });
+  }
+
+  deleteTask(id, groupId = null) {
+    return new Promise((resolve, reject) => {
+      const sql = groupId
+        ? 'DELETE FROM tasks WHERE id = ? AND group_id = ?'
+        : 'DELETE FROM tasks WHERE id = ?';
+      const params = groupId ? [id, groupId] : [id];
+      this.db.run(sql, params, function(err) {
+        if (err) reject(err);
+        else resolve({ id, changed: this.changes });
+      });
+    });
+  }
+
   completeTask(id, groupId = null) {
     return new Promise((resolve, reject) => {
       const sql = groupId

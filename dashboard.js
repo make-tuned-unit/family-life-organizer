@@ -2236,6 +2236,34 @@ app.post('/api/add', requireAuth, async (req, res) => {
   }
 });
 
+// Task edit/delete (household-scoped). The concierge and any future UI use
+// the same DB methods.
+app.put('/api/tasks/:id', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    if (!(await requireHouseholdRow(db, 'tasks', req.params.id, req, res))) return;
+    await db.updateTask(req.params.id, req.body);
+    res.json({ success: true });
+  } catch (err) {
+    sendServerError(res, err);
+  } finally {
+    db.close();
+  }
+});
+
+app.delete('/api/tasks/:id', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    if (!(await requireHouseholdRow(db, 'tasks', req.params.id, req, res))) return;
+    await db.deleteTask(req.params.id);
+    res.json({ success: true });
+  } catch (err) {
+    sendServerError(res, err);
+  } finally {
+    db.close();
+  }
+});
+
 app.post('/api/complete', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {

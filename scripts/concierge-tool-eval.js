@@ -41,6 +41,18 @@ const CASES = [
   { say: 'save a contact for Dr. Patel, our pediatrician', tool: 'contacts', actions: ['add'] },
   { say: 'we need a babysitter Friday night, ask the care team', tool: 'coverage', actions: ['create'] },
   { say: "start a trip — I'm driving to the airport now", tool: 'trips', actions: ['add'] },
+  // Full-CRUD coverage (edit / delete / move / create everywhere)
+  { say: 'move the dentist task to Friday', tool: 'tasks', actions: ['update', 'list'] },
+  { say: 'delete the car insurance task, we sold the car', tool: 'tasks', actions: ['delete', 'list'] },
+  { say: 'make a new packing list for the cottage', tool: 'lists', actions: ['create'] },
+  { say: 'take the milk off the grocery list, we already have some', tool: 'lists', actions: ['delete_item', 'get'] },
+  { say: 'move the batteries from Groceries to the Costco list', tool: 'lists', actions: ['move_item', 'get'] },
+  { say: 'I spent $42 at Costco today on groceries', tool: 'budget', actions: ['log_expense'] },
+  { say: 'start a poll: pizza or tacos for Friday dinner?', tool: 'decisions', actions: ['create'] },
+  { say: 'mark the Lego set for Jude as purchased', tool: 'gifts', actions: ['update_idea', 'list_ideas'] },
+  { say: 'did anyone ask me for babysitting help?', tool: 'coverage', actions: ['incoming'] },
+  { say: "tell Sophie I'll be home late tonight", tool: 'send_message', actions: null },
+  { say: 'end the step competition and call the winner', tool: 'rivalries', actions: ['complete', 'list'] },
 ];
 
 const defs = tools.definitions();
