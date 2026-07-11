@@ -21,7 +21,7 @@ struct ConciergeHistoryView: View {
                 AmbientBackground(style: .home)
 
                 if loading {
-                    ProgressView().tint(accent)
+                    FLLoadingState(message: "Loading your conversations…")
                 } else if let errorMessage {
                     WarmEmptyState(title: "Couldn't load", systemImage: "exclamationmark.triangle", description: errorMessage)
                 } else if conversations.isEmpty {

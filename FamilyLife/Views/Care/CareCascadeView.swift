@@ -75,16 +75,12 @@ struct CoverageCascadeView: View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 0) {
                 // Header
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("NEW COVERAGE REQUEST")
-                        .font(.flOverline)
-                        .foregroundStyle(TabAccent.care.color).tracking(0.4)
-                    Text("Ask your care team\nto cover a time slot.")
-                        .font(.flScreenTitle).foregroundStyle(WarmPalette.ink1)
-                    Text("Pick contacts, propose windows, and send. They'll get a link to approve.")
-                        .font(.flSubheadline).foregroundStyle(WarmPalette.ink2).padding(.top, 4)
-                }
-                .padding(.horizontal, DesignTokens.Spacing.horizontalMargin).padding(.top, 10).padding(.bottom, 18)
+                FLScreenHeader(
+                    eyebrow: "New coverage request",
+                    title: "Ask your care team\nto cover a time slot.",
+                    subtitle: "Pick contacts, propose windows, and send. They'll get a link to approve.",
+                    accent: TabAccent.care.color
+                )
 
                 // Care team selection
                 sectionLabel("Who to ask")
@@ -137,7 +133,7 @@ struct CoverageCascadeView: View {
                             .font(.system(size: 15)).foregroundStyle(WarmPalette.ink1)
                     }
                     .padding(12)
-                    .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: 16))
+                    .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.tile))
                 }
                 .padding(.horizontal, DesignTokens.Spacing.horizontalMargin).padding(.bottom, 18)
 
@@ -166,18 +162,17 @@ struct CoverageCascadeView: View {
                         .font(.system(size: 15)).foregroundStyle(WarmPalette.ink2)
                 }
                 .padding(14).frame(maxWidth: .infinity, alignment: .leading)
-                .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: 18))
+                .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.tile))
                 .padding(.horizontal, DesignTokens.Spacing.horizontalMargin).padding(.bottom, 14)
 
                 // Send
                 Button { Task { await sendRequest() } } label: {
                     HStack(spacing: 8) {
-                        Text("Send request").font(.flHeadline)
+                        Text("Send request")
                         Image(systemName: "paperplane.fill").font(.system(size: 14))
                     }
-                    .foregroundStyle(WarmPalette.cream1).frame(maxWidth: .infinity).padding(.vertical, 16)
-                    .background(WarmPalette.ink1).clipShape(RoundedRectangle(cornerRadius: 22))
                 }
+                .buttonStyle(.flCTA)
                 .disabled(selectedContactIds.isEmpty || candidateWindows.isEmpty)
                 .opacity(selectedContactIds.isEmpty || candidateWindows.isEmpty ? 0.5 : 1)
                 .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
@@ -216,11 +211,10 @@ struct CoverageCascadeView: View {
     private var pendingView: some View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 0) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("COVERAGE REQUEST SENT").font(.flOverline).foregroundStyle(WarmPalette.ink3).tracking(0.4)
-                    Text("Waiting for reply").font(.flScreenTitle).foregroundStyle(WarmPalette.ink1)
-                }
-                .padding(.horizontal, DesignTokens.Spacing.horizontalMargin).padding(.top, 10).padding(.bottom, 12)
+                FLScreenHeader(
+                    eyebrow: "Coverage request sent",
+                    title: "Waiting for reply"
+                )
 
                 // Recipients with share buttons
                 let selectedContacts = household.members.filter { selectedContactIds.contains($0.id) }
@@ -246,7 +240,7 @@ struct CoverageCascadeView: View {
                         }
                     }
                     .padding(14)
-                    .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: 18))
+                    .flCard()
                     .padding(.horizontal, DesignTokens.Spacing.horizontalMargin).padding(.bottom, 8)
                 }
 
@@ -259,7 +253,7 @@ struct CoverageCascadeView: View {
                         Text("Check for approvals").font(.flSubheadline.weight(.semibold))
                     }
                     .foregroundStyle(TabAccent.care.color).frame(maxWidth: .infinity).padding(.vertical, 14)
-                    .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: 22))
+                    .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
                 }
                 .padding(.horizontal, DesignTokens.Spacing.horizontalMargin).padding(.top, 8).padding(.bottom, 40)
             }
@@ -328,10 +322,8 @@ struct CoverageCascadeView: View {
 
                     Button { currentStep = .booking } label: {
                         Text("Book into this window")
-                            .font(.flHeadline).foregroundStyle(WarmPalette.cream1)
-                            .frame(maxWidth: .infinity).padding(.vertical, 16)
-                            .background(WarmPalette.ink1).clipShape(RoundedRectangle(cornerRadius: 22))
                     }
+                    .buttonStyle(.flCTA)
                     .padding(.horizontal, DesignTokens.Spacing.horizontalMargin).padding(.bottom, 40)
                 }
             }
@@ -375,16 +367,14 @@ struct CoverageCascadeView: View {
                         HStack(spacing: 8) {
                             Button { Task { await bookAppointment(approval: approval) } } label: {
                                 Text("Add to calendar")
-                                    .font(.flSubheadline.weight(.semibold)).foregroundStyle(WarmPalette.cream1)
-                                    .frame(maxWidth: .infinity).padding(.vertical, 12)
-                                    .background(WarmPalette.ink1).clipShape(Capsule())
                             }
+                            .buttonStyle(.flCTA)
                             .disabled(bookingTitle.isEmpty).opacity(bookingTitle.isEmpty ? 0.5 : 1)
                         }
                         .padding(.top, 16)
                     }
                     .padding(18)
-                    .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: 22))
+                    .flCard()
                     .padding(.horizontal, DesignTokens.Spacing.horizontalMargin).padding(.bottom, 40)
                 }
             }
@@ -453,8 +443,8 @@ struct CoverageCascadeView: View {
             }
         }
         .padding(12)
-        .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: 16))
-        .overlay(RoundedRectangle(cornerRadius: 16).stroke(selected ? TabAccent.care.color.opacity(0.3) : .clear, lineWidth: 1))
+        .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.tile))
+        .overlay(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.tile).stroke(selected ? TabAccent.care.color.opacity(0.3) : .clear, lineWidth: 1))
     }
 
     private func windowEditor(index: Int) -> some View {
@@ -472,28 +462,28 @@ struct CoverageCascadeView: View {
                     TextField("YYYY-MM-DD", text: $candidateWindows[index].date)
                         .font(.system(size: 14, design: .monospaced))
                         .padding(8)
-                        .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: 10))
+                        .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.small))
                 }
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Start").font(.flOverline).foregroundStyle(WarmPalette.ink3)
                     TextField("HH:MM", text: $candidateWindows[index].startTime)
                         .font(.system(size: 14, design: .monospaced))
                         .padding(8)
-                        .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: 10))
+                        .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.small))
                 }
                 VStack(alignment: .leading, spacing: 4) {
                     Text("End").font(.flOverline).foregroundStyle(WarmPalette.ink3)
                     TextField("HH:MM", text: $candidateWindows[index].endTime)
                         .font(.system(size: 14, design: .monospaced))
                         .padding(8)
-                        .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: 10))
+                        .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.small))
                 }
             }
             TextField("What's happening? (optional)", text: $candidateWindows[index].description)
                 .font(.system(size: 13)).foregroundStyle(WarmPalette.ink3)
         }
         .padding(14)
-        .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: 20))
+        .flCard()
     }
 }
 

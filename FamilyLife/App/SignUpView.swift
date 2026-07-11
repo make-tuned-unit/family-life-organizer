@@ -54,7 +54,7 @@ struct SignUpView: View {
                                 Spacer()
                             }
                             .padding(14)
-                            .flGlassSurface(tint: .white.opacity(0.03), strokeOpacity: 0.08, in: RoundedRectangle(cornerRadius: 14))
+                            .flGlassSurface(tint: .white.opacity(0.03), strokeOpacity: 0.08, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.small))
                         }
 
                         if hasInviteCode {
@@ -80,16 +80,12 @@ struct SignUpView: View {
 
                         Button(action: signUp) {
                             if isLoading {
-                                ProgressView().tint(.white).frame(maxWidth: .infinity)
+                                ProgressView()
                             } else {
                                 Text(hasInviteCode ? "Join Household" : "Create Household")
-                                    .font(.flHeadline)
-                                    .foregroundStyle(.white)
-                                    .frame(maxWidth: .infinity)
                             }
                         }
-                        .padding(.vertical, 16)
-                        .background(AccentTheme.sage.color, in: RoundedRectangle(cornerRadius: 16))
+                        .buttonStyle(.flCTA(fill: AccentTheme.sage.color))
                         .disabled(name.isEmpty || username.isEmpty || password.isEmpty || isLoading)
                         .opacity(name.isEmpty || username.isEmpty || password.isEmpty ? 0.5 : 1)
                         .padding(.top, 8)
@@ -134,7 +130,7 @@ struct SignUpView: View {
             }
         }
         .padding(16)
-        .flGlassSurface(tint: .white.opacity(0.03), strokeOpacity: 0.08, in: RoundedRectangle(cornerRadius: 14))
+        .flGlassSurface(tint: .white.opacity(0.03), strokeOpacity: 0.08, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.small))
     }
 
     private func signUp() {

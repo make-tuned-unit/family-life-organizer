@@ -225,7 +225,7 @@ struct PersonDetailView: View {
             }
         }
         .padding(13)
-        .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: 16))
+        .flCard()
         .contextMenu {
             Button { editingMilestone = m } label: {
                 Label("Edit milestone", systemImage: "pencil")
@@ -311,7 +311,7 @@ struct PersonDetailView: View {
             }
         }
         .padding(13)
-        .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: 16))
+        .flCard()
         .contextMenu {
             if status != .given, let next = giftNextStatus(status) {
                 Button {
@@ -410,7 +410,7 @@ struct PersonDetailView: View {
                 .foregroundStyle(WarmPalette.ink3)
         }
         .padding(13)
-        .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: 14))
+        .flCard()
         .contextMenu {
             if let event {
                 Button { editingKeyDate = event } label: {
@@ -465,7 +465,7 @@ struct PersonDetailView: View {
                                 .foregroundStyle(WarmPalette.ink3)
                         }
                         .padding(13)
-                        .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: 16))
+                        .flCard()
                     }
                     .buttonStyle(.plain)
                 }

@@ -33,9 +33,11 @@ struct FamilyListsView: View {
                 ListDetailSection(list: selected, api: api)
             } else if lists.isEmpty && !isLoading {
                 WarmEmptyState(
-                    title: "No lists yet",
+                    title: "Start your first list",
                     systemImage: "list.bullet.rectangle",
-                    description: "Create your first list to get started"
+                    description: "Groceries, packing, projects — keep them all in one place",
+                    actionLabel: "New list",
+                    action: { showingNewList = true }
                 )
                 .padding(.top, 40)
             }
@@ -56,7 +58,7 @@ struct FamilyListsView: View {
             NewListSheet { await loadLists() }
         }
         .overlay {
-            if isLoading && lists.isEmpty { ProgressView() }
+            if isLoading && lists.isEmpty { FLLoadingState(message: "Loading your lists…") }
         }
         .refreshable { await loadLists() }
         .task { await loadLists() }
@@ -112,21 +114,7 @@ struct FamilyListsView: View {
     // MARK: - Header
 
     private var headerSection: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("\(lists.count) LISTS")
-                    .font(.flOverline)
-                    .foregroundStyle(WarmPalette.ink3)
-                    .tracking(0.4)
-                Text("Lists")
-                    .font(.flScreenTitle)
-                    .foregroundStyle(WarmPalette.ink1)
-            }
-            Spacer()
-        }
-        .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
-        .padding(.top, 14)
-        .padding(.bottom, 8)
+        FLScreenHeader(eyebrow: "\(lists.count) lists", title: "Lists")
     }
 
     // MARK: - List Picker

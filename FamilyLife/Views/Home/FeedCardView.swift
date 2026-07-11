@@ -87,8 +87,8 @@ struct FeedCard: View {
                 commentsSection
             }
         }
-        .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: 18))
-        .contentShape(RoundedRectangle(cornerRadius: 18))
+        .flCard()
+        .contentShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
         .contextMenu {
             Button { showingSendTo = true } label: {
                 Label("Send to...", systemImage: "arrowshape.turn.up.right")
@@ -294,7 +294,7 @@ struct FeedCard: View {
                     }
                 }
                 .padding(.vertical, 4)
-                .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: 10))
+                .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.small))
                 .padding(.horizontal, 14)
             }
 

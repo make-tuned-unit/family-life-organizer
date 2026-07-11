@@ -270,15 +270,7 @@ struct ConciergeView: View {
     }
 
     private var loadingCard: some View {
-        HStack(spacing: 12) {
-            ProgressView().tint(accent)
-            Text("Gathering your day…")
-                .font(.flSubheadline)
-                .foregroundStyle(WarmPalette.ink3)
-        }
-        .padding(DesignTokens.Spacing.cardPadding)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .flCard(tint: accent)
+        FLLoadingState(message: "Gathering your day…")
     }
 
     private func errorCard(_ message: String) -> some View {

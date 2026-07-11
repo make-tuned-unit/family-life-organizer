@@ -14,8 +14,8 @@ struct PeopleView: View {
         ScrollView(showsIndicators: false) {
             VStack(spacing: 12) {
                 if isLoading && people.isEmpty {
-                    ProgressView()
-                        .padding(.top, 60)
+                    FLLoadingState(message: "Loading your people…")
+                        .padding(.top, 20)
                 } else if people.isEmpty {
                     emptyState
                 } else {
@@ -48,7 +48,7 @@ struct PeopleView: View {
                             .foregroundStyle(WarmPalette.ink3)
                     }
                     .padding(14)
-                    .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: 16))
+                    .flCard()
                 }
                 .buttonStyle(.plain)
                 .padding(.top, 6)
@@ -74,20 +74,13 @@ struct PeopleView: View {
     }
 
     private var emptyState: some View {
-        VStack(spacing: 10) {
-            Image(systemName: "person.2.fill")
-                .font(.system(size: 34))
-                .foregroundStyle(WarmPalette.ink4)
-            Text("Your family's people")
-                .font(.flHeadline)
-                .foregroundStyle(WarmPalette.ink1)
-            Text("Household members appear automatically. Add the kids as dependents to track their milestones, dates, and ideas.")
-                .font(.flFootnote)
-                .foregroundStyle(WarmPalette.ink3)
-                .multilineTextAlignment(.center)
-        }
-        .padding(.top, 60)
-        .padding(.horizontal, 30)
+        WarmEmptyState(
+            title: "Your family's people",
+            systemImage: "person.2.fill",
+            description: "Household members appear automatically. Add the kids as dependents to track their milestones, dates, and ideas.",
+            actionLabel: "Add a person",
+            action: { showingAddPerson = true }
+        )
     }
 
     private func personCard(_ person: PersonResponse) -> some View {
@@ -129,7 +122,7 @@ struct PeopleView: View {
                 .foregroundStyle(WarmPalette.ink3)
         }
         .padding(14)
-        .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: 18))
+        .flCard()
     }
 
     @ViewBuilder
@@ -289,22 +282,14 @@ struct YearRecapView: View {
                 }
 
                 if isLoading && milestones.isEmpty {
-                    ProgressView().padding(.top, 60)
+                    FLLoadingState(message: "Loading milestones…")
+                        .padding(.top, 20)
                 } else if yearMilestones.isEmpty {
-                    VStack(spacing: 8) {
-                        Image(systemName: "sparkles")
-                            .font(.system(size: 30))
-                            .foregroundStyle(WarmPalette.ink4)
-                        Text("No milestones in \(String(selectedYear)) yet")
-                            .font(.flSubheadline.weight(.semibold))
-                            .foregroundStyle(WarmPalette.ink1)
-                        Text("Log the family's moments from each person's card, and this page becomes the story of your year.")
-                            .font(.flFootnote)
-                            .foregroundStyle(WarmPalette.ink3)
-                            .multilineTextAlignment(.center)
-                    }
-                    .padding(.top, 50)
-                    .padding(.horizontal, 30)
+                    WarmEmptyState(
+                        title: "Make \(String(selectedYear)) a year to remember",
+                        systemImage: "sparkles",
+                        description: "Log the family's moments from each person's card, and this page becomes the story of your year."
+                    )
                 } else {
                     HStack {
                         Text("\(yearMilestones.count) moment\(yearMilestones.count == 1 ? "" : "s") in \(String(selectedYear))")
@@ -353,7 +338,7 @@ struct YearRecapView: View {
                                     }
                                 }
                                 .padding(11)
-                                .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: 14))
+                                .flCard()
                             }
                         }
                         .padding(.top, 6)

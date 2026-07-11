@@ -135,7 +135,7 @@ struct CookingModeView: View {
                     .font(.system(size: 18, weight: .semibold))
                     .frame(width: 56, height: 52)
                     .foregroundStyle(WarmPalette.ink2)
-                    .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: 18))
+                    .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.tile))
             }
             .disabled(currentStep == 0)
             .opacity(currentStep == 0 ? 0.4 : 1)

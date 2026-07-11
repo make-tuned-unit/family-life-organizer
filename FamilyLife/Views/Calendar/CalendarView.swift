@@ -100,7 +100,7 @@ struct CalendarView: View {
         }
         .overlay {
             if viewModel.isLoading && viewModel.monthAppointments.isEmpty {
-                ProgressView()
+                FLLoadingState(message: "Loading your month…")
             }
         }
         .inlineError(viewModel.error) { viewModel.error = nil }
@@ -445,7 +445,7 @@ struct CalendarView: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 16)
-        .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: 24))
+        .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.cardLarge))
         .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
         .padding(.bottom, 14)
     }
@@ -478,16 +478,13 @@ struct CalendarView: View {
             }
 
             if dayAppointments.isEmpty && dayCoverage.isEmpty && dayExternal.isEmpty && dayHousehold.isEmpty {
-                VStack(spacing: 8) {
-                    Image(systemName: "calendar.badge.plus")
-                        .font(.system(size: 32))
-                        .foregroundStyle(WarmPalette.ink4)
-                    Text("No events")
-                        .font(.flSubheadline)
-                        .foregroundStyle(WarmPalette.ink3)
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 40)
+                WarmEmptyState(
+                    title: "This day is wide open",
+                    systemImage: "calendar.badge.plus",
+                    description: "A good time to plan something.",
+                    actionLabel: "Add an event",
+                    action: { showingAddAppointment = true }
+                )
             } else {
                 VStack(spacing: 10) {
                     ForEach(dayAppointments) { appt in
@@ -570,16 +567,13 @@ struct CalendarView: View {
             }
 
             if dayAppointments.isEmpty && dayCoverage.isEmpty && dayExternal.isEmpty && dayHousehold.isEmpty {
-                VStack(spacing: 8) {
-                    Image(systemName: "calendar.badge.plus")
-                        .font(.system(size: 32))
-                        .foregroundStyle(WarmPalette.ink4)
-                    Text("No events")
-                        .font(.flSubheadline)
-                        .foregroundStyle(WarmPalette.ink3)
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 40)
+                WarmEmptyState(
+                    title: "This day is wide open",
+                    systemImage: "calendar.badge.plus",
+                    description: "A good time to plan something.",
+                    actionLabel: "Add an event",
+                    action: { showingAddAppointment = true }
+                )
             } else {
                 VStack(spacing: 10) {
                     ForEach(dayAppointments) { appt in
@@ -721,7 +715,7 @@ struct CalendarEventCard: View {
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: 20))
+        .flCard()
     }
 
     private var categoryColor: Color {
@@ -773,9 +767,9 @@ struct ExternalEventCard: View {
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: 20))
+        .flCard()
         .overlay(
-            RoundedRectangle(cornerRadius: 20)
+            RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card)
                 .strokeBorder(event.calendarColor.opacity(0.25), style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
         )
     }
@@ -844,11 +838,7 @@ struct HouseholdEventCard: View {
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: 20))
-        .overlay(
-            RoundedRectangle(cornerRadius: 20)
-                .strokeBorder(color.opacity(0.3), lineWidth: 1)
-        )
+        .flCard(tint: color)
     }
 }
 

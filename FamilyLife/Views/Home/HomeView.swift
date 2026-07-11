@@ -163,7 +163,7 @@ struct HomeView: View {
         }
         .overlay(alignment: .center) {
             if viewModel.isLoading && viewModel.summary == nil {
-                ProgressView()
+                FLLoadingState(message: "Getting your day ready…")
             }
         }
         .inlineError(viewModel.error) {
@@ -396,12 +396,8 @@ struct HomeView: View {
                         }
                     } label: {
                         Text("Get directions")
-                            .font(.flSubheadline.weight(.semibold))
-                            .foregroundStyle(WarmPalette.cream1)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 10)
-                            .background(WarmPalette.ink1, in: Capsule())
                     }
+                    .buttonStyle(.flCTA)
                 }
                 if showDismiss {
                     Button {
@@ -501,7 +497,7 @@ struct HomeView: View {
                         Spacer()
                     }
                     .padding(13)
-                    .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: 16))
+                    .flCard()
                 }
             }
             .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
@@ -693,7 +689,7 @@ struct HomeView: View {
                         .foregroundStyle(TabAccent.home.color)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 12)
-                        .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: 12))
+                        .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.small))
                 }
                 .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
                 .padding(.bottom, 10)

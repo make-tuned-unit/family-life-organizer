@@ -27,9 +27,7 @@ struct EventAttachmentsSection: View {
             .padding(.bottom, 8)
 
             if loading {
-                ProgressView()
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 16)
+                FLLoadingState()
             } else if attachments.isEmpty {
                 Button { showingPicker = true } label: {
                     HStack(spacing: 12) {
@@ -179,17 +177,14 @@ struct AttachmentPickerView: View {
                 .padding(.vertical, 12)
 
                 if loading {
-                    Spacer(); ProgressView(); Spacer()
+                    Spacer(); FLLoadingState(); Spacer()
                 } else if available.isEmpty {
                     Spacer()
-                    VStack(spacing: 8) {
-                        Image(systemName: kind.icon)
-                            .font(.system(size: 32))
-                            .foregroundStyle(WarmPalette.ink3)
-                        Text("Nothing to attach")
-                            .font(.flSubheadline.weight(.medium))
-                            .foregroundStyle(WarmPalette.ink2)
-                    }
+                    WarmEmptyState(
+                        title: "Nothing to attach yet",
+                        systemImage: kind.icon,
+                        description: "Create a \(kind.label.lowercased()) and it will show up here."
+                    )
                     Spacer()
                 } else {
                     ScrollView {
@@ -361,7 +356,7 @@ struct AttachmentDestinationView: View {
         } else if phase == .notFound {
             WarmEmptyState(title: "Item Unavailable", systemImage: "questionmark.folder", description: "This attachment may have been deleted.")
         } else {
-            ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+            FLLoadingState().frame(maxHeight: .infinity)
         }
     }
 

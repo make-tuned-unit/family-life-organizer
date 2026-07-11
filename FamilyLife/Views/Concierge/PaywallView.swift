@@ -127,16 +127,13 @@ struct PaywallView: View {
                 guard let product else { return }
                 Task { await subscription.purchase(product, api: api); if subscription.isPremium { dismiss() } }
             } label: {
-                Group {
-                    if subscription.isPurchasing {
-                        ProgressView().tint(.white)
-                    } else {
-                        Text("Subscribe").frame(maxWidth: .infinity)
-                    }
+                if subscription.isPurchasing {
+                    ProgressView()
+                } else {
+                    Text("Subscribe")
                 }
-                .frame(maxWidth: .infinity)
             }
-            .buttonStyle(FLPrimaryButtonStyle(tint: recommended ? accent : AccentTheme.sage.color))
+            .buttonStyle(.flCTA(fill: recommended ? accent : AccentTheme.sage.color))
             .disabled(subscription.isPurchasing || product == nil)
         }
         .padding(DesignTokens.Spacing.cardPadding)

@@ -181,16 +181,13 @@ struct RecurringPaymentsView: View {
     }
 
     private var emptyState: some View {
-        VStack(spacing: 8) {
-            Image(systemName: "arrow.triangle.2.circlepath")
-                .font(.system(size: 32)).foregroundStyle(WarmPalette.ink4)
-            Text("No recurring payments yet")
-                .font(.flSubheadline.weight(.semibold)).foregroundStyle(WarmPalette.ink2)
-            Text("Add rent, subscriptions, insurance and more to see your fixed monthly costs.")
-                .font(.flFootnote).foregroundStyle(WarmPalette.ink3)
-                .multilineTextAlignment(.center)
-        }
-        .frame(maxWidth: .infinity).padding(.vertical, 40)
+        WarmEmptyState(
+            title: "Know your fixed costs",
+            systemImage: "arrow.triangle.2.circlepath",
+            description: "Add rent, subscriptions, insurance and more to see your fixed monthly costs.",
+            actionLabel: "Add a payment",
+            action: { showingAdd = true }
+        )
     }
 }
 
@@ -226,7 +223,7 @@ private struct RecurringRow: View {
                 .foregroundStyle(WarmPalette.ink1)
         }
         .padding(14)
-        .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: 20))
+        .flCard()
     }
 }
 

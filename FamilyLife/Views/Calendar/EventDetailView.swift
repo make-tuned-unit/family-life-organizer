@@ -78,14 +78,9 @@ struct EventDetailView: View {
                                 Image(systemName: "arrow.triangle.turn.up.right.diamond.fill")
                                     .font(.system(size: 14))
                                 Text("Get Directions")
-                                    .font(.flSubheadline.weight(.semibold))
                             }
-                            .foregroundStyle(WarmPalette.cream1)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 12)
-                            .background(WarmPalette.ink1)
-                            .clipShape(RoundedRectangle(cornerRadius: 14))
                         }
+                        .buttonStyle(.flCTA)
                     }
 
                     // Description
@@ -150,7 +145,7 @@ struct EventDetailView: View {
                         .foregroundStyle(TabAccent.calendar.color)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 14)
-                        .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: 16))
+                        .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.tile))
                     }
 
                     // Send to family member
@@ -164,7 +159,7 @@ struct EventDetailView: View {
                         .foregroundStyle(AccentTheme.ocean.color)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 14)
-                        .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: 16))
+                        .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.tile))
                     }
 
                     // Edit
@@ -180,7 +175,7 @@ struct EventDetailView: View {
                         .foregroundStyle(WarmPalette.ink2)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 14)
-                        .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: 16))
+                        .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.tile))
                     }
 
                     // Delete
@@ -201,7 +196,7 @@ struct EventDetailView: View {
                         .foregroundStyle(WarmPalette.bad)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 14)
-                        .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: 16))
+                        .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.tile))
                     }
                 }
                 .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)

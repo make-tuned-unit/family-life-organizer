@@ -15,19 +15,14 @@ struct MyCoverageRequestsView: View {
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(spacing: 0) {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("COVERAGE")
-                        .font(.flOverline)
-                        .foregroundStyle(TabAccent.care.color).tracking(0.4)
-                    Text("Care Cascade")
-                        .font(.flScreenTitle)
-                        .foregroundStyle(WarmPalette.ink1)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, DesignTokens.Spacing.horizontalMargin).padding(.top, 14).padding(.bottom, 18)
+                FLScreenHeader(
+                    eyebrow: "Coverage",
+                    title: "Care Cascade",
+                    accent: TabAccent.care.color
+                )
 
                 if isLoading && myRequests.isEmpty && incoming.isEmpty {
-                    ProgressView().padding(.top, 40)
+                    FLLoadingState(message: "Loading coverage requests…")
                 } else {
                     // Incoming help requests
                     if !incoming.isEmpty {
@@ -46,23 +41,13 @@ struct MyCoverageRequestsView: View {
                     // My sent requests
                     sectionHeader("Your requests")
                     if myRequests.isEmpty {
-                        VStack(spacing: 12) {
-                            Image(systemName: "arrow.triangle.swap")
-                                .font(.system(size: 32))
-                                .foregroundStyle(WarmPalette.ink4)
-                            Text("No requests yet")
-                                .font(.flSubheadline)
-                                .foregroundStyle(WarmPalette.ink3)
-                            Button { showingCareCascade = true } label: {
-                                Text("Send a coverage request")
-                                    .font(.flSubheadline.weight(.semibold))
-                                    .foregroundStyle(TabAccent.care.color)
-                                    .padding(.horizontal, 16).padding(.vertical, 10)
-                                    .background(TabAccent.care.color.opacity(0.12), in: Capsule())
-                            }
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 30)
+                        WarmEmptyState(
+                            title: "Ask for a hand",
+                            systemImage: "arrow.triangle.swap",
+                            description: "Send a coverage request and your care team can claim a time slot.",
+                            actionLabel: "Send a coverage request",
+                            action: { showingCareCascade = true }
+                        )
                     } else {
                         VStack(spacing: 8) {
                             ForEach(myRequests) { request in
@@ -262,7 +247,7 @@ struct CoverageDetailSheet: View {
                             Spacer()
                         }
                         .padding(12)
-                        .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: 14))
+                        .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.small))
                     }
                 }
                 .padding(.horizontal, DesignTokens.Spacing.horizontalMargin).padding(.bottom, 18)
@@ -280,7 +265,7 @@ struct CoverageDetailSheet: View {
                             recipientStatusBadge(recipient.status)
                         }
                         .padding(12)
-                        .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: 14))
+                        .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.small))
                     }
                 }
                 .padding(.horizontal, DesignTokens.Spacing.horizontalMargin).padding(.bottom, 18)

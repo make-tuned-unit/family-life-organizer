@@ -95,19 +95,7 @@ struct CookView: View {
     // MARK: - Header
 
     private var headerSection: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text("TONIGHT'S DINNER")
-                .font(.flOverline)
-                .foregroundStyle(WarmPalette.ink3)
-                .tracking(0.4)
-            Text("What can I make?")
-                .font(.flScreenTitle)
-                .foregroundStyle(WarmPalette.ink1)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
-        .padding(.top, 14)
-        .padding(.bottom, 14)
+        FLScreenHeader(eyebrow: "Tonight's dinner", title: "What can I make?")
     }
 
     // MARK: - AI Input
@@ -161,14 +149,7 @@ struct CookView: View {
     @ViewBuilder
     private var heroRecipe: some View {
         if viewModel.isLoading {
-            VStack(spacing: 12) {
-                ProgressView()
-                Text("Checking your pantry and finding recipes...")
-                    .font(.flFootnote)
-                    .foregroundStyle(WarmPalette.ink3)
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 40)
+            FLLoadingState(message: "Checking your pantry and finding recipes...")
         } else if let recipe = viewModel.recipes.first {
             VStack(spacing: 0) {
                 // Recipe image placeholder
@@ -264,13 +245,8 @@ struct CookView: View {
                             cookingRecipe = recipe
                         } label: {
                             Text("Start cooking")
-                                .font(.flSubheadline.weight(.semibold))
-                                .foregroundStyle(WarmPalette.cream1)
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 12)
-                                .background(WarmPalette.ink1)
-                                .clipShape(Capsule())
                         }
+                        .buttonStyle(.flCTA)
                         Button {
                             viewModel.saveRecipe(recipe)
                         } label: {
@@ -285,21 +261,16 @@ struct CookView: View {
                 }
                 .padding(18)
             }
-            .clipShape(RoundedRectangle(cornerRadius: 26))
-            .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: 26))
+            .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.cardLarge))
+            .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.cardLarge))
             .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
             .padding(.bottom, 14)
         } else if viewModel.hasSearched {
-            VStack(spacing: 8) {
-                Image(systemName: "frying.pan")
-                    .font(.system(size: 32))
-                    .foregroundStyle(WarmPalette.ink4)
-                Text("No recipes found. Try a different query.")
-                    .font(.flSubheadline)
-                    .foregroundStyle(WarmPalette.ink3)
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 40)
+            WarmEmptyState(
+                title: "Let's try another idea",
+                systemImage: "frying.pan",
+                description: "Ask for a different dish or ingredient — your pantry has more in it than you think."
+            )
         }
     }
 
@@ -382,7 +353,7 @@ struct RecipeRowCard: View {
                 .foregroundStyle(WarmPalette.ink3)
         }
         .padding(14)
-        .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: 20))
+        .flCard()
     }
 }
 

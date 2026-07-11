@@ -87,17 +87,13 @@ struct RivalriesView: View {
                 }
 
                 if activeRivalries.isEmpty && completedRivalries.isEmpty && !isLoading {
-                    VStack(spacing: 16) {
-                        WarmEmptyState(
-                            title: "No Rivalries Yet",
-                            systemImage: "flag.2.crossed.fill",
-                            description: "Challenge a family member to a head-to-head competition!"
-                        )
-                        Button("Start a Rivalry") {
-                            showingStartRivalry = true
-                        }
-                        .buttonStyle(.flPrimary(tint: TabAccent.rivalries.color))
-                    }
+                    WarmEmptyState(
+                        title: "Start a friendly rivalry",
+                        systemImage: "flag.2.crossed.fill",
+                        description: "Challenge a family member to a head-to-head competition!",
+                        actionLabel: "Start a rivalry",
+                        action: { showingStartRivalry = true }
+                    )
                     .padding(.top, DesignTokens.Spacing.large)
                 }
             }
@@ -129,7 +125,7 @@ struct RivalriesView: View {
         }
         .overlay {
             if isLoading && rivalries.isEmpty {
-                ProgressView()
+                FLLoadingState(message: "Loading rivalries…")
             }
         }
         .inlineError(error) { error = nil }

@@ -75,7 +75,9 @@ struct ExpensesView: View {
         }
         .sheet(isPresented: $showingAddReceipt) { AddReceiptView() }
         .overlay {
-            if viewModel.isLoading && viewModel.budgetItems.isEmpty { ProgressView() }
+            if viewModel.isLoading && viewModel.budgetItems.isEmpty {
+                FLLoadingState(message: "Loading budget...")
+            }
         }
         .inlineError(viewModel.error) { viewModel.error = nil }
         .refreshable { await viewModel.loadAll(api: api); await projectStore.loadAll(api: api); await recurringStore.load(api: api) }
@@ -123,7 +125,7 @@ struct ExpensesView: View {
                                 .foregroundStyle(WarmPalette.ink4)
                         }
                         .padding(12)
-                        .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: 16))
+                        .flCard()
                     }
                     .buttonStyle(.plain)
                 }
@@ -427,7 +429,7 @@ struct BudgetCategoryCard: View {
                 .foregroundStyle(WarmPalette.ink4)
         }
         .padding(14)
-        .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: 20))
+        .flCard()
     }
 }
 
@@ -591,7 +593,7 @@ struct ReceiptDetailView: View {
                     .foregroundStyle(WarmPalette.bad)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 14)
-                    .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: 16))
+                    .flCard()
                 }
                 .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
                 .padding(.bottom, DesignTokens.Spacing.bottomBuffer)

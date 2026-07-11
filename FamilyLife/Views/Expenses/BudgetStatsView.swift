@@ -77,7 +77,7 @@ struct BudgetStatsView: View {
                 categoryCard(s)
                 fixedVsVariable(s)
             } else if store.isLoading {
-                ProgressView().padding(.top, 60)
+                FLLoadingState(message: "Loading spending stats...")
             } else {
                 emptyState
             }
@@ -276,18 +276,10 @@ struct BudgetStatsView: View {
     }
 
     private var emptyState: some View {
-        VStack(spacing: 8) {
-            Image(systemName: "chart.line.uptrend.xyaxis")
-                .font(.system(size: 32))
-                .foregroundStyle(WarmPalette.ink4)
-            Text("No spending yet")
-                .font(.flSubheadline.weight(.semibold))
-                .foregroundStyle(WarmPalette.ink2)
-            Text("Add receipts to see trends and insights.")
-                .font(.flFootnote)
-                .foregroundStyle(WarmPalette.ink3)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 50)
+        WarmEmptyState(
+            title: "See where your money goes",
+            systemImage: "chart.line.uptrend.xyaxis",
+            description: "Add receipts to see trends and insights."
+        )
     }
 }

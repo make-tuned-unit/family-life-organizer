@@ -70,15 +70,10 @@ struct TwoFactorView: View {
                     }
 
                     Button { primaryAction() } label: {
-                        Group {
-                            if isWorking { ProgressView().tint(.white) }
-                            else { Text(mode == .email ? "Send code" : "Verify").fontWeight(.semibold) }
-                        }
-                        .foregroundStyle(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 16)
-                        .background(AccentTheme.sage.color, in: RoundedRectangle(cornerRadius: 16))
+                        if isWorking { ProgressView() }
+                        else { Text(mode == .email ? "Send code" : "Verify") }
                     }
+                    .buttonStyle(.flCTA(fill: AccentTheme.sage.color))
                     .disabled(!canSubmit)
                     .opacity(canSubmit ? 1 : 0.6)
                     .padding(.top, 4)

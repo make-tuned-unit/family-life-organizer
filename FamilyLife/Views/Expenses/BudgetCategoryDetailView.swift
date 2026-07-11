@@ -81,16 +81,11 @@ struct BudgetCategoryDetailView: View {
                     .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
                     .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
                 } else if !isLoading {
-                    VStack(spacing: 8) {
-                        Image(systemName: "receipt")
-                            .font(.system(size: 28))
-                            .foregroundStyle(WarmPalette.ink4)
-                        Text("No receipts in \(category.category)")
-                            .font(.flSubheadline)
-                            .foregroundStyle(WarmPalette.ink3)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 40)
+                    WarmEmptyState(
+                        title: "Track your \(category.category.lowercased()) spending",
+                        systemImage: "receipt",
+                        description: "Receipts you add to \(category.category) will show up here."
+                    )
                 }
             }
             .padding(.bottom, DesignTokens.Spacing.bottomBuffer)
@@ -100,7 +95,9 @@ struct BudgetCategoryDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackgroundVisibility(.hidden, for: .navigationBar)
         .overlay {
-            if isLoading && receipts.isEmpty { ProgressView() }
+            if isLoading && receipts.isEmpty {
+                FLLoadingState(message: "Loading receipts...")
+            }
         }
         .task { await loadReceipts() }
     }

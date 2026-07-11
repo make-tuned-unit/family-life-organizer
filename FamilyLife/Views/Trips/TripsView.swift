@@ -15,21 +15,10 @@ struct TripsView: View {
         ScrollView(showsIndicators: false) {
             VStack(spacing: 0) {
                 // Header
-                HStack {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(viewModel.activeTrip != nil ? "IN PROGRESS" : "NO ACTIVE TRIP")
-                            .font(.flOverline)
-                            .foregroundStyle(WarmPalette.ink3)
-                            .tracking(0.4)
-                        Text("Trips")
-                            .font(.flScreenTitle)
-                            .foregroundStyle(WarmPalette.ink1)
-                    }
-                    Spacer()
-                }
-                .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
-                .padding(.top, 14)
-                .padding(.bottom, 16)
+                FLScreenHeader(
+                    eyebrow: viewModel.activeTrip != nil ? "In progress" : "No active trip",
+                    title: "Trips"
+                )
 
                 // Permission banner when tracking needs "Always" location
                 if viewModel.activeTrip != nil && !locationService.hasAlwaysPermission {
@@ -46,16 +35,10 @@ struct TripsView: View {
                     Button { showingNewTrip = true } label: {
                         HStack(spacing: 10) {
                             Image(systemName: "car.fill")
-                                .font(.system(size: 16))
                             Text("Start a Trip")
-                                .font(.flHeadline)
                         }
-                        .foregroundStyle(WarmPalette.cream1)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 14)
-                        .background(WarmPalette.ink1)
-                        .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
                     }
+                    .buttonStyle(.flCTA)
                     .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
                 }
 
@@ -81,7 +64,7 @@ struct TripsView: View {
 
                 if viewModel.activeTrip == nil && viewModel.pastTrips.isEmpty && !viewModel.isLoading {
                     WarmEmptyState(
-                        title: "No Trips Yet",
+                        title: "Plan your first trip",
                         systemImage: "car.fill",
                         description: "Start a trip to share your ETA with family"
                     )
@@ -122,7 +105,7 @@ struct TripsView: View {
         }
         .overlay {
             if viewModel.isLoading && viewModel.activeTrip == nil && viewModel.pastTrips.isEmpty {
-                ProgressView()
+                FLLoadingState(message: "Loading trips…")
             }
         }
         .inlineError(viewModel.error) { viewModel.error = nil }

@@ -116,24 +116,11 @@ struct LoginView: View {
                         Button { login() } label: {
                             if isLoading {
                                 ProgressView()
-                                    .tint(.white)
-                                    .frame(maxWidth: .infinity)
                             } else {
                                 Text("Sign In")
-                                    .font(.flHeadline)
-                                    .foregroundStyle(.white)
-                                    .frame(maxWidth: .infinity)
                             }
                         }
-                        .padding(.vertical, 16)
-                        .background(
-                            LinearGradient(
-                                colors: [AccentTheme.sage.color, AccentTheme.sage.color.opacity(0.8)],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            ),
-                            in: RoundedRectangle(cornerRadius: 16)
-                        )
+                        .buttonStyle(.flCTA(fill: AccentTheme.sage.color))
                         .shadow(color: AccentTheme.sage.color.opacity(0.4), radius: 12, y: 6)
                         .disabled(username.isEmpty || password.isEmpty || isLoading)
                         .opacity(username.isEmpty || password.isEmpty ? 0.6 : 1)

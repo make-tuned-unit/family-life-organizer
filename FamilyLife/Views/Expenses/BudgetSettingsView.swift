@@ -44,16 +44,13 @@ struct BudgetSettingsView: View {
                 }
 
                 if categories.isEmpty && !isLoading {
-                    VStack(spacing: 8) {
-                        Image(systemName: "chart.pie")
-                            .font(.system(size: 28))
-                            .foregroundStyle(WarmPalette.ink4)
-                        Text("No budget categories")
-                            .font(.flSubheadline)
-                            .foregroundStyle(WarmPalette.ink3)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 16)
+                    WarmEmptyState(
+                        title: "Set up your first budget",
+                        systemImage: "chart.pie",
+                        description: "Create categories with monthly limits to see where the money goes.",
+                        actionLabel: "Add a category",
+                        action: { showingAdd = true }
+                    )
                 }
             } header: {
                 Text("Categories")

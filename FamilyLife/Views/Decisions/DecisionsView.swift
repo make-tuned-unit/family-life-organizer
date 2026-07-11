@@ -75,7 +75,7 @@ struct DecisionsView: View {
         }
         .refreshable { await loadDecisions() }
         .overlay {
-            if isLoading && decisions.isEmpty { ProgressView() }
+            if isLoading && decisions.isEmpty { FLLoadingState(message: "Loading decisions…") }
         }
         .inlineError(error) { error = nil }
         .task { await loadDecisions() }
@@ -91,21 +91,10 @@ struct DecisionsView: View {
     // MARK: - Header
 
     private var headerSection: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("\(activeDecisions.count) ACTIVE")
-                    .font(.flOverline)
-                    .foregroundStyle(WarmPalette.ink3)
-                    .tracking(0.4)
-                Text("Decisions")
-                    .font(.flScreenTitle)
-                    .foregroundStyle(WarmPalette.ink1)
-            }
-            Spacer()
-        }
-        .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
-        .padding(.top, 14)
-        .padding(.bottom, 12)
+        FLScreenHeader(
+            eyebrow: "\(activeDecisions.count) active",
+            title: "Decisions"
+        )
     }
 
     // MARK: - Filter Chips

@@ -45,13 +45,8 @@ struct AIDisclosureView: View {
             VStack(spacing: 12) {
                 Button(action: onAccept) {
                     Text("Allow AI Suggestions")
-                        .font(.flHeadline)
-                        .foregroundStyle(WarmPalette.cream1)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 16)
-                        .background(WarmPalette.ink1)
-                        .clipShape(RoundedRectangle(cornerRadius: 22))
                 }
+                .buttonStyle(.flCTA)
 
                 Button(action: onDecline) {
                     Text("No Thanks")

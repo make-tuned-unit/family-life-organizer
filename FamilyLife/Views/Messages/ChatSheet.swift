@@ -145,14 +145,11 @@ struct ChatSheet: View {
                         .id(groupId)
                 case nil:
                     Spacer()
-                    VStack(spacing: 8) {
-                        Image(systemName: "bubble.left.and.text.bubble.right")
-                            .font(.system(size: 32))
-                            .foregroundStyle(WarmPalette.ink4)
-                        Text("Select a chat")
-                            .font(.flSubheadline)
-                            .foregroundStyle(WarmPalette.ink3)
-                    }
+                    WarmEmptyState(
+                        title: "Start a conversation",
+                        systemImage: "bubble.left.and.text.bubble.right",
+                        description: "Pick a person or group above to catch up"
+                    )
                     Spacer()
                 }
             }

@@ -52,15 +52,12 @@ struct WeekView: View {
                 let dayExternal = viewModel.externalEvents(for: selected)
                 let dayHousehold = viewModel.householdEvents(for: selected)
                 if dayAppts.isEmpty && dayExternal.isEmpty && dayHousehold.isEmpty {
-                    VStack(spacing: 8) {
-                        Image(systemName: "calendar.badge.checkmark")
-                            .font(.system(size: 28))
-                            .foregroundStyle(WarmPalette.ink4)
-                        Text("Nothing scheduled")
-                            .font(.flSubheadline)
-                            .foregroundStyle(WarmPalette.ink3)
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    WarmEmptyState(
+                        title: "This day is wide open",
+                        systemImage: "calendar.badge.checkmark",
+                        description: "A good time to plan something."
+                    )
+                    .frame(maxHeight: .infinity)
                 } else {
                     ScrollView {
                         VStack(spacing: 10) {

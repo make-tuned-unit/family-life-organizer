@@ -471,8 +471,8 @@ struct EventCard: View {
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(color.opacity(0.06), in: RoundedRectangle(cornerRadius: 20))
-        .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: 20))
+        .background(color.opacity(0.06), in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
+        .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
     }
 }
 

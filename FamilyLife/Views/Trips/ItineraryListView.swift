@@ -28,20 +28,13 @@ struct ItineraryListView: View {
 
                 // Itineraries
                 if itineraries.isEmpty && !isLoading {
-                    VStack(spacing: 12) {
-                        Image(systemName: "map.fill")
-                            .font(.system(size: 40))
-                            .foregroundStyle(AccentTheme.ocean.color.opacity(0.5))
-                        Text("No Itineraries Yet")
-                            .font(.headline)
-                            .foregroundStyle(WarmPalette.ink2)
-                        Text("Plan your next trip — add stays with family and friends")
-                            .font(.subheadline)
-                            .foregroundStyle(WarmPalette.ink3)
-                            .multilineTextAlignment(.center)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 40)
+                    WarmEmptyState(
+                        title: "Plan your first itinerary",
+                        systemImage: "map.fill",
+                        description: "Plan your next trip — add stays with family and friends",
+                        actionLabel: "New itinerary",
+                        action: { showingNewItinerary = true }
+                    )
                 } else {
                     VStack(alignment: .leading, spacing: 8) {
                         if !itineraries.isEmpty {

@@ -70,14 +70,7 @@ struct ReceiptScannerView: View {
 
 
                     if isScanning {
-                        VStack(spacing: 12) {
-                            ProgressView().controlSize(.large)
-                            Text("Scanning receipt with AI...")
-                                .font(.subheadline)
-                                .foregroundStyle(WarmPalette.ink3)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 40)
+                        FLLoadingState(message: "Scanning receipt with AI...")
                     }
 
                     if let error {
@@ -107,7 +100,7 @@ struct ReceiptScannerView: View {
                             .font(.subheadline.weight(.medium))
                         }
                         .padding()
-                        .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: 16))
+                        .flCard()
                         .padding(.horizontal)
                     }
 
@@ -166,16 +159,10 @@ struct ReceiptScannerView: View {
             Button { requestCameraAndShow() } label: {
                 HStack(spacing: 12) {
                     Image(systemName: "camera.fill")
-                        .font(.system(size: 20))
                     Text("Take Photo")
-                        .font(.flHeadline)
                 }
-                .foregroundStyle(WarmPalette.cream1)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 16)
-                .background(WarmPalette.ink1)
-                .clipShape(RoundedRectangle(cornerRadius: 16))
             }
+            .buttonStyle(.flCTA)
             .padding(.horizontal, 22)
 
             // Photo library
@@ -189,7 +176,7 @@ struct ReceiptScannerView: View {
                 .foregroundStyle(WarmPalette.ink1)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 16)
-                .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: 16))
+                .flCard()
             }
             .padding(.horizontal, 22)
         }
@@ -343,11 +330,8 @@ struct ReceiptScannerView: View {
                     resetForNextScan()
                 } label: {
                     Text("Scan Another Receipt")
-                        .font(.headline).frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.borderedProminent)
-                .tint(TabAccent.home.color)
-                .controlSize(.large)
+                .buttonStyle(.flCTA(fill: TabAccent.home.color))
 
                 Button { dismiss() } label: {
                     Text("Done")
@@ -361,15 +345,12 @@ struct ReceiptScannerView: View {
                     Task { await saveReceipt() }
                 } label: {
                     if isSaving {
-                        ProgressView().frame(maxWidth: .infinity)
+                        ProgressView()
                     } else {
                         Text(isProjectMode ? "Add to Project" : "Save Receipt")
-                            .font(.headline).frame(maxWidth: .infinity)
                     }
                 }
-                .buttonStyle(.borderedProminent)
-                .tint(isProjectMode ? AccentTheme.sage.color : TabAccent.home.color)
-                .controlSize(.large)
+                .buttonStyle(.flCTA(fill: isProjectMode ? AccentTheme.sage.color : TabAccent.home.color))
                 .disabled(isSaving || editableTotal.isEmpty || editableMerchant.isEmpty)
 
                 Button {

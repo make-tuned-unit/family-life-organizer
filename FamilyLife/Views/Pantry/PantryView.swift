@@ -52,7 +52,9 @@ struct PantryView: View {
             }
         }
         .overlay {
-            if viewModel.isLoading && viewModel.items.isEmpty { ProgressView() }
+            if viewModel.isLoading && viewModel.items.isEmpty {
+                FLLoadingState(message: "Loading pantry...")
+            }
         }
         .inlineError(viewModel.error) { viewModel.error = nil }
         .refreshable { await viewModel.load(api: api) }
@@ -62,22 +64,10 @@ struct PantryView: View {
     // MARK: - Header
 
     private var headerSection: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("\(viewModel.items.count) items \u{00B7} \(expiringCount) expiring")
-                    .font(.flOverline)
-                    .foregroundStyle(WarmPalette.ink3)
-                    .tracking(0.4)
-                    .textCase(.uppercase)
-                Text("Pantry")
-                    .font(.flScreenTitle)
-                    .foregroundStyle(WarmPalette.ink1)
-            }
-            Spacer()
-        }
-        .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
-        .padding(.top, 14)
-        .padding(.bottom, 12)
+        FLScreenHeader(
+            eyebrow: "\(viewModel.items.count) items \u{00B7} \(expiringCount) expiring",
+            title: "Pantry"
+        )
     }
 
     // MARK: - Search
@@ -143,7 +133,7 @@ struct PantryView: View {
                 }
             }
             .padding(16)
-            .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: 24))
+            .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.cardLarge))
             .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
             .padding(.bottom, 14)
         }
@@ -155,16 +145,15 @@ struct PantryView: View {
     private var itemsGrid: some View {
         let items = viewModel.filteredItems
         if items.isEmpty && !viewModel.isLoading {
-            VStack(spacing: 8) {
-                Image(systemName: "refrigerator")
-                    .font(.system(size: 32))
-                    .foregroundStyle(WarmPalette.ink4)
-                Text(viewModel.selectedLocation == "All" ? "Your pantry is empty" : "Nothing in \(viewModel.selectedLocation.lowercased())")
-                    .font(.flSubheadline)
-                    .foregroundStyle(WarmPalette.ink3)
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 40)
+            WarmEmptyState(
+                title: viewModel.selectedLocation == "All"
+                    ? "Stock your pantry"
+                    : "Nothing in \(viewModel.selectedLocation.lowercased()) yet",
+                systemImage: "refrigerator",
+                description: "Add what you have on hand to track quantities and expiry dates.",
+                actionLabel: "Add an item",
+                action: { showingAddItem = true }
+            )
         } else {
             let grouped = Dictionary(grouping: items) { $0.location?.capitalized ?? "Other" }
             ForEach(grouped.keys.sorted(), id: \.self) { location in
@@ -239,7 +228,7 @@ struct ExpiringItemCard: View {
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
         .frame(minWidth: 130, alignment: .leading)
-        .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: 16))
+        .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.tile))
     }
 }
 

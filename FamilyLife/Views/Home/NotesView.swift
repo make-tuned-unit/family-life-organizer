@@ -105,16 +105,13 @@ struct NotesView: View {
     }
 
     private var emptyState: some View {
-        VStack(spacing: 8) {
-            Image(systemName: "note.text")
-                .font(.system(size: 32)).foregroundStyle(WarmPalette.ink4)
-            Text("No notes yet")
-                .font(.flSubheadline.weight(.semibold)).foregroundStyle(WarmPalette.ink2)
-            Text("Jot something down. Notes are private until you share them.")
-                .font(.flFootnote).foregroundStyle(WarmPalette.ink3)
-                .multilineTextAlignment(.center)
-        }
-        .frame(maxWidth: .infinity).padding(.vertical, 50)
+        WarmEmptyState(
+            title: "Jot down your first note",
+            systemImage: "note.text",
+            description: "Notes are private until you share them.",
+            actionLabel: "New note",
+            action: { showingAdd = true }
+        )
     }
 }
 

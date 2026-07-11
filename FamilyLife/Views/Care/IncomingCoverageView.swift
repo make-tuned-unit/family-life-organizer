@@ -122,7 +122,7 @@ struct ApproveRequestSheet: View {
                         .font(.flSubheadline).italic()
                         .foregroundStyle(WarmPalette.ink2)
                         .padding(14).frame(maxWidth: .infinity, alignment: .leading)
-                        .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: 18))
+                        .flCard()
                         .padding(.horizontal, DesignTokens.Spacing.horizontalMargin).padding(.bottom, 14)
                 }
 
@@ -133,7 +133,7 @@ struct ApproveRequestSheet: View {
                     .padding(.horizontal, DesignTokens.Spacing.horizontalMargin).padding(.bottom, 8)
 
                 if isLoading {
-                    ProgressView().frame(maxWidth: .infinity).padding(.vertical, 20)
+                    FLLoadingState(message: "Loading time slots…")
                 } else {
                     VStack(spacing: 8) {
                         ForEach(windows) { window in
@@ -161,9 +161,9 @@ struct ApproveRequestSheet: View {
                                     }
                                 }
                                 .padding(14)
-                                .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: 18))
+                                .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
                                 .overlay(
-                                    RoundedRectangle(cornerRadius: 18)
+                                    RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card)
                                         .stroke(isSelected ? TabAccent.care.color.opacity(0.4) : .clear, lineWidth: 1.5)
                                 )
                             }
@@ -182,7 +182,7 @@ struct ApproveRequestSheet: View {
                         .font(.system(size: 15)).foregroundStyle(WarmPalette.ink2)
                 }
                 .padding(14).frame(maxWidth: .infinity, alignment: .leading)
-                .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: 18))
+                .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.tile))
                 .padding(.horizontal, DesignTokens.Spacing.horizontalMargin).padding(.bottom, 18)
 
                 // Approve button
@@ -191,16 +191,14 @@ struct ApproveRequestSheet: View {
                 } label: {
                     HStack(spacing: 8) {
                         if isSaving {
-                            ProgressView().tint(WarmPalette.cream1)
+                            ProgressView()
                         }
                         Text("Confirm availability")
-                            .font(.flHeadline)
                         Image(systemName: "checkmark.shield.fill")
                             .font(.system(size: 14))
                     }
-                    .foregroundStyle(WarmPalette.cream1).frame(maxWidth: .infinity).padding(.vertical, 16)
-                    .background(WarmPalette.ink1, in: RoundedRectangle(cornerRadius: 22))
                 }
+                .buttonStyle(.flCTA)
                 .disabled(selectedWindow == nil || isSaving)
                 .opacity(selectedWindow == nil ? 0.5 : 1)
                 .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)

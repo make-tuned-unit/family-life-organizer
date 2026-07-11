@@ -253,20 +253,13 @@ struct HouseholdView: View {
             }
 
             if otherHouseholdMembers.isEmpty {
-                VStack(spacing: 8) {
-                    Image(systemName: "person.2.slash")
-                        .font(.system(size: 28))
-                        .foregroundStyle(WarmPalette.ink4)
-                    Text("No family members yet")
-                        .font(.flSubheadline)
-                        .foregroundStyle(WarmPalette.ink3)
-                    Text("Share your invite code or add family members manually.")
-                        .font(.flCaption)
-                        .foregroundStyle(WarmPalette.ink4)
-                        .multilineTextAlignment(.center)
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 16)
+                WarmEmptyState(
+                    title: "Bring your family in",
+                    systemImage: "person.2",
+                    description: "Share your invite code or add family members manually.",
+                    actionLabel: "Add member",
+                    action: { showingAddMember = true }
+                )
             }
         } header: {
             Text("Family Members")

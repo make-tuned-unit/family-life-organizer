@@ -97,22 +97,10 @@ struct BudgetProjectsView: View {
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(spacing: 0) {
-                // Header
-                HStack {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("\(store.projects.count) PROJECTS")
-                            .font(.flOverline)
-                            .foregroundStyle(WarmPalette.ink3)
-                            .tracking(0.4)
-                        Text("Projects")
-                            .font(.flScreenTitle)
-                            .foregroundStyle(WarmPalette.ink1)
-                    }
-                    Spacer()
-                }
-                .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
-                .padding(.top, 14)
-                .padding(.bottom, 16)
+                FLScreenHeader(
+                    eyebrow: "\(store.projects.count) projects",
+                    title: "Projects"
+                )
 
                 if store.projects.isEmpty && !store.isLoading {
                     WarmEmptyState(
@@ -154,7 +142,9 @@ struct BudgetProjectsView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackgroundVisibility(.hidden, for: .navigationBar)
         .overlay {
-            if store.isLoading && store.projects.isEmpty { ProgressView() }
+            if store.isLoading && store.projects.isEmpty {
+                FLLoadingState(message: "Loading projects...")
+            }
         }
         .sheet(isPresented: $showingNewProject) {
             NewProjectSheet { name, budget in
@@ -483,7 +473,7 @@ struct ExpenseDetailView: View {
                     .foregroundStyle(WarmPalette.bad)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 14)
-                    .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: 16))
+                    .flCard()
                 }
                 .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
                 .padding(.bottom, DesignTokens.Spacing.bottomBuffer)

@@ -66,7 +66,7 @@ struct FamilyGroupsView: View {
             }
         }
         .overlay {
-            if isLoading && groups.isEmpty { ProgressView() }
+            if isLoading && groups.isEmpty { FLLoadingState(message: "Loading your people…") }
         }
         .refreshable { await loadAll() }
         .task { await loadAll() }
@@ -91,21 +91,7 @@ struct FamilyGroupsView: View {
     // MARK: - Header
 
     private var headerSection: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("YOUR PEOPLE")
-                    .font(.flOverline)
-                    .foregroundStyle(WarmPalette.ink3)
-                    .tracking(0.4)
-                Text("Family")
-                    .font(.flScreenTitle)
-                    .foregroundStyle(WarmPalette.ink1)
-            }
-            Spacer()
-        }
-        .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
-        .padding(.top, 14)
-        .padding(.bottom, 16)
+        FLScreenHeader(eyebrow: "Your people", title: "Family")
     }
 
     // MARK: - Household
@@ -237,7 +223,7 @@ struct GroupRow: View {
                 .foregroundStyle(WarmPalette.ink4)
         }
         .padding(14)
-        .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: 16))
+        .flCard()
     }
 }
 
@@ -269,7 +255,7 @@ struct ContactRow: View {
             }
         }
         .padding(12)
-        .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: 14))
+        .flCard()
     }
 }
 
@@ -359,17 +345,12 @@ struct GroupDetailView: View {
                                 Image(systemName: "message.fill")
                                     .font(.system(size: 14))
                                 Text("Send invite")
-                                    .font(.flSubheadline.weight(.semibold))
                             }
-                            .foregroundStyle(WarmPalette.cream1)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 10)
-                            .background(TabAccent.home.color)
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
                         }
+                        .buttonStyle(.flCTA(fill: TabAccent.home.color))
                     }
                     .padding(14)
-                    .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: 16))
+                    .flCard()
                     .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
                     .padding(.bottom, 14)
                 }
@@ -585,7 +566,7 @@ struct GroupDetailView: View {
                     }
                 }
                 .padding(12)
-                .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: 14))
+                .flCard()
                 .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
             }
 
@@ -600,7 +581,7 @@ struct GroupDetailView: View {
                 .foregroundStyle(TabAccent.home.color)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 12)
-                .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: 14))
+                .flCard()
             }
             .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
 
@@ -826,7 +807,7 @@ struct FeedPostCard: View {
             .foregroundStyle(WarmPalette.ink3)
         }
         .padding(16)
-        .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: 20))
+        .flCard()
     }
 
     @ViewBuilder
