@@ -24,15 +24,20 @@ final class HouseholdService {
     func load(api: APIService, profileCache: ProfileImageCache? = nil, currentUserId: Int? = nil) async {
         guard !isLoading else { return }
         isLoading = true
-        do {
-            // Load contacts + household group users so @mentions work for everyone
-            async let contactsReq = api.fetchContacts()
-            async let groupsReq = api.fetchGroups()
+        defer { isLoading = false }
 
-            // Real throws: a failed fetch must NOT mark the service loaded with
-            // an empty roster (which silently emptied mention/assignee pickers).
-            let contacts = try await contactsReq
-            let groups = try await groupsReq
+        // Load contacts + household group users so @mentions work for everyone
+        async let contactsReq = api.fetchContacts()
+        async let groupsReq = api.fetchGroups()
+
+        // Partial tolerance: one endpoint failing shouldn't empty the other's
+        // data — but if BOTH fail, bail WITHOUT marking loaded (which silently
+        // emptied mention/assignee pickers); the foreground retry repopulates.
+        let contactsResult = try? await contactsReq
+        let groupsResult = try? await groupsReq
+        guard contactsResult != nil || groupsResult != nil else { return }
+        let contacts = contactsResult ?? []
+        let groups = groupsResult ?? []
 
             // Cache the household group for invite code display
             householdGroup = groups.first { $0.group_type == "household" }
@@ -111,13 +116,7 @@ final class HouseholdService {
             userIdsByName = nameToUserId
             householdMemberNames = householdNames
             householdUsers = householdUserList.sorted { $0.name < $1.name }
-        } catch {
-            // Leave isLoaded false so the next appear/foreground retries.
-            isLoading = false
-            return
-        }
         isLoaded = true
-        isLoading = false
     }
 
     func reload(api: APIService, profileCache: ProfileImageCache? = nil, currentUserId: Int? = nil) async {

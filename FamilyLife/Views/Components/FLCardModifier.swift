@@ -3,8 +3,9 @@ import SwiftUI
 // MARK: - FLCard ViewModifier
 // Single entry point for all glass card surfaces in the app.
 // Usage:
-//   .flCard(tint: .blue)                      // display-only card
-//   .flCard(tint: .blue, interactive: true)   // tappable card (scale + shimmer)
+//   .flCard(tint: .blue)   // the card surface
+//   For TAPPABLE cards, put the card inside a Button and add
+//   .buttonStyle(.flCardPress) for the press scale/dim feedback.
 //
 // IMPORTANT: Apply padding INSIDE the card content BEFORE calling .flCard().
 //   ✓  content.padding(DesignTokens.Spacing.cardPadding).flCard(tint: color)
@@ -12,7 +13,6 @@ import SwiftUI
 
 struct FLCardModifier: ViewModifier {
     var tint: Color = .clear
-    var interactive: Bool = false
 
     func body(content: Content) -> some View {
         content
@@ -25,13 +25,10 @@ struct FLCardModifier: ViewModifier {
 
 extension View {
     /// Apply the standard FamilyLife glass card surface.
-    /// - Parameters:
-    ///   - tint: The tab accent color to tint the glass surface. Pass `.clear` for untinted.
-    ///   - interactive: Marker for tappable cards. The surface is identical —
-    ///     pair the enclosing Button with `.buttonStyle(.flCardPress)` to get
-    ///     the press scale/dim feedback.
-    func flCard(tint: Color = .clear, interactive: Bool = false) -> some View {
-        modifier(FLCardModifier(tint: tint, interactive: interactive))
+    /// - Parameter tint: The tab accent color to tint the glass surface.
+    ///   Pass `.clear` for untinted.
+    func flCard(tint: Color = .clear) -> some View {
+        modifier(FLCardModifier(tint: tint))
     }
 
     /// Solid card surface with subtle tint border. Zero GPU cost — no real-time blur.
@@ -85,22 +82,22 @@ extension View {
             .flCard(tint: TabAccent.home.color)
             .frame(maxWidth: .infinity)
 
-            // Interactive card
+            // Tappable card: Button + .flCardPress provides the press feedback
             Button {
                 // preview tap
             } label: {
                 VStack(alignment: .leading, spacing: 8) {
-                    Label("Interactive Card", systemImage: "hand.tap.fill")
+                    Label("Tappable Card", systemImage: "hand.tap.fill")
                         .font(.headline)
-                    Text("Use for tappable rows. Adds scale and shimmer on press via .interactive().")
+                    Text("Wrap in a Button with .buttonStyle(.flCardPress) for press scale/dim.")
                         .font(.caption)
                         .foregroundStyle(WarmPalette.ink3)
                 }
                 .padding(DesignTokens.Spacing.cardPadding)
-                .flCard(tint: AccentTheme.mauve.color, interactive: true)
+                .flCard(tint: AccentTheme.mauve.color)
                 .frame(maxWidth: .infinity)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.flCardPress)
 
             // Untinted card
             VStack(alignment: .leading, spacing: 8) {

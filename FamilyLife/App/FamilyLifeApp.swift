@@ -183,6 +183,14 @@ struct FamilyLifeApp: App {
                     guard authService.isAuthenticated, let userId = authService.currentUser?.id else { return }
                     messageCache.preload(api: apiService, userId: userId)
                     Task { await calendarService.syncToHousehold(api: apiService) }
+                    // If the launch-time roster load failed (offline start),
+                    // this is the retry that actually repopulates the
+                    // mention/assignee/care-team pickers.
+                    if !householdService.isLoaded {
+                        Task {
+                            await householdService.reload(api: apiService, profileCache: profileImageCache, currentUserId: authService.currentUser?.id)
+                        }
+                    }
                 }
                 // System calendar changed while the app is running — push the fresh
                 // snapshot to the household so deletions/edits propagate right away

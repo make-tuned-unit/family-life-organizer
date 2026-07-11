@@ -8,6 +8,14 @@ final class MessageCache {
     /// Cached images per message ID
     private var imageCache: [Int: UIImage] = [:]
     private var pendingImages: Set<Int> = []
+    /// For each optimistic temp: the newest REAL message id at insert time.
+    /// Confirmation only matches rows NEWER than this — otherwise re-sending
+    /// "ok" (or any photo, they all share "Sent a photo") would match an old
+    /// row and drop the in-flight bubble.
+    private var tempBaselines: [Int: Int] = [:]
+    /// One shared formatter: used for BOTH writing temp timestamps and parsing
+    /// them back, so the round-trip can never drift (and no per-poll allocs).
+    private static let isoFormatter = ISO8601DateFormatter()
 
     func messages(for partnerId: Int) -> [APIService.DirectMessageResponse] {
         cache[partnerId] ?? []
@@ -19,6 +27,7 @@ final class MessageCache {
         cache = [:]
         imageCache = [:]
         pendingImages = []
+        tempBaselines = [:]
     }
 
     func setMessages(_ messages: [APIService.DirectMessageResponse], for partnerId: Int) {
@@ -39,21 +48,28 @@ final class MessageCache {
         let existing = cache[partnerId] ?? []
         let temps = existing.filter { $0.id >= Self.tempIdThreshold }
         let keptTemps = temps.filter { temp in
-            // Confirmed: its real row is in the fetched window now.
-            let confirmed = fetched.contains { $0.sender_id == temp.sender_id && $0.text == temp.text }
-            if confirmed { return false }
-            // Unconfirmed temps age out after 30s (the send failure path
-            // removes its own temp immediately; this is just a backstop).
+            // Confirmed: a real row NEWER than everything known at insert
+            // time matches this temp. (sender_id 0 = unknown-at-insert; match
+            // on text alone rather than never confirming and showing doubles.)
+            let baseline = tempBaselines[temp.id] ?? 0
+            let confirmed = fetched.contains {
+                $0.id > baseline
+                    && (temp.sender_id == 0 || $0.sender_id == temp.sender_id)
+                    && $0.text == temp.text
+            }
+            if confirmed { tempBaselines[temp.id] = nil; return false }
+            // Unconfirmed temps age out after 2 minutes — long enough for a
+            // large photo on slow cellular (the send-failure path removes its
+            // own temp immediately; this is only a backstop).
             guard let createdAt = temp.created_at,
-                  let created = ISO8601DateFormatter().date(from: createdAt) else { return false }
-            return Date().timeIntervalSince(created) < 30
-        }
-        guard let minFetchedId = fetched.map(\.id).min() else {
-            cache[partnerId] = keptTemps + existing.filter { $0.id < Self.tempIdThreshold }
-            return
+                  let created = Self.isoFormatter.date(from: createdAt) else { return false }
+            if Date().timeIntervalSince(created) >= 120 { tempBaselines[temp.id] = nil; return false }
+            return true
         }
         // Keep only older real pages; the newest window comes from `fetched`
-        // (which is authoritative and contiguous by id).
+        // (which is authoritative and contiguous by id). An empty fetch keeps
+        // all real history (minFetchedId = Int.max).
+        let minFetchedId = fetched.map(\.id).min() ?? Int.max
         let olderRetained = existing.filter { $0.id < minFetchedId && $0.id < Self.tempIdThreshold }
         cache[partnerId] = (keptTemps + fetched + olderRetained).sorted { $0.id > $1.id }
     }
@@ -62,6 +78,7 @@ final class MessageCache {
     func removeOptimistic(partnerId: Int, text: String) {
         var msgs = cache[partnerId] ?? []
         if let idx = msgs.firstIndex(where: { $0.id >= Self.tempIdThreshold && $0.text == text }) {
+            tempBaselines[msgs[idx].id] = nil
             msgs.remove(at: idx)
             cache[partnerId] = msgs
         }
@@ -91,9 +108,11 @@ final class MessageCache {
             has_image: imageData != nil ? 1 : nil,
             image_data: imageData,
             read_at: nil,
-            created_at: ISO8601DateFormatter().string(from: Date())
+            created_at: Self.isoFormatter.string(from: Date())
         )
         var msgs = cache[partnerId] ?? []
+        // Only rows newer than this can confirm the temp (see mergeNewest).
+        tempBaselines[msg.id] = msgs.first(where: { $0.id < Self.tempIdThreshold })?.id ?? 0
         msgs.insert(msg, at: 0) // newest first
         cache[partnerId] = msgs
     }

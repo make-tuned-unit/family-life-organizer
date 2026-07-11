@@ -645,6 +645,7 @@ struct AddGroupMemberSheet: View {
     @State private var relationship = "sister"
     @State private var phone = ""
     @State private var isSaving = false
+    @State private var errorMessage: String?
 
     private let relationships = [
         "mom", "dad", "sister", "brother",
@@ -677,12 +678,21 @@ struct AddGroupMemberSheet: View {
                         ForEach(household.members) { contact in
                             Button {
                                 Task {
-                                    _ = try? await api.addGroupMember(groupId: groupId, data: [
-                                        "contact_id": contact.id,
-                                        "role": "member"
-                                    ])
-                                    await onComplete()
-                                    dismiss()
+                                    do {
+                                        // Household pseudo-contacts have negative
+                                        // ids; the server translates them to a
+                                        // user add (consent = shared group).
+                                        _ = try await api.addGroupMember(groupId: groupId, data: [
+                                            "contact_id": contact.id,
+                                            "role": "member"
+                                        ])
+                                        await onComplete()
+                                        dismiss()
+                                    } catch {
+                                        guard !error.isCancellation else { return }
+                                        errorMessage = error.localizedDescription
+                                        UINotificationFeedbackGenerator().notificationOccurred(.error)
+                                    }
                                 }
                             } label: {
                                 HStack(spacing: 10) {
@@ -707,6 +717,7 @@ struct AddGroupMemberSheet: View {
             }
             .scrollContentBackground(.hidden)
             .background { AmbientBackground(style: .home) }
+            .inlineError(errorMessage) { errorMessage = nil }
             .navigationTitle("Add Member")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -730,14 +741,16 @@ struct AddGroupMemberSheet: View {
             var contactData: [String: Any] = ["name": name, "relationship": relationship]
             if !phone.isEmpty { contactData["phone"] = phone }
             let result: APIService.IDResponse = try await api.addContact(contactData)
-            _ = try? await api.addGroupMember(groupId: groupId, data: [
+            _ = try await api.addGroupMember(groupId: groupId, data: [
                 "contact_id": result.id,
                 "role": "member"
             ])
             await onComplete()
             dismiss()
         } catch {
+            guard !error.isCancellation else { return }
             isSaving = false
+            errorMessage = error.localizedDescription
         }
     }
 }

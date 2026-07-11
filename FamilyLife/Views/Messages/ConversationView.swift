@@ -300,12 +300,17 @@ struct ConversationView: View {
                 await refreshMessages()
             } catch {
                 guard !error.isCancellation else { return }
-                // Pull the phantom bubble, restore the draft so nothing is lost,
-                // and say what happened.
+                // Pull the phantom bubble and say what happened. Restore the
+                // failed draft ONLY if the composer is still empty — the user
+                // may already be typing the next message, and clobbering that
+                // would trade one lost message for another.
                 messageCache.removeOptimistic(partnerId: partnerId, text: sentText)
-                newMessage = text
-                pendingQuote = quote
-                pendingImageData = imageBase64.flatMap { Data(base64Encoded: $0) }
+                if newMessage.trimmingCharacters(in: .whitespaces).isEmpty,
+                   pendingImageData == nil, pendingQuote == nil {
+                    newMessage = text
+                    pendingQuote = quote
+                    pendingImageData = imageBase64.flatMap { Data(base64Encoded: $0) }
+                }
                 sendError = "Message didn't send — \(error.localizedDescription)"
                 UINotificationFeedbackGenerator().notificationOccurred(.error)
             }

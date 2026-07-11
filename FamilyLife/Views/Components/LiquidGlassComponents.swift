@@ -204,6 +204,27 @@ struct FLLoadingState: View {
     }
 }
 
+#Preview("Screen Header + Loading") {
+    ZStack {
+        AmbientBackground(style: .home)
+        VStack(spacing: 0) {
+            FLScreenHeader(
+                eyebrow: "Tonight's dinner",
+                title: "What can I make?",
+                subtitle: "Recipes from what's already in your pantry.",
+                accent: AccentTheme.terracotta.color
+            )
+            FLLoadingState(message: "Checking your pantry…")
+            WarmEmptyState(
+                title: "Stock your pantry",
+                systemImage: "cabinet",
+                description: "Track what you have and when it expires.",
+                actionLabel: "Add an item"
+            ) {}
+        }
+    }
+}
+
 // MARK: - Presence Chip
 
 struct PresenceChip: View {

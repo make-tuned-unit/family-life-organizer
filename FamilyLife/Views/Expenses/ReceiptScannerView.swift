@@ -609,7 +609,8 @@ struct ScanItem: Codable {
         if let d = try? c.decode(Double.self, forKey: .price) {
             price = d
         } else if let s = try? c.decode(String.self, forKey: .price) {
-            price = Double(s.replacingOccurrences(of: "$", with: ""))
+            // Same rules as total: "$1,299.00" must parse, not vanish.
+            price = Double(s.replacingOccurrences(of: "$", with: "").replacingOccurrences(of: ",", with: ""))
         } else {
             price = nil
         }

@@ -151,15 +151,8 @@ struct CookingModeView: View {
                 }
             } label: {
                 Text(isLastStep ? "Done — mark as cooked" : "Next step")
-                    .font(.flSubheadline.weight(.semibold))
-                    .foregroundStyle(WarmPalette.cream1)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 52)
-                    .background(
-                        isLastStep ? WarmPalette.good : WarmPalette.ink1,
-                        in: RoundedRectangle(cornerRadius: 18)
-                    )
             }
+            .buttonStyle(.flCTA(fill: isLastStep ? WarmPalette.good : WarmPalette.ink1))
         }
         .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
         .padding(.bottom, 14)

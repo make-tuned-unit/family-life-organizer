@@ -135,12 +135,18 @@ final class AuthService {
                 UserDefaults.standard.set(user.id, forKey: "auth_user_id")
             }
         } catch APIError.unauthorized {
-            // Session expired — try silent re-login with saved credentials
-            if await silentRelogin(api: api) {
-                // Re-validate after successful login
+            // Session expired — try silent re-login with the device token.
+            switch await silentRelogin(api: api) {
+            case .success:
                 await validateSession(api: api)
-            } else {
+            case .unauthorized:
+                // The credential itself is dead (revoked/rotated away).
                 logout()
+            case .transient:
+                // Server hiccup or no connectivity — do NOT log out (which
+                // would revoke a perfectly valid token). Keep cached state;
+                // the next 401 retries.
+                break
             }
         } catch {
             // Keep cached credentials for transient connectivity failures.
@@ -261,9 +267,34 @@ final class AuthService {
 
     // MARK: - Silent Re-login
 
-    private func silentRelogin(api: APIService) async -> Bool {
+    enum ReloginOutcome {
+        case success
+        /// The credential is definitively dead — interactive login required.
+        case unauthorized
+        /// Network/server hiccup — the credential may still be valid; retry later.
+        case transient
+    }
+
+    // Single-flight: concurrent 401s (dashboard fan-out) must share ONE
+    // re-login. The token rotates on use, so a second racing tokenLogin would
+    // present the already-rotated token, get 401, and wrongly wipe the fresh
+    // token the winner just saved.
+    @ObservationIgnored private var reloginTask: Task<ReloginOutcome, Never>?
+
+    private func silentRelogin(api: APIService) async -> ReloginOutcome {
+        if let inFlight = reloginTask {
+            return await inFlight.value
+        }
+        let task = Task { await performSilentRelogin(api: api) }
+        reloginTask = task
+        let outcome = await task.value
+        reloginTask = nil
+        return outcome
+    }
+
+    private func performSilentRelogin(api: APIService) async -> ReloginOutcome {
         guard let username = currentUser?.username ?? UserDefaults.standard.string(forKey: "auth_username") else {
-            return false
+            return .unauthorized
         }
         // Preferred path: revocable device token. Rotates on every use.
         if let token = Self.loadRefreshToken(for: username) {
@@ -273,34 +304,36 @@ final class AuthService {
                     if let fresh = response.refresh_token {
                         Self.saveRefreshToken(fresh, for: username)
                     }
-                    return true
+                    return .success
                 }
+                return .transient
             } catch {
-                // Revoked/rotated-away token → interactive login. (Don't fall
-                // through to the password path on a definitive 401.)
+                // Only a definitive 401 kills the credential. A 500/timeout
+                // must not — deleting here would strand a valid token.
                 if case APIError.unauthorized = error {
                     Self.deleteRefreshToken(for: username)
-                    return false
+                    return .unauthorized
                 }
+                return .transient
             }
-            return false
         }
         // Legacy migration: older installs stored the password. Use it once to
         // earn a token, then scrub it. (Only works while 2FA is off.)
         if let password = Self.loadPassword(for: username) {
             do {
                 let response = try await api.login(username: username, password: password)
-                guard response.success == true else { return false }
+                guard response.success == true else { return .unauthorized }
                 if let token = response.refresh_token {
                     Self.saveRefreshToken(token, for: username)
                     Self.deletePassword(for: username)
                 }
-                return true
+                return .success
             } catch {
-                return false
+                if case APIError.unauthorized = error { return .unauthorized }
+                return .transient
             }
         }
-        return false
+        return .unauthorized
     }
 
     // MARK: - Keychain

@@ -108,7 +108,7 @@ struct ConciergeView: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .flCard(tint: accent, interactive: true)
+            .flCard(tint: accent)
         }
         .buttonStyle(.flCardPress)
     }
@@ -246,7 +246,7 @@ struct ConciergeView: View {
             }
             .padding(DesignTokens.Spacing.cardPadding)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .flCard(tint: tint(for: card.kind), interactive: true)
+            .flCard(tint: tint(for: card.kind))
         }
         .buttonStyle(.flCardPress)
     }
