@@ -133,8 +133,14 @@ The system moved on substantially since the 2026-06-25 log. Current state:
   grace window). Legacy Keychain passwords are read once for migration then
   scrubbed. "Log out everywhere" = password change revokes all tokens; logout
   hard-deletes the device's refresh + APNs tokens. See `test/auth-token.test.js`.
-- Deploy target is **Render** (`render.yaml`), not Railway — the go-live steps
-  above that say "Railway" mean the Render dashboard.
+- Deploy target is **Railway** — the iOS app's production URL is
+  `family-life-organizer-production.up.railway.app` (`AppConfig.swift`). The
+  `render.yaml` in the repo appears **unused/aspirational**; the go-live steps
+  above that say "Railway" are correct. (An earlier addendum wrongly flipped
+  this to Render — corrected 2026-07-11.)
+- Per the owner (2026-07-11): **email 2FA is already configured on Railway**
+  (`AUTH_2FA_ENABLED=1` + `RESEND_API_KEY`). Remaining action is just to verify
+  one real end-to-end login on the live server.
 
 ### Data lifecycle / privacy (new this pass)
 - **In-app account deletion** shipped: `POST /api/account/delete` (re-auth)
@@ -160,5 +166,5 @@ The system moved on substantially since the 2026-06-25 log. Current state:
   places**: it says "we do not collect precise GPS" (the server stores
   `last_lat/last_lng` when presence sharing is on) and undersells that receipt
   images are never stored. Reconcile the copy with the shipped behavior.
-- **Backups are unencrypted** on the same Render disk (14-day retention);
+- **Backups are unencrypted** on the same host disk (14-day retention);
   consider app-level encryption of the nightly `VACUUM INTO` snapshots.

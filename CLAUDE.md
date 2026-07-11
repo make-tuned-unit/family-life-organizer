@@ -31,7 +31,7 @@ website/                    # kinrows.com static marketing site + llms.txt/llms-
 
 - Bundle ID: `com.mylauft.kinrows` · App name: **Kinrows**
 - API base: DEBUG → `http://localhost:3456` · RELEASE → hardcoded prod URL (see `AppConfig.swift`; the `server_url` UserDefaults override is DEBUG-only by design)
-- Deploy: Render (`render.yaml`); required env vars are documented in `.env.example`
+- Deploy: **Railway** (prod URL in `AppConfig.swift`); `render.yaml` is present but appears unused. Required env vars documented in `.env.example`
 
 ## iOS: the design system is LAW
 

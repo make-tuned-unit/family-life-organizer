@@ -33,8 +33,8 @@ Legend: ✅ done · ⏳ deferred (needs a human / external action) · 🔜 code-
 ## 3. Security (human-owned)
 
 - ⏳ **Purge git history** of committed secrets. Early commits still contain plaintext passwords + an old session secret (verified present). Run `git filter-repo` (or BFG), force-push, then **rotate `SESSION_SECRET`** and reset those legacy account passwords. Destructive — do deliberately, coordinate with any clones.
-- ⏳ **Enable email 2FA in production**: install the 2FA-capable build broadly, set `RESEND_API_KEY` and `AUTH_2FA_ENABLED=1` on Render (see `docs/SECURITY_AUDIT.md` go-live sequence). Never set `AUTH_2FA_ECHO_CODE` in prod (server fail-fasts if you do).
-- ⏳ **Encrypt DB backups** — nightly `VACUUM INTO` snapshots are unencrypted on the same Render disk (14-day retention). Consider app-level encryption (age/libsodium, key in env) or an encrypted off-disk destination.
+- ✅/⏳ **Email 2FA** — configured on **Railway** (`AUTH_2FA_ENABLED=1` + `RESEND_API_KEY`) per the owner. Code path verified (fail-fast guards + `test/two-factor.test.js`). **Verify step:** do one real end-to-end login on the live server and confirm a code is emailed and accepted. Never set `AUTH_2FA_ECHO_CODE` in prod (server fail-fasts if you do).
+- ⏳ **Encrypt DB backups** — nightly `VACUUM INTO` snapshots are unencrypted on the same persistent disk (14-day retention). Consider app-level encryption (age/libsodium, key in env) or an encrypted off-disk destination.
 - ⏳ **Re-run `npm audit`** before release. Current 5 "high" advisories are all in `tar`, a **build-only** transitive dep of `sqlite3` (never runs in production) — not shipped, but recheck for anything runtime.
 - ✅ Rotating device-token auth, household authorization guards, parameterized SQL, money coercion, LIKE-injection escaping, cross-household tests.
 
@@ -50,10 +50,10 @@ Legend: ✅ done · ⏳ deferred (needs a human / external action) · 🔜 code-
 ## 5. Infrastructure / ops
 
 - ✅ `.env.example` documents all 26 server env vars.
-- ⏳ Confirm Render env has: `SESSION_SECRET`, `ANTHROPIC_API_KEY`, APNs trio (`APNS_KEY_ID`/`TEAM_ID`/`KEY_BASE64`), `RESEND_API_KEY`, `APNS_BUNDLE_ID`. Push and email are silently disabled if unset.
+- ⏳ Confirm Railway env has: `SESSION_SECRET`, `ANTHROPIC_API_KEY`, APNs trio (`APNS_KEY_ID`/`TEAM_ID`/`KEY_BASE64`), `RESEND_API_KEY`, `APNS_BUNDLE_ID`. Push and email are silently disabled if unset.
 - ⏳ Verify the **APNs production** certificate/key and `aps-environment: production` match the distribution build.
 - ⏳ **StoreKit / subscriptions**: products configured in App Store Connect matching `services/subscription.js` IDs; test a sandbox purchase end-to-end (verify, entitlement unlock, `/api/subscription/notifications` server-to-server).
-- ⏳ Confirm the Render **persistent disk** is provisioned (DB + backups live there) and sized.
+- ⚠️ **Verify DB persistence on Railway.** `database.js` only auto-uses a persistent path when `RENDER_DISK_PATH` is set (Render-specific). On Railway you must set **`FAMILY_DB_DIR` to a mounted volume path** (e.g. `/data`) — otherwise `family.db` lands on ephemeral storage and is **wiped on every redeploy**. Confirm the volume is mounted, `FAMILY_DB_DIR` points at it, and `backups/` (nightly snapshots) is on the same volume. This is the single highest-risk ops item.
 - 🔜 Set up basic uptime monitoring on `/healthz`.
 
 ## 6. Nice-to-have polish (post-launch OK)
