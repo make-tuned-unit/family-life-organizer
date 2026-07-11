@@ -209,6 +209,7 @@ struct CalendarView: View {
                 HStack(spacing: 12) {
                     Image(systemName: "calendar.badge.plus")
                         .font(.system(size: 18, weight: .medium))
+                        .symbolRenderingMode(.hierarchical)
                         .foregroundStyle(AccentTheme.sage.color)
                         .frame(width: 36, height: 36)
                         .background(AccentTheme.sage.color.opacity(0.15))
@@ -259,6 +260,7 @@ struct CalendarView: View {
                 HStack(spacing: 12) {
                     Image(systemName: "arrow.triangle.swap")
                         .font(.system(size: 18, weight: .medium))
+                        .symbolRenderingMode(.hierarchical)
                         .foregroundStyle(TabAccent.care.color)
                         .frame(width: 36, height: 36)
                         .background(TabAccent.care.color.opacity(0.15))
@@ -290,6 +292,7 @@ struct CalendarView: View {
                 HStack(spacing: 12) {
                     Image(systemName: "arrow.triangle.swap")
                         .font(.system(size: 18, weight: .medium))
+                        .symbolRenderingMode(.hierarchical)
                         .foregroundStyle(TabAccent.care.color)
                         .frame(width: 36, height: 36)
                         .background(TabAccent.care.color.opacity(0.15))
@@ -527,10 +530,10 @@ struct CalendarView: View {
                         } label: {
                             VStack(spacing: 2) {
                                 Text(DateFormatter.shortWeekday.string(from: date))
-                                    .font(.system(size: 10, weight: .semibold))
+                                    .font(.flOverline)
                                     .foregroundStyle(isThis ? WarmPalette.cream1.opacity(0.7) : WarmPalette.ink3)
                                 Text("\(Calendar.current.component(.day, from: date))")
-                                    .font(.system(size: 17, weight: .bold))
+                                    .font(.flBody.weight(.bold))
                                     .foregroundStyle(isThis ? WarmPalette.cream1 : WarmPalette.ink1)
                             }
                             .frame(width: 44)
@@ -622,7 +625,7 @@ struct CalendarDayCell: View {
         VStack(spacing: 2) {
             if let date = day.date {
                 Text("\(Calendar.current.component(.day, from: date))")
-                    .font(.system(size: 15, weight: day.isToday ? .bold : .medium, design: .default))
+                    .font(.flSubheadline.weight(day.isToday ? .bold : .medium))
                     .foregroundStyle(isSelected ? .white : (day.isToday ? AccentTheme.terracotta.color : WarmPalette.ink1))
                     .frame(width: cellSize, height: cellSize)
                     .background {

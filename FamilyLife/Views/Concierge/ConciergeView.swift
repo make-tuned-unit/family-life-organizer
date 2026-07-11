@@ -223,6 +223,7 @@ struct ConciergeView: View {
             HStack(spacing: 14) {
                 Image(systemName: card.icon)
                     .font(.system(size: 16, weight: .semibold))
+                    .symbolRenderingMode(.hierarchical)
                     .foregroundStyle(tint(for: card.kind))
                     .frame(width: 38, height: 38)
                     .background(tint(for: card.kind).opacity(0.15), in: Circle())

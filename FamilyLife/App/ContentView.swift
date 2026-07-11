@@ -156,7 +156,7 @@ struct MainTabView: View {
 
                             if unreadCount > 0 {
                                 Text("\(unreadCount)")
-                                    .font(.system(size: 10, weight: .bold))
+                                    .font(.flCaption2.weight(.bold))
                                     .foregroundStyle(.white)
                                     .frame(minWidth: 18, minHeight: 18)
                                     .background(AccentTheme.rose.color, in: Circle())
@@ -501,6 +501,7 @@ struct FloatingTabBar: View {
                 } label: {
                     Image(systemName: tab.icon)
                         .font(.system(size: 18, weight: .medium))
+                        .symbolRenderingMode(.hierarchical)
                         .foregroundStyle(selectedTab == tab ? accentColor(for: tab) : WarmPalette.ink3)
                         .frame(maxWidth: .infinity, minHeight: 44)
                         .contentShape(Rectangle())

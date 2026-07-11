@@ -112,7 +112,7 @@ struct CookView: View {
                 .clipShape(Circle())
 
             TextField("Something quick with chicken...", text: $viewModel.query)
-                .font(.system(size: 15))
+                .font(.flSubheadline)
                 .foregroundStyle(WarmPalette.ink1)
                 .onSubmit { getSuggestions() }
 

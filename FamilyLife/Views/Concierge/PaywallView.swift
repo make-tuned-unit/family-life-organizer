@@ -75,6 +75,7 @@ struct PaywallView: View {
                 HStack(alignment: .top, spacing: 12) {
                     Image(systemName: icon)
                         .font(.system(size: 16, weight: .semibold))
+                        .symbolRenderingMode(.hierarchical)
                         .foregroundStyle(accent)
                         .frame(width: 28, height: 28)
                         .background(accent.opacity(0.15), in: Circle())
@@ -161,7 +162,7 @@ struct PaywallView: View {
             }
 
             Text("Auto-renewing subscription. Cancel anytime in Settings.")
-                .font(.system(size: 11))
+                .font(.flCaption2)
                 .foregroundStyle(WarmPalette.ink3)
                 .multilineTextAlignment(.center)
         }

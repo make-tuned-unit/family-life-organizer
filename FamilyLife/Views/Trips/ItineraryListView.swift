@@ -30,7 +30,7 @@ struct ItineraryListView: View {
                 if itineraries.isEmpty && !isLoading {
                     WarmEmptyState(
                         title: "Plan your first itinerary",
-                        systemImage: "map.fill",
+                        systemImage: "airplane",
                         description: "Plan your next trip — add stays with family and friends",
                         actionLabel: "New itinerary",
                         action: { showingNewItinerary = true }

@@ -53,7 +53,7 @@ struct LoginView: View {
                             .shadow(color: .black.opacity(0.3), radius: 8, y: 4)
 
                         Text("Grow together.")
-                            .font(.system(size: 16, weight: .medium))
+                            .font(.flBody.weight(.medium))
                             .foregroundStyle(.white.opacity(0.85))
                     }
                     .padding(.bottom, 36)

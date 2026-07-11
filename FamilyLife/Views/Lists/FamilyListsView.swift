@@ -283,7 +283,7 @@ struct ListDetailSection: View {
                         .font(.system(size: 14))
                         .foregroundStyle(WarmPalette.ink3)
                     TextField("Add item...", text: $newItem)
-                        .font(.system(size: 15))
+                        .font(.flSubheadline)
                         .foregroundStyle(WarmPalette.ink1)
                         .focused($isInputFocused)
                         .onSubmit { addItem() }
@@ -472,7 +472,7 @@ struct ListDetailSection: View {
 
             if isEditing {
                 TextField("Item name", text: $editingText)
-                    .font(.system(size: 15))
+                    .font(.flSubheadline)
                     .foregroundStyle(WarmPalette.ink1)
                     .focused($isEditFocused)
                     .onSubmit { commitEdit(item) }
@@ -540,7 +540,7 @@ struct ListDetailSection: View {
 
             if isEditing {
                 TextField("Item name", text: $editingText)
-                    .font(.system(size: 15))
+                    .font(.flSubheadline)
                     .foregroundStyle(WarmPalette.ink1)
                     .focused($isEditFocused)
                     .onSubmit { commitEdit(item) }
@@ -775,7 +775,7 @@ struct NewListSheet: View {
                                                 .stroke(selectedIcon == icon ? TabAccent.home.color : .clear, lineWidth: 2)
                                         )
                                     Text(label)
-                                        .font(.system(size: 10))
+                                        .font(.flCaption2)
                                         .foregroundStyle(WarmPalette.ink3)
                                 }
                             }
@@ -862,7 +862,7 @@ struct TasksDetailSection: View {
                         .font(.system(size: 14))
                         .foregroundStyle(WarmPalette.ink3)
                     TextField("Add a task...", text: $newTask)
-                        .font(.system(size: 15))
+                        .font(.flSubheadline)
                         .foregroundStyle(WarmPalette.ink1)
                         .focused($isInputFocused)
                         .onSubmit { addTask() }

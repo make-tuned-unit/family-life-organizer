@@ -130,7 +130,7 @@ struct CoverageCascadeView: View {
                     HStack(spacing: 10) {
                         Image(systemName: "pencil").font(.system(size: 16)).foregroundStyle(WarmPalette.ink3).frame(width: 28)
                         TextField("Custom reason...", text: $coverageReason)
-                            .font(.system(size: 15)).foregroundStyle(WarmPalette.ink1)
+                            .font(.flSubheadline).foregroundStyle(WarmPalette.ink1)
                     }
                     .padding(12)
                     .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.tile))
@@ -159,7 +159,7 @@ struct CoverageCascadeView: View {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("OPTIONAL NOTE").font(.flOverline).foregroundStyle(WarmPalette.ink3).tracking(0.4)
                     TextField("Add a note for them...", text: $noteText)
-                        .font(.system(size: 15)).foregroundStyle(WarmPalette.ink2)
+                        .font(.flSubheadline).foregroundStyle(WarmPalette.ink2)
                 }
                 .padding(14).frame(maxWidth: .infinity, alignment: .leading)
                 .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.tile))
@@ -480,7 +480,7 @@ struct CoverageCascadeView: View {
                 }
             }
             TextField("What's happening? (optional)", text: $candidateWindows[index].description)
-                .font(.system(size: 13)).foregroundStyle(WarmPalette.ink3)
+                .font(.flFootnote).foregroundStyle(WarmPalette.ink3)
         }
         .padding(14)
         .flCard()
@@ -507,7 +507,7 @@ struct BookingFormField: View {
     var body: some View {
         HStack {
             Text(label).font(.flFootnote).foregroundStyle(WarmPalette.ink3).frame(width: 70, alignment: .leading)
-            TextField(placeholder, text: $text).font(.system(size: 15, weight: .medium)).foregroundStyle(WarmPalette.ink1)
+            TextField(placeholder, text: $text).font(.flSubheadline.weight(.medium)).foregroundStyle(WarmPalette.ink1)
         }
         .padding(.vertical, 10)
     }

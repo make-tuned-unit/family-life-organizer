@@ -771,14 +771,14 @@ struct HouseholdMemberRow: View {
                     if let phone = contact?.phone, !phone.isEmpty {
                         Link(destination: URL(string: "tel:\(phone.filter { $0.isNumber || $0 == "+" })")!) {
                             Label(phone, systemImage: "phone.fill")
-                                .font(.system(size: 11))
+                                .font(.flCaption2)
                                 .foregroundStyle(TabAccent.home.color)
                         }
                     }
                     if let email = contact?.email, !email.isEmpty {
                         Link(destination: URL(string: "mailto:\(email)")!) {
                             Label(email, systemImage: "envelope.fill")
-                                .font(.system(size: 11))
+                                .font(.flCaption2)
                                 .foregroundStyle(TabAccent.home.color)
                                 .lineLimit(1)
                         }
@@ -820,14 +820,14 @@ struct MemberRow: View {
                     if let phone = member.phone, !phone.isEmpty {
                         Link(destination: URL(string: "tel:\(phone.filter { $0.isNumber || $0 == "+" })")!) {
                             Label(phone, systemImage: "phone.fill")
-                                .font(.system(size: 11))
+                                .font(.flCaption2)
                                 .foregroundStyle(TabAccent.home.color)
                         }
                     }
                     if let email = member.email, !email.isEmpty {
                         Link(destination: URL(string: "mailto:\(email)")!) {
                             Label(email, systemImage: "envelope.fill")
-                                .font(.system(size: 11))
+                                .font(.flCaption2)
                                 .foregroundStyle(TabAccent.home.color)
                                 .lineLimit(1)
                         }

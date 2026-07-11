@@ -51,7 +51,7 @@ struct SettingsView: View {
                                     )
                                     .frame(width: 56, height: 56)
                                 Text(String(auth.currentUser?.name.prefix(1) ?? "?"))
-                                    .font(.system(size: 22, weight: .bold))
+                                    .font(.flTitle)
                                     .foregroundStyle(.white)
                             }
                             .overlay(alignment: .bottomTrailing) {

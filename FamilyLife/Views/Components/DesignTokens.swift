@@ -63,6 +63,9 @@ extension Font {
     static let flFootnote: Font = .system(.footnote)
     static let flCaption: Font = .system(.caption)
     static let flOverline: Font = .system(.caption2, weight: .semibold)
+    /// Smallest legible text (timestamps, dense badges) — 11pt regular,
+    /// scales. Use flOverline for the semibold/uppercase variant.
+    static let flCaption2: Font = .system(.caption2)
     static let flHero: Font = .system(size: 44, weight: .bold, design: .rounded)
     /// Secondary big number (detail-screen totals) — rounded numerals are the
     /// friendly-but-adult signature for money/stats; scales with Dynamic Type.

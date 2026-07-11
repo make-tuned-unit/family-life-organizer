@@ -150,12 +150,12 @@ private struct NoteCard: View {
             HStack(spacing: 5) {
                 Image(systemName: shareLabel.0).font(.system(size: 10))
                 if !isOwner, let author = note.author_name, !author.isEmpty {
-                    Text("Shared by \(author)").font(.system(size: 11, weight: .medium))
+                    Text("Shared by \(author)").font(.flCaption2.weight(.medium))
                     if note.canCollaborate {
-                        Text("\u{00B7} you can edit").font(.system(size: 11))
+                        Text("\u{00B7} you can edit").font(.flCaption2)
                     }
                 } else {
-                    Text(shareLabel.1).font(.system(size: 11, weight: .medium))
+                    Text(shareLabel.1).font(.flCaption2.weight(.medium))
                 }
             }
             .foregroundStyle(note.isShared ? AccentTheme.sage.color : WarmPalette.ink4)

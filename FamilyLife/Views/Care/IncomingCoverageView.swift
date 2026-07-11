@@ -179,7 +179,7 @@ struct ApproveRequestSheet: View {
                         .font(.flOverline)
                         .foregroundStyle(WarmPalette.ink3).tracking(0.4)
                     TextField("e.g. We'll bring lunch!", text: $helperNote)
-                        .font(.system(size: 15)).foregroundStyle(WarmPalette.ink2)
+                        .font(.flSubheadline).foregroundStyle(WarmPalette.ink2)
                 }
                 .padding(14).frame(maxWidth: .infinity, alignment: .leading)
                 .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.tile))

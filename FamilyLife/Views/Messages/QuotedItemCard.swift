@@ -31,7 +31,7 @@ struct QuotedItemCard: View {
 
     private var icon: String {
         switch type {
-        case "decision": "bubble.left.and.bubble.right.fill"
+        case "decision": "chart.bar.fill"
         case "task": "checkmark.circle.fill"
         case "gift": "gift.fill"
         case "post": "text.bubble.fill"

@@ -829,8 +829,8 @@ struct FeedPostCard: View {
         case "photo": ("photo", "Photo", AccentTheme.saffron.color)
         case "link": ("link", "Link", AccentTheme.ocean.color)
         case "event": ("calendar", "Event", AccentTheme.mauve.color)
-        case "decision": ("bubble.left.and.bubble.right", "Decision", TabAccent.decisions.color)
-        case "rivalry": ("flame", "Challenge", AccentTheme.rose.color)
+        case "decision": ("chart.bar", "Decision", TabAccent.decisions.color)
+        case "rivalry": ("flag.2.crossed", "Challenge", AccentTheme.rose.color)
         case "poll": ("chart.bar", "Poll", AccentTheme.sage.color)
         default: ("text.bubble", "Post", WarmPalette.ink3)
         }

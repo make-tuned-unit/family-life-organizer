@@ -107,6 +107,7 @@ struct ConciergeChatView: View {
                 HStack(alignment: .top, spacing: 10) {
                     Image(systemName: "sparkles")
                         .font(.system(size: 14, weight: .semibold))
+                        .symbolRenderingMode(.hierarchical)
                         .foregroundStyle(accent)
                         .frame(width: 28, height: 28)
                         .background(accent.opacity(0.15), in: Circle())
@@ -137,6 +138,7 @@ struct ConciergeChatView: View {
         HStack(spacing: 10) {
             Image(systemName: "sparkles")
                 .font(.system(size: 14, weight: .semibold))
+                .symbolRenderingMode(.hierarchical)
                 .foregroundStyle(accent)
                 .frame(width: 28, height: 28)
                 .background(accent.opacity(0.15), in: Circle())
@@ -186,7 +188,7 @@ struct ConciergeChatView: View {
                 micButton
 
                 TextField(speech.isRecording ? "Listening…" : "Message your concierge…", text: $draft, axis: .vertical)
-                    .font(.system(size: 16))
+                    .font(.flBody)
                     .lineLimit(1...4)
                     .focused($inputFocused)
                     .padding(.horizontal, 14)

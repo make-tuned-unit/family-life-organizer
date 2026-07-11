@@ -123,6 +123,7 @@ struct DecisionsView: View {
             HStack(spacing: 12) {
                 Image(systemName: "fork.knife")
                     .font(.system(size: 16, weight: .medium))
+                    .symbolRenderingMode(.hierarchical)
                     .foregroundStyle(TabAccent.decisions.color)
                     .frame(width: 36, height: 36)
                     .background(TabAccent.decisions.color.opacity(0.15))
@@ -158,7 +159,7 @@ struct DecisionsView: View {
         if filteredActive.isEmpty && resolvedDecisions.isEmpty && !isLoading {
             WarmEmptyState(
                 title: "No decisions yet",
-                systemImage: "bubble.left.and.bubble.right.fill",
+                systemImage: "chart.bar",
                 description: "Share something with your family for input"
             )
         } else {

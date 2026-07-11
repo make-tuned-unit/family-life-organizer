@@ -102,6 +102,7 @@ struct ExpensesView: View {
                         HStack(spacing: 12) {
                             Image(systemName: "hammer.fill")
                                 .font(.system(size: 14))
+                                .symbolRenderingMode(.hierarchical)
                                 .foregroundStyle(AccentTheme.sage.color)
                                 .frame(width: 28, height: 28)
                                 .background(AccentTheme.sage.color.opacity(0.15))
@@ -149,6 +150,7 @@ struct ExpensesView: View {
                 HStack(spacing: 12) {
                     Image(systemName: "hammer.fill")
                         .font(.system(size: 16))
+                        .symbolRenderingMode(.hierarchical)
                         .foregroundStyle(AccentTheme.sage.color)
                         .frame(width: 36, height: 36)
                         .background(AccentTheme.sage.color.opacity(0.15))
@@ -195,6 +197,7 @@ struct ExpensesView: View {
             HStack(spacing: 12) {
                 Image(systemName: "arrow.triangle.2.circlepath")
                     .font(.system(size: 16))
+                    .symbolRenderingMode(.hierarchical)
                     .foregroundStyle(AccentTheme.ocean.color)
                     .frame(width: 36, height: 36)
                     .background(AccentTheme.ocean.color.opacity(0.15))

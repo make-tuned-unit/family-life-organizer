@@ -145,7 +145,7 @@ struct FeedCard: View {
                 }
                 HStack(spacing: 4) {
                     Text(prepared.time)
-                        .font(.system(size: 11))
+                        .font(.flCaption2)
                         .foregroundStyle(WarmPalette.ink4)
                     if let groupName = item.group_name {
                         Text("\u{00B7}")
@@ -162,7 +162,7 @@ struct FeedCard: View {
                             }
                         } label: {
                             Text(groupName)
-                                .font(.system(size: 11, weight: .medium))
+                                .font(.flCaption2.weight(.medium))
                                 .foregroundStyle(AccentTheme.mauve.color)
                         }
                         .buttonStyle(.plain)
@@ -191,7 +191,7 @@ struct FeedCard: View {
                     .foregroundStyle(isLiked ? WarmPalette.bad : WarmPalette.ink4)
                 if displayLikeCount > 0 {
                     Text("\(displayLikeCount)")
-                        .font(.system(size: 11))
+                        .font(.flCaption2)
                         .foregroundStyle(WarmPalette.ink4)
                 }
             }
@@ -201,7 +201,7 @@ struct FeedCard: View {
                     .foregroundStyle(WarmPalette.ink4)
                 if displayCommentCount > 0 {
                     Text("\(displayCommentCount)")
-                        .font(.system(size: 11))
+                        .font(.flCaption2)
                         .foregroundStyle(WarmPalette.ink4)
                 }
             }
@@ -302,7 +302,7 @@ struct FeedCard: View {
                 UserAvatar(name: auth.currentUser?.name ?? "?", userId: auth.currentUser?.id, size: 24)
 
                 TextField("Add a comment...", text: $newComment)
-                    .font(.system(size: 14))
+                    .font(.flSubheadline)
                     .textFieldStyle(.plain)
                     .onChange(of: newComment) { updateMentionSuggestions() }
 
@@ -333,7 +333,7 @@ struct FeedCard: View {
                         .foregroundStyle(WarmPalette.ink1)
                     if let created = comment.created_at {
                         Text(HomeViewModel.formatRelativeTime(created))
-                            .font(.system(size: 11))
+                            .font(.flCaption2)
                             .foregroundStyle(WarmPalette.ink4)
                     }
                 }

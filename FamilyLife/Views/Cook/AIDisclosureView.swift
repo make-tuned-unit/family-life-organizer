@@ -12,7 +12,7 @@ struct AIDisclosureView: View {
             Spacer()
 
             VStack(spacing: 20) {
-                Image(systemName: "sparkle")
+                Image(systemName: "sparkles")
                     .font(.system(size: 40))
                     .foregroundStyle(
                         LinearGradient(colors: [WarmPalette.peach, AccentTheme.terracotta.color], startPoint: .topLeading, endPoint: .bottomTrailing)

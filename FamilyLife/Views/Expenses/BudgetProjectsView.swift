@@ -166,6 +166,7 @@ struct ProjectCard: View {
             HStack {
                 Image(systemName: "hammer.fill")
                     .font(.system(size: 16))
+                    .symbolRenderingMode(.hierarchical)
                     .foregroundStyle(AccentTheme.sage.color)
                     .frame(width: 32, height: 32)
                     .background(AccentTheme.sage.color.opacity(0.15))

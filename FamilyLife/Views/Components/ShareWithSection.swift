@@ -19,7 +19,7 @@ struct ShareWithSection: View {
                             withAnimation(.spring(response: 0.25)) { selectedGroupId = nil }
                         } label: {
                             Text("None")
-                                .font(.system(size: 13, weight: .medium))
+                                .font(.flFootnote.weight(.medium))
                                 .foregroundStyle(selectedGroupId == nil ? WarmPalette.cream1 : WarmPalette.ink2)
                                 .padding(.horizontal, 12)
                                 .padding(.vertical, 8)
@@ -42,7 +42,7 @@ struct ShareWithSection: View {
                                     Image(systemName: groupIcon(group.group_type))
                                         .font(.system(size: 11))
                                     Text(group.name)
-                                        .font(.system(size: 13, weight: .medium))
+                                        .font(.flFootnote.weight(.medium))
                                 }
                                 .foregroundStyle(selectedGroupId == group.id ? WarmPalette.cream1 : WarmPalette.ink2)
                                 .padding(.horizontal, 12)

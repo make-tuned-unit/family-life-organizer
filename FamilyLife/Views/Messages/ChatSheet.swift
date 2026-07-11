@@ -578,7 +578,7 @@ struct GroupMessageBubble: View {
 
                 if let date = post.created_at {
                     Text(relativeTime(date))
-                        .font(.system(size: 10))
+                        .font(.flCaption2)
                         .foregroundStyle(isOwn ? .white.opacity(0.7) : WarmPalette.ink4)
                 }
             }

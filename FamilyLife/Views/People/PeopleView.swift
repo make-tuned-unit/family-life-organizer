@@ -76,7 +76,7 @@ struct PeopleView: View {
     private var emptyState: some View {
         WarmEmptyState(
             title: "Your family's people",
-            systemImage: "person.2.fill",
+            systemImage: "person.2",
             description: "Household members appear automatically. Add the kids as dependents to track their milestones, dates, and ideas.",
             actionLabel: "Add a person",
             action: { showingAddPerson = true }

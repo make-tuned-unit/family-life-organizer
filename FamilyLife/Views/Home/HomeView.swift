@@ -92,7 +92,7 @@ struct HomeView: View {
                             .fill(currentLocationColor)
                             .frame(width: 6, height: 6)
                         Text(currentLocationLabel)
-                            .font(.system(size: 11, weight: .medium))
+                            .font(.flCaption2.weight(.medium))
                             .foregroundStyle(WarmPalette.ink3)
                     }
                 }

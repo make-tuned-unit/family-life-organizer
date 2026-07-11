@@ -8,7 +8,7 @@ struct MoreView: View {
                 // Header
                 HStack {
                     Text("More")
-                        .font(.system(size: 28, weight: .bold))
+                        .font(.flScreenTitle)
                         .foregroundStyle(WarmPalette.ink1)
                     Spacer()
                 }
@@ -91,10 +91,10 @@ struct MoreView: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(.flSubheadline.weight(.semibold))
                     .foregroundStyle(WarmPalette.ink1)
                 Text(subtitle)
-                    .font(.system(size: 13))
+                    .font(.flFootnote)
                     .foregroundStyle(WarmPalette.ink3)
             }
 

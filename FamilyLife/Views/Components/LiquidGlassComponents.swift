@@ -342,6 +342,7 @@ struct WarmAgendaRow: View {
                 if !isDone {
                     Image(systemName: "sparkle")
                         .font(.system(size: 12))
+                        .symbolRenderingMode(.hierarchical)
                         .foregroundStyle(TabAccent.home.color)
                         .frame(width: 22, height: 22)
                         .background(TabAccent.home.color.opacity(0.15), in: Circle())
@@ -540,7 +541,7 @@ struct InlineErrorBanner: View {
                 .font(.system(size: 14))
                 .foregroundStyle(WarmPalette.bad)
             Text(message)
-                .font(.system(size: 13))
+                .font(.flFootnote)
                 .foregroundStyle(WarmPalette.ink2)
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 8)

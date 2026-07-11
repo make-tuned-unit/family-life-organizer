@@ -25,7 +25,7 @@ struct ConciergeHistoryView: View {
                 } else if let errorMessage {
                     WarmEmptyState(title: "Couldn't load", systemImage: "exclamationmark.triangle", description: errorMessage)
                 } else if conversations.isEmpty {
-                    WarmEmptyState(title: "No conversations yet", systemImage: "bubble.left.and.bubble.right", description: "Your past chats with the concierge will appear here.")
+                    WarmEmptyState(title: "No conversations yet", systemImage: "sparkles", description: "Your past chats with the concierge will appear here.")
                 } else {
                     ScrollView {
                         VStack(spacing: 0) {
@@ -57,6 +57,7 @@ struct ConciergeHistoryView: View {
             HStack(spacing: 12) {
                 Image(systemName: "sparkles")
                     .font(.system(size: 14, weight: .semibold))
+                    .symbolRenderingMode(.hierarchical)
                     .foregroundStyle(accent)
                     .frame(width: 30, height: 30)
                     .background(accent.opacity(0.15), in: Circle())

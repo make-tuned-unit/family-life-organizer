@@ -78,7 +78,7 @@ struct PantryView: View {
                 .font(.system(size: 14))
                 .foregroundStyle(WarmPalette.ink3)
             TextField("Search pantry...", text: $viewModel.searchText)
-                .font(.system(size: 15))
+                .font(.flSubheadline)
         }
         .padding(10)
         .background(WarmPalette.cardSurface, in: Capsule())
@@ -149,7 +149,7 @@ struct PantryView: View {
                 title: viewModel.selectedLocation == "All"
                     ? "Stock your pantry"
                     : "Nothing in \(viewModel.selectedLocation.lowercased()) yet",
-                systemImage: "refrigerator",
+                systemImage: "cabinet",
                 description: "Add what you have on hand to track quantities and expiry dates.",
                 actionLabel: "Add an item",
                 action: { showingAddItem = true },
@@ -222,7 +222,7 @@ struct ExpiringItemCard: View {
                 .font(.flFootnote.weight(.semibold))
                 .foregroundStyle(daysLeft <= 0 ? WarmPalette.bad : daysLeft <= 1 ? WarmPalette.warn : WarmPalette.warn)
             Text(item.location?.capitalized ?? "")
-                .font(.system(size: 11))
+                .font(.flCaption2)
                 .foregroundStyle(WarmPalette.ink3)
                 .opacity(0.7)
         }
@@ -268,7 +268,7 @@ struct PantryItemTile: View {
 
             if let qty = item.quantity, !qty.isEmpty {
                 Text(qty + (item.unit.map { " \($0)" } ?? ""))
-                    .font(.system(size: 11))
+                    .font(.flCaption2)
                     .foregroundStyle(WarmPalette.ink3)
             }
 
@@ -281,7 +281,7 @@ struct PantryItemTile: View {
                     }
                     Text(isExpired ? "Expired" : "Exp \u{00B7} \(display)")
                 }
-                .font(.system(size: 11, weight: isExpiringSoon ? .semibold : .regular))
+                .font(.flCaption2.weight(isExpiringSoon ? .semibold : .regular))
                 .foregroundStyle(isExpired ? WarmPalette.bad.opacity(0.8) : (isExpiringSoon ? WarmPalette.bad : WarmPalette.ink3))
                 .padding(.top, 6)
             }

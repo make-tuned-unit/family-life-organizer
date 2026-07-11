@@ -89,7 +89,7 @@ struct RivalriesView: View {
                 if activeRivalries.isEmpty && completedRivalries.isEmpty && !isLoading {
                     WarmEmptyState(
                         title: "Start a friendly rivalry",
-                        systemImage: "flag.2.crossed.fill",
+                        systemImage: "flag.2.crossed",
                         description: "Challenge a family member to a head-to-head competition!",
                         actionLabel: "Start a rivalry",
                         action: { showingStartRivalry = true }
