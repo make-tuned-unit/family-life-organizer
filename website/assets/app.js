@@ -203,6 +203,14 @@ if ('IntersectionObserver' in window && jsOn && !reduceMotion) {
   briefParas.forEach((p, i) => { p.innerHTML = briefHTML[i]; });
 }
 
+// Referral: capture ?ref= from the share link so we can credit the referrer,
+// and clean it out of the URL so it isn't re-shared.
+const REF = new URLSearchParams(location.search).get('ref');
+if (REF && history.replaceState) {
+  const u = new URL(location.href); u.searchParams.delete('ref');
+  history.replaceState(null, '', u.pathname + u.search + u.hash);
+}
+
 // Waitlist forms — every .notify-form (hero + final CTA) posts to /api/waitlist
 // (same origin as the marketing site). data-source tags where the signup came from.
 document.querySelectorAll('.notify-form').forEach(initNotifyForm);
@@ -240,18 +248,18 @@ function initNotifyForm(form) {
       const res = await fetch('/api/waitlist', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: input.value.trim(), source: form.dataset.source || 'site' }),
+        body: JSON.stringify({ email: input.value.trim(), source: form.dataset.source || 'site', ref: REF || undefined }),
       });
       const data = await res.json().catch(() => ({}));
 
       if (res.ok && data.success) {
-        btn.textContent = "You're on the list ✓";
-        setStatus(
-          data.already
-            ? "You're already on the list — we'll be in touch."
-            : 'Check your inbox — a little welcome is on its way.',
-          'success'
-        );
+        if (data.ref_code) {
+          renderReferral(form, status, data);
+        } else {
+          btn.textContent = "You're on the list ✓";
+          setStatus(data.already ? "You're already on the list — we'll be in touch."
+                                 : 'Check your inbox — a little welcome is on its way.', 'success');
+        }
       } else {
         throw new Error(data.error || 'Request failed');
       }
@@ -260,6 +268,46 @@ function initNotifyForm(form) {
       btn.disabled = false;
       input.disabled = false;
       setStatus("Hmm, that didn't go through. Please try again.", 'error');
+    }
+  });
+}
+
+// The highest-intent moment: replace the form with a warm share card so the
+// user can move up the list by inviting family. (Queue-position mechanic.)
+function renderReferral(form, status, data) {
+  status.remove();
+  const link = location.origin + '/?ref=' + data.ref_code;
+  const pos = data.position ? '#' + data.position.toLocaleString() : null;
+  const head = pos
+    ? `${data.already ? 'Welcome back &mdash; you&rsquo;re' : 'You&rsquo;re'} <b>${pos}</b> on the list &#10003;`
+    : (data.already ? 'You&rsquo;re already on the list &#10003;' : 'You&rsquo;re on the list &#10003;');
+  const friends = data.referrals === 1 ? '1 friend has joined' : `${data.referrals} friends have joined`;
+
+  const card = document.createElement('div');
+  card.className = 'wl-ref';
+  card.setAttribute('role', 'status');
+  card.setAttribute('aria-live', 'polite');
+  card.innerHTML = `
+    <p class="wl-ref-head">${head}</p>
+    <p class="wl-ref-sub">Invite your partner or co-parent &mdash; every family who joins with your link moves you up.</p>
+    <div class="wl-ref-row">
+      <input class="wl-ref-link" type="text" readonly value="${link}" aria-label="Your invite link" />
+      <button type="button" class="btn btn-primary wl-copy">Copy link</button>
+    </div>
+    <p class="wl-ref-count">${data.referrals > 0 ? '&#11088; ' + friends : 'Be the first in your family to invite someone.'}</p>
+  `;
+  form.replaceWith(card);
+
+  const copyBtn = card.querySelector('.wl-copy');
+  const linkEl = card.querySelector('.wl-ref-link');
+  copyBtn.addEventListener('click', async () => {
+    try {
+      if (navigator.share) { await navigator.share({ title: 'Kinrows', text: 'Join me on the Kinrows waitlist', url: link }); return; }
+      await navigator.clipboard.writeText(link);
+      copyBtn.textContent = 'Copied ✓';
+      setTimeout(() => (copyBtn.textContent = 'Copy link'), 2000);
+    } catch (_) {
+      linkEl.select();
     }
   });
 }

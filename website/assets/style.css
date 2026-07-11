@@ -163,6 +163,25 @@ a:focus-visible, button:focus-visible, input:focus-visible,
   color:var(--terracotta);text-decoration:none}
 .hero-link:hover{text-decoration:underline}
 .hero-copy .notify-status{text-align:left;margin:10px 0 0;max-width:460px}
+
+/* Referral share card — the post-signup "move up the list" moment.
+   Near-opaque so it reads as a distinct card on both the hero photo and the
+   flat-cream CTA section, with a warm accent hairline for definition. */
+.wl-ref{margin-top:22px;max-width:520px;padding:22px 24px;border-radius:20px;
+  background:rgba(255,253,246,.94);border:1px solid rgba(196,106,74,.22);
+  -webkit-backdrop-filter:blur(16px) saturate(150%);backdrop-filter:blur(16px) saturate(150%);
+  box-shadow:var(--shadow-lg)}
+.cta .wl-ref{margin-left:auto;margin-right:auto;text-align:center}
+.wl-ref-head{font-family:var(--serif);font-size:1.24rem;line-height:1.25;color:var(--ink-1);letter-spacing:-.01em}
+.wl-ref-head b{font-weight:600}
+.wl-ref-sub{margin-top:6px;font-size:.95rem;color:var(--ink-2);line-height:1.5}
+.wl-ref-row{display:flex;gap:8px;margin-top:14px}
+.cta .wl-ref-row{max-width:440px;margin-left:auto;margin-right:auto}
+.wl-ref-link{flex:1;min-width:0;padding:.7em 1em;border-radius:12px;border:1px solid var(--line);
+  background:#fff;font-family:var(--sans);font-size:.9rem;color:var(--ink-2);text-overflow:ellipsis}
+.wl-copy{white-space:nowrap;flex:none}
+.wl-ref-count{margin-top:12px;font-size:.9rem;color:var(--ink-3)}
+@media (max-width:560px){ .wl-ref-row{flex-direction:column} .wl-copy{width:100%} }
 .hero-trust{display:flex;align-items:center;gap:9px;color:var(--ink-3);font-size:.9rem}
 .hero-trust .dot{width:8px;height:8px;border-radius:50%;background:var(--sage);box-shadow:0 0 0 4px rgba(123,160,91,.18)}
 

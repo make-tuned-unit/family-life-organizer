@@ -179,6 +179,11 @@ class FamilyDB {
         // Itinerary travelers column (added after initial table creation)
         this.db.run('ALTER TABLE itineraries ADD COLUMN travelers TEXT', () => {});
         this.db.run('ALTER TABLE receipts ADD COLUMN itinerary_id INTEGER REFERENCES itineraries(id)', () => {});
+        // Waitlist referral program
+        this.db.run('ALTER TABLE waitlist ADD COLUMN ref_code TEXT', () => {});
+        this.db.run('ALTER TABLE waitlist ADD COLUMN referred_by TEXT', () => {});
+        this.db.run('CREATE UNIQUE INDEX IF NOT EXISTS idx_waitlist_ref_code ON waitlist(ref_code)', () => {});
+        this.db.run('CREATE INDEX IF NOT EXISTS idx_waitlist_referred_by ON waitlist(referred_by)', () => {});
         // Per-day HealthKit totals: one synced row per member per calendar day
         this.db.run('ALTER TABLE rivalry_entries ADD COLUMN activity_date TEXT', () => {});
         this.db.run(`CREATE UNIQUE INDEX IF NOT EXISTS idx_rivalry_entries_daily
@@ -2949,23 +2954,83 @@ class FamilyDB {
     });
   }
 
-  // Marketing waitlist (public, not household data).
-  // Resolves { created: bool, total: int } — created=false when already present.
-  addWaitlistEntry({ email, source, referrer, user_agent }) {
-    return new Promise((resolve, reject) => {
-      const db = this.db;
-      db.run(
-        'INSERT OR IGNORE INTO waitlist (email, source, referrer, user_agent) VALUES (?, ?, ?, ?)',
-        [email, source || null, referrer || null, user_agent || null],
-        function (err) {
-          if (err) return reject(err);
-          const created = this.changes > 0;
-          db.get('SELECT COUNT(*) AS n FROM waitlist', [], (e, row) => {
-            if (e) return reject(e);
-            resolve({ created, total: row ? row.n : 0 });
-          });
+  // Marketing waitlist (public, not household data). Handles the referral
+  // program: each signup gets a shareable ref_code; `ref` is the code of
+  // whoever referred them (validated to exist). Returns the signup's standing
+  // so the site can show "You're #N — invite a friend to move up".
+  // Resolves { created, total, ref_code, position, referrals }.
+  addWaitlistEntry({ email, source, referrer, user_agent, ref }) {
+    const dbGet = (sql, p = []) => new Promise((r, j) => this.db.get(sql, p, (e, row) => e ? j(e) : r(row)));
+    const dbRun = (sql, p = []) => new Promise((r, j) => this.db.run(sql, p, function (e) { e ? j(e) : r(this); }));
+    const genCode = () => require('crypto').randomBytes(5).toString('hex'); // 10 hex chars
+
+    return (async () => {
+      const existing = await dbGet('SELECT id, ref_code FROM waitlist WHERE email = ?', [email]);
+      // Only credit a referrer that actually exists and isn't the signer themselves.
+      let referredBy = null;
+      if (ref) {
+        const referrer_row = await dbGet('SELECT email FROM waitlist WHERE ref_code = ?', [ref]);
+        if (referrer_row && referrer_row.email !== email) referredBy = ref;
+      }
+
+      let ref_code, created;
+      if (existing) {
+        created = false;
+        ref_code = existing.ref_code;
+        if (!ref_code) { // backfill a code for a pre-referral-era signup
+          ref_code = genCode();
+          await dbRun('UPDATE waitlist SET ref_code = ? WHERE id = ?', [ref_code, existing.id]);
         }
-      );
+      } else {
+        created = true;
+        // Generate a unique code (retry on the rare collision).
+        for (let i = 0; i < 5; i++) {
+          ref_code = genCode();
+          try {
+            await dbRun(
+              'INSERT INTO waitlist (email, source, referrer, user_agent, ref_code, referred_by) VALUES (?, ?, ?, ?, ?, ?)',
+              [email, source || null, referrer || null, user_agent || null, ref_code, referredBy]);
+            break;
+          } catch (e) {
+            if (String(e.message).includes('idx_waitlist_ref_code') && i < 4) continue;
+            throw e;
+          }
+        }
+      }
+
+      const standing = await this.getWaitlistStanding(ref_code);
+      return { created, ...standing };
+    })();
+  }
+
+  // Rank ordered by referrals (desc) then signup order (id asc — monotonic, so
+  // signups in the same second don't tie). Returns { ref_code, position,
+  // referrals, total }; position is null when the code doesn't exist.
+  getWaitlistStanding(ref_code) {
+    return new Promise((resolve, reject) => {
+      if (!ref_code) return resolve({ ref_code: null, position: null, referrals: 0, total: 0 });
+      this.db.get(`
+        WITH c AS (
+          SELECT w.id, w.ref_code,
+            (SELECT COUNT(*) FROM waitlist r WHERE r.referred_by = w.ref_code) AS refs
+          FROM waitlist w
+        ),
+        me AS (SELECT * FROM c WHERE ref_code = ?)
+        SELECT
+          (SELECT COUNT(*) FROM me) AS present,
+          (SELECT refs FROM me) AS referrals,
+          (SELECT COUNT(*) FROM waitlist) AS total,
+          (SELECT COUNT(*) + 1 FROM c
+             WHERE c.refs > (SELECT refs FROM me)
+                OR (c.refs = (SELECT refs FROM me) AND c.id < (SELECT id FROM me))
+          ) AS position
+      `, [ref_code], (err, row) => {
+        if (err) return reject(err);
+        if (!row || !row.present) {
+          return resolve({ ref_code, position: null, referrals: 0, total: row ? row.total : 0 });
+        }
+        resolve({ ref_code, position: row.position, referrals: row.referrals, total: row.total });
+      });
     });
   }
 

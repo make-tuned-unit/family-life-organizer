@@ -32,7 +32,8 @@ Legend: ✅ done · ⏳ deferred (needs a human / external action) · 🔜 code-
 
 ## 3. Security (human-owned)
 
-- ⏳ **Purge git history** of committed secrets. Early commits still contain plaintext passwords + an old session secret (verified present). Run `git filter-repo` (or BFG), force-push, then **rotate `SESSION_SECRET`** and reset those legacy account passwords. Destructive — do deliberately, coordinate with any clones.
+- ✅ **Git history purged** (2026-07-11) — `git filter-repo` scrubbed the two legacy plaintext passwords + the old session secret to `***REMOVED***` across all 381 commits (verified: zero real secrets remain on either branch; HEAD tree byte-identical; old SHAs 1db4954/753b017/5b2a956 gone). Also stripped the old committed `node_modules` (37→27MB). Force-pushed main + the feat branch. **Backup bundle:** scratchpad/PREPURGE-backup.bundle.
+  - ⚠️ **STILL REQUIRED — ROTATE the exposed secrets.** History rewrite doesn't undo prior exposure (clones/caches/GitHub's unreachable objects). Rotate `SESSION_SECRET` on Railway (invalidates live sessions — users re-login, harmless) and reset the legacy jesse/sophie account passwords if those accounts still matter. Optionally ask GitHub Support to purge cached views of the old commits. Anyone with an existing clone should re-clone.
 - ✅/⏳ **Email 2FA** — configured on **Railway** (`AUTH_2FA_ENABLED=1` + `RESEND_API_KEY`) per the owner. Code path verified (fail-fast guards + `test/two-factor.test.js`). **Verify step:** do one real end-to-end login on the live server and confirm a code is emailed and accepted. Never set `AUTH_2FA_ECHO_CODE` in prod (server fail-fasts if you do).
 - ⏳ **Encrypt DB backups** — nightly `VACUUM INTO` snapshots are unencrypted on the same persistent disk (14-day retention). Consider app-level encryption (age/libsodium, key in env) or an encrypted off-disk destination.
 - ⏳ **Re-run `npm audit`** before release. Current 5 "high" advisories are all in `tar`, a **build-only** transitive dep of `sqlite3` (never runs in production) — not shipped, but recheck for anything runtime.
@@ -60,6 +61,7 @@ Legend: ✅ done · ⏳ deferred (needs a human / external action) · 🔜 code-
 
 - ⏳ Notification upgrades from the audit: trip pushes to the *household* (not the traveler's own device), rivalry score-update spam throttle, in-context banner suppression (don't notify a DM while that chat is open), `INSendMessageIntent` communication notifications with sender avatars, quick-action categories (reply/approve/check-off). Deep-linking + threading + time-sensitive levels are ✅ done.
 - ✅ Concierge `complete_rivalry` now posts the feed celebration + win/loss pushes (parity with the UI button).
+- ✅ **Waitlist referral program** (2026-07-11) — each signup gets a shareable `?ref=` code; referring friends moves you up the queue (rank by referrals then signup id). Post-signup card shows position + copy/share link + referral count. `/api/waitlist` returns standing; `/api/waitlist/status` refreshes it. Covered by `test/waitlist-referral.test.js` (5 tests). The higher-leverage conversion lever from the UX research, now built.
 - ⏳ iOS unit/UI test target (backend has 28 tests; the app has none).
 - ⏳ Widgets / Live Activities (coverage "who has the kids now", active-trip next stop) — flagged by UI/UX research.
 

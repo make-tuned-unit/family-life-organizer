@@ -870,6 +870,10 @@ CREATE TABLE IF NOT EXISTS waitlist (
     referrer TEXT,
     user_agent TEXT,
     welcomed INTEGER DEFAULT 0,
+    ref_code TEXT,                 -- this signup's shareable referral code
+    referred_by TEXT,              -- the ref_code of whoever referred them
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
+CREATE UNIQUE INDEX IF NOT EXISTS idx_waitlist_ref_code ON waitlist(ref_code);
+CREATE INDEX IF NOT EXISTS idx_waitlist_referred_by ON waitlist(referred_by);
 CREATE INDEX IF NOT EXISTS idx_waitlist_created ON waitlist(created_at DESC);

@@ -1001,15 +1001,17 @@ app.post('/api/waitlist', waitlistLimiter, async (req, res) => {
       return res.status(400).json({ error: 'Please enter a valid email.' });
     }
 
-    const { created, total } = await db.addWaitlistEntry({
+    const refInput = typeof req.body?.ref === 'string' ? req.body.ref.trim().slice(0, 20) : null;
+    const { created, total, ref_code, position, referrals } = await db.addWaitlistEntry({
       email: raw,
       source: typeof req.body?.source === 'string' ? req.body.source.slice(0, 80) : 'site',
       referrer: (req.get('referer') || '').slice(0, 300) || null,
       user_agent: (req.get('user-agent') || '').slice(0, 300) || null,
+      ref: /^[a-f0-9]{6,20}$/.test(refInput || '') ? refInput : null,
     });
 
     // Respond immediately; email send is best-effort and must not block/fail the signup.
-    res.json({ success: true, already: !created });
+    res.json({ success: true, already: !created, ref_code, position, referrals, total });
 
     if (created && email.isEmailEnabled()) {
       const welcome = email.waitlistWelcomeEmail();
@@ -1030,6 +1032,23 @@ app.post('/api/waitlist', waitlistLimiter, async (req, res) => {
   } catch (err) {
     if (!res.headersSent) res.status(500).json({ error: 'Something went wrong. Please try again.' });
     console.error('[waitlist] error:', err.message);
+  } finally {
+    db.close();
+  }
+});
+
+// Refresh a signup's referral standing (position + referrals) when they return
+// via their share link — so the count reflects friends who joined since.
+app.get('/api/waitlist/status', waitlistLimiter, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const code = typeof req.query.ref_code === 'string' ? req.query.ref_code.trim() : '';
+    if (!/^[a-f0-9]{6,20}$/.test(code)) return res.status(400).json({ error: 'Invalid code' });
+    const standing = await db.getWaitlistStanding(code);
+    if (!standing.position) return res.status(404).json({ error: 'Not found' });
+    res.json({ success: true, ...standing });
+  } catch (err) {
+    if (!res.headersSent) res.status(500).json({ error: 'Something went wrong.' });
   } finally {
     db.close();
   }
