@@ -36,6 +36,9 @@ final class NotificationService {
         content.body = time != nil ? "Your appointment is at \(time!). Time to get ready." : "Your appointment is coming up soon."
         content.sound = .default
         content.categoryIdentifier = "APPOINTMENT"
+        // Tapping opens the specific event (was: no payload, tap did nothing).
+        content.userInfo = ["type": "event", "ref_id": id]
+        content.interruptionLevel = .timeSensitive
 
         guard let triggerDate = parseDateTime(date: date, time: time, minutesBefore: 60) else { return }
         guard triggerDate > Date() else {
@@ -318,11 +321,15 @@ final class NotificationService {
 
     func notifyNewMessage(from sender: String, text: String, hasImage: Bool = false, userInfo: [String: Any] = [:]) {
         let content = UNMutableNotificationContent()
-        content.title = "Message from \(sender)"
-        content.body = hasImage ? "Sent you a photo" : String(text.prefix(100))
+        content.title = sender
+        content.body = hasImage ? "Sent you a photo" : String(text.prefix(140))
         content.sound = .default
         content.categoryIdentifier = "MESSAGE"
         if !userInfo.isEmpty { content.userInfo = userInfo }
+        // Group a conversation's notifications together (per partner/group id).
+        if let refId = userInfo["ref_id"] as? Int {
+            content.threadIdentifier = "chat-\(refId)"
+        }
 
         let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 1, repeats: false)
         let request = UNNotificationRequest(identifier: "dm-\(UUID().uuidString)", content: content, trigger: trigger)

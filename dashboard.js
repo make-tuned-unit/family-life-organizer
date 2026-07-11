@@ -2347,7 +2347,7 @@ app.post('/api/appointments', requireAuth, async (req, res) => {
       const creator = await db.getUserById(userId);
       const senderName = (creator?.name || '').trim();
       const pushTitle = senderName ? `${senderName} added an event` : 'New event added';
-      push.pushToGroup(db, data.group_id, userId, pushTitle, body, { type: 'event' });
+      push.pushToGroup(db, data.group_id, userId, pushTitle, body, { type: 'event', ref_id: created.id });
     }
   } catch (err) {
     sendServerError(res, err);
@@ -2510,6 +2510,21 @@ app.get('/api/calendar-sync/:year/:month', requireAuth, async (req, res) => {
     const month = parseInt(req.params.month);
     const rows = await db.getSyncedCalendarEventsByMonth(year, month, req.session.user.id);
     res.json(rows);
+  } catch (err) {
+    sendServerError(res, err);
+  } finally {
+    db.close();
+  }
+});
+
+// One appointment by id (for opening it from a notification). Household-scoped.
+app.get('/api/appointments/id/:id', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    if (!(await requireHouseholdRow(db, 'appointments', req.params.id, req, res))) return;
+    const appt = await dbGet(db, 'SELECT * FROM appointments WHERE id = ?', [req.params.id]);
+    if (!appt) return res.status(404).json({ error: 'Not found' });
+    res.json(appt);
   } catch (err) {
     sendServerError(res, err);
   } finally {
@@ -5027,9 +5042,12 @@ app.post('/api/groups/:id/feed', requireAuth, async (req, res) => {
     }
     const result = await db.addFeedPost({ ...req.body, group_id: groupId, author_id: userId });
     res.json({ success: true, id: result.id });
-    // Push to group members (fire-and-forget)
+    // Push to group members (fire-and-forget). Include the group name so the
+    // tap opens the exact group thread (the client router needs `name`).
     const preview = req.body.title || req.body.body || 'New post';
-    push.pushToGroup(db, groupId, userId, `New from ${senderName}`, preview, { type: 'group_message', ref_id: groupId });
+    const grp = await dbGet(db, 'SELECT name FROM groups WHERE id = ?', [groupId]);
+    push.pushToGroup(db, groupId, userId, `New from ${senderName}`, preview,
+      { type: 'group_message', ref_id: groupId, name: grp?.name || 'Group' });
   } catch (err) {
     sendServerError(res, err);
   } finally {

@@ -182,6 +182,11 @@ final class APIService {
         return try await get("/api/appointments", queryParams: params)
     }
 
+    /// One appointment by id — used to open it from a notification tap.
+    func fetchAppointment(id: Int) async throws -> AppointmentResponse {
+        try await get("/api/appointments/id/\(id)")
+    }
+
     func fetchAppointmentsByMonth(year: Int, month: Int) async throws -> [AppointmentResponse] {
         try await get("/api/appointments/\(year)/\(month)")
     }

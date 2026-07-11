@@ -122,6 +122,8 @@ struct MainTabView: View {
     @State private var deepRivalry: RivalryResponse?
     @State private var deepDecision: DecisionResponse?
     @State private var deepEvent: AppointmentResponse?
+    @State private var showingDeepCoverage = false
+    @State private var showingDeepTravel = false
     @AppStorage("aiConciergeEnabled") private var aiConciergeEnabled = false
     @State private var ptt = PushToTalkController()
 
@@ -209,6 +211,12 @@ struct MainTabView: View {
         .sheet(item: $deepEvent) { event in
             NavigationStack { EventDetailView(appointment: event) }
         }
+        .sheet(isPresented: $showingDeepCoverage) {
+            NavigationStack { MyCoverageRequestsView() }
+        }
+        .sheet(isPresented: $showingDeepTravel) {
+            NavigationStack { TravelHubView() }
+        }
         #if DEBUG
         .fullScreenCover(isPresented: .constant(ScreenshotHarness.screen != nil)) {
             NavigationStack {
@@ -255,8 +263,9 @@ struct MainTabView: View {
         var locationReportCounter = 0
         var stepSyncCounter = 19  // trigger on second poll cycle (30s in)
         var isFirstPoll = true
-        // Clear stale local notifications on launch to prevent flood
-        UNUserNotificationCenter.current().removeAllDeliveredNotifications()
+        // Don't wipe delivered notifications on launch — that erased the user's
+        // Notification Center history, including unread coverage/trip alerts
+        // they hadn't acted on. Only clear stale PENDING (future) calendar ones.
         NotificationService.shared.removeStalePendingCalendarNotifications()
         while !Task.isCancelled {
             // Update badge count
@@ -467,7 +476,13 @@ struct MainTabView: View {
             }
             switchTab(to: .home)
         case "event", "appointment":
-            switchTab(to: .calendar)
+            // Open the specific event when the id is known; else the calendar.
+            if let refId,
+               let event = try? await api.fetchAppointment(id: refId) {
+                deepEvent = event
+            } else {
+                switchTab(to: .calendar)
+            }
         case "message":
             if let refId, let name {
                 chatInitialThread = .dm(partnerId: refId, name: name)
@@ -478,7 +493,13 @@ struct MainTabView: View {
                 chatInitialThread = .group(groupId: refId, name: name)
             }
             showingChat = true
-        case "coverage":
+        case "coverage", "coverage_request", "coverage_confirmed":
+            // Land on the coverage screen, not a generic home tab.
+            showingDeepCoverage = true
+        case "stay_request", "stay_confirmed", "stay_declined":
+            showingDeepTravel = true
+        case "post", "comment", "like", "mention", "milestone":
+            // Feed-centric items live on Home.
             switchTab(to: .home)
         case "concierge":
             switchTab(to: .concierge)
