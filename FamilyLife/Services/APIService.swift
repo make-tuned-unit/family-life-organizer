@@ -63,10 +63,12 @@ final class APIService {
         try await post("/api/auth/token-login", body: ["refresh_token": refreshToken])
     }
 
-    /// Revoke this device's token server-side and destroy the session.
-    func serverLogout(refreshToken: String?) async throws {
+    /// Revoke this device's token server-side and destroy the session, and stop
+    /// APNs pushes to this device.
+    func serverLogout(refreshToken: String?, deviceToken: String? = nil) async throws {
         var body: [String: Any] = [:]
         if let refreshToken { body["refresh_token"] = refreshToken }
+        if let deviceToken { body["device_token"] = deviceToken }
         let _: SuccessResponse = try await post("/api/auth/logout", body: body)
     }
 

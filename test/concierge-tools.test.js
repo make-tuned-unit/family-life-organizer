@@ -137,6 +137,32 @@ test('gifts: idea lifecycle to purchased', async () => {
   assert.equal((await tools.run('gifts', ctx, { action: 'delete_idea', id: lego.id })).result.ok, true);
 });
 
+test('cross-household: tools refuse to touch another household\'s rows', async () => {
+  // Second household with its own task, receipt, and decision.
+  const u3 = await run("INSERT INTO users (username, name, password_hash) VALUES ('rex_t', 'Rex Other', 'x')");
+  const g2 = await run("INSERT INTO groups (name, group_type, invite_code, created_by) VALUES ('Others', 'household', 'OTHERHH01', ?)", [u3.lastID]);
+  await run('INSERT INTO group_members (group_id, user_id, role) VALUES (?, ?, ?)', [g2.lastID, u3.lastID, 'admin']);
+  const otherCtx = { db, userId: u3.lastID, userName: 'Rex Other', groupId: g2.lastID, push: { pushToUser() {} }, today: '2026-07-11' };
+
+  // Rex creates a real task + decision in his household.
+  await tools.run('tasks', otherCtx, { action: 'add', title: 'Rex private task' });
+  const rexTaskId = (await get("SELECT id FROM tasks WHERE title = 'Rex private task'")).id;
+  await tools.run('decisions', otherCtx, { action: 'create', title: 'Rex private poll', options: ['A', 'B'] });
+  const rexDecId = (await get("SELECT id FROM decisions WHERE title = 'Rex private poll'")).id;
+
+  // Pam (ctx = first household) must NOT be able to update/delete them.
+  // Refusal surfaces either as {ok:false} (guard returns) or {error} (guard
+  // throws through run()); both mean "not done".
+  const refused = (r) => r.result.ok !== true;
+  assert.ok(refused(await tools.run('tasks', ctx, { action: 'update', id: rexTaskId, title: 'HACKED' })), 'cross-household task update refused');
+  assert.ok(refused(await tools.run('tasks', ctx, { action: 'delete', id: rexTaskId })), 'cross-household task delete refused');
+  assert.ok(refused(await tools.run('decisions', ctx, { action: 'delete', id: rexDecId })), 'cross-household decision delete refused');
+
+  // The rows are untouched.
+  assert.equal((await get('SELECT title FROM tasks WHERE id = ?', [rexTaskId])).title, 'Rex private task');
+  assert.ok(await get('SELECT id FROM decisions WHERE id = ?', [rexDecId]), 'decision still exists');
+});
+
 test('send_message: resolves by first name, refuses strangers', async () => {
   const sent = await tools.run('send_message', ctx, { to: 'Quinn', text: 'Home late tonight' });
   assert.equal(sent.result.ok, true, JSON.stringify(sent.result));

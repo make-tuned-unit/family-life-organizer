@@ -841,10 +841,15 @@ app.post('/api/auth/token-login', loginLimiter, async (req, res) => {
 app.post('/api/auth/logout', async (req, res) => {
   const db = new FamilyDB();
   try {
-    const { refresh_token } = req.body || {};
+    const { refresh_token, device_token } = req.body || {};
     if (typeof refresh_token === 'string' && refresh_token.length >= 32) {
       // Hard delete: a logged-out token gets no grace window and no tombstone.
       await dbRun(db, 'DELETE FROM auth_tokens WHERE token_hash = ?', [hashAuthToken(refresh_token)]);
+    }
+    // Stop pushing to this device — a shared/resold phone must not keep
+    // receiving the household's messages and nudges.
+    if (typeof device_token === 'string' && device_token) {
+      await db.removeDeviceToken(device_token).catch(() => {});
     }
     req.session.destroy(() => res.json({ success: true }));
   } catch (err) {
@@ -999,7 +1004,9 @@ app.post('/api/waitlist', waitlistLimiter, async (req, res) => {
           .catch((e) => console.error('[waitlist] admin notify send failed:', e?.message || e));
       }
     } else if (created) {
-      console.warn('[waitlist] new signup but email disabled (no RESEND_API_KEY):', raw);
+      // Don't log the raw email — note the domain only.
+      const domain = String(raw || '').split('@')[1] || 'unknown';
+      console.warn(`[waitlist] new signup but email disabled (no RESEND_API_KEY): @${domain}`);
     }
   } catch (err) {
     if (!res.headersSent) res.status(500).json({ error: 'Something went wrong. Please try again.' });
@@ -2992,7 +2999,9 @@ app.post('/api/receipts/save', requireAuth, async (req, res) => {
       group_id: groupId
     });
 
-    console.log(`[receipt-save] id=${receipt.id} amount=${total} merchant="${merchant}" date=${normalizedDate} category="${category}" by=${username}`);
+    // Log ids/category only — no amounts, merchant, or usernames (financial PII
+    // into the host log pipeline).
+    console.log(`[receipt-save] id=${receipt.id} category="${category}" date=${normalizedDate}`);
 
     // Verify the receipt was actually written
     const verify = await new Promise((resolve, reject) => {

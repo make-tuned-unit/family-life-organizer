@@ -12,8 +12,16 @@
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 function requireDate(value, field) {
-  if (!DATE_RE.test(String(value || ''))) {
+  const s = String(value || '');
+  if (!DATE_RE.test(s)) {
     throw new Error(`${field} must be in YYYY-MM-DD format`);
+  }
+  // Shape isn't enough — reject impossible calendar dates (e.g. 2026-13-45),
+  // which would silently drop out of strftime('%Y-%m') budget rollups.
+  const [y, m, d] = s.split('-').map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  if (dt.getUTCFullYear() !== y || dt.getUTCMonth() !== m - 1 || dt.getUTCDate() !== d) {
+    throw new Error(`${field} is not a real calendar date`);
   }
   return value;
 }
@@ -2316,14 +2324,18 @@ const TOOLS = [
       const name = String(input.to || '').trim();
       const text = String(input.text || '').trim();
       if (!name || !text) return { result: { ok: false, error: 'Both recipient and message are required' } };
+      // Escape LIKE metacharacters so a crafted name ("%") can't fan out to
+      // arbitrary group members — the LLM-supplied `to` is untrusted input.
+      const likePrefix = name.replace(/[\\%_]/g, '\\$&').toLowerCase() + ' %';
       // Only people you share a group with — same rule as the messages API.
       const recipient = await dbGet(ctx, `
         SELECT u.id, u.name FROM users u
         JOIN group_members gm ON gm.user_id = u.id
         WHERE gm.group_id IN (SELECT group_id FROM group_members WHERE user_id = ?)
           AND u.id != ?
-          AND (LOWER(u.name) = LOWER(?) OR LOWER(u.name) LIKE LOWER(?) || ' %' OR LOWER(u.username) = LOWER(?))
-        LIMIT 1`, [ctx.userId, ctx.userId, name, name, name]);
+          AND (LOWER(u.name) = LOWER(?) OR LOWER(u.name) LIKE ? ESCAPE '\\' OR LOWER(u.username) = LOWER(?))
+        ORDER BY (LOWER(u.name) = LOWER(?)) DESC, u.id ASC
+        LIMIT 1`, [ctx.userId, ctx.userId, name, likePrefix, name, name]);
       if (!recipient) return { result: { ok: false, error: `No one named "${name}" in your groups` } };
       await ctx.db.sendMessage({ sender_id: ctx.userId, recipient_id: recipient.id, text });
       if (ctx.push) {

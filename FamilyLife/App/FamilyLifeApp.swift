@@ -76,6 +76,8 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
 
     func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
         let token = deviceToken.map { String(format: "%02x", $0) }.joined()
+        // Remember it so logout can revoke pushes to this device server-side.
+        UserDefaults.standard.set(token, forKey: "apns_device_token")
         guard let api = apiService else { return }
         Task {
             try? await api.registerDeviceToken(token)

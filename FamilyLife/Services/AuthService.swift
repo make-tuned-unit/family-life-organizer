@@ -254,14 +254,16 @@ final class AuthService {
         UserDefaults.standard.removeObject(forKey: "notified_dm_ids")
         UserDefaults.standard.removeObject(forKey: "notified_feed_keys")
         if let username {
-            // Revoke the device token server-side (best effort), then scrub
-            // local credentials.
+            // Revoke the device + push tokens server-side (best effort), then
+            // scrub local credentials.
             let token = Self.loadRefreshToken(for: username)
+            let deviceToken = UserDefaults.standard.string(forKey: "apns_device_token")
             let api = self.api
-            Task { try? await api.serverLogout(refreshToken: token) }
+            Task { try? await api.serverLogout(refreshToken: token, deviceToken: deviceToken) }
             Self.deleteRefreshToken(for: username)
             Self.deletePassword(for: username)
         }
+        UserDefaults.standard.removeObject(forKey: "apns_device_token")
         HTTPCookieStorage.shared.cookies?.forEach { HTTPCookieStorage.shared.deleteCookie($0) }
     }
 
