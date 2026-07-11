@@ -28,6 +28,8 @@
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,400&family=Inter:wght@400;450;500;600&display=swap" rel="stylesheet" />
 
 <link rel="stylesheet" href="assets/style.css" />
+<!-- Preload the hero screenshot (the LCP element) so it isn't discovered late -->
+<link rel="preload" as="image" href="assets/shots/home.png" fetchpriority="high" />
 
 <script type="application/ld+json">
 {
@@ -166,7 +168,7 @@
       <div class="hero-stage reveal" aria-hidden="true">
         <div class="phone phone-hero phone-shot">
           <div class="phone-screen">
-            <img class="app-shot" src="assets/shots/home.png" alt="Kinrows home screen — today's events, the family's tasks, and the shared feed" width="1206" height="2622" loading="lazy" decoding="async">
+            <img class="app-shot" src="assets/shots/home.png" alt="Kinrows home screen — today's events, the family's tasks, and the shared feed" width="1206" height="2622" fetchpriority="high" decoding="async">
           </div>
         </div>
         <div class="phone-glow"></div>
@@ -559,10 +561,10 @@
         <input type="email" name="email" placeholder="you@email.com" aria-label="Email address" autocomplete="email" inputmode="email" required />
         <button type="submit" class="btn btn-primary">Join the waitlist</button>
       </form>
-      <a href="#notify" class="store-badge store-badge-lg" aria-label="Coming soon to the App Store">
+      <div class="store-badge store-badge-lg" role="img" aria-label="Coming soon to the App Store">
         <svg class="ic store-apple" aria-hidden="true"><use href="#i-apple"/></svg>
-        <span><small>This September on the</small><strong>App Store</strong></span>
-      </a>
+        <span><small>Coming soon to the</small><strong>App Store</strong></span>
+      </div>
       <p class="cta-fine">Free on the App Store · Concierge optional add-on · iOS 18+</p>
     </div>
   </section>

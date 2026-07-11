@@ -94,7 +94,12 @@ h2{font-size:clamp(1.8rem,3.6vw,2.9rem)}
 .btn-pill:hover{background:var(--terracotta);transform:translateY(-1px)}
 
 /* Visible keyboard focus on all interactive elements */
-a:focus-visible, button:focus-visible{outline:2px solid var(--terracotta);outline-offset:3px}
+/* Visible keyboard focus on every interactive element (WCAG 2.2 2.4.7/2.4.11) */
+a:focus-visible, button:focus-visible, input:focus-visible,
+.store-badge:focus-visible, [tabindex]:focus-visible{
+  outline:3px solid var(--terracotta);outline-offset:3px;border-radius:6px}
+/* Don't double up the ring on the email field's own focus glow */
+.notify-form input:focus-visible{outline-offset:2px}
 
 /* ============================================================
    Nav
