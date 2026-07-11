@@ -119,3 +119,46 @@ code no longer uses them, but the exposed values are still in past commits.
   (gated by `assertHousehold`); add as defense-in-depth when convenient.
 - **Architecture** (separate effort): `dashboard.js` (~4.7k lines) and `database.js`
   (~3.4k lines) should be split into `routes/*` + `db/*Repo.js` modules. Not security-blocking.
+
+---
+
+## Addendum — 2026-07-11 (privacy & production-readiness pass)
+
+The system moved on substantially since the 2026-06-25 log. Current state:
+
+### Auth (superseded)
+- The iOS app **no longer stores the account password**. Login/2FA/register
+  return a rotating, server-revocable **device refresh token** (`auth_tokens`,
+  SHA-256 at rest, rotated on every use with an `AUTH_TOKEN_GRACE_SECONDS`
+  grace window). Legacy Keychain passwords are read once for migration then
+  scrubbed. "Log out everywhere" = password change revokes all tokens; logout
+  hard-deletes the device's refresh + APNs tokens. See `test/auth-token.test.js`.
+- Deploy target is **Render** (`render.yaml`), not Railway — the go-live steps
+  above that say "Railway" mean the Render dashboard.
+
+### Data lifecycle / privacy (new this pass)
+- **In-app account deletion** shipped: `POST /api/account/delete` (re-auth)
+  transactionally erases the user + personal data; sole-owner households are
+  wiped, shared ones survive. Settings → Account → Delete Account. App Store
+  5.1.1(v) satisfied. See `test/account-deletion.test.js`.
+- Concierge **memory/conversation deletion** and **DM deletion** endpoints added
+  (privacy-policy promises that previously had no implementation).
+- Household **location presence sharing is opt-in** (`sharePresenceEnabled`,
+  default off); the background poll no longer reports coordinates by default.
+- Receipt scanning now has its own **AI first-use consent** (5.1.2(i)).
+- **Privacy manifest** corrected (valid Fitness type, Linked=true, full data
+  inventory). HealthKit clinical-records entitlement + NSHealthUpdate string
+  removed (app never writes HealthKit). Profile image written with
+  `.completeFileProtection`. PII (receipt amounts, raw emails) removed from logs.
+
+### Still requiring HUMAN action (unchanged / new)
+- **Git-history purge NOT done** — plaintext passwords + old session secret
+  remain in early commits. Run `git filter-repo`, force-push, rotate the secret.
+- **2FA still OFF** in production (`AUTH_2FA_ENABLED` unset) — enable per the
+  go-live sequence once the 2FA build is broadly installed.
+- **Privacy policy (`website/privacy.html`) still contradicts the code in two
+  places**: it says "we do not collect precise GPS" (the server stores
+  `last_lat/last_lng` when presence sharing is on) and undersells that receipt
+  images are never stored. Reconcile the copy with the shipped behavior.
+- **Backups are unencrypted** on the same Render disk (14-day retention);
+  consider app-level encryption of the nightly `VACUUM INTO` snapshots.

@@ -110,3 +110,36 @@ wired up for real billing yet**. Before this can sell:
 - [ ] Calendar conflict detection and schedule suggestions.
 - [ ] Location-aware reminders and routines.
 - [ ] Family document vault and household reference center.
+
+---
+
+## Addendum — 2026-07-11 (readiness re-audit)
+
+This doc's original body predates a large amount of shipped work. Corrections:
+
+- **SwiftData**: there is none anywhere. Models are Codable DTOs. Any "remove
+  SwiftData paths" item is done by virtue of SwiftData never existing now.
+- **Local credential persistence**: replaced by rotating device refresh tokens
+  (see SECURITY_AUDIT addendum). Done.
+- **Auth rules / validation on shared endpoints**: household/owner guards +
+  column allowlists + `parseMoney` coercion in place; concierge tools scoped
+  and cross-household-tested (`test/concierge-tools.test.js`).
+- **EventKit calendar integration**: built (`CalendarService`, per-calendar
+  opt-in share, `synced_calendar_events`).
+- **Backend tests**: `npm test` now runs 28 across auth-isolation, auth-token,
+  two-factor, coverage-consent, concierge-tools, account-deletion.
+- **Errors are inline, not alerts** — the `.inlineError` house style is used
+  app-wide (the earlier "visible error alerts" note is stale wording).
+
+### Remaining before App Store submission (human-owned)
+1. Build & archive with **Xcode Cloud** (iOS 26 SDK requirement; this repo's
+   local Xcode 16.2 can develop/test but not upload). Compiler-guarded for both.
+2. **Purge git history** of committed secrets; rotate them.
+3. **Reconcile `website/privacy.html`** with actual data practices (GPS,
+   receipt images) — see SECURITY_AUDIT addendum.
+4. Fill the **App Privacy "nutrition label"** in App Store Connect from the
+   inventory in this pass (Name/Email/UserID/Fitness/Location/Photos/Messages/
+   Financial/Purchases/User Content — all Linked, none Tracking).
+5. Enable **2FA** in production when the 2FA-capable build is broadly installed.
+6. First real device build should exercise: login → silent re-login, account
+   deletion, receipt-scan consent, cooking mode, and notification taps.
