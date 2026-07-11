@@ -2128,6 +2128,9 @@ app.post('/api/add', requireAuth, async (req, res) => {
   try {
     const { type, data } = req.body;
     if (type === 'grocery') {
+      if (typeof data?.item !== 'string' || !data.item.trim()) {
+        return res.status(400).json({ error: 'item is required' });
+      }
       // Resolve user's household group_id
       const username = req.session.user.username || req.session.user.name;
       const userGroupId = await db.getUserHouseholdId(req.session.user?.id);
@@ -2136,8 +2139,12 @@ app.post('/api/add', requireAuth, async (req, res) => {
       if (!userGroupId) return res.status(403).json({ error: 'Join a household first' });
       await db.addGrocery(data.item, data.category || null, data.quantity || '1', username, userGroupId);
     } else if (type === 'task') {
+      if (typeof data?.title !== 'string' || !data.title.trim()) {
+        return res.status(400).json({ error: 'title is required' });
+      }
       const groupId = await db.getUserHouseholdId(req.session.user?.id);
-      await db.addTask({...data, status: 'active', group_id: groupId});
+      // category is NOT NULL in the schema — default rather than 500.
+      await db.addTask({...data, category: data.category || 'personal', status: 'active', group_id: groupId});
     }
     res.json({ success: true });
   } catch (err) {
