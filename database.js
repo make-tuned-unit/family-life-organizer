@@ -2706,20 +2706,26 @@ class FamilyDB {
   //     removed and their PERSONAL rows (DMs, concierge, contacts, tokens,
   //     coverage requests) are erased everywhere.
   // Transactional: either the whole account is gone or nothing changes.
+  //
+  // Runs on a DEDICATED private connection — NOT the shared one. The shared
+  // connection serves concurrent requests, so a `BEGIN` or `PRAGMA
+  // foreign_keys = OFF` on it would interleave with (and corrupt) their writes.
+  // FK enforcement is disabled only on this private connection so an
+  // informational reference we don't explicitly clear becomes a harmless orphan
+  // instead of failing the whole erase.
   deleteUserAccount(userId) {
     const uid = parseInt(userId);
-    return new Promise((resolve, reject) => {
-      if (!uid) return reject(new Error('Invalid user id'));
-      const get = (sql, p = []) => new Promise((r, j) => this.db.get(sql, p, (e, x) => e ? j(e) : r(x)));
-      const all = (sql, p = []) => new Promise((r, j) => this.db.all(sql, p, (e, x) => e ? j(e) : r(x || [])));
-      const run = (sql, p = []) => new Promise((r, j) => this.db.run(sql, p, function (e) { e ? j(e) : r(this); }));
-      (async () => {
+    if (!uid) return Promise.reject(new Error('Invalid user id'));
+    const pdb = new sqlite3.Database(DB_PATH);
+    const get = (sql, p = []) => new Promise((r, j) => pdb.get(sql, p, (e, x) => e ? j(e) : r(x)));
+    const all = (sql, p = []) => new Promise((r, j) => pdb.all(sql, p, (e, x) => e ? j(e) : r(x || [])));
+    const run = (sql, p = []) => new Promise((r, j) => pdb.run(sql, p, function (e) { e ? j(e) : r(this); }));
+    const closeDb = () => new Promise((r) => pdb.close(() => r()));
+    return (async () => {
+      try {
+        await run('PRAGMA busy_timeout = 10000');
         const user = await get('SELECT id FROM users WHERE id = ?', [uid]);
         if (!user) throw new Error('User not found');
-        // This is a per-request connection; disabling FK enforcement here (only
-        // possible OUTSIDE a transaction) makes deletion resilient — an
-        // informational reference we don't explicitly clear becomes a harmless
-        // orphan instead of failing the whole erase. Restored before we return.
         await run('PRAGMA foreign_keys = OFF');
         await run('BEGIN');
         try {
@@ -2758,6 +2764,7 @@ class FamilyDB {
           await run('DELETE FROM concierge_messages WHERE conversation_id IN (SELECT id FROM concierge_conversations WHERE user_id = ?)', [uid]);
           await run('DELETE FROM concierge_conversations WHERE user_id = ?', [uid]);
           await run('DELETE FROM concierge_memory WHERE user_id = ?', [uid]);
+          await run('DELETE FROM notes WHERE user_id = ?', [uid]);   // private notes are personal
           await run('DELETE FROM feed_reactions WHERE user_id = ?', [uid]);
           await run('DELETE FROM feed_comments WHERE user_id = ?', [uid]);
           await run('DELETE FROM contacts WHERE added_by = ?', [uid]);
@@ -2776,15 +2783,15 @@ class FamilyDB {
           await run('DELETE FROM group_members WHERE user_id = ?', [uid]);
           await run('DELETE FROM users WHERE id = ?', [uid]);
           await run('COMMIT');
-          await run('PRAGMA foreign_keys = ON').catch(() => {});
-          resolve({ ok: true });
         } catch (e) {
           await run('ROLLBACK').catch(() => {});
-          await run('PRAGMA foreign_keys = ON').catch(() => {});
-          reject(e);
+          throw e;
         }
-      })().catch(reject);
-    });
+        return { ok: true };
+      } finally {
+        await closeDb();
+      }
+    })();
   }
 
   // Merge one household into another: re-point all household-scoped data and
@@ -2992,7 +2999,16 @@ class FamilyDB {
               [email, source || null, referrer || null, user_agent || null, ref_code, referredBy]);
             break;
           } catch (e) {
-            if (String(e.message).includes('idx_waitlist_ref_code') && i < 4) continue;
+            const msg = String(e.message);
+            if (msg.includes('idx_waitlist_ref_code') && i < 4) continue; // code collision → retry
+            if (msg.includes('waitlist.email') || msg.includes('UNIQUE constraint failed: waitlist.email')) {
+              // Concurrent signup with the same new email won the insert — treat
+              // this one as the existing entry rather than 500ing.
+              created = false;
+              const row = await dbGet('SELECT ref_code FROM waitlist WHERE email = ?', [email]);
+              ref_code = row?.ref_code || null;
+              break;
+            }
             throw e;
           }
         }

@@ -64,6 +64,9 @@ Legend: ✅ done · ⏳ deferred (needs a human / external action) · 🔜 code-
 - ✅ **Waitlist referral program** (2026-07-11) — each signup gets a shareable `?ref=` code; referring friends moves you up the queue (rank by referrals then signup id). Post-signup card shows position + copy/share link + referral count. `/api/waitlist` returns standing; `/api/waitlist/status` refreshes it. Covered by `test/waitlist-referral.test.js` (5 tests). The higher-leverage conversion lever from the UX research, now built.
 - ⏳ iOS unit/UI test target (backend has 28 tests; the app has none).
 - ⏳ Widgets / Live Activities (coverage "who has the kids now", active-trip next stop) — flagged by UI/UX research.
+- ⏳ **Avatar cache invalidation** (from bug sweep, low) — `ProfileImageCache.loadFromHousehold` guards on `images[userId] == nil`, so another member's *new* profile photo isn't picked up until app relaunch/logout even though `fetchGroupMembers` returns fresh base64. Fix: overwrite the cached image when the inline base64 differs, or add an avatar version/hash to the me/group-members payload and refetch on change.
+- ⏳ **Coverage deep-link precision** (from bug sweep, low) — `handleDeepLink` maps `coverage`/`coverage_request`/`coverage_confirmed` to the combined list and ignores `ref_id`, so a helper tapping "X needs your help" lands on the list rather than the specific request. Recoverable, but thread `pendingRefId` into the coverage view to scroll to the referenced request.
+- ⏳ **Message-notification de-dup race** (from bug sweep, low) — `checkForNewMessages` fires local notifications from two loops (MessageCache.preload on foreground + ContentView.pollUnread's 15s timer) sharing only a UserDefaults dedup set; a genuinely-new DM on foreground can notify twice. Fix: make one owner (pollUnread) fire notifications while preload only warms the cache, or serialize the read+write of `notified_dm_ids` in an actor.
 
 ---
 

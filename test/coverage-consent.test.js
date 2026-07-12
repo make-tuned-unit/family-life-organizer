@@ -99,9 +99,10 @@ test('coverage: household pseudo-contact (negative id) resolves and reaches the 
   });
   assert.equal(noWindow.status, 400);
 
+  // Picking only a window (omitting the times) defaults them from the window
+  // instead of hitting a NOT NULL 500 on coverage_approvals.
   const approve = await quinn('POST', `/api/coverage/incoming/${reqId}/approve`, {
     window_id: windowId,
-    approved_date: '2026-07-14', approved_start: '09:00', approved_end: '12:00',
   });
   assert.equal(approve.status, 200, `approve: ${JSON.stringify(approve.body)}`);
 });

@@ -145,10 +145,10 @@ const TOOLS = [
         group_id: ctx.groupId,
         created_by: ctx.userId,
       };
-      await ctx.db.addAppointment(data);
+      const created = await ctx.db.addAppointment(data);
       if (ctx.groupId && ctx.push) {
         const body = `${data.title} on ${data.appointment_date} has been added to your calendar.`;
-        ctx.push.pushToGroup(ctx.db, ctx.groupId, ctx.userId, `${ctx.userName} added an event`, body, { type: 'event' });
+        ctx.push.pushToGroup(ctx.db, ctx.groupId, ctx.userId, `${ctx.userName} added an event`, body, { type: 'event', ref_id: created.id });
       }
       const summary = `Added "${data.title}" on ${data.appointment_date}${data.appointment_time ? ' at ' + data.appointment_time : ''}`;
       return { result: { ok: true, summary }, action: { tool: 'add_appointment', summary } };

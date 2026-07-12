@@ -160,7 +160,10 @@ final class AuthService {
     enum LoginStep: Equatable {
         case authenticated
         case needsEmailEnrollment(challenge: String)   // first login — no email on file yet
-        case needsCode(challenge: String, emailHint: String?)
+        // emailSent is false when the server accepted the challenge but code
+        // delivery failed (Resend outage, bad address) — the view warns instead
+        // of silently waiting for a code that never arrives.
+        case needsCode(challenge: String, emailHint: String?, emailSent: Bool)
     }
 
     // Held between the password step and code verification.
@@ -173,7 +176,8 @@ final class AuthService {
             if response.status == "enroll_email" {
                 return .needsEmailEnrollment(challenge: challenge)
             }
-            return .needsCode(challenge: challenge, emailHint: response.email_hint)
+            return .needsCode(challenge: challenge, emailHint: response.email_hint,
+                              emailSent: response.email_sent ?? true)
         }
         guard response.success == true, let user = response.user else {
             throw APIError.unauthorized
@@ -185,7 +189,8 @@ final class AuthService {
     /// First-login: submit the email; server sends a code. Returns the code step.
     func submitLoginEmail(challenge: String, email: String) async throws -> LoginStep {
         let r = try await api.submitLoginEmail(challenge: challenge, email: email)
-        return .needsCode(challenge: challenge, emailHint: r.email_hint)
+        return .needsCode(challenge: challenge, emailHint: r.email_hint,
+                          emailSent: r.email_sent ?? true)
     }
 
     /// Verify the emailed code and finish signing in.
@@ -197,8 +202,11 @@ final class AuthService {
         completeLogin(user: user, refreshToken: response.refresh_token, username: pendingUsername ?? user.username)
     }
 
-    func resendLoginCode(challenge: String) async throws {
-        _ = try await api.resendLoginCode(challenge: challenge)
+    /// Returns whether the server actually sent the code (false on delivery failure).
+    @discardableResult
+    func resendLoginCode(challenge: String) async throws -> Bool {
+        let r = try await api.resendLoginCode(challenge: challenge)
+        return r.email_sent ?? true
     }
 
     private func completeLogin(user: APIService.UserInfo, refreshToken: String?, username: String) {

@@ -108,12 +108,17 @@ struct TwoFactorView: View {
         return mode == .email ? email.contains("@") : code.count >= 6
     }
 
+    // Shown when the server issued the challenge but couldn't deliver the code —
+    // otherwise the user waits on an inbox that will never get one.
+    private let deliveryFailedMessage = "We couldn't send your code — check the address or tap Resend."
+
     private func configureFromStep() {
         switch initialStep {
         case .needsEmailEnrollment(let ch):
             challenge = ch; mode = .email
-        case .needsCode(let ch, let hint):
+        case .needsCode(let ch, let hint, let emailSent):
             challenge = ch; emailHint = hint; mode = .code
+            if !emailSent { errorMessage = deliveryFailedMessage }
         case .authenticated:
             dismiss()
         }
@@ -125,7 +130,10 @@ struct TwoFactorView: View {
             do {
                 if mode == .email {
                     let step = try await auth.submitLoginEmail(challenge: challenge, email: email.trimmingCharacters(in: .whitespaces))
-                    if case let .needsCode(_, hint) = step { emailHint = hint; mode = .code; code = "" }
+                    if case let .needsCode(_, hint, emailSent) = step {
+                        emailHint = hint; mode = .code; code = ""
+                        if !emailSent { errorMessage = deliveryFailedMessage }
+                    }
                 } else {
                     try await auth.verifyLoginCode(challenge: challenge, code: code.trimmingCharacters(in: .whitespaces))
                     // Success → AuthService.isAuthenticated flips; root view replaces us.
@@ -143,8 +151,9 @@ struct TwoFactorView: View {
         errorMessage = nil; resendNote = nil; isWorking = true
         Task {
             do {
-                try await auth.resendLoginCode(challenge: challenge)
-                resendNote = "A new code is on its way."
+                let sent = try await auth.resendLoginCode(challenge: challenge)
+                if sent { resendNote = "A new code is on its way." }
+                else { errorMessage = deliveryFailedMessage }
             } catch {
                 errorMessage = "Couldn't resend the code."
             }

@@ -356,16 +356,31 @@ async function usersShareGroup(db, userA, userB) {
 
 // A coverage approval must reference a window, and only one belonging to its
 // own request (coverage_approvals.window_id is NOT NULL — a missing window
-// used to surface as a 500).
+// used to surface as a 500). Returns the window row on success, or null after
+// having sent a 4xx.
 async function requireWindowInRequest(db, windowId, requestId, res) {
   if (!windowId) {
     res.status(400).json({ error: 'Pick a time window to confirm' });
-    return false;
+    return null;
   }
-  const win = await dbGet(db, 'SELECT 1 FROM coverage_windows WHERE id = ? AND request_id = ?',
+  const win = await dbGet(db, 'SELECT * FROM coverage_windows WHERE id = ? AND request_id = ?',
     [windowId, requestId]);
-  if (!win) { res.status(400).json({ error: 'Invalid window for this request' }); return false; }
-  return true;
+  if (!win) { res.status(400).json({ error: 'Invalid window for this request' }); return null; }
+  return win;
+}
+
+// Final approved date/times: honor the helper's values, else default to the
+// chosen window's. Guarantees the NOT NULL coverage_approvals columns are set
+// (a client omitting them used to 500). Returns null after sending a 400.
+function resolveApprovalTimes(win, body, res) {
+  const approved_date = normalizeDate(body.approved_date || win.window_date || '');
+  const approved_start = body.approved_start || win.start_time;
+  const approved_end = body.approved_end || win.end_time;
+  if (!approved_date || !approved_start || !approved_end) {
+    res.status(400).json({ error: 'A date, start and end time are required' });
+    return null;
+  }
+  return { approved_date, approved_start, approved_end };
 }
 
 // The iOS household roster shows group members who aren't contact rows as
@@ -2270,6 +2285,9 @@ app.post('/api/add', requireAuth, async (req, res) => {
         return res.status(400).json({ error: 'title is required' });
       }
       const groupId = await db.getUserHouseholdId(req.session.user?.id);
+      // Never write a NULL-group row: the startup backfill would later re-home
+      // it into another household (same guard as the grocery branch).
+      if (!groupId) return res.status(403).json({ error: 'Join a household first' });
       // category is NOT NULL in the schema — default rather than 500.
       await db.addTask({...data, category: data.category || 'personal', status: 'active', group_id: groupId});
     }
@@ -2317,8 +2335,11 @@ app.post('/api/complete', requireAuth, async (req, res) => {
       if (!(await requireHouseholdRow(db, 'groceries', id, req, res))) return;
       await db.purchaseGrocery(id);
     } else if (type === 'task') {
-      const groupId = await db.getUserHouseholdId(req.session.user?.id);
-      await db.completeTask(id, groupId);
+      // Verify the task is in the caller's household before completing — a
+      // household-less user must not be able to complete arbitrary task ids
+      // (completeTask with a null group would run unscoped).
+      if (!(await requireHouseholdRow(db, 'tasks', id, req, res))) return;
+      await db.completeTask(id, await db.getUserHouseholdId(req.session.user?.id));
     }
     res.json({ success: true });
   } catch (err) {
@@ -5723,14 +5744,18 @@ app.post('/api/coverage/approve/:token', async (req, res) => {
     if (!recipient) return res.status(404).json({ error: 'Invalid or expired link' });
     if (recipient.status === 'approved') return res.status(409).json({ error: 'Already approved' });
 
-    const { window_id, approved_date, approved_start, approved_end, helper_note } = req.body;
-    if (!(await requireWindowInRequest(db, window_id, recipient.request_id, res))) return;
+    const { window_id, helper_note } = req.body;
+    const win = await requireWindowInRequest(db, window_id, recipient.request_id, res);
+    if (!win) return;
+    const times = resolveApprovalTimes(win, req.body, res);
+    if (!times) return;
+    const { approved_date, approved_start, approved_end } = times;
 
     await db.approveCoverage({
       request_id: recipient.request_id,
       recipient_id: recipient.id,
       window_id,
-      approved_date: approved_date ? normalizeDate(approved_date) : null,
+      approved_date,
       approved_start,
       approved_end,
       helper_note
@@ -5780,14 +5805,18 @@ app.post('/api/coverage/incoming/:id/approve', requireAuth, async (req, res) => 
     if (!recipient) return res.status(404).json({ error: 'Not found' });
     if (recipient.status === 'approved') return res.status(409).json({ error: 'Already approved' });
 
-    const { window_id, approved_date, approved_start, approved_end, helper_note } = req.body;
-    if (!(await requireWindowInRequest(db, window_id, requestId, res))) return;
+    const { window_id, helper_note } = req.body;
+    const win = await requireWindowInRequest(db, window_id, requestId, res);
+    if (!win) return;
+    const times = resolveApprovalTimes(win, req.body, res);
+    if (!times) return;
+    const { approved_date, approved_start, approved_end } = times;
 
     await db.approveCoverage({
       request_id: requestId,
       recipient_id: recipient.id,
       window_id,
-      approved_date: approved_date ? normalizeDate(approved_date) : null,
+      approved_date,
       approved_start,
       approved_end,
       helper_note

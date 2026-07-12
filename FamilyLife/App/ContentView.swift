@@ -525,14 +525,21 @@ struct MainTabView: View {
 
 struct FloatingTabBar: View {
     @Binding var selectedTab: MainTab
+    /// Owner's tab switch (preloads the destination, then animates). Falls back
+    /// to a plain animated write if not supplied.
+    var onSelect: ((MainTab) -> Void)? = nil
     @Namespace private var pill
 
     var body: some View {
         HStack(spacing: 0) {
             ForEach(MainTab.barTabs, id: \.self) { tab in
                 Button {
-                    withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-                        selectedTab = tab
+                    if let onSelect {
+                        onSelect(tab)
+                    } else {
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                            selectedTab = tab
+                        }
                     }
                 } label: {
                     Image(systemName: tab.icon)
