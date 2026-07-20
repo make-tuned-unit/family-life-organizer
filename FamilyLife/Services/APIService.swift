@@ -1071,6 +1071,10 @@ final class APIService {
         var text: String
         var unread_count: Int
         var created_at: String?
+        /// Sender of the latest message in this thread (the conversation row is
+        /// the newest message regardless of direction). Lets notification logic
+        /// suppress a row whose latest message we sent ourselves.
+        var sender_id: Int?
     }
 
     struct DirectMessageResponse: Codable, Identifiable {

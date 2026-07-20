@@ -284,7 +284,7 @@ struct MainTabView: View {
                     isFirstPoll = false
                 } else {
                     if let convos = try? await api.fetchConversations() {
-                        NotificationService.shared.checkForNewMessages(convos)
+                        NotificationService.shared.checkForNewMessages(convos, currentUserId: auth.currentUser?.id)
                     }
                     let currentUser = auth.currentUser?.name ?? ""
                     if let feed = try? await api.fetchActivity() {

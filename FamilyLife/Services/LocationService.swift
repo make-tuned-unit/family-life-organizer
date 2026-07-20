@@ -24,6 +24,25 @@ final class LocationService: NSObject, CLLocationManagerDelegate {
     private var arrivalHandler: (() -> Void)?
     private var monitoredTripRegionId: String?
 
+    /// One-shot waiters for a single fresh fix (see `awaitFix`). Resolved by the
+    /// delegate when a usable location arrives, or by a timeout with `nil`.
+    @MainActor
+    private final class FixWaiter {
+        let continuation: CheckedContinuation<CLLocationCoordinate2D?, Never>
+        let startedAt: Date
+        var isResumed = false
+        init(continuation: CheckedContinuation<CLLocationCoordinate2D?, Never>, startedAt: Date) {
+            self.continuation = continuation
+            self.startedAt = startedAt
+        }
+        func resume(with value: CLLocationCoordinate2D?) {
+            guard !isResumed else { return }
+            isResumed = true
+            continuation.resume(returning: value)
+        }
+    }
+    @MainActor private var fixWaiters: [FixWaiter] = []
+
     override init() {
         super.init()
         manager.delegate = self
@@ -102,9 +121,7 @@ final class LocationService: NSObject, CLLocationManagerDelegate {
 
     func getCurrentLocation() async -> CLLocationCoordinate2D? {
         requestPermission()
-        manager.requestLocation()
-        try? await Task.sleep(for: .seconds(2))
-        return currentLocation
+        return await awaitFix(timeout: 10)
     }
 
     /// Read the current location WITHOUT ever prompting — returns nil unless
@@ -114,19 +131,59 @@ final class LocationService: NSObject, CLLocationManagerDelegate {
         guard authorizationStatus == .authorizedWhenInUse || authorizationStatus == .authorizedAlways else {
             return nil
         }
+        return await awaitFix(timeout: 10)
+    }
+
+    /// Request one fix and await the actual delegate callback (up to `timeout`),
+    /// instead of blindly sleeping and returning whatever `currentLocation` holds
+    /// — which was nil on a slow fix or a stale coordinate from an earlier
+    /// tracking session. Returns the freshly-acquired coordinate, or nil on
+    /// timeout. `deliverFix` only satisfies a waiter with a fix newer than the
+    /// call start and of usable accuracy, so a stale coordinate is never handed back.
+    @MainActor
+    private func awaitFix(timeout: TimeInterval) async -> CLLocationCoordinate2D? {
+        let start = Date()
         manager.requestLocation()
-        try? await Task.sleep(for: .seconds(2))
-        return currentLocation
+        return await withCheckedContinuation { (cont: CheckedContinuation<CLLocationCoordinate2D?, Never>) in
+            let waiter = FixWaiter(continuation: cont, startedAt: start)
+            fixWaiters.append(waiter)
+            Task { @MainActor in
+                try? await Task.sleep(for: .seconds(timeout))
+                guard !waiter.isResumed else { return }
+                fixWaiters.removeAll { $0 === waiter }
+                waiter.resume(with: nil)
+            }
+        }
+    }
+
+    /// Resolve any pending one-shot waiters with a genuinely fresh, usable fix.
+    /// A negative `horizontalAccuracy` marks an invalid fix; a fix older than the
+    /// waiter's call start is a leftover from a previous session and is ignored
+    /// (that waiter keeps waiting for a newer fix, or times out).
+    @MainActor
+    private func deliverFix(_ location: CLLocation) {
+        guard !fixWaiters.isEmpty else { return }
+        guard location.horizontalAccuracy >= 0, location.horizontalAccuracy <= 100 else { return }
+        let coord = location.coordinate
+        var stillWaiting: [FixWaiter] = []
+        for waiter in fixWaiters {
+            if location.timestamp >= waiter.startedAt.addingTimeInterval(-5) {
+                waiter.resume(with: coord)
+            } else {
+                stillWaiting.append(waiter)
+            }
+        }
+        fixWaiters = stillWaiting
     }
 
     // MARK: - CLLocationManagerDelegate
 
     nonisolated func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
         guard let location = locations.last else { return }
-        let coord = location.coordinate
         Task { @MainActor in
-            self.currentLocation = coord
-            self.updateHandler?(coord)
+            self.currentLocation = location.coordinate
+            self.updateHandler?(location.coordinate)
+            self.deliverFix(location)
         }
     }
 

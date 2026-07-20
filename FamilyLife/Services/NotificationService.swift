@@ -365,7 +365,7 @@ final class NotificationService {
     }
 
     /// Check for new DMs since last check and fire notifications
-    func checkForNewMessages(_ conversations: [APIService.ConversationResponse]) {
+    func checkForNewMessages(_ conversations: [APIService.ConversationResponse], currentUserId: Int? = nil) {
         var list = UserDefaults.standard.stringArray(forKey: "notified_dm_ids") ?? []
         var seen = Set(list)
         // First launch — mark all current
@@ -378,6 +378,15 @@ final class NotificationService {
         for convo in conversations {
             let key = String(convo.id)
             guard !seen.contains(key) else { continue }
+            // Never notify for a thread whose newest message is one WE sent
+            // (e.g. share-to-DM without opening the thread while an older unread
+            // exists): the row is the latest message regardless of direction, so
+            // an outgoing message would otherwise fire with the partner's name
+            // but our own text. Advance the watermark past it so a later partner
+            // reply (a new row/id) still notifies.
+            if let currentUserId, convo.sender_id == currentUserId {
+                seen.insert(key); list.append(key); continue
+            }
             guard convo.unread_count > 0 else { continue }
             guard notified < 3 else { break }
             notifyNewMessage(

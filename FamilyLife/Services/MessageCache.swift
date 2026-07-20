@@ -13,6 +13,14 @@ final class MessageCache {
     /// "ok" (or any photo, they all share "Sent a photo") would match an old
     /// row and drop the in-flight bubble.
     private var tempBaselines: [Int: Int] = [:]
+    /// Monotonic source for optimistic temp ids: decremented on every send so
+    /// two in-flight temps can never collide, even if the cache shrinks (partner
+    /// deletes a message) between two sends. A count-derived id reused values and
+    /// produced duplicate Identifiable ids + corrupted tempBaselines. Stays
+    /// at/above `tempIdThreshold` so temps remain distinguishable from real
+    /// server rows; wraps back to Int.max long before it could reach the
+    /// threshold (1M sends per session is unreachable).
+    private var nextTempId = Int.max
     /// One shared formatter: used for BOTH writing temp timestamps and parsing
     /// them back, so the round-trip can never drift (and no per-poll allocs).
     private static let isoFormatter = ISO8601DateFormatter()
@@ -28,6 +36,7 @@ final class MessageCache {
         imageCache = [:]
         pendingImages = []
         tempBaselines = [:]
+        nextTempId = Int.max
     }
 
     func setMessages(_ messages: [APIService.DirectMessageResponse], for partnerId: Int) {
@@ -96,8 +105,11 @@ final class MessageCache {
     func insertOptimistic(partnerId: Int, text: String, senderId: Int, senderName: String,
                           referenceType: String? = nil, referenceId: Int? = nil,
                           referenceTitle: String? = nil, imageData: String? = nil) {
+        let tempId = nextTempId
+        nextTempId -= 1
+        if nextTempId < Self.tempIdThreshold { nextTempId = Int.max }
         let msg = APIService.DirectMessageResponse(
-            id: Int.max - (cache[partnerId]?.count ?? 0), // temp ID, replaced on next fetch
+            id: tempId, // monotonic temp ID (never reused), replaced on next fetch
             sender_id: senderId,
             recipient_id: partnerId,
             sender_name: senderName,
@@ -145,7 +157,7 @@ final class MessageCache {
 
                 // Fire notifications for new messages
                 if await NotificationService.shared.isAuthorized() {
-                    NotificationService.shared.checkForNewMessages(convos)
+                    NotificationService.shared.checkForNewMessages(convos, currentUserId: userId)
                 }
 
                 for convo in convos {

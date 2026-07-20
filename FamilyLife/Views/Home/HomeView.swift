@@ -205,7 +205,7 @@ struct HomeView: View {
         do {
             let convos = try await api.fetchConversations()
             guard await NotificationService.shared.isAuthorized() else { return }
-            NotificationService.shared.checkForNewMessages(convos)
+            NotificationService.shared.checkForNewMessages(convos, currentUserId: auth.currentUser?.id)
         } catch {}
     }
 
