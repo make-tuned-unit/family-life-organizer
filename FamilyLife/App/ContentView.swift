@@ -261,7 +261,7 @@ struct MainTabView: View {
 
     private func pollUnread() async {
         var locationReportCounter = 0
-        var stepSyncCounter = 19  // trigger on second poll cycle (30s in)
+        var stepSyncCounter = 18  // trigger on the second poll cycle, not the first
         var isFirstPoll = true
         // Don't wipe delivered notifications on launch — that erased the user's
         // Notification Center history, including unread coverage/trip alerts
@@ -384,13 +384,26 @@ struct MainTabView: View {
             let myName = myRivalryName(in: rivalry)
 
             for entry in daily {
-                try? await api.addRivalryEntry(id: rivalry.id, data: [
-                    "member_name": myName,
-                    "value": Int(entry.value.rounded()),
-                    "activity_date": dayFormatter.string(from: entry.day),
-                    "note": "Synced from Apple Health",
-                    "is_verified": true
-                ])
+                let value = Int(entry.value.rounded())
+                let dayStr = dayFormatter.string(from: entry.day)
+                // Only POST when the day's total actually changed. Past days are
+                // fixed, so without this we'd re-post every day's total on every
+                // 5-minute cycle — and the server fires an "ahead/behind" push to
+                // opponents on each POST, spamming them dozens of times an hour.
+                let key = "hk_synced_\(rivalry.id)_\(dayStr)"
+                if UserDefaults.standard.object(forKey: key) as? Int == value { continue }
+                do {
+                    try await api.addRivalryEntry(id: rivalry.id, data: [
+                        "member_name": myName,
+                        "value": value,
+                        "activity_date": dayStr,
+                        "note": "Synced from Apple Health",
+                        "is_verified": true
+                    ])
+                    UserDefaults.standard.set(value, forKey: key)
+                } catch {
+                    // Leave the watermark unset so the next cycle retries.
+                }
             }
         }
 

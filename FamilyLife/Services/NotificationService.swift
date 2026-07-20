@@ -336,11 +336,21 @@ final class NotificationService {
         UNUserNotificationCenter.current().add(request)
     }
 
-    /// Update DM watermark without firing notifications (used on app launch)
+    /// Update DM watermark without firing notifications (used on app launch).
+    /// Must seed the SAME set `checkForNewMessages` consults ("notified_dm_ids");
+    /// writing a separate "last_seen_dm_id" key left every already-delivered
+    /// (APNs-pushed) conversation unseen, so it re-fired as a local notification.
     func syncWatermark(_ conversations: [APIService.ConversationResponse]) {
-        if let maxId = conversations.map(\.id).max() {
-            UserDefaults.standard.set(maxId, forKey: "last_seen_dm_id")
+        var list = UserDefaults.standard.stringArray(forKey: "notified_dm_ids") ?? []
+        var seen = Set(list)
+        for convo in conversations {
+            let key = String(convo.id)
+            if !seen.contains(key) {
+                seen.insert(key)
+                list.append(key)
+            }
         }
+        UserDefaults.standard.set(Array(list.suffix(500)), forKey: "notified_dm_ids")
     }
 
     /// Update feed watermark without firing notifications (used on app launch)

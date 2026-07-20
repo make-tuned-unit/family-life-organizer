@@ -114,14 +114,20 @@ final class AuthService {
         return nil
     }
 
-    func validateSession(api: APIService) async {
+    func validateSession(api: APIService, attempt: Int = 0) async {
         guard isAuthenticated else {
             isRestoringSession = false
             return
         }
+        let gen = sessionGeneration
 
         do {
             let response = try await api.fetchMe()
+            // A logout during the request must not re-persist account state.
+            guard gen == sessionGeneration, isAuthenticated else {
+                isRestoringSession = false
+                return
+            }
             if let user = response.user {
                 let profile = UserProfile(
                     id: user.id,
@@ -136,10 +142,22 @@ final class AuthService {
                 UserDefaults.standard.set(user.id, forKey: "auth_user_id")
             }
         } catch APIError.unauthorized {
+            guard gen == sessionGeneration else {
+                isRestoringSession = false
+                return
+            }
             // Session expired — try silent re-login with the device token.
             switch await silentRelogin(api: api) {
             case .success:
-                await validateSession(api: api)
+                // Bound the retry: if fetchMe keeps 401ing even after a
+                // successful token rotation (e.g. the session cookie never
+                // sticks), stop instead of looping and burning a rotation each
+                // pass.
+                if attempt < 2 {
+                    await validateSession(api: api, attempt: attempt + 1)
+                } else {
+                    logout()
+                }
             case .unauthorized:
                 // The credential itself is dead (revoked/rotated away).
                 logout()
@@ -246,6 +264,11 @@ final class AuthService {
     }
 
     func logout() {
+        // Invalidate any in-flight silent re-login so it can't resurrect the
+        // session by saving a freshly-rotated token after we've torn down.
+        sessionGeneration += 1
+        reloginTask?.cancel()
+        reloginTask = nil
         isAuthenticated = false
         isRestoringSession = false
         let username = currentUser?.username
@@ -292,6 +315,12 @@ final class AuthService {
     // token the winner just saved.
     @ObservationIgnored private var reloginTask: Task<ReloginOutcome, Never>?
 
+    // Bumped on every logout. An in-flight token refresh captures the value at
+    // start and refuses to persist a rotated token if it changed mid-flight —
+    // otherwise a logout that lands during `await tokenLogin` would be undone by
+    // the refresh resuming and re-saving a server-valid credential.
+    @ObservationIgnored private var sessionGeneration = 0
+
     private func silentRelogin(api: APIService) async -> ReloginOutcome {
         if let inFlight = reloginTask {
             return await inFlight.value
@@ -307,10 +336,21 @@ final class AuthService {
         guard let username = currentUser?.username ?? UserDefaults.standard.string(forKey: "auth_username") else {
             return .unauthorized
         }
+        let gen = sessionGeneration
         // Preferred path: revocable device token. Rotates on every use.
         if let token = Self.loadRefreshToken(for: username) {
             do {
                 let response = try await api.tokenLogin(refreshToken: token)
+                // A logout landed while this refresh was in flight — do not
+                // persist the rotated token (that would resurrect the session).
+                // Best-effort revoke the token the server just handed us.
+                if gen != sessionGeneration {
+                    if let fresh = response.refresh_token {
+                        try? await api.serverLogout(refreshToken: fresh,
+                            deviceToken: UserDefaults.standard.string(forKey: "apns_device_token"))
+                    }
+                    return .unauthorized
+                }
                 if response.success == true {
                     if let fresh = response.refresh_token {
                         Self.saveRefreshToken(fresh, for: username)
@@ -334,6 +374,7 @@ final class AuthService {
             do {
                 let response = try await api.login(username: username, password: password)
                 guard response.success == true else { return .unauthorized }
+                if gen != sessionGeneration { return .unauthorized }
                 if let token = response.refresh_token {
                     Self.saveRefreshToken(token, for: username)
                     Self.deletePassword(for: username)
