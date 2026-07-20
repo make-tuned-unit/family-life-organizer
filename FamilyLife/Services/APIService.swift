@@ -611,6 +611,46 @@ final class APIService {
         let _: SuccessResponse = try await post("/api/decisions/\(id)/comments", body: data)
     }
 
+    // MARK: - Routines
+
+    func fetchRoutines() async throws -> [RoutineResponse] {
+        try await get("/api/routines")
+    }
+
+    func fetchRoutine(id: Int) async throws -> RoutineDetailResponse {
+        try await get("/api/routines/\(id)")
+    }
+
+    @discardableResult
+    func addRoutine(_ routine: [String: Any]) async throws -> IDResponse {
+        try await post("/api/routines", body: routine)
+    }
+
+    func updateRoutine(id: Int, data: [String: Any]) async throws {
+        let _: SuccessResponse = try await put("/api/routines/\(id)", body: data)
+    }
+
+    func deleteRoutine(id: Int) async throws {
+        let _: SuccessResponse = try await delete("/api/routines/\(id)")
+    }
+
+    func fetchRoutineEntries(id: Int) async throws -> [RoutineEntryResponse] {
+        try await get("/api/routines/\(id)/entries")
+    }
+
+    @discardableResult
+    func addRoutineEntry(id: Int, data: [String: Any]) async throws -> IDResponse {
+        try await post("/api/routines/\(id)/entries", body: data)
+    }
+
+    func deleteRoutineEntry(routineId: Int, entryId: Int) async throws {
+        let _: SuccessResponse = try await delete("/api/routines/\(routineId)/entries/\(entryId)")
+    }
+
+    func fetchSleepTrainingTemplate() async throws -> SleepTrainingTemplate {
+        try await get("/api/routines/templates/sleep-training")
+    }
+
     // MARK: - Rivalries
 
     func fetchRivalries(status: String? = nil) async throws -> [RivalryResponse] {

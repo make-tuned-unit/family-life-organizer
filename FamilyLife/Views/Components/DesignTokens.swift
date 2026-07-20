@@ -166,7 +166,7 @@ enum AccentTheme: String, CaseIterable, Identifiable {
 // MARK: - Tab Accent Colors
 
 enum TabAccent {
-    case home, calendar, pantry, expenses, trips, cook, rivalries, decisions, gifts, care
+    case home, calendar, pantry, expenses, trips, cook, rivalries, decisions, gifts, care, routines
 
     var color: Color {
         switch self {
@@ -180,6 +180,7 @@ enum TabAccent {
         case .decisions:  AccentTheme.mauve.color
         case .gifts:      AccentTheme.saffron.color
         case .care:       AccentTheme.sage.color
+        case .routines:   Color(hex: "#7b83b8")
         }
     }
 }
@@ -211,6 +212,7 @@ extension TabAccent: CustomStringConvertible {
         case .decisions:  "decisions"
         case .gifts:      "gifts"
         case .care:       "care"
+        case .routines:   "routines"
         }
     }
 }

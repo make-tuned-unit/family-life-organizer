@@ -31,6 +31,9 @@ struct MoreView: View {
                         NavigationLink { MyCoverageRequestsView() } label: {
                             moreRow(icon: "arrow.triangle.swap", title: "Coverage", subtitle: "Your requests and incoming help", color: TabAccent.care.color)
                         }
+                        NavigationLink { RoutinesView() } label: {
+                            moreRow(icon: "repeat", title: "Routines", subtitle: "Cycles, baby sleep & sleep training", color: TabAccent.routines.color)
+                        }
                     }
 
                     // HOUSEHOLD

@@ -9,9 +9,9 @@
 ```
 FamilyLife/                 # iOS app (SwiftUI, iOS 18+, Xcode 16+)
 ├── App/                    # FamilyLifeApp, ContentView (tab spine), Login/SignUp/TwoFactorView, AppConfig
-├── Views/<Feature>/        # 16 feature areas: Calendar, Care, Concierge, Cook, Decisions,
+├── Views/<Feature>/        # 17 feature areas: Calendar, Care, Concierge, Cook, Decisions,
 │                           #   Expenses, Family, Gifts, Home, Lists, Messages, Pantry,
-│                           #   People, Rivalries, Trips + shared Components/
+│                           #   People, Rivalries, Routines, Trips + shared Components/
 ├── Models/                 # Codable DTOs mirroring API JSON (snake_case) — NO SwiftData anywhere
 └── Services/               # APIService (the REST client, ~200 methods), AuthService (device-token
                             #   auth), CalendarService (EventKit), HealthKitManager, HouseholdService,
@@ -41,7 +41,7 @@ website/                    # kinrows.com static marketing site + llms.txt/llms-
 - **Colors**: `WarmPalette` (cream/ink), `AccentTheme`, `TabAccent` (per-feature), `PersonPalette.color(for: fullName)` for per-person identity colors (pass full names to `FamilyAvatar(initial:size:name:)`). App is deliberately light-mode-only.
 - **Surfaces**: `.flCard(tint:)` for cards; corner radii ONLY via `DesignTokens.CornerRadius` (card 22 / cardLarge 28 / tile 18 / small 12); spacing via `DesignTokens.Spacing`.
 - **Patterns**: `FLScreenHeader(eyebrow:title:subtitle:accent:)` opens every screen; `.buttonStyle(.flCTA)` is THE primary action; `.flCardPress` on tappable cards; `WarmEmptyState` (possibility-framed copy + `actionLabel:` + optional `conciergePrompt:`); `FLLoadingState` instead of bare spinners; `.inlineError(_:onDismiss:)` for failures — never alerts.
-- **Icons**: SF Symbols only, one canonical symbol per feature (calendar/list.bullet.rectangle/house/creditcard/sparkles/chart.bar/flag.2.crossed/person.2/arrow.triangle.swap/fork.knife/note.text/airplane/cabinet/gift/bubble.left.and.text.bubble.right/gearshape). `.fill` in selected/accent chips, outline in content.
+- **Icons**: SF Symbols only, one canonical symbol per feature (calendar/list.bullet.rectangle/house/creditcard/sparkles/chart.bar/flag.2.crossed/person.2/arrow.triangle.swap/fork.knife/note.text/airplane/cabinet/gift/repeat/bubble.left.and.text.bubble.right/gearshape). `.fill` in selected/accent chips, outline in content.
 
 ## Backend rules
 
