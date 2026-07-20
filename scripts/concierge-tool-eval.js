@@ -51,6 +51,7 @@ const CASES = [
   { say: 'start a poll: pizza or tacos for Friday dinner?', tool: 'decisions', actions: ['create'] },
   { say: 'mark the Lego set for Jude as purchased', tool: 'gifts', actions: ['update_idea', 'list_ideas'] },
   { say: 'did anyone ask me for babysitting help?', tool: 'coverage', actions: ['incoming'] },
+  { say: 'cancel my babysitter request for Friday night', tool: 'coverage', actions: ['list', 'cancel'] },
   { say: "tell Sophie I'll be home late tonight", tool: 'send_message', actions: null },
   { say: 'end the step competition and call the winner', tool: 'rivalries', actions: ['complete', 'list'] },
 ];
