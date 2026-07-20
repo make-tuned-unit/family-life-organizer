@@ -1031,6 +1031,9 @@ class FamilyDB {
 
   getReceipts(filters = {}, groupId = null) {
     return new Promise((resolve, reject) => {
+      // Fail closed: a null groupId must never mean "every household" — the
+      // route guards enforce this, this is defense-in-depth for future callers.
+      if (groupId == null) return resolve([]);
       let sql = 'SELECT * FROM receipts WHERE 1=1';
       const params = [];
 
@@ -1067,6 +1070,7 @@ class FamilyDB {
 
   getBudgetSummary(month, groupId = null) {
     return new Promise((resolve, reject) => {
+      if (groupId == null) return resolve([]);
       const sql = `
         SELECT
           c.name as category,
@@ -1090,6 +1094,7 @@ class FamilyDB {
 
   getBudgetCategories(groupId = null) {
     return new Promise((resolve, reject) => {
+      if (groupId == null) return resolve([]);
       const sql = groupId != null
         ? 'SELECT * FROM budget_categories WHERE group_id = ? ORDER BY name'
         : 'SELECT * FROM budget_categories ORDER BY name';
@@ -1170,6 +1175,7 @@ class FamilyDB {
 
   getPantry(filters = {}, groupId = null) {
     return new Promise((resolve, reject) => {
+      if (groupId == null) return resolve([]);
       let sql = 'SELECT * FROM pantry WHERE 1=1';
       const params = [];
       if (groupId != null) { sql += ' AND group_id = ?'; params.push(groupId); }
@@ -1227,6 +1233,7 @@ class FamilyDB {
 
   getTrips(filters = {}, groupId = null) {
     return new Promise((resolve, reject) => {
+      if (groupId == null) return resolve([]);
       let sql = 'SELECT * FROM trips WHERE 1=1';
       const params = [];
       if (groupId != null) { sql += ' AND group_id = ?'; params.push(groupId); }
@@ -1305,6 +1312,7 @@ class FamilyDB {
 
   getFamilyAddresses(groupId = null) {
     return new Promise((resolve, reject) => {
+      if (groupId == null) return resolve([]);
       const sql = groupId != null
         ? 'SELECT * FROM family_addresses WHERE group_id = ? ORDER BY name'
         : 'SELECT * FROM family_addresses ORDER BY name';
@@ -1929,6 +1937,7 @@ class FamilyDB {
 
   getGiftPeople(groupId = null) {
     return new Promise((resolve, reject) => {
+      if (groupId == null) return resolve([]);
       const sql = groupId != null
         ? 'SELECT * FROM gift_people WHERE group_id = ? ORDER BY name'
         : 'SELECT * FROM gift_people ORDER BY name';
@@ -1952,6 +1961,7 @@ class FamilyDB {
 
   getGiftIdeas(personId = null, groupId = null) {
     return new Promise((resolve, reject) => {
+      if (groupId == null) return resolve([]);
       let sql = 'SELECT * FROM gift_ideas WHERE 1=1';
       const params = [];
       if (groupId != null) {
@@ -2011,6 +2021,7 @@ class FamilyDB {
 
   getSpecialEvents(groupId = null) {
     return new Promise((resolve, reject) => {
+      if (groupId == null) return resolve([]);
       const sql = groupId != null
         ? 'SELECT * FROM special_events WHERE group_id = ? ORDER BY date'
         : 'SELECT * FROM special_events ORDER BY date';
@@ -2238,6 +2249,7 @@ class FamilyDB {
 
   getProjects(groupId = null) {
     return new Promise((resolve, reject) => {
+      if (groupId == null) return resolve([]);
       const sql = `
         SELECT p.*, COALESCE(SUM(e.amount), 0) as total_spent, COUNT(e.id) as expense_count
         FROM budget_projects p
@@ -2320,6 +2332,7 @@ class FamilyDB {
 
   getRecurringPayments(groupId = null) {
     return new Promise((resolve, reject) => {
+      if (groupId == null) return resolve([]);
       const sql = groupId != null
         ? 'SELECT * FROM recurring_payments WHERE group_id = ? AND active = 1 ORDER BY due_day IS NULL, due_day, name'
         : 'SELECT * FROM recurring_payments WHERE active = 1 ORDER BY due_day IS NULL, due_day, name';
@@ -2455,6 +2468,11 @@ class FamilyDB {
   // the caller's household. itinerary receipts (trip expenses) are excluded.
   getSpendingStats(groupId, months = 6) {
     return new Promise((resolve, reject) => {
+      // Fail closed: never aggregate across every household on a null groupId.
+      if (groupId == null) {
+        const thisMonth = new Date().toLocaleDateString('en-CA').slice(0, 7);
+        return resolve({ thisMonth, monthly: [], byCategory: [], recurringMonthly: 0 });
+      }
       const all = (sql, p = []) => new Promise((r, j) => this.db.all(sql, p, (e, x) => e ? j(e) : r(x || [])));
       const gFilter = groupId != null ? 'AND group_id = ?' : '';
       const gp = groupId != null ? [groupId] : [];

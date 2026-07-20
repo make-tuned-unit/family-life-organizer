@@ -55,11 +55,14 @@ async function buildSnapshot(db, userId) {
     safe(db.getTasks({ status: 'active' }, userId), [], 'tasks'),
     safe(db.getAppointments({}, userId), [], 'appointments'),
     safe(db.getDecisions({ status: 'active' }, userId), [], 'decisions'),
-    safe(db.getPantry({}, groupId), [], 'pantry'),
-    safe(db.getSpecialEvents(groupId), [], 'events'),
+    // Household-scoped reads must NOT run with a null groupId — the DB methods
+    // treat null as "no filter" and would return every household's data. Only
+    // query when the user actually belongs to a household.
+    safe(groupId ? db.getPantry({}, groupId) : Promise.resolve([]), [], 'pantry'),
+    safe(groupId ? db.getSpecialEvents(groupId) : Promise.resolve([]), [], 'events'),
     safe(db.getIncomingCoverageRequests(userId), [], 'coverage'),
-    safe(db.getBudgetSummary(month, groupId), [], 'budget'),
-    safe(db.getTrips({ status: 'active' }, groupId), [], 'trips'),
+    safe(groupId ? db.getBudgetSummary(month, groupId) : Promise.resolve([]), [], 'budget'),
+    safe(groupId ? db.getTrips({ status: 'active' }, groupId) : Promise.resolve([]), [], 'trips'),
     safe(db.getItineraries(userId), [], 'itineraries'),
     safe(groupId ? db.getMilestones(groupId) : Promise.resolve([]), [], 'milestones'),
   ]);
