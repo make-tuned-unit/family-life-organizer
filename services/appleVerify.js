@@ -16,6 +16,37 @@ const crypto = require('crypto');
 const APPLE_ROOT_CA_G3 =
   'MIICQzCCAcmgAwIBAgIILcX8iNLFS5UwCgYIKoZIzj0EAwMwZzEbMBkGA1UEAwwSQXBwbGUgUm9vdCBDQSAtIEczMSYwJAYDVQQLDB1BcHBsZSBDZXJ0aWZpY2F0aW9uIEF1dGhvcml0eTETMBEGA1UECgwKQXBwbGUgSW5jLjELMAkGA1UEBhMCVVMwHhcNMTQwNDMwMTgxOTA2WhcNMzkwNDMwMTgxOTA2WjBnMRswGQYDVQQDDBJBcHBsZSBSb290IENBIC0gRzMxJjAkBgNVBAsMHUFwcGxlIENlcnRpZmljYXRpb24gQXV0aG9yaXR5MRMwEQYDVQQKDApBcHBsZSBJbmMuMQswCQYDVQQGEwJVUzB2MBAGByqGSM49AgEGBSuBBAAiA2IABJjpLz1AcqTtkyJygRMc3RCV8cWjTnHcFBbZDuWmBSp3ZHtfTjjTuxxEtX/1H7YyYl3J6YRbTzBPEVoA/VhYDKX1DyxNB0cTddqXl5dvMVztK517IDvYuVTZXpmkOlEKMaNCMEAwHQYDVR0OBBYEFLuw3qFYM4iapIqZ3r6966/ayySrMA8GA1UdEwEB/wQFMAMBAf8wDgYDVR0PAQH/BAQDAgEGMAoGCCqGSM49BAMDA2gAMGUCMQCD6cHEFl4aXTQY2e3v9GwOAEZLuN+yRhHFD/3meoyhpmvOwgPUnPWTxnS4at+qIxUCMG1mihDK1A3UT82NQz60imOlM27jbdoXt2QfyFMm+YhidDkLF1vLUagM6BgD56KyKA==';
 
+// Apple's StoreKit transaction/receipt-signing leaf certificate carries this
+// custom extension OID. Requiring it means a chain that merely terminates at the
+// Apple root (any Apple-issued cert does) is no longer sufficient — only a real
+// App Store signing cert passes.
+const STOREKIT_LEAF_OID = '1.2.840.113635.100.6.11.1';
+
+// Encode a dotted OID string to its DER TLV bytes (06 <len> <content>).
+function oidToDer(oid) {
+  const parts = oid.split('.').map(Number);
+  const body = [40 * parts[0] + parts[1]];
+  for (let i = 2; i < parts.length; i++) {
+    let v = parts[i];
+    const stack = [v & 0x7f];
+    v = Math.floor(v / 128);
+    while (v > 0) { stack.unshift((v & 0x7f) | 0x80); v = Math.floor(v / 128); }
+    body.push(...stack);
+  }
+  return Buffer.from([0x06, body.length, ...body]);
+}
+
+const STOREKIT_LEAF_OID_DER = oidToDer(STOREKIT_LEAF_OID);
+
+// The leaf's extensions live in its DER; the custom OID appears verbatim there.
+// A presence check is sufficient to distinguish a StoreKit signing cert from any
+// other Apple-issued certificate whose chain also roots at G3.
+function assertStoreKitLeaf(leaf) {
+  if (!leaf.raw.includes(STOREKIT_LEAF_OID_DER)) {
+    throw new Error('Leaf is not an Apple StoreKit signing certificate');
+  }
+}
+
 function b64urlToBuffer(str) {
   return Buffer.from(str.replace(/-/g, '+').replace(/_/g, '/'), 'base64');
 }
@@ -77,6 +108,9 @@ function verifyTransaction(jws, { bundleId, rootCertBase64 = process.env.APPLE_R
 
   // 2. Chain to the Apple root (when configured).
   verifyChain(x5c, rootCertBase64);
+
+  // 3. The leaf must be an actual StoreKit signing cert, not just Apple-rooted.
+  assertStoreKitLeaf(leaf);
 
   const payload = decodeSegment(p);
   if (bundleId && payload.bundleId && payload.bundleId !== bundleId) {

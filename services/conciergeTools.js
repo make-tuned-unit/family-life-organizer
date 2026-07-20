@@ -1563,9 +1563,14 @@ const TOOLS = [
       required: ['reason'],
     },
     async run(ctx, input) {
+      // Validate & authorize everything BEFORE writing — a bad window date or a
+      // contact the caller doesn't own, thrown mid-loop, would otherwise strand
+      // a half-built request (with some invite pushes already sent).
+      for (const w of (input.windows || [])) requireDate(w.window_date, 'window_date');
+      for (const contactId of (input.contact_ids || [])) await assertContactOwner(ctx, contactId);
+
       const request = await ctx.db.createCoverageRequest({ requester_id: ctx.userId, reason: input.reason, note: input.note || null });
       for (const w of (input.windows || [])) {
-        requireDate(w.window_date, 'window_date');
         await ctx.db.addCoverageWindow({
           request_id: request.id, window_date: w.window_date,
           start_time: w.start_time, end_time: w.end_time, description: w.description || null,
@@ -1573,7 +1578,6 @@ const TOOLS = [
       }
       const recipients = [];
       for (const contactId of (input.contact_ids || [])) {
-        await assertContactOwner(ctx, contactId);
         const rec = await ctx.db.addCoverageRecipient({ request_id: request.id, contact_id: contactId });
         recipients.push(rec);
         if (ctx.push) {

@@ -4,8 +4,10 @@
 
 // keyFn may be sync or async (e.g. when the bucket key needs a DB lookup such as
 // the caller's household). maxFn, if given, derives the per-request limit (e.g. a
-// tier-dependent daily cap) and overrides the static `max`. Errors deriving either
-// fail open rather than blocking.
+// tier-dependent daily cap) and overrides the static `max`. If deriving the key
+// or limit fails (e.g. a transient DB error) the limiter does NOT fail open — it
+// falls back to a coarse per-user/per-IP bucket at the static `max`, since a key
+// lookup failing is exactly when an expensive endpoint is already under load.
 // Disabled under `NODE_ENV=test` so the suite (which hammers endpoints from one
 // IP) isn't throttled; no test depends on rate-limit behavior.
 const RATE_LIMIT_OFF = process.env.NODE_ENV === 'test';
@@ -17,8 +19,12 @@ function createRateLimiter({ windowMs = 60000, max = 30, keyFn, maxFn }) {
     let key, limit = max;
     try {
       key = await keyFn(req);
-      if (maxFn) limit = await maxFn(req);
-    } catch { return next(); }
+    } catch {
+      key = `fallback:${req.session?.user?.id || req.ip || 'anon'}`;
+    }
+    if (maxFn) {
+      try { limit = await maxFn(req); } catch { limit = max; }
+    }
     const now = Date.now();
     const recent = (hits.get(key) || []).filter(t => now - t < windowMs);
     if (recent.length >= limit) {

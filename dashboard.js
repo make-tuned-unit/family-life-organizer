@@ -351,6 +351,14 @@ function clampLimit(value, def, max = 200) {
   return Math.min(n, max);
 }
 
+// Server-local YYYY-MM-DD. Using UTC (toISOString) rolled "today" forward in the
+// evening (Halifax is UTC-3/-4), landing receipts in the wrong day/month and
+// mis-filtering "today"'s appointments — inconsistent with getSpendingStats,
+// which already uses en-CA local. This is the single source of truth for it.
+function todayLocal() {
+  return new Date().toLocaleDateString('en-CA');
+}
+
 // The caller may only act on contacts they created (contacts are owner-scoped).
 async function userOwnsContact(db, contactId, userId) {
   return !!(await dbGet(db, 'SELECT 1 FROM contacts WHERE id = ? AND added_by = ?', [contactId, userId]));
@@ -1494,7 +1502,7 @@ app.get('/app', requireAuth, async (req, res) => {
 // Render Dashboard
 function renderDashboard(user, summary, groceries, tasksByCategory, appointments) {
   const categories = Object.keys(tasksByCategory).sort();
-  const today = new Date().toISOString().split('T')[0];
+  const today = todayLocal();
   const todayAppointments = appointments.filter(a => a.appointment_date === today);
   return `<!DOCTYPE html>
 <html lang="en">
@@ -3177,16 +3185,16 @@ function expandRecurrence(rule, origin, rangeStart, rangeEnd, endDate) {
 }
 
 function normalizeDate(dateStr) {
-  if (!dateStr) return new Date().toISOString().split('T')[0];
+  if (!dateStr) return todayLocal();
   // Already YYYY-MM-DD
   if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr;
   // Try parsing with Date constructor
   const parsed = new Date(dateStr);
   if (!isNaN(parsed.getTime())) {
-    return parsed.toISOString().split('T')[0];
+    return parsed.toLocaleDateString('en-CA');
   }
   // Fallback to today
-  return new Date().toISOString().split('T')[0];
+  return todayLocal();
 }
 
 // Helper: guess pantry category from item name
@@ -4362,7 +4370,13 @@ app.post('/api/stays/:stayId/respond', requireAuth, async (req, res) => {
     const hostName = req.session.user.name;
 
     if (approved) {
-      // Create calendar event for traveler
+      // Create calendar event for traveler — scope to the TRAVELER's household,
+      // not the itinerary's group. Itineraries can live in a clan group, but
+      // appointments are only read/edited through household-scoped queries, so a
+      // clan-scoped event would be invisible and permanently uneditable.
+      const travelerGroupId = itinerary?.traveler_id
+        ? await db.getUserHouseholdId(itinerary.traveler_id)
+        : null;
       const travelerEvent = await db.addAppointment({
         title: `Staying at ${hostName}'s`,
         appointment_date: stay.check_in,
@@ -4370,7 +4384,7 @@ app.post('/api/stays/:stayId/respond', requireAuth, async (req, res) => {
         location: stay.address || stay.location_name || null,
         category: 'social',
         with_person: hostName,
-        group_id: itinerary?.group_id || null
+        group_id: travelerGroupId
       });
 
       // Create calendar event for host
