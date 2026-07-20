@@ -284,3 +284,9 @@ struct BudgetStatsView: View {
         )
     }
 }
+
+#Preview {
+    ScrollView { BudgetStatsView() }
+        .background { AmbientBackground(style: .expenses) }
+        .environment(APIService())
+}

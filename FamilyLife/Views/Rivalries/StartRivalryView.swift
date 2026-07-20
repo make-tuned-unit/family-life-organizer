@@ -41,11 +41,11 @@ struct StartRivalryView: View {
                                     .foregroundStyle(typeColor(type))
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(type.displayName)
-                                        .font(.subheadline.weight(.medium))
+                                        .font(.flSubheadline.weight(.medium))
                                         .foregroundStyle(.primary)
                                     if type != .custom {
                                         Text(type.hint)
-                                            .font(.caption)
+                                            .font(.flCaption)
                                             .foregroundStyle(WarmPalette.ink3)
                                     }
                                 }
@@ -99,7 +99,7 @@ struct StartRivalryView: View {
                         }
                         if household.members.isEmpty {
                             Text("Add family members in Settings to challenge them")
-                                .font(.caption)
+                                .font(.flCaption)
                                 .foregroundStyle(WarmPalette.ink3)
                         }
                     }
@@ -112,7 +112,7 @@ struct StartRivalryView: View {
                             }
                             updateDefaultTitle()
                         }
-                        .font(.subheadline)
+                        .font(.flSubheadline)
                         ForEach(allPeople, id: \.self) { name in
                             teamPickRow(name)
                         }
@@ -183,9 +183,9 @@ struct StartRivalryView: View {
                 Text(name).foregroundStyle(.primary)
                 Spacer()
                 if inA {
-                    Text("Your team").font(.caption.weight(.semibold)).foregroundStyle(AccentTheme.ocean.color)
+                    Text("Your team").font(.flCaption.weight(.semibold)).foregroundStyle(AccentTheme.ocean.color)
                 } else if inB {
-                    Text("Their team").font(.caption.weight(.semibold)).foregroundStyle(AccentTheme.terracotta.color)
+                    Text("Their team").font(.flCaption.weight(.semibold)).foregroundStyle(AccentTheme.terracotta.color)
                 } else {
                     Image(systemName: "circle").foregroundStyle(WarmPalette.ink4)
                 }

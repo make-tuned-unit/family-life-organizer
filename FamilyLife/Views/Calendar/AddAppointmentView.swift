@@ -63,11 +63,11 @@ struct AddAppointmentView: View {
                             } label: {
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(result.title)
-                                        .font(.subheadline.weight(.medium))
+                                        .font(.flSubheadline.weight(.medium))
                                         .foregroundStyle(.primary)
                                     if !result.subtitle.isEmpty {
                                         Text(result.subtitle)
-                                            .font(.caption)
+                                            .font(.flCaption)
                                             .foregroundStyle(WarmPalette.ink3)
                                     }
                                 }
@@ -132,7 +132,7 @@ struct AddAppointmentView: View {
                                     .foregroundStyle(.primary)
                                 if let rel = contact.relationship {
                                     Text(rel.capitalized)
-                                        .font(.caption)
+                                        .font(.flCaption)
                                         .foregroundStyle(WarmPalette.ink3)
                                 }
                                 Spacer()

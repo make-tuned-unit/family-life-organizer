@@ -260,8 +260,8 @@ struct PushToTalkOverlay: View {
             .padding(.horizontal, 18)
             .padding(.vertical, 14)
             .frame(maxWidth: 320)
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18))
-            .overlay(RoundedRectangle(cornerRadius: 18).stroke(WarmPalette.ink4.opacity(0.35), lineWidth: 1))
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.tile))
+            .overlay(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.tile).stroke(WarmPalette.ink4.opacity(0.35), lineWidth: 1))
             .shadow(color: .black.opacity(0.12), radius: 14, y: 6)
             .padding(.horizontal, 24)
             .transition(.move(edge: .bottom).combined(with: .opacity))
@@ -345,4 +345,9 @@ struct ConciergeIntroView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackgroundVisibility(.hidden, for: .navigationBar)
     }
+}
+
+#Preview {
+    AskButlerButton(prompt: "What should we make for dinner?")
+        .environment(ConciergeLaunch())
 }

@@ -49,3 +49,12 @@ struct QuotedItemCard: View {
         }
     }
 }
+
+#Preview {
+    VStack(spacing: 10) {
+        QuotedItemCard(type: "decision", title: "Where should we go for spring break?")
+        QuotedItemCard(type: "task", title: "Pick up the cake")
+        QuotedItemCard(type: "gift", title: "Lego set for Sam")
+    }
+    .padding()
+}

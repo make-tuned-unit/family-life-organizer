@@ -51,7 +51,7 @@ struct NewPostView: View {
                 Section("Share with") {
                     if groups.isEmpty {
                         Text("No groups yet — create one in Family tab")
-                            .font(.caption)
+                            .font(.flCaption)
                             .foregroundStyle(WarmPalette.ink3)
                     } else {
                         ForEach(groups) { group in

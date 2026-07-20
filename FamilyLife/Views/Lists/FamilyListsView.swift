@@ -769,9 +769,9 @@ struct NewListSheet: View {
                                         .font(.system(size: 20))
                                         .frame(width: 44, height: 44)
                                         .background(selectedIcon == icon ? TabAccent.home.color.opacity(0.15) : WarmPalette.ink1.opacity(0.06))
-                                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                                        .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.small))
                                         .overlay(
-                                            RoundedRectangle(cornerRadius: 12)
+                                            RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.small)
                                                 .stroke(selectedIcon == icon ? TabAccent.home.color : .clear, lineWidth: 2)
                                         )
                                     Text(label)

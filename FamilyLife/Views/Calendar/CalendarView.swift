@@ -494,7 +494,7 @@ struct CalendarView: View {
                         Button { selectedEvent = appt } label: {
                             CalendarEventCard(appointment: appt)
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(.flCardPress)
                     }
                     ForEach(dayExternal) { event in
                         ExternalEventCard(event: event)
@@ -583,7 +583,7 @@ struct CalendarView: View {
                         Button { selectedEvent = appt } label: {
                             CalendarEventCard(appointment: appt)
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(.flCardPress)
                     }
                     ForEach(dayExternal) { event in
                         ExternalEventCard(event: event)
@@ -616,7 +616,7 @@ struct CalendarDayCell: View {
     private let dotColors: [Color] = [
         AccentTheme.terracotta.color,
         AccentTheme.sage.color,
-        Color(hex: "#b97090")
+        TabAccent.calendar.color
     ]
 
     private let cellSize: CGFloat = 40
@@ -669,7 +669,7 @@ struct CalendarEventCard: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            RoundedRectangle(cornerRadius: 999)
+            RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.chip)
                 .fill(categoryColor)
                 .frame(width: 4)
 
@@ -739,7 +739,7 @@ struct ExternalEventCard: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            RoundedRectangle(cornerRadius: 999)
+            RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.chip)
                 .fill(event.calendarColor)
                 .frame(width: 4)
 
@@ -782,7 +782,7 @@ struct ExternalEventCard: View {
 
 private let householdOwnerColors: [Color] = [
     AccentTheme.ocean.color, AccentTheme.mauve.color, AccentTheme.saffron.color,
-    AccentTheme.sage.color, Color(hex: "#b97090")
+    AccentTheme.sage.color, TabAccent.calendar.color
 ]
 
 func colorForOwner(_ id: Int?) -> Color {
@@ -809,7 +809,7 @@ struct HouseholdEventCard: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            RoundedRectangle(cornerRadius: 999)
+            RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.chip)
                 .fill(color)
                 .frame(width: 4)
 
@@ -857,7 +857,7 @@ struct AppointmentListRow: View {
                 .frame(width: 4, height: 40)
             VStack(alignment: .leading, spacing: 4) {
                 Text(appointment.title)
-                    .font(.subheadline.weight(.medium))
+                    .font(.flSubheadline.weight(.medium))
                 HStack(spacing: 8) {
                     if let time = appointment.appointment_time, !time.isEmpty {
                         Label(time, systemImage: "clock")
@@ -866,7 +866,7 @@ struct AppointmentListRow: View {
                         Label(location, systemImage: "mappin")
                     }
                 }
-                .font(.caption)
+                .font(.flCaption)
                 .foregroundStyle(WarmPalette.ink3)
             }
             Spacer()
@@ -891,7 +891,7 @@ struct CoverageBlockCard: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            RoundedRectangle(cornerRadius: 999)
+            RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.chip)
                 .fill(AccentTheme.sage.color)
                 .frame(width: 4)
 

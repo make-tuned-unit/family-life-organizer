@@ -79,7 +79,7 @@ struct ReceiptScannerView: View {
                         HStack {
                             Image(systemName: "exclamationmark.triangle.fill")
                                 .foregroundStyle(AccentTheme.saffron.color)
-                            Text(error).font(.subheadline)
+                            Text(error).font(.flSubheadline)
                         }
                         .padding()
                         .background(TabAccent.expenses.color.opacity(DesignTokens.Opacity.cardTint))
@@ -90,16 +90,16 @@ struct ReceiptScannerView: View {
                     if cameraPermissionDenied {
                         VStack(spacing: 8) {
                             Text("Camera access denied")
-                                .font(.subheadline.weight(.semibold))
+                                .font(.flSubheadline.weight(.semibold))
                             Text("Go to Settings > Kinrows to enable camera access.")
-                                .font(.caption)
+                                .font(.flCaption)
                                 .foregroundStyle(WarmPalette.ink3)
                             Button("Open Settings") {
                                 if let url = URL(string: UIApplication.openSettingsURLString) {
                                     UIApplication.shared.open(url)
                                 }
                             }
-                            .font(.subheadline.weight(.medium))
+                            .font(.flSubheadline.weight(.medium))
                         }
                         .padding()
                         .flCard()
@@ -209,9 +209,9 @@ struct ReceiptScannerView: View {
             VStack(spacing: 12) {
                 HStack {
                     VStack(alignment: .leading, spacing: 6) {
-                        Text("Merchant").font(.caption.weight(.medium)).foregroundStyle(WarmPalette.ink3)
+                        Text("Merchant").font(.flCaption.weight(.medium)).foregroundStyle(WarmPalette.ink3)
                         TextField("Store name", text: $editableMerchant)
-                            .font(.headline)
+                            .font(.flHeadline)
                             .foregroundStyle(WarmPalette.ink1)
                     }
                     Spacer()
@@ -220,26 +220,26 @@ struct ReceiptScannerView: View {
                 HStack {
                     VStack(alignment: .leading, spacing: 6) {
                         HStack(spacing: 4) {
-                            Text("Date").font(.caption.weight(.medium)).foregroundStyle(WarmPalette.ink3)
+                            Text("Date").font(.flCaption.weight(.medium)).foregroundStyle(WarmPalette.ink3)
                             if dateNeedsAttention {
                                 Image(systemName: "exclamationmark.triangle.fill")
-                                    .font(.caption2)
+                                    .font(.flCaption2)
                                     .foregroundStyle(AccentTheme.saffron.color)
                             }
                         }
                         TextField("YYYY-MM-DD", text: $editableDate)
-                            .font(.subheadline)
+                            .font(.flSubheadline)
                             .foregroundStyle(dateNeedsAttention ? WarmPalette.bad : WarmPalette.ink2)
                     }
                     Spacer()
                     VStack(alignment: .trailing, spacing: 6) {
-                        Text("Total").font(.caption.weight(.medium)).foregroundStyle(WarmPalette.ink3)
+                        Text("Total").font(.flCaption.weight(.medium)).foregroundStyle(WarmPalette.ink3)
                         HStack(spacing: 2) {
                             Text("$")
-                                .font(.title2.bold())
+                                .font(.flStat)
                                 .foregroundStyle(TabAccent.home.color)
                             TextField("0.00", text: $editableTotal)
-                                .font(.title2.bold())
+                                .font(.flStat)
                                 .foregroundStyle(TabAccent.home.color)
                                 .keyboardType(.decimalPad)
                                 .multilineTextAlignment(.trailing)
@@ -257,7 +257,7 @@ struct ReceiptScannerView: View {
                     Image(systemName: "hammer.fill")
                         .foregroundStyle(AccentTheme.sage.color)
                     Text("Saving to: \(projectName ?? "Project")")
-                        .font(.subheadline.weight(.medium))
+                        .font(.flSubheadline.weight(.medium))
                 }
                 .padding(10)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -265,26 +265,26 @@ struct ReceiptScannerView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 10))
             }
 
-            Text("Items Found").font(.headline)
+            Text("Items Found").font(.flHeadline)
             ForEach(Array(result.items.enumerated()), id: \.offset) { _, item in
                 HStack {
                     Image(systemName: "checkmark.circle.fill").foregroundStyle(WarmPalette.good)
-                    Text(item.name).font(.subheadline)
+                    Text(item.name).font(.flSubheadline)
                     Spacer()
                     if let price = item.price {
                         Text("$\(price, specifier: "%.2f")")
-                            .font(.subheadline).foregroundStyle(WarmPalette.ink3)
+                            .font(.flSubheadline).foregroundStyle(WarmPalette.ink3)
                     }
                 }
                 .padding(.vertical, DesignTokens.Spacing.chipVerticalPadding)
             }
 
             HStack {
-                Text(isProjectMode ? "Project" : "Category").font(.subheadline.weight(.medium))
+                Text(isProjectMode ? "Project" : "Category").font(.flSubheadline.weight(.medium))
                 Spacer()
                 if isProjectMode {
                     Text(projectName ?? "Project")
-                        .font(.subheadline)
+                        .font(.flSubheadline)
                         .padding(.horizontal, DesignTokens.Spacing.inset)
                         .padding(.vertical, DesignTokens.Spacing.chipVerticalPadding)
                         .background(AccentTheme.sage.color.opacity(DesignTokens.Opacity.cardTint))
@@ -304,7 +304,7 @@ struct ReceiptScannerView: View {
             if selectedCategory == "Trip" {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Which trip?")
-                        .font(.subheadline.weight(.medium))
+                        .font(.flSubheadline.weight(.medium))
                     ForEach(itineraries) { itin in
                         Button {
                             selectedItinerary = itin
@@ -332,12 +332,12 @@ struct ReceiptScannerView: View {
                             .font(.system(size: 20))
                             .foregroundStyle(WarmPalette.good)
                         Text("Receipt saved!")
-                            .font(.headline)
+                            .font(.flHeadline)
                             .foregroundStyle(WarmPalette.good)
                         Spacer()
                     }
                     Text("$\(editableTotal) → \(selectedCategory) • \(formattedSavedMonth)")
-                        .font(.subheadline)
+                        .font(.flSubheadline)
                         .foregroundStyle(WarmPalette.ink3)
                 }
                 .padding()

@@ -24,11 +24,11 @@ struct ItineraryDetailView: View {
                     HStack {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(dateRange)
-                                .font(.subheadline)
+                                .font(.flSubheadline)
                                 .foregroundStyle(WarmPalette.ink2)
                             if let nights = totalNights {
                                 Text("\(nights) nights \u{00B7} \(stays.count) stays")
-                                    .font(.caption)
+                                    .font(.flCaption)
                                     .foregroundStyle(WarmPalette.ink3)
                             }
                         }
@@ -46,13 +46,13 @@ struct ItineraryDetailView: View {
                         Image(systemName: "creditcard.fill")
                             .foregroundStyle(AccentTheme.saffron.color)
                         Text("Trip Expenses")
-                            .font(.subheadline.weight(.semibold))
+                            .font(.flSubheadline.weight(.semibold))
                         Spacer()
                         Text("$\(tripExpenseTotal, specifier: "%.2f")")
-                            .font(.subheadline.weight(.bold))
+                            .font(.flSubheadline.weight(.bold))
                             .foregroundStyle(WarmPalette.ink1)
                         Text("(\(tripExpenseCount) receipts)")
-                            .font(.caption)
+                            .font(.flCaption)
                             .foregroundStyle(WarmPalette.ink3)
                     }
                     .padding(DesignTokens.Spacing.cardPadding)
@@ -209,7 +209,7 @@ struct ItineraryDetailView: View {
             Image(systemName: "checkmark.circle.fill")
                 .foregroundStyle(WarmPalette.good)
             Text("\(confirmed)/\(total)")
-                .font(.subheadline.weight(.semibold))
+                .font(.flSubheadline.weight(.semibold))
                 .foregroundStyle(WarmPalette.ink1)
         }
     }
@@ -259,10 +259,10 @@ struct TimelineDayRow: View {
             // Date column
             VStack(spacing: 2) {
                 Text(dayOfWeek)
-                    .font(.caption2.weight(.medium))
+                    .font(.flCaption2.weight(.medium))
                     .foregroundStyle(WarmPalette.ink3)
                 Text(dayNumber)
-                    .font(.title3.weight(.bold))
+                    .font(.flTitle)
                     .foregroundStyle(day.stay != nil ? WarmPalette.ink1 : WarmPalette.ink4)
             }
             .frame(width: 36)
@@ -289,7 +289,7 @@ struct TimelineDayRow: View {
                         Image(systemName: "plus.circle.dashed")
                             .foregroundStyle(WarmPalette.ink4)
                         Text("Open")
-                            .font(.subheadline)
+                            .font(.flSubheadline)
                             .foregroundStyle(WarmPalette.ink3)
                         Spacer()
                     }
@@ -302,14 +302,14 @@ struct TimelineDayRow: View {
                     if let host = stay.host_name {
                         FamilyAvatar(initial: String(host.prefix(1)).uppercased(), size: 22, name: host)
                         Text(host)
-                            .font(.caption.weight(.medium))
+                            .font(.flCaption.weight(.medium))
                             .foregroundStyle(WarmPalette.ink2)
                     } else {
                         Image(systemName: "house.fill")
-                            .font(.caption)
+                            .font(.flCaption)
                             .foregroundStyle(stayStatusColor(stay))
                         Text(stay.location_name ?? "Stay")
-                            .font(.caption.weight(.medium))
+                            .font(.flCaption.weight(.medium))
                             .foregroundStyle(WarmPalette.ink2)
                     }
                     Spacer()
@@ -317,7 +317,7 @@ struct TimelineDayRow: View {
                 .padding(.vertical, 6)
                 .padding(.horizontal, 8)
                 .background(stayStatusColor(stay).opacity(0.08))
-                .clipShape(RoundedRectangle(cornerRadius: 6))
+                .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.small))
                 .padding(.bottom, 2)
             }
         }
@@ -368,44 +368,44 @@ struct StayCard: View {
                 if let host = stay.host_name {
                     FamilyAvatar(initial: String(host.prefix(1)).uppercased(), size: 28, name: host)
                     Text(host)
-                        .font(.subheadline.weight(.semibold))
+                        .font(.flSubheadline.weight(.semibold))
                         .foregroundStyle(WarmPalette.ink1)
                 } else {
                     Image(systemName: "house.fill")
                         .foregroundStyle(AccentTheme.ocean.color)
                     Text(stay.location_name ?? "TBD")
-                        .font(.subheadline.weight(.semibold))
+                        .font(.flSubheadline.weight(.semibold))
                         .foregroundStyle(WarmPalette.ink1)
                 }
                 Spacer()
                 Image(systemName: stay.statusIcon)
                     .foregroundStyle(statusColor)
-                    .font(.subheadline)
+                    .font(.flSubheadline)
             }
 
             HStack {
                 if let loc = stay.location_name ?? stay.address {
                     Label(loc, systemImage: "mappin")
-                        .font(.caption)
+                        .font(.flCaption)
                         .foregroundStyle(WarmPalette.ink3)
                         .lineLimit(1)
                 }
                 Spacer()
                 Text("\(stay.nightCount) night\(stay.nightCount == 1 ? "" : "s")")
-                    .font(.caption)
+                    .font(.flCaption)
                     .foregroundStyle(WarmPalette.ink3)
             }
 
             if let notes = stay.notes, !notes.isEmpty {
                 Text(notes)
-                    .font(.caption)
+                    .font(.flCaption)
                     .foregroundStyle(WarmPalette.ink3)
                     .lineLimit(2)
             }
 
             // Status label
             Text(stay.status.capitalized)
-                .font(.caption2.weight(.medium))
+                .font(.flCaption2.weight(.medium))
                 .padding(.horizontal, 6)
                 .padding(.vertical, 2)
                 .background(statusColor.opacity(0.15))
@@ -432,4 +432,25 @@ struct StayCard: View {
         default: WarmPalette.ink3
         }
     }
+}
+
+#Preview {
+    NavigationStack {
+        ItineraryDetailView(itinerary: ItineraryResponse(
+            id: 1,
+            title: "Summer in Halifax",
+            traveler_id: 1,
+            traveler_name: "Jesse",
+            start_date: "2026-08-01",
+            end_date: "2026-08-08",
+            travelers: "Jesse, Sophie",
+            notes: nil,
+            status: "planning",
+            group_id: nil,
+            created_at: nil
+        ))
+    }
+    .environment(APIService())
+    .environment(AuthService())
+    .environment(HouseholdService())
 }

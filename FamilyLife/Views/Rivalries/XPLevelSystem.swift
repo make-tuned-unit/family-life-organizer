@@ -166,7 +166,7 @@ struct LevelUpCelebration: View, Identifiable {
                     .shadow(color: tier.color.opacity(0.5), radius: 20)
 
                 Text(tier.name)
-                    .font(.system(size: 36, weight: .black))
+                    .font(.flHero)
                     .foregroundStyle(.white)
 
                 Text("You've reached a new tier!")

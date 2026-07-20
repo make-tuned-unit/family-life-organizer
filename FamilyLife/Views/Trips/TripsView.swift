@@ -14,12 +14,6 @@ struct TripsView: View {
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(spacing: 0) {
-                // Header
-                FLScreenHeader(
-                    eyebrow: viewModel.activeTrip != nil ? "In progress" : "No active trip",
-                    title: "Trips"
-                )
-
                 // Permission banner when tracking needs "Always" location
                 if viewModel.activeTrip != nil && !locationService.hasAlwaysPermission {
                     LocationPermissionBanner(locationService: locationService)
@@ -220,7 +214,7 @@ struct TripStatusHeader: View {
                         FamilyAvatar(initial: String(trip.traveler.prefix(1)).uppercased(), size: 28, name: trip.traveler)
                     }
                     Text("\(trip.traveler.capitalized) is on the way to \(trip.destination)")
-                        .font(.headline)
+                        .font(.flHeadline)
                 }
 
                 HStack(spacing: 8) {
@@ -229,14 +223,14 @@ struct TripStatusHeader: View {
                         Text(started)
                     }
                 }
-                .font(.caption)
+                .font(.flCaption)
                 .foregroundStyle(WarmPalette.ink3)
 
                 HStack(spacing: 8) {
                     Image(systemName: "mappin.circle.fill")
                         .foregroundStyle(WarmPalette.bad)
                     Text(trip.destination)
-                        .font(.subheadline.weight(.medium))
+                        .font(.flSubheadline.weight(.medium))
                 }
             }
 
@@ -245,10 +239,10 @@ struct TripStatusHeader: View {
             if let eta = trip.eta_minutes {
                 VStack(spacing: 2) {
                     Text(TripDisplayHelpers.etaText(eta))
-                        .font(.title3.bold())
+                        .font(.flTitle)
                         .foregroundStyle(eta <= 0 ? WarmPalette.good : TabAccent.home.color)
                     Text("ETA")
-                        .font(.caption)
+                        .font(.flCaption)
                         .foregroundStyle(WarmPalette.ink3)
                 }
             }
@@ -317,16 +311,16 @@ struct TripMetricPill: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             Label(title, systemImage: systemImage)
-                .font(.caption)
+                .font(.flCaption)
                 .foregroundStyle(WarmPalette.ink3)
             Text(value)
-                .font(.subheadline.weight(.semibold))
+                .font(.flSubheadline.weight(.semibold))
                 .foregroundStyle(WarmPalette.ink1)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(DesignTokens.Spacing.cardGap)
         .background(tint.opacity(DesignTokens.Opacity.cardTint))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.small))
     }
 }
 
@@ -336,16 +330,16 @@ struct TripAlertStateRow: View {
     var body: some View {
         HStack {
             Label(alertTitle, systemImage: alertIcon)
-                .font(.subheadline)
+                .font(.flSubheadline)
                 .foregroundStyle(alertColor)
             Spacer()
             Text(alertDetail)
-                .font(.caption)
+                .font(.flCaption)
                 .foregroundStyle(WarmPalette.ink3)
         }
         .padding(DesignTokens.Spacing.cardGap)
         .background(WarmPalette.ink1.opacity(0.06))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.small))
     }
 
     private var alertTitle: String {
@@ -399,7 +393,7 @@ struct TripLiveMapView: View {
                         .tint(TabAccent.home.color)
                 }
                 .frame(height: 220)
-                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.small))
                 .task(id: mapRefreshID) {
                     await loadRoute()
                 }
@@ -412,7 +406,7 @@ struct TripLiveMapView: View {
                 .frame(maxWidth: .infinity)
                 .frame(height: 220)
                 .background(WarmPalette.ink1.opacity(0.06))
-                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.small))
             }
         }
     }
@@ -527,7 +521,7 @@ struct TripHistoryRow: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 Text("\(trip.traveler.capitalized) → \(trip.destination)")
-                    .font(.subheadline.weight(.medium))
+                    .font(.flSubheadline.weight(.medium))
                 HStack(spacing: 8) {
                     if let purpose = trip.purpose, !purpose.isEmpty {
                         Text(purpose)
@@ -536,13 +530,13 @@ struct TripHistoryRow: View {
                         Text(String(date.prefix(10)))
                     }
                 }
-                .font(.caption)
+                .font(.flCaption)
                 .foregroundStyle(WarmPalette.ink3)
             }
             Spacer()
             if trip.status == "arrived", let started = trip.started_at, let arrived = trip.arrived_at {
                 Text(formatDuration(from: started, to: arrived))
-                    .font(.caption)
+                    .font(.flCaption)
                     .foregroundStyle(WarmPalette.ink3)
             }
         }
@@ -600,7 +594,7 @@ struct LocationPermissionBanner: View {
                         .foregroundStyle(.white)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 8)
-                        .background(AccentTheme.saffron.color, in: RoundedRectangle(cornerRadius: 8))
+                        .background(AccentTheme.saffron.color, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.small))
                 }
             } else if locationService.isDenied || locationService.authorizationStatus == .authorizedWhenInUse {
                 Button {
@@ -615,7 +609,7 @@ struct LocationPermissionBanner: View {
                     .foregroundStyle(AccentTheme.saffron.color)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 8)
-                    .background(AccentTheme.saffron.color.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
+                    .background(AccentTheme.saffron.color.opacity(0.12), in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.small))
                 }
             }
         }

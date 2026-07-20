@@ -87,3 +87,12 @@ struct SendToSheet: View {
         }
     }
 }
+
+#Preview {
+    SendToSheet(quotedItem: QuotedItem(type: "task", id: 1, title: "Pick up the cake"))
+        .environment(APIService())
+        .environment(AuthService())
+        .environment(HouseholdService())
+        .environment(ProfileImageCache())
+        .environment(MessageCache())
+}

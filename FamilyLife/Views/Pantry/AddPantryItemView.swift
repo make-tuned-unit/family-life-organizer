@@ -49,7 +49,7 @@ struct AddPantryItemView: View {
                         DatePicker("Expires", selection: $expiryDate, displayedComponents: .date)
                         Toggle("Notify me the day before", isOn: $addExpiryAlert)
                         Text("If notifications are unavailable, the item still saves and the alert is skipped.")
-                            .font(.caption)
+                            .font(.flCaption)
                             .foregroundStyle(WarmPalette.ink3)
                     }
                 }

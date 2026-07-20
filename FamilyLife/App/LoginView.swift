@@ -48,7 +48,7 @@ struct LoginView: View {
                     VStack(spacing: 8) {
 
                         Text("Kinrows")
-                            .font(.system(size: 38, weight: .bold))
+                            .font(.flHero)
                             .foregroundStyle(.white)
                             .shadow(color: .black.opacity(0.3), radius: 8, y: 4)
 
@@ -75,9 +75,9 @@ struct LoginView: View {
                                 .tint(.white)
                         }
                         .padding(16)
-                        .background(.ultraThinMaterial.opacity(0.8), in: RoundedRectangle(cornerRadius: 16))
+                        .background(.ultraThinMaterial.opacity(0.8), in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.tile))
                         .overlay(
-                            RoundedRectangle(cornerRadius: 16)
+                            RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.tile)
                                 .stroke(.white.opacity(0.2), lineWidth: 0.5)
                         )
 
@@ -94,9 +94,9 @@ struct LoginView: View {
                                 .tint(.white)
                         }
                         .padding(16)
-                        .background(.ultraThinMaterial.opacity(0.8), in: RoundedRectangle(cornerRadius: 16))
+                        .background(.ultraThinMaterial.opacity(0.8), in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.tile))
                         .overlay(
-                            RoundedRectangle(cornerRadius: 16)
+                            RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.tile)
                                 .stroke(.white.opacity(0.2), lineWidth: 0.5)
                         )
 

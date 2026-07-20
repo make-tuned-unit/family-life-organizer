@@ -20,7 +20,7 @@ struct LogProgressView: View {
                         Image(systemName: rivalry.challengeType.icon)
                             .foregroundStyle(TabAccent.home.color)
                         Text(rivalry.title)
-                            .font(.subheadline)
+                            .font(.flSubheadline)
                     }
                 }
 

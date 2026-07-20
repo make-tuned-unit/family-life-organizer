@@ -295,7 +295,7 @@ struct CoverageDetailSheet: View {
                                 }
                             }
                             .padding(12)
-                            .background(AccentTheme.sage.color.opacity(0.08), in: RoundedRectangle(cornerRadius: 14))
+                            .background(AccentTheme.sage.color.opacity(0.08), in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.small))
                         }
                     }
                     .padding(.horizontal, DesignTokens.Spacing.horizontalMargin).padding(.bottom, 18)
@@ -314,7 +314,7 @@ struct CoverageDetailSheet: View {
                             .font(.flSubheadline.weight(.semibold))
                             .foregroundStyle(AccentTheme.rose.color)
                             .frame(maxWidth: .infinity).padding(.vertical, 14)
-                            .background(AccentTheme.rose.color.opacity(0.1), in: RoundedRectangle(cornerRadius: 18))
+                            .background(AccentTheme.rose.color.opacity(0.1), in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.tile))
                     }
                     .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
                 }

@@ -21,31 +21,29 @@ struct PersonGiftListView: View {
             Section {
                 VStack(alignment: .leading, spacing: 8) {
                     HStack {
-                        Image(systemName: "person.circle.fill")
-                            .font(.largeTitle)
-                            .foregroundStyle(TabAccent.home.color)
+                        FamilyAvatar(initial: String(person.name.prefix(1)).uppercased(), size: 44, name: person.name)
                         VStack(alignment: .leading) {
                             Text(person.name)
-                                .font(.title3.bold())
+                                .font(.flTitle)
                             if let relationship = person.relationship, !relationship.isEmpty {
                                 Text(relationship.capitalized)
-                                    .font(.caption)
+                                    .font(.flCaption)
                                     .foregroundStyle(WarmPalette.ink3)
                             }
                         }
                     }
                     if let birthday = person.birthday {
                         Label("Birthday: \(formatMonthDay(birthday))", systemImage: "birthday.cake.fill")
-                            .font(.subheadline)
+                            .font(.flSubheadline)
                     }
                     if let anniversary = person.anniversary {
                         Label("Anniversary: \(formatMonthDay(anniversary))", systemImage: "heart.fill")
-                            .font(.subheadline)
+                            .font(.flSubheadline)
                             .foregroundStyle(AccentTheme.rose.color)
                     }
                     if let notes = person.notes, !notes.isEmpty {
                         Text(notes)
-                            .font(.caption)
+                            .font(.flCaption)
                             .foregroundStyle(WarmPalette.ink3)
                     }
                 }
@@ -176,7 +174,7 @@ struct GiftIdeaRowRemote: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(idea.title)
-                    .font(.subheadline.weight(.medium))
+                    .font(.flSubheadline.weight(.medium))
                     .strikethrough(idea.statusValue == .given)
                 HStack(spacing: 8) {
                     if let event = idea.for_event, !event.isEmpty {
@@ -188,7 +186,7 @@ struct GiftIdeaRowRemote: View {
                     Text(idea.statusValue.rawValue.capitalized)
                         .foregroundStyle(statusColor)
                 }
-                .font(.caption)
+                .font(.flCaption)
                 .foregroundStyle(WarmPalette.ink3)
             }
 
@@ -197,7 +195,7 @@ struct GiftIdeaRowRemote: View {
             if let url = idea.link_url, !url.isEmpty, let parsedURL = URL(string: url) {
                 Link(destination: parsedURL) {
                     Image(systemName: "link")
-                        .font(.caption)
+                        .font(.flCaption)
                         .foregroundStyle(AccentTheme.ocean.color)
                 }
             }

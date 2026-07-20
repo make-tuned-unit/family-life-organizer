@@ -49,7 +49,7 @@ struct AddStayView: View {
                                         .foregroundStyle(.primary)
                                     if household.userId(for: member.name) != nil {
                                         Text("App user — can approve")
-                                            .font(.caption2)
+                                            .font(.flCaption2)
                                             .foregroundStyle(WarmPalette.good)
                                     }
                                 }
@@ -234,4 +234,25 @@ struct EditStayView: View {
             isSaving = false
         }
     }
+}
+
+#Preview {
+    AddStayView(
+        itinerary: ItineraryResponse(
+            id: 1,
+            title: "Summer in Halifax",
+            traveler_id: 1,
+            traveler_name: "Jesse",
+            start_date: "2026-08-01",
+            end_date: "2026-08-08",
+            travelers: "Jesse, Sophie",
+            notes: nil,
+            status: "planning",
+            group_id: nil,
+            created_at: nil
+        ),
+        existingStays: []
+    ) {}
+    .environment(APIService())
+    .environment(HouseholdService())
 }

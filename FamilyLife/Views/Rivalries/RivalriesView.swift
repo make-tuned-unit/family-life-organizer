@@ -36,6 +36,12 @@ struct RivalriesView: View {
     var body: some View {
         ScrollView {
             LazyVStack(spacing: 20) {
+                FLScreenHeader(
+                    eyebrow: "\(activeRivalries.count) active",
+                    title: "Rivalries",
+                    accent: TabAccent.rivalries.color
+                )
+
                 if !leaderboard.isEmpty {
                     LeaderboardCardRemote(points: leaderboard)
                 }
@@ -43,8 +49,8 @@ struct RivalriesView: View {
                 if !activeRivalries.isEmpty {
                     VStack(alignment: .leading, spacing: 12) {
                         Text("Active Rivalries")
-                            .font(.headline)
-                            .padding(.horizontal)
+                            .font(.flHeadline)
+                            .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
 
                         ForEach(activeRivalries) { rivalry in
                             NavigationLink {
@@ -52,8 +58,8 @@ struct RivalriesView: View {
                             } label: {
                                 RivalryCardRemote(rivalry: rivalry, entries: entriesByRivalry[rivalry.id] ?? [])
                             }
-                            .buttonStyle(.plain)
-                            .padding(.horizontal)
+                            .buttonStyle(.flCardPress)
+                            .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
                             .contextMenu {
                                 Button(role: .destructive) {
                                     Task { await deleteRivalry(rivalry) }
@@ -66,8 +72,8 @@ struct RivalriesView: View {
                 if !completedRivalries.isEmpty {
                     VStack(alignment: .leading, spacing: 12) {
                         Text("Completed")
-                            .font(.headline)
-                            .padding(.horizontal)
+                            .font(.flHeadline)
+                            .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
 
                         ForEach(completedRivalries.prefix(10)) { rivalry in
                             NavigationLink {
@@ -75,8 +81,8 @@ struct RivalriesView: View {
                             } label: {
                                 RivalryCardRemote(rivalry: rivalry, entries: entriesByRivalry[rivalry.id] ?? [])
                             }
-                            .buttonStyle(.plain)
-                            .padding(.horizontal)
+                            .buttonStyle(.flCardPress)
+                            .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
                             .contextMenu {
                                 Button(role: .destructive) {
                                     Task { await deleteRivalry(rivalry) }
@@ -201,7 +207,7 @@ struct RivalryCardRemote: View {
                 Image(systemName: rivalry.challengeType.icon)
                     .foregroundStyle(challengeColor)
                 Text(rivalry.title)
-                    .font(.subheadline.weight(.semibold))
+                    .font(.flSubheadline.weight(.semibold))
                 Spacer()
                 StatusBadge(status: rivalry.statusValue)
             }
@@ -210,7 +216,7 @@ struct RivalryCardRemote: View {
                 CompetitorScore(name: leftName, value: leftTotal, isLeading: leftTotal >= rightTotal)
                 Spacer()
                 Text("vs")
-                    .font(.caption.weight(.bold))
+                    .font(.flCaption.weight(.bold))
                     .foregroundStyle(WarmPalette.ink3)
                 Spacer()
                 CompetitorScore(name: rightName, value: rightTotal, isLeading: rightTotal >= leftTotal, trailing: true)
@@ -219,10 +225,10 @@ struct RivalryCardRemote: View {
             GeometryReader { geo in
                 let total = max(leftTotal + rightTotal, 1)
                 HStack(spacing: 2) {
-                    RoundedRectangle(cornerRadius: 4)
+                    RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.small)
                         .fill(rivalry.isTeam ? TabAccent.home.color : PersonPalette.color(for: rivalry.initiator_name))
                         .frame(width: geo.size.width * (leftTotal / total))
-                    RoundedRectangle(cornerRadius: 4)
+                    RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.small)
                         .fill(rivalry.isTeam ? AccentTheme.saffron.color : PersonPalette.color(for: rivalry.opponent_name))
                         .frame(width: geo.size.width * (rightTotal / total))
                 }
@@ -231,18 +237,18 @@ struct RivalryCardRemote: View {
 
             if rivalry.isTeam {
                 Text("Team challenge")
-                    .font(.caption2.weight(.semibold))
+                    .font(.flCaption2.weight(.semibold))
                     .foregroundStyle(TabAccent.rivalries.color)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
 
             HStack {
                 Label("\(rivalry.point_value) pts", systemImage: "trophy.fill")
-                    .font(.caption2)
+                    .font(.flCaption2)
                     .foregroundStyle(WarmPalette.ink3)
                 Spacer()
                 Text(daysRemaining)
-                    .font(.caption2)
+                    .font(.flCaption2)
                     .foregroundStyle(WarmPalette.ink3)
             }
         }
@@ -276,29 +282,29 @@ struct LeaderboardCardRemote: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Leaderboard")
-                .font(.headline)
-                .padding(.horizontal)
+                .font(.flHeadline)
+                .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
 
             VStack(spacing: 10) {
                 ForEach(Array(points.prefix(5).enumerated()), id: \.element.id) { index, member in
                     HStack(spacing: 10) {
                         Text("\(index + 1)")
-                            .font(.subheadline.bold())
+                            .font(.flSubheadline.bold())
                             .foregroundStyle(index == 0 ? AccentTheme.saffron.color : WarmPalette.ink3)
                             .frame(width: 20)
                         Text(member.member_name)
-                            .font(.subheadline.weight(.medium))
+                            .font(.flSubheadline.weight(.medium))
                         LevelBadge(xp: member.total_points, compact: true)
                         Spacer()
                         Text("\(member.total_points) pts")
-                            .font(.subheadline.bold())
+                            .font(.flSubheadline.bold())
                             .foregroundStyle(TabAccent.home.color)
                     }
                 }
             }
             .padding(DesignTokens.Spacing.cardPadding)
             .flCard(tint: TabAccent.rivalries.color)
-            .padding(.horizontal)
+            .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
         }
     }
 }
@@ -322,7 +328,7 @@ struct StatusBadge: View {
 
     var body: some View {
         Text(label)
-            .font(.caption2.weight(.semibold))
+            .font(.flCaption2.weight(.semibold))
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
             .background(color.opacity(0.16))
@@ -358,14 +364,14 @@ struct CompetitorScore: View {
     var body: some View {
         VStack(alignment: trailing ? .trailing : .leading, spacing: 4) {
             Text(name)
-                .font(.caption.weight(.medium))
+                .font(.flCaption.weight(.medium))
                 .foregroundStyle(WarmPalette.ink3)
             Text(valueText)
-                .font(.title3.bold())
+                .font(.flTitle)
                 .foregroundStyle(isLeading ? .primary : WarmPalette.ink3)
             if isLeading {
                 Text("Leading")
-                    .font(.caption2.weight(.semibold))
+                    .font(.flCaption2.weight(.semibold))
                     .foregroundStyle(WarmPalette.good)
             }
         }
@@ -388,13 +394,13 @@ struct PlayerColumn: View {
     var body: some View {
         VStack(spacing: 6) {
             Text(name)
-                .font(.subheadline.weight(.medium))
+                .font(.flSubheadline.weight(.medium))
                 .foregroundStyle(WarmPalette.ink3)
             Text(valueText)
                 .font(.system(.title, design: .rounded, weight: .bold))
                 .foregroundStyle(color)
             Text(isLeading ? "Ahead" : "Chasing")
-                .font(.caption.weight(.semibold))
+                .font(.flCaption.weight(.semibold))
                 .foregroundStyle(isLeading ? WarmPalette.good : WarmPalette.ink3)
         }
         .frame(maxWidth: .infinity)
@@ -418,19 +424,19 @@ struct ProgressRow: View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
                 Text(name)
-                    .font(.caption.weight(.medium))
+                    .font(.flCaption.weight(.medium))
                     .foregroundStyle(WarmPalette.ink3)
                 Spacer()
                 Text(valueText)
-                    .font(.caption.weight(.semibold))
+                    .font(.flCaption.weight(.semibold))
                     .foregroundStyle(.primary)
             }
 
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
-                    RoundedRectangle(cornerRadius: 6)
+                    RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.small)
                         .fill(WarmPalette.ink1.opacity(0.06))
-                    RoundedRectangle(cornerRadius: 6)
+                    RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.small)
                         .fill(color.opacity(0.85))
                         .frame(width: geo.size.width * fillFraction)
                 }

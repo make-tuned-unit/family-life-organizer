@@ -478,7 +478,7 @@ struct HomeView: View {
                 ForEach(onThisDay) { m in
                     HStack(spacing: 12) {
                         ZStack {
-                            RoundedRectangle(cornerRadius: 11)
+                            RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.small)
                                 .fill(AccentTheme.saffron.color.opacity(0.16))
                                 .frame(width: 38, height: 38)
                             Image(systemName: "sparkles")

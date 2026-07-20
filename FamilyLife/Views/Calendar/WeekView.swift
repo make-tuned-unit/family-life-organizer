@@ -32,10 +32,10 @@ struct WeekView: View {
                         .padding(.vertical, 10)
                         .background {
                             if isSelected {
-                                RoundedRectangle(cornerRadius: 14)
+                                RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.small)
                                     .fill(WarmPalette.ink1)
                             } else if isToday {
-                                RoundedRectangle(cornerRadius: 14)
+                                RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.small)
                                     .stroke(AccentTheme.terracotta.color, lineWidth: 1.5)
                             }
                         }

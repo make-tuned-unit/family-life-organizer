@@ -596,7 +596,7 @@ struct GroupDetailView: View {
                 .foregroundStyle(WarmPalette.bad)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 12)
-                .background(WarmPalette.bad.opacity(0.08), in: RoundedRectangle(cornerRadius: 14))
+                .background(WarmPalette.bad.opacity(0.08), in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.small))
             }
             .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
             .padding(.top, 16)

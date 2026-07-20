@@ -35,7 +35,7 @@ struct DecisionDetailView: View {
         Group {
             if currentDecision.status == DecisionStatus.resolved.rawValue {
                 Label("Resolved", systemImage: "checkmark.circle.fill")
-                    .font(.subheadline.weight(.semibold))
+                    .font(.flSubheadline.weight(.semibold))
                     .foregroundStyle(WarmPalette.good)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 8)
@@ -45,7 +45,7 @@ struct DecisionDetailView: View {
                       let expiresDate = ISO8601DateFormatter.flexible.date(from: expiresStr) {
                 if expiresDate < Date() {
                     Label("Expired", systemImage: "clock.badge.xmark")
-                        .font(.subheadline.weight(.semibold))
+                        .font(.flSubheadline.weight(.semibold))
                         .foregroundStyle(WarmPalette.ink3)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 8)
@@ -53,7 +53,7 @@ struct DecisionDetailView: View {
                         .background(WarmPalette.ink1.opacity(0.06), in: RoundedRectangle(cornerRadius: 10))
                 } else {
                     Label("Expires \(expiresDate, style: .relative)", systemImage: "clock")
-                        .font(.caption)
+                        .font(.flCaption)
                         .foregroundStyle(WarmPalette.ink3)
                 }
             }
@@ -72,21 +72,21 @@ struct DecisionDetailView: View {
                     HStack {
                         UserAvatar(name: currentDecision.creator_name, size: 24)
                         Text(currentDecision.creator_name)
-                            .font(.subheadline.weight(.semibold))
+                            .font(.flSubheadline.weight(.semibold))
                         Spacer()
                         if let created = currentDecision.createdDate {
                             Text(created, style: .relative)
-                                .font(.caption)
+                                .font(.flCaption)
                                 .foregroundStyle(WarmPalette.ink3)
                         }
                     }
 
                     Text(currentDecision.title)
-                        .font(.title3.bold())
+                        .font(.flTitle)
 
                     if let body = currentDecision.body, !body.isEmpty {
                         Text(body)
-                            .font(.subheadline)
+                            .font(.flSubheadline)
                             .foregroundStyle(WarmPalette.ink3)
                     }
 
@@ -108,7 +108,7 @@ struct DecisionDetailView: View {
                                 Text(url)
                                     .lineLimit(1)
                             }
-                            .font(.subheadline)
+                            .font(.flSubheadline)
                             .padding(DesignTokens.Spacing.inset)
                             .background(TabAccent.decisions.color.opacity(DesignTokens.Opacity.cardTint))
                             .clipShape(RoundedRectangle(cornerRadius: 8))
@@ -128,11 +128,11 @@ struct DecisionDetailView: View {
                             } label: {
                                 HStack {
                                     Text(option)
-                                        .font(.subheadline)
+                                        .font(.flSubheadline)
                                         .foregroundStyle(.primary)
                                     Spacer()
                                     Text("\(voteCount)")
-                                        .font(.subheadline.bold())
+                                        .font(.flSubheadline.bold())
                                         .foregroundStyle(TabAccent.home.color)
                                     if myVote == idx {
                                         Image(systemName: "checkmark.circle.fill")
@@ -176,7 +176,7 @@ struct DecisionDetailView: View {
 
                 VStack(alignment: .leading, spacing: 12) {
                     Text("Comments (\(comments.count))")
-                        .font(.headline)
+                        .font(.flHeadline)
                         .padding(.horizontal)
 
                     ForEach(comments) { comment in
@@ -186,15 +186,15 @@ struct DecisionDetailView: View {
                             VStack(alignment: .leading, spacing: 2) {
                                 HStack {
                                     Text(comment.member_name)
-                                        .font(.caption.weight(.semibold))
+                                        .font(.flCaption.weight(.semibold))
                                     if let date = comment.createdDate {
                                         Text(date, style: .relative)
-                                            .font(.caption2)
+                                            .font(.flCaption2)
                                             .foregroundStyle(WarmPalette.ink4)
                                     }
                                 }
                                 Text(comment.text)
-                                    .font(.subheadline)
+                                    .font(.flSubheadline)
                             }
                         }
                         .padding(.horizontal)
@@ -212,7 +212,7 @@ struct DecisionDetailView: View {
                                 Task { await addComment() }
                             } label: {
                                 Image(systemName: "arrow.up.circle.fill")
-                                    .font(.title2)
+                                    .font(.flTitle)
                                     .foregroundStyle(newComment.isEmpty ? WarmPalette.ink4 : TabAccent.home.color)
                             }
                             .disabled(newComment.isEmpty)

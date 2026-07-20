@@ -333,7 +333,7 @@ struct PantryItemRow: View {
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 4) {
                 Text(item.item)
-                    .font(.subheadline.weight(.medium))
+                    .font(.flSubheadline.weight(.medium))
                 HStack(spacing: 8) {
                     if let qty = item.quantity, !qty.isEmpty {
                         Label(qty + (item.unit.map { " \($0)" } ?? ""), systemImage: "number")
@@ -342,7 +342,7 @@ struct PantryItemRow: View {
                         Label(loc.capitalized, systemImage: "mappin")
                     }
                 }
-                .font(.caption)
+                .font(.flCaption)
                 .foregroundStyle(WarmPalette.ink3)
             }
             Spacer()
@@ -369,7 +369,7 @@ struct ExpiryBadge: View {
 
     var body: some View {
         Text(status.0)
-            .font(.caption2.weight(.medium))
+            .font(.flCaption2.weight(.medium))
             .padding(.horizontal, DesignTokens.Spacing.chipPadding)
             .padding(.vertical, DesignTokens.Spacing.tinyLabel)
             .background(status.1.opacity(DesignTokens.Opacity.badgeFill))

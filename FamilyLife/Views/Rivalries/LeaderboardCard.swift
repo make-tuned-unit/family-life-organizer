@@ -14,7 +14,7 @@ struct LeaderboardCard: View {
                 Image(systemName: "trophy.fill")
                     .foregroundStyle(AccentTheme.saffron.color)
                 Text("Family Leaderboard")
-                    .font(.headline)
+                    .font(.flHeadline)
             }
             .padding(.horizontal)
 
@@ -25,7 +25,7 @@ struct LeaderboardCard: View {
                     HStack(spacing: 12) {
                         // Rank
                         Text("\(index + 1)")
-                            .font(.subheadline.bold())
+                            .font(.flSubheadline.bold())
                             .frame(width: 24)
                             .foregroundStyle(rankColor(index))
 
@@ -38,7 +38,7 @@ struct LeaderboardCard: View {
 
                         // Name
                         Text(member.memberName)
-                            .font(.subheadline.weight(.medium))
+                            .font(.flSubheadline.weight(.medium))
                             .foregroundStyle(.primary)
 
                         Spacer()
@@ -46,10 +46,10 @@ struct LeaderboardCard: View {
                         // Stats
                         HStack(spacing: 8) {
                             Label("\(member.rivalriesWon)W", systemImage: "star.fill")
-                                .font(.caption2)
+                                .font(.flCaption2)
                                 .foregroundStyle(WarmPalette.ink3)
                             Text("\(member.totalPoints) pts")
-                                .font(.subheadline.bold())
+                                .font(.flSubheadline.bold())
                                 .foregroundStyle(TabAccent.home.color)
                                 .contentTransition(.numericText())
                                 .animation(.snappy, value: member.totalPoints)
@@ -100,14 +100,12 @@ struct MemberStatsSheet: View {
             List {
                 Section {
                     HStack {
-                        Image(systemName: "person.circle.fill")
-                            .font(.largeTitle)
-                            .foregroundStyle(TabAccent.home.color)
+                        FamilyAvatar(initial: String(member.memberName.prefix(1)).uppercased(), size: 40, name: member.memberName)
                         VStack(alignment: .leading) {
                             Text(member.memberName)
-                                .font(.title2.bold())
+                                .font(.flTitle)
                             Text("Family competitor")
-                                .font(.caption)
+                                .font(.flCaption)
                                 .foregroundStyle(WarmPalette.ink3)
                         }
                     }
@@ -142,7 +140,7 @@ struct StatRow: View {
             Text(label)
             Spacer()
             Text(value)
-                .font(.headline)
+                .font(.flHeadline)
         }
     }
 }

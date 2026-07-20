@@ -202,7 +202,7 @@ private struct RecurringRow: View {
                 .font(.system(size: 16))
                 .foregroundStyle(AccentTheme.ocean.color)
                 .frame(width: 40, height: 40)
-                .background(AccentTheme.ocean.color.opacity(0.15), in: RoundedRectangle(cornerRadius: 14))
+                .background(AccentTheme.ocean.color.opacity(0.15), in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.small))
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 6) {
                     Text(item.name)
@@ -370,4 +370,9 @@ struct RecurringPaymentEditor: View {
         do { try await api.deleteRecurringPayment(id: e.id); await onSave(); dismiss() }
         catch { }
     }
+}
+
+#Preview {
+    NavigationStack { RecurringPaymentsView() }
+        .environment(APIService())
 }

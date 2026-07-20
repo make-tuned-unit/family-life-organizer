@@ -83,7 +83,7 @@ struct EventAttachmentsSection: View {
                     .font(.system(size: 16, weight: .medium))
                     .foregroundStyle(kind?.color ?? WarmPalette.ink2)
                     .frame(width: 30, height: 30)
-                    .background((kind?.color ?? WarmPalette.ink2).opacity(0.12), in: RoundedRectangle(cornerRadius: 9))
+                    .background((kind?.color ?? WarmPalette.ink2).opacity(0.12), in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.small))
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(att.title ?? kind?.label ?? "Item")
@@ -480,4 +480,10 @@ private struct AttachedTripDetail: View {
                 .foregroundStyle(WarmPalette.ink2)
         }
     }
+}
+
+#Preview {
+    EventAttachmentsSection(appointmentId: 1)
+        .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
+        .environment(APIService())
 }

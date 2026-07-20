@@ -21,7 +21,7 @@ struct SecurityView: View {
         Form {
             Section {
                 if loading {
-                    HStack { ProgressView(); Text("Loading…").foregroundStyle(WarmPalette.ink3) }
+                    FLLoadingState(message: "Loading…")
                 } else if let status {
                     HStack {
                         Text("Status")
@@ -118,4 +118,9 @@ struct SecurityView: View {
     private func resetFlow() {
         challenge = nil; code = ""; newEmail = ""; emailHint = nil
     }
+}
+
+#Preview {
+    NavigationStack { SecurityView() }
+        .environment(APIService())
 }

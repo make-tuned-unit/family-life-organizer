@@ -455,9 +455,9 @@ struct FeedCard: View {
                     .scaledToFill()
                     .frame(maxWidth: .infinity)
                     .frame(height: 200)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.small))
             } else {
-                RoundedRectangle(cornerRadius: 12)
+                RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.small)
                     .fill(WarmPalette.ink1.opacity(0.05))
                     .frame(height: 200)
                     .overlay { ProgressView() }

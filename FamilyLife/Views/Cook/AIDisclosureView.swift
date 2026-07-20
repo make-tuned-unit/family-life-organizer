@@ -39,7 +39,7 @@ struct AIDisclosureView: View {
                 }
                 .padding(16)
                 .background(WarmPalette.ink1.opacity(0.04))
-                .clipShape(RoundedRectangle(cornerRadius: 16))
+                .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.tile))
             }
             .padding(.horizontal, 24)
 

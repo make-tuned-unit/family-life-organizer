@@ -150,7 +150,7 @@ struct CoverageCascadeView: View {
                         }
                         .foregroundStyle(WarmPalette.ink3)
                         .frame(maxWidth: .infinity).padding(.vertical, 12)
-                        .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(style: StrokeStyle(lineWidth: 1, dash: [6])).foregroundStyle(WarmPalette.ink1.opacity(0.08)))
+                        .overlay(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.tile).strokeBorder(style: StrokeStyle(lineWidth: 1, dash: [6])).foregroundStyle(WarmPalette.ink1.opacity(0.08)))
                     }
                 }
                 .padding(.horizontal, DesignTokens.Spacing.horizontalMargin).padding(.bottom, 14)
@@ -307,8 +307,8 @@ struct CoverageCascadeView: View {
                         }
                         .padding(14).frame(maxWidth: .infinity, alignment: .leading)
                         .background(WarmPalette.good.opacity(0.12))
-                        .overlay(RoundedRectangle(cornerRadius: 18).stroke(WarmPalette.good.opacity(0.28), lineWidth: 1))
-                        .clipShape(RoundedRectangle(cornerRadius: 18))
+                        .overlay(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.tile).stroke(WarmPalette.good.opacity(0.28), lineWidth: 1))
+                        .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.tile))
                     }
                     .padding(22)
                     .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.cardLarge))
@@ -351,8 +351,8 @@ struct CoverageCascadeView: View {
                     }
                     .padding(14).frame(maxWidth: .infinity, alignment: .leading)
                     .background(WarmPalette.good.opacity(0.14))
-                    .overlay(RoundedRectangle(cornerRadius: 20).stroke(WarmPalette.good.opacity(0.32), lineWidth: 1))
-                    .clipShape(RoundedRectangle(cornerRadius: 20))
+                    .overlay(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card).stroke(WarmPalette.good.opacity(0.32), lineWidth: 1))
+                    .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
                     .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
                     .padding(.top, 12).padding(.bottom, 14)
 

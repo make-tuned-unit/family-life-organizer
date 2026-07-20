@@ -169,7 +169,7 @@ struct PersonDetailView: View {
                     .font(.flSubheadline.weight(.semibold))
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 11)
-                    .background(display.accentColor.opacity(0.14), in: RoundedRectangle(cornerRadius: 14))
+                    .background(display.accentColor.opacity(0.14), in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.small))
                     .foregroundStyle(display.accentColor)
             }
             .buttonStyle(.plain)
@@ -188,7 +188,7 @@ struct PersonDetailView: View {
     private func milestoneRow(_ m: MilestoneResponse) -> some View {
         HStack(alignment: .top, spacing: 12) {
             ZStack {
-                RoundedRectangle(cornerRadius: 11)
+                RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.small)
                     .fill(m.categoryEnum.color.opacity(0.15))
                     .frame(width: 38, height: 38)
                 Image(systemName: m.categoryEnum.icon)
@@ -221,7 +221,7 @@ struct PersonDetailView: View {
                     .resizable()
                     .scaledToFill()
                     .frame(width: 52, height: 52)
-                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                    .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.small))
             }
         }
         .padding(13)
@@ -251,7 +251,7 @@ struct PersonDetailView: View {
                     .font(.flSubheadline.weight(.semibold))
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 11)
-                    .background(display.accentColor.opacity(0.14), in: RoundedRectangle(cornerRadius: 14))
+                    .background(display.accentColor.opacity(0.14), in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.small))
                     .foregroundStyle(display.accentColor)
             }
             .buttonStyle(.plain)
@@ -271,7 +271,7 @@ struct PersonDetailView: View {
         let status = GiftIdeaStatus(rawValue: idea.status) ?? .idea
         return HStack(alignment: .top, spacing: 12) {
             ZStack {
-                RoundedRectangle(cornerRadius: 11)
+                RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.small)
                     .fill(giftStatusColor(status).opacity(0.15))
                     .frame(width: 38, height: 38)
                 Image(systemName: giftStatusIcon(status))
@@ -372,7 +372,7 @@ struct PersonDetailView: View {
                     .font(.flSubheadline.weight(.semibold))
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 11)
-                    .background(display.accentColor.opacity(0.14), in: RoundedRectangle(cornerRadius: 14))
+                    .background(display.accentColor.opacity(0.14), in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.small))
                     .foregroundStyle(display.accentColor)
             }
             .buttonStyle(.plain)
@@ -536,7 +536,7 @@ struct AddMilestoneSheet: View {
                             .resizable()
                             .scaledToFit()
                             .frame(maxHeight: 180)
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                            .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.small))
                             .frame(maxWidth: .infinity)
                     }
                     PhotosPicker(selection: $selectedPhoto, matching: .images) {
@@ -559,12 +559,10 @@ struct AddMilestoneSheet: View {
                         .font(.flFootnote)
                         .foregroundStyle(WarmPalette.ink3)
                 }
-                if let error {
-                    Text(error).foregroundStyle(.red).font(.flFootnote)
-                }
             }
             .navigationTitle("New milestone")
             .navigationBarTitleDisplayMode(.inline)
+            .inlineError(error) { error = nil }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
@@ -667,7 +665,7 @@ struct EditMilestoneSheet: View {
                             .resizable()
                             .scaledToFit()
                             .frame(maxHeight: 180)
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                            .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.small))
                             .frame(maxWidth: .infinity)
                         Button(role: .destructive) {
                             photoChange = .some(nil)
@@ -689,12 +687,10 @@ struct EditMilestoneSheet: View {
                         }
                     }
                 }
-                if let error {
-                    Text(error).foregroundStyle(.red).font(.flFootnote)
-                }
             }
             .navigationTitle("Edit milestone")
             .navigationBarTitleDisplayMode(.inline)
+            .inlineError(error) { error = nil }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
@@ -765,12 +761,10 @@ struct AddKeyDateSheet: View {
                     TextField("A little detail (optional)", text: $notes, axis: .vertical)
                         .lineLimit(2...4)
                 }
-                if let error {
-                    Text(error).foregroundStyle(.red).font(.flFootnote)
-                }
             }
             .navigationTitle("New key date for \(person.name)")
             .navigationBarTitleDisplayMode(.inline)
+            .inlineError(error) { error = nil }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
@@ -846,12 +840,10 @@ struct EditKeyDateSheet: View {
                     TextField("A little detail (optional)", text: $notes, axis: .vertical)
                         .lineLimit(2...4)
                 }
-                if let error {
-                    Text(error).foregroundStyle(.red).font(.flFootnote)
-                }
             }
             .navigationTitle("Edit key date")
             .navigationBarTitleDisplayMode(.inline)
+            .inlineError(error) { error = nil }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
@@ -949,12 +941,10 @@ struct EditPersonSheet: View {
                         }
                     }
                 }
-                if let error {
-                    Text(error).foregroundStyle(.red).font(.flFootnote)
-                }
             }
             .navigationTitle("Edit \(person.name)")
             .navigationBarTitleDisplayMode(.inline)
+            .inlineError(error) { error = nil }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }

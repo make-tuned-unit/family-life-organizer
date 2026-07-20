@@ -25,7 +25,7 @@ struct PeopleView: View {
                         } label: {
                             personCard(person)
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(.flCardPress)
                     }
                 }
 
@@ -50,7 +50,7 @@ struct PeopleView: View {
                     .padding(14)
                     .flCard()
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.flCardPress)
                 .padding(.top, 6)
             }
             .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
@@ -197,12 +197,10 @@ struct AddPersonSheet: View {
                         }
                     }
                 }
-                if let error {
-                    Text(error).foregroundStyle(.red).font(.flFootnote)
-                }
             }
             .navigationTitle("Add a person")
             .navigationBarTitleDisplayMode(.inline)
+            .inlineError(error) { error = nil }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
@@ -334,7 +332,7 @@ struct YearRecapView: View {
                                             .resizable()
                                             .scaledToFill()
                                             .frame(width: 40, height: 40)
-                                            .clipShape(RoundedRectangle(cornerRadius: 9))
+                                            .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.small))
                                     }
                                 }
                                 .padding(11)

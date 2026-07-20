@@ -500,11 +500,11 @@ struct EditMemberSheet: View {
                                 } label: {
                                     VStack(alignment: .leading, spacing: 2) {
                                         Text(result.title)
-                                            .font(.subheadline.weight(.medium))
+                                            .font(.flSubheadline.weight(.medium))
                                             .foregroundStyle(.primary)
                                         if !result.subtitle.isEmpty {
                                             Text(result.subtitle)
-                                                .font(.caption)
+                                                .font(.flCaption)
                                                 .foregroundStyle(WarmPalette.ink3)
                                         }
                                     }
@@ -660,11 +660,11 @@ struct EditAddressSheet: View {
                             } label: {
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(result.title)
-                                        .font(.subheadline.weight(.medium))
+                                        .font(.flSubheadline.weight(.medium))
                                         .foregroundStyle(.primary)
                                     if !result.subtitle.isEmpty {
                                         Text(result.subtitle)
-                                            .font(.caption)
+                                            .font(.flCaption)
                                             .foregroundStyle(WarmPalette.ink3)
                                     }
                                 }
@@ -752,7 +752,7 @@ struct HouseholdMemberRow: View {
                         .resizable()
                         .scaledToFill()
                         .frame(width: 36, height: 36)
-                        .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+                        .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.small, style: .continuous))
                 } else {
                     FamilyAvatar(initial: member.initial, size: 36, name: member.displayName)
                 }

@@ -46,11 +46,11 @@ struct NewTripView: View {
                                 HStack {
                                     VStack(alignment: .leading) {
                                         Text(addr.name)
-                                            .font(.subheadline.weight(.medium))
+                                            .font(.flSubheadline.weight(.medium))
                                             .foregroundStyle(selectedAddress?.id == addr.id ? TabAccent.home.color : .primary)
                                         if let address = addr.address {
                                             Text(address)
-                                                .font(.caption)
+                                                .font(.flCaption)
                                                 .foregroundStyle(WarmPalette.ink3)
                                         }
                                     }
@@ -82,11 +82,11 @@ struct NewTripView: View {
                                 } label: {
                                     VStack(alignment: .leading, spacing: 2) {
                                         Text(result.title)
-                                            .font(.subheadline.weight(.medium))
+                                            .font(.flSubheadline.weight(.medium))
                                             .foregroundStyle(.primary)
                                         if !result.subtitle.isEmpty {
                                             Text(result.subtitle)
-                                                .font(.caption)
+                                                .font(.flCaption)
                                                 .foregroundStyle(WarmPalette.ink3)
                                         }
                                     }
@@ -100,7 +100,7 @@ struct NewTripView: View {
                             etaMinutes = nil
                         } label: {
                             Label("Change destination", systemImage: "arrow.triangle.2.circlepath")
-                                .font(.caption)
+                                .font(.flCaption)
                                 .foregroundStyle(WarmPalette.ink3)
                         }
                     }

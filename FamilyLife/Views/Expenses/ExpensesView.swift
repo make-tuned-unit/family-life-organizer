@@ -405,7 +405,7 @@ struct BudgetCategoryCard: View {
                 .foregroundStyle(color)
                 .frame(width: 40, height: 40)
                 .background(color.opacity(0.15))
-                .clipShape(RoundedRectangle(cornerRadius: 14))
+                .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.small))
 
             VStack(alignment: .leading, spacing: 6) {
                 HStack {
@@ -453,7 +453,7 @@ struct ReceiptListRow: View {
             if isCurrentUser {
                 ProfileAvatar(size: 28)
             } else {
-                FamilyAvatar(initial: String(receipt.added_by?.prefix(1) ?? "?").uppercased(), size: 28)
+                FamilyAvatar(initial: String(receipt.added_by?.prefix(1) ?? "?").uppercased(), size: 28, name: receipt.added_by)
             }
 
             VStack(alignment: .leading, spacing: 2) {

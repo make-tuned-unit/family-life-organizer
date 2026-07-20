@@ -112,11 +112,11 @@ struct ItineraryCard: View {
                 Image(systemName: "map.fill")
                     .foregroundStyle(AccentTheme.ocean.color)
                 Text(itinerary.title)
-                    .font(.headline)
+                    .font(.flHeadline)
                     .foregroundStyle(WarmPalette.ink1)
                 Spacer()
                 Text(itinerary.status.capitalized)
-                    .font(.caption.weight(.medium))
+                    .font(.flCaption.weight(.medium))
                     .padding(.horizontal, 8)
                     .padding(.vertical, 3)
                     .background(statusColor.opacity(0.15))
@@ -126,24 +126,24 @@ struct ItineraryCard: View {
 
             HStack {
                 Image(systemName: "calendar")
-                    .font(.caption)
+                    .font(.flCaption)
                     .foregroundStyle(WarmPalette.ink3)
                 Text(dateRange)
-                    .font(.subheadline)
+                    .font(.flSubheadline)
                     .foregroundStyle(WarmPalette.ink2)
                 Spacer()
                 Image(systemName: "chevron.right")
-                    .font(.caption)
+                    .font(.flCaption)
                     .foregroundStyle(WarmPalette.ink4)
             }
 
             if let travelers = itinerary.travelers, !travelers.isEmpty {
                 HStack {
                     Image(systemName: "person.2.fill")
-                        .font(.caption)
+                        .font(.flCaption)
                         .foregroundStyle(WarmPalette.ink3)
                     Text(travelers)
-                        .font(.caption)
+                        .font(.flCaption)
                         .foregroundStyle(WarmPalette.ink3)
                         .lineLimit(1)
                 }
@@ -287,10 +287,10 @@ struct StayRequestCard: View {
                 FamilyAvatar(initial: String((stay.traveler_name ?? "?").prefix(1)).uppercased(), size: 32, name: stay.traveler_name)
                 VStack(alignment: .leading, spacing: 2) {
                     Text("\(stay.traveler_name ?? "Someone") wants to stay")
-                        .font(.subheadline.weight(.semibold))
+                        .font(.flSubheadline.weight(.semibold))
                         .foregroundStyle(WarmPalette.ink1)
                     Text("\(stay.check_in) to \(stay.check_out)")
-                        .font(.caption)
+                        .font(.flCaption)
                         .foregroundStyle(WarmPalette.ink2)
                 }
                 Spacer()
@@ -298,7 +298,7 @@ struct StayRequestCard: View {
 
             if let notes = stay.notes, !notes.isEmpty {
                 Text(notes)
-                    .font(.caption)
+                    .font(.flCaption)
                     .foregroundStyle(WarmPalette.ink3)
             }
 
@@ -335,4 +335,31 @@ struct StayRequestCard: View {
             isResponding = false
         }
     }
+}
+
+#Preview {
+    NavigationStack {
+        ItineraryListView()
+    }
+    .environment(APIService())
+    .environment(AuthService())
+    .environment(HouseholdService())
+}
+
+#Preview("Itinerary Card") {
+    ItineraryCard(itinerary: ItineraryResponse(
+        id: 1,
+        title: "Summer in Halifax",
+        traveler_id: 1,
+        traveler_name: "Jesse",
+        start_date: "2026-08-01",
+        end_date: "2026-08-08",
+        travelers: "Jesse, Sophie",
+        notes: nil,
+        status: "planning",
+        group_id: nil,
+        created_at: nil
+    ))
+    .padding()
+    .background { AmbientBackground(style: .trips) }
 }

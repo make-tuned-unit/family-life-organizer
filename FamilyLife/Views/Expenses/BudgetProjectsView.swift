@@ -170,7 +170,7 @@ struct ProjectCard: View {
                     .foregroundStyle(AccentTheme.sage.color)
                     .frame(width: 32, height: 32)
                     .background(AccentTheme.sage.color.opacity(0.15))
-                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                    .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.small))
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(project.name)

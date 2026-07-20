@@ -168,8 +168,8 @@ struct TwoFactorView: View {
             .font(.flBody)
             .padding(16)
             .frame(maxWidth: .infinity)
-            .background(.ultraThinMaterial.opacity(0.85), in: RoundedRectangle(cornerRadius: 16))
-            .overlay(RoundedRectangle(cornerRadius: 16).stroke(.white.opacity(0.2), lineWidth: 0.5))
+            .background(.ultraThinMaterial.opacity(0.85), in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.tile))
+            .overlay(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.tile).stroke(.white.opacity(0.2), lineWidth: 0.5))
             .multilineTextAlignment(.center)
     }
 

@@ -13,12 +13,18 @@ struct TravelHubView: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            FLScreenHeader(
+                eyebrow: "On the move",
+                title: "Travel",
+                subtitle: "Trips, itineraries, and saved places",
+                accent: TabAccent.trips.color
+            )
+
             Picker("Travel", selection: $segment.animation(.easeInOut(duration: 0.2))) {
                 ForEach(Segment.allCases) { Text($0.rawValue).tag($0) }
             }
             .pickerStyle(.segmented)
             .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
-            .padding(.top, 10)
             .padding(.bottom, 6)
 
             switch segment {
@@ -32,4 +38,14 @@ struct TravelHubView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackgroundVisibility(.hidden, for: .navigationBar)
     }
+}
+
+#Preview {
+    NavigationStack {
+        TravelHubView()
+    }
+    .environment(APIService())
+    .environment(AuthService())
+    .environment(HouseholdService())
+    .environment(LocationService())
 }

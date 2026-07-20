@@ -346,7 +346,7 @@ struct MessageBubble: View {
                             .resizable()
                             .scaledToFit()
                             .frame(maxWidth: 200, maxHeight: 200)
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                            .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.small))
                     }
                 } else if message.has_image == 1 {
                     if let cached = messageCache.image(for: message.id) {
@@ -355,10 +355,10 @@ struct MessageBubble: View {
                                 .resizable()
                                 .scaledToFit()
                                 .frame(maxWidth: 200, maxHeight: 200)
-                                .clipShape(RoundedRectangle(cornerRadius: 12))
+                                .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.small))
                         }
                     } else {
-                        RoundedRectangle(cornerRadius: 12)
+                        RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.small)
                             .fill(WarmPalette.ink1.opacity(0.06))
                             .frame(width: 150, height: 100)
                             .overlay {
@@ -387,7 +387,7 @@ struct MessageBubble: View {
             .padding(.vertical, 8)
             .background(
                 isOwn ? AnyShapeStyle(TabAccent.home.color) : AnyShapeStyle(WarmPalette.cardSurface),
-                in: RoundedRectangle(cornerRadius: 16)
+                in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.tile)
             )
 
             if !isOwn { Spacer(minLength: 60) }
@@ -436,4 +436,14 @@ struct ImagePreviewView: View {
         }
         .statusBarHidden()
     }
+}
+
+#Preview {
+    NavigationStack {
+        ConversationView(partnerId: 1, partnerName: "Alex")
+    }
+    .environment(APIService())
+    .environment(AuthService())
+    .environment(ProfileImageCache())
+    .environment(MessageCache())
 }

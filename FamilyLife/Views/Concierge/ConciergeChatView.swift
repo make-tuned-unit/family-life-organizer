@@ -100,7 +100,7 @@ struct ConciergeChatView: View {
                     .foregroundStyle(.white)
                     .padding(.horizontal, 14)
                     .padding(.vertical, 10)
-                    .background(accent, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    .background(accent, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.tile, style: .continuous))
             }
         case .assistant:
             VStack(alignment: .leading, spacing: 8) {
@@ -116,7 +116,7 @@ struct ConciergeChatView: View {
                         .foregroundStyle(WarmPalette.ink1)
                         .padding(.horizontal, 14)
                         .padding(.vertical, 10)
-                        .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                        .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.tile, style: .continuous))
                         .fixedSize(horizontal: false, vertical: true)
                     Spacer(minLength: 24)
                 }

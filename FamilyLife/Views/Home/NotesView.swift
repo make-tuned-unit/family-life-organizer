@@ -299,3 +299,9 @@ struct NoteEditorView: View {
         } catch { /* surfaced on next load */ }
     }
 }
+
+#Preview {
+    NavigationStack { NotesView() }
+        .environment(APIService())
+        .environment(AuthService())
+}

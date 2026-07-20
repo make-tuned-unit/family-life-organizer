@@ -21,14 +21,14 @@ struct FamilyAddressesView: View {
             ForEach(addresses) { addr in
                 VStack(alignment: .leading, spacing: 4) {
                     Text(addr.name)
-                        .font(.subheadline.weight(.medium))
+                        .font(.flSubheadline.weight(.medium))
                     if let address = addr.address {
                         Text(address)
-                            .font(.caption)
+                            .font(.flCaption)
                             .foregroundStyle(WarmPalette.ink3)
                     }
                     Text("\(addr.lat, specifier: "%.4f"), \(addr.lng, specifier: "%.4f")")
-                        .font(.caption2)
+                        .font(.flCaption2)
                         .foregroundStyle(WarmPalette.ink4)
                 }
                 .swipeActions(edge: .trailing) {
@@ -137,11 +137,11 @@ struct AddAddressView: View {
                             } label: {
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(result.title)
-                                        .font(.subheadline.weight(.medium))
+                                        .font(.flSubheadline.weight(.medium))
                                         .foregroundStyle(.primary)
                                     if !result.subtitle.isEmpty {
                                         Text(result.subtitle)
-                                            .font(.caption)
+                                            .font(.flCaption)
                                             .foregroundStyle(WarmPalette.ink3)
                                     }
                                 }
@@ -157,7 +157,7 @@ struct AddAddressView: View {
                                 .tint(TabAccent.home.color)
                         }
                         .frame(height: 200)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                        .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.small))
                     }
                 }
             }

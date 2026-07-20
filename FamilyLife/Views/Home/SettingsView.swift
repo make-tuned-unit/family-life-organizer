@@ -113,13 +113,13 @@ struct SettingsView: View {
 
                 if notificationsEnabled {
                     Label("Appointment reminders", systemImage: "calendar.badge.clock")
-                        .font(.subheadline)
+                        .font(.flSubheadline)
                         .foregroundStyle(WarmPalette.ink2)
                     Label("Expiry alerts", systemImage: "clock.badge.exclamationmark")
-                        .font(.subheadline)
+                        .font(.flSubheadline)
                         .foregroundStyle(WarmPalette.ink2)
                     Label("Trip updates", systemImage: "car.fill")
-                        .font(.subheadline)
+                        .font(.flSubheadline)
                         .foregroundStyle(WarmPalette.ink2)
                 } else {
                     Button {

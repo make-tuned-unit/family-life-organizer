@@ -102,3 +102,8 @@ struct ConciergeHistoryView: View {
         }
     }
 }
+
+#Preview {
+    ConciergeHistoryView(currentId: nil) { _ in }
+        .environment(APIService())
+}

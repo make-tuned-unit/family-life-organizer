@@ -328,12 +328,12 @@ struct RecipeRowCard: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            RoundedRectangle(cornerRadius: 14)
+            RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.small)
                 .fill(LinearGradient(colors: [color, color.opacity(0.6)], startPoint: .topLeading, endPoint: .bottomTrailing))
                 .frame(width: 48, height: 48)
                 .overlay {
                     // Subtle stripe
-                    RoundedRectangle(cornerRadius: 14)
+                    RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.small)
                         .fill(.white.opacity(0.1))
                 }
 

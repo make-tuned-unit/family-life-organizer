@@ -49,13 +49,13 @@ struct RivalryDetailView: View {
     private func teamColumn(names: [String], total: Double, color: Color, leading: Bool) -> some View {
         VStack(spacing: 4) {
             Text(leading ? "Leading" : " ")
-                .font(.caption2.weight(.bold))
+                .font(.flCaption2.weight(.bold))
                 .foregroundStyle(leading ? color : .clear)
             Text(Int(total).formatted())
-                .font(.title.bold())
+                .font(.flStat)
                 .foregroundStyle(color)
             Text(names.joined(separator: ", "))
-                .font(.caption)
+                .font(.flCaption)
                 .foregroundStyle(WarmPalette.ink3)
                 .multilineTextAlignment(.center)
                 .lineLimit(2)
@@ -84,11 +84,11 @@ struct RivalryDetailView: View {
                             .foregroundStyle(AccentTheme.saffron.color)
                         if let winner = currentRivalry.winner_name {
                             Text("\(winner) Wins!")
-                                .font(.title2.bold())
+                                .font(.flTitle)
                                 .foregroundStyle(WarmPalette.ink1)
                         } else {
                             Text("It's a Tie!")
-                                .font(.title2.bold())
+                                .font(.flTitle)
                                 .foregroundStyle(WarmPalette.ink1)
                         }
                         if let msg = completionMessage {
@@ -108,10 +108,10 @@ struct RivalryDetailView: View {
                 VStack(spacing: 16) {
                     HStack {
                         Image(systemName: currentRivalry.challengeType.icon)
-                            .font(.title2)
+                            .font(.flTitle)
                             .foregroundStyle(challengeColor)
                         Text(currentRivalry.title)
-                            .font(.headline)
+                            .font(.flHeadline)
                         Spacer()
                         StatusBadge(status: currentRivalry.statusValue)
                     }
@@ -120,7 +120,7 @@ struct RivalryDetailView: View {
                         // Team scoreboard: two team totals, then per-member breakdown.
                         HStack(spacing: 16) {
                             teamColumn(names: currentRivalry.teamANames, total: teamATotal, color: TabAccent.home.color, leading: teamATotal >= teamBTotal)
-                            Text("vs").font(.title3.bold()).foregroundStyle(WarmPalette.ink3)
+                            Text("vs").font(.flTitle).foregroundStyle(WarmPalette.ink3)
                             teamColumn(names: currentRivalry.teamBNames, total: teamBTotal, color: AccentTheme.saffron.color, leading: teamBTotal > teamATotal)
                         }
                         let maxVal = participantScores.first?.total ?? 0
@@ -143,7 +143,7 @@ struct RivalryDetailView: View {
                         HStack(spacing: 20) {
                             PlayerColumn(name: currentRivalry.initiator_name, value: initiatorTotal, color: PersonPalette.color(for: currentRivalry.initiator_name), isLeading: initiatorTotal > opponentTotal)
                             Text("vs")
-                                .font(.title3.bold())
+                                .font(.flTitle)
                                 .foregroundStyle(WarmPalette.ink3)
                             PlayerColumn(name: currentRivalry.opponent_name, value: opponentTotal, color: PersonPalette.color(for: currentRivalry.opponent_name), isLeading: opponentTotal > initiatorTotal)
                         }
@@ -156,13 +156,13 @@ struct RivalryDetailView: View {
 
                     HStack {
                         Label("\(currentRivalry.point_value) pts to winner", systemImage: "trophy.fill")
-                            .font(.caption)
+                            .font(.flCaption)
                             .foregroundStyle(WarmPalette.ink3)
                         Spacer()
                         if currentRivalry.status == RivalryStatus.active.rawValue, let endDate = currentRivalry.endDate {
                             let days = Calendar.current.dateComponents([.day], from: Date(), to: endDate).day ?? 0
                             Text(days >= 0 ? "\(days) days left" : "Overtime")
-                                .font(.caption.weight(.medium))
+                                .font(.flCaption.weight(.medium))
                                 .foregroundStyle(days <= 1 ? .red : .secondary)
                         }
                     }
@@ -193,7 +193,7 @@ struct RivalryDetailView: View {
                         VStack(spacing: 8) {
                             HStack {
                                 Image(systemName: "heart.fill")
-                                    .foregroundStyle(.red)
+                                    .foregroundStyle(WarmPalette.rose)
                                 Text("Apple Health: \(Int(hkSteps)) \(currentRivalry.challengeType.healthMetricLabel)")
                                     .font(.flSubheadline.weight(.semibold))
                                 Spacer()
@@ -242,7 +242,7 @@ struct RivalryDetailView: View {
                             Task { await completeRivalry() }
                         } label: {
                             Text("Finalize Results")
-                                .font(.headline)
+                                .font(.flHeadline)
                                 .frame(maxWidth: .infinity)
                         }
                         .buttonStyle(.flPrimary(tint: WarmPalette.good))
@@ -253,7 +253,7 @@ struct RivalryDetailView: View {
                 if !entries.isEmpty {
                     VStack(alignment: .leading, spacing: 12) {
                         Text("Activity Log")
-                            .font(.headline)
+                            .font(.flHeadline)
                             .padding(.horizontal)
 
                         ForEach(entries) { entry in
@@ -485,14 +485,14 @@ struct EntryRowRemote: View {
             VStack(alignment: .leading, spacing: 4) {
                 HStack {
                     Text(entry.member_name)
-                        .font(.subheadline.weight(.medium))
+                        .font(.flSubheadline.weight(.medium))
                     Spacer()
                     Text("\(entry.value, specifier: "%.0f")")
-                        .font(.subheadline.bold())
+                        .font(.flSubheadline.bold())
                 }
                 if let note = entry.note, !note.isEmpty {
                     Text(note)
-                        .font(.caption)
+                        .font(.flCaption)
                         .foregroundStyle(WarmPalette.ink3)
                 }
             }

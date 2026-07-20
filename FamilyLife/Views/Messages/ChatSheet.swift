@@ -111,7 +111,7 @@ struct ChatSheet: View {
                                         }
                                         if unread > 0 {
                                             Text("\(unread)")
-                                                .font(.system(size: 9, weight: .bold))
+                                                .font(.flOverline)
                                                 .foregroundStyle(.white)
                                                 .frame(minWidth: 16, minHeight: 16)
                                                 .background(AccentTheme.rose.color, in: Circle())
@@ -506,7 +506,7 @@ struct InlinePollCard: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
             isOwn ? AnyShapeStyle(WarmPalette.cream1.opacity(0.95)) : AnyShapeStyle(TabAccent.decisions.color.opacity(0.08)),
-            in: RoundedRectangle(cornerRadius: 12)
+            in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.small)
         )
         .task { await load() }
     }
@@ -586,7 +586,7 @@ struct GroupMessageBubble: View {
             .padding(.vertical, 8)
             .background(
                 isOwn ? AnyShapeStyle(TabAccent.home.color) : AnyShapeStyle(WarmPalette.cardSurface),
-                in: RoundedRectangle(cornerRadius: 16)
+                in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.tile)
             )
             if !isOwn { Spacer(minLength: 60) }
         }
@@ -596,4 +596,12 @@ struct GroupMessageBubble: View {
         guard let date = ISO8601DateFormatter.flexible.date(from: dateStr) else { return "" }
         return date.formatted(.relative(presentation: .named))
     }
+}
+
+#Preview {
+    ChatSheet(initialThread: nil)
+        .environment(APIService())
+        .environment(AuthService())
+        .environment(HouseholdService())
+        .environment(ProfileImageCache())
 }
