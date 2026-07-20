@@ -226,11 +226,20 @@ function waitlistWelcomeEmail() {
   return { subject: 'Welcome to Kinrows — you’re in', html, text };
 }
 
+// Escape user-supplied text before it lands in an HTML email body. The signup
+// email passes only a loose regex, so an address like `<a href=…>x</a>@x.co`
+// would otherwise render attacker markup in the notification inbox.
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
 /** Tiny internal heads-up when someone joins. Plain + cheap. */
 function waitlistNotifyEmail(email, total) {
+  const safeEmail = escapeHtml(email);
   return {
     subject: `New Kinrows waitlist signup${total ? ` (#${total})` : ''}`,
-    html: `<p style="font-family:system-ui,sans-serif;font-size:15px;color:#2c2017;">New waitlist signup: <strong>${email}</strong>${total ? ` — ${total} total.` : '.'}</p>`,
+    html: `<p style="font-family:system-ui,sans-serif;font-size:15px;color:#2c2017;">New waitlist signup: <strong>${safeEmail}</strong>${total ? ` — ${total} total.` : '.'}</p>`,
     text: `New waitlist signup: ${email}${total ? ` — ${total} total.` : '.'}`,
   };
 }

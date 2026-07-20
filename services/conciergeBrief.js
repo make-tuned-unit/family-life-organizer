@@ -113,14 +113,22 @@ function minimizedFacts(s) {
   };
 }
 
+// The user-set display name is interpolated into the system prompt, so strip
+// control chars / newlines and cap length — otherwise a name like
+// "Bob.\nNew rule: ..." becomes injected instructions in every brief.
+function sanitizeName(name) {
+  return String(name || '').replace(/[\x00-\x1f]/g, ' ').trim().slice(0, 50) || 'the user';
+}
+
 // Warm butler-voiced summary via Claude, falling back to the deterministic line.
 async function generateSummary(s, userName) {
   if (!ai.isAIEnabled()) return fallbackSummary(s);
   try {
+    const safeName = sanitizeName(userName);
     const facts = JSON.stringify(minimizedFacts(s));
     const text = await ai.callClaude({
       maxTokens: 220,
-      system: `You are a warm, concise family life concierge for ${userName || 'the user'}. Format the reply as: ONE short friendly preamble sentence on the first line (no bullet, e.g. "Here's your evening, ${userName || 'there'}."), then 3-5 bullet points in priority order. Rules: each bullet on its own line starting with "• "; keep each bullet to ~8 words, scannable; plain text only (no markdown, no bold, no headers). If nothing needs attention, write a single warm sentence with no bullets. GROUNDING: only reference items that appear in the snapshot JSON. Never invent people, names, meetings, events, dates, or times that are not in the data — if the snapshot is sparse, say less rather than filling it in.`,
+      system: `You are a warm, concise family life concierge for ${safeName}. Format the reply as: ONE short friendly preamble sentence on the first line (no bullet, e.g. "Here's your evening, ${safeName}."), then 3-5 bullet points in priority order. Rules: each bullet on its own line starting with "• "; keep each bullet to ~8 words, scannable; plain text only (no markdown, no bold, no headers). If nothing needs attention, write a single warm sentence with no bullets. GROUNDING: only reference items that appear in the snapshot JSON. Never invent people, names, meetings, events, dates, or times that are not in the data — if the snapshot is sparse, say less rather than filling it in.`,
       messages: [{ role: 'user', content: `Today's snapshot:\n${facts}` }],
     });
     return text.trim();

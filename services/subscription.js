@@ -43,6 +43,14 @@ async function verifyAndStore(db, userId, signedTransaction) {
     throw new Error(`Unexpected product: ${payload.productId}`);
   }
 
+  // A Sandbox-signed transaction is free to mint and must not unlock entitlement
+  // on the production server. Sandbox is accepted only when explicitly enabled
+  // (dev / TestFlight builds set STOREKIT_ALLOW_SANDBOX=1); production rejects it.
+  const allowSandbox = process.env.STOREKIT_ALLOW_SANDBOX === '1' || process.env.NODE_ENV !== 'production';
+  if (payload.environment && payload.environment !== 'Production' && !allowSandbox) {
+    throw new Error(`Refusing ${payload.environment} transaction on production`);
+  }
+
   // Entitlement is per-household; an ungrouped user can't unlock a shared tier.
   const groupId = await db.getUserHouseholdId(userId);
   if (!groupId) throw new Error('User must belong to a household to subscribe');

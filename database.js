@@ -200,8 +200,33 @@ class FamilyDB {
     });
   }
 
-  // Ensure Jesse + Sophie share a "Fairbanks" household, fix any bad state
+  // Ensure Jesse + Sophie share a "Fairbanks" household, fix any bad state.
+  //
+  // This is a ONE-TIME dev seed: it force-deletes and re-inserts group_members
+  // by hardcoded username. Running it on every boot corrupts real memberships —
+  // it evicts legitimately invited members and can absorb an unrelated user who
+  // happens to register the username 'sophie'. So the destructive seed is gated
+  // behind an app_meta flag (like reattributeHouseholdsOnce) and runs at most
+  // once per database. The NULL-only _backfillGroupIds pass is idempotent and
+  // still runs every boot to home any legacy pre-isolation rows.
   runHouseholdMigrations() {
+    return new Promise((resolve, reject) => {
+      const get = (sql, p = []) => new Promise((r, j) => this.db.get(sql, p, (e, x) => e ? j(e) : r(x)));
+      const run = (sql, p = []) => new Promise((r, j) => this.db.run(sql, p, function (e) { e ? j(e) : r(this); }));
+      (async () => {
+        await run(`CREATE TABLE IF NOT EXISTS app_meta (key TEXT PRIMARY KEY, value TEXT)`);
+        const done = await get(`SELECT value FROM app_meta WHERE key = 'household_seed_v1'`);
+        if (done) {
+          // Seed already applied — only run the safe NULL-only backfill.
+          return this._backfillGroupIds().then(resolve, reject);
+        }
+        await run(`INSERT OR REPLACE INTO app_meta (key, value) VALUES ('household_seed_v1', '1')`);
+        this._runHouseholdSeed().then(resolve, reject);
+      })().catch(reject);
+    });
+  }
+
+  _runHouseholdSeed() {
     return new Promise((resolve, reject) => {
       // Find jesse and sophie specifically
       this.db.all("SELECT id, username, name FROM users WHERE username IN ('jesse', 'sophie')", (err, users) => {
@@ -1588,15 +1613,24 @@ class FamilyDB {
     );
   }
 
-  getUserIdByName(name) {
+  // Resolve a display name to an app user id, for sending pushes. When groupId
+  // is supplied the match is constrained to that group's members — without it, a
+  // name like "Sophie" could resolve to an unrelated same-named user in another
+  // household and leak a rivalry's push content to them. Callers in a group
+  // context (rivalries carry group_id) should always pass it.
+  getUserIdByName(name, groupId = null) {
+    const scope = groupId != null
+      ? ' AND id IN (SELECT user_id FROM group_members WHERE group_id = ? AND user_id IS NOT NULL)'
+      : '';
+    const p = (val) => groupId != null ? [val, groupId] : [val];
     return new Promise((resolve, reject) => {
       // Try exact match first, then first-name prefix match (e.g. "Sophie Chiasson" finds user "Sophie")
-      this.db.get('SELECT id FROM users WHERE name = ? COLLATE NOCASE', [name], (err, row) => {
+      this.db.get(`SELECT id FROM users WHERE name = ? COLLATE NOCASE${scope}`, p(name), (err, row) => {
         if (err) return reject(err);
         if (row) return resolve(row.id);
         const firstName = name.split(' ')[0];
         if (firstName === name) return resolve(null);
-        this.db.get('SELECT id FROM users WHERE name = ? COLLATE NOCASE', [firstName], (err2, row2) => {
+        this.db.get(`SELECT id FROM users WHERE name = ? COLLATE NOCASE${scope}`, p(firstName), (err2, row2) => {
           if (err2) reject(err2);
           else resolve(row2?.id || null);
         });
@@ -3720,12 +3754,24 @@ class FamilyDB {
     });
   }
 
+  // Resolve a contact to the app user it represents. Matching by display name
+  // alone is forgeable (any user can rename themselves), so we additionally
+  // require the candidate user to share a group with the contact's owner — the
+  // real social link. Prevents a same-named stranger from being pushed another
+  // household's coverage details. Contact-only outsiders (no shared group) don't
+  // resolve here and reach the recipient only via their invite_token link.
   getUserIdByContactId(contactId) {
     return new Promise((resolve, reject) => {
       this.db.get(`
         SELECT u.id FROM users u
         JOIN contacts c ON LOWER(u.name) = LOWER(c.name)
-        WHERE c.id = ? LIMIT 1
+        WHERE c.id = ?
+          AND EXISTS (
+            SELECT 1 FROM group_members gm1
+            JOIN group_members gm2 ON gm1.group_id = gm2.group_id
+            WHERE gm1.user_id = u.id AND gm2.user_id = c.added_by
+          )
+        LIMIT 1
       `, [contactId], (err, row) => err ? reject(err) : resolve(row?.id || null));
     });
   }
@@ -3741,9 +3787,14 @@ class FamilyDB {
         JOIN contacts c ON c.id = crec.contact_id
         JOIN users u ON u.id = cr.requester_id
         WHERE LOWER(c.name) = (SELECT LOWER(name) FROM users WHERE id = ?)
+          AND EXISTS (
+            SELECT 1 FROM group_members gm1
+            JOIN group_members gm2 ON gm1.group_id = gm2.group_id
+            WHERE gm1.user_id = ? AND gm2.user_id = c.added_by
+          )
           AND cr.status IN ('pending', 'approved')
         ORDER BY cr.created_at DESC
-      `, [userId], (err, rows) => err ? reject(err) : resolve(rows || []));
+      `, [userId, userId], (err, rows) => err ? reject(err) : resolve(rows || []));
     });
   }
 
@@ -3754,7 +3805,12 @@ class FamilyDB {
         JOIN contacts c ON c.id = crec.contact_id
         WHERE crec.request_id = ?
           AND LOWER(c.name) = (SELECT LOWER(name) FROM users WHERE id = ?)
-      `, [requestId, userId], (err, row) => err ? reject(err) : resolve(row));
+          AND EXISTS (
+            SELECT 1 FROM group_members gm1
+            JOIN group_members gm2 ON gm1.group_id = gm2.group_id
+            WHERE gm1.user_id = ? AND gm2.user_id = c.added_by
+          )
+      `, [requestId, userId, userId], (err, row) => err ? reject(err) : resolve(row));
     });
   }
 
@@ -4049,14 +4105,17 @@ class FamilyDB {
   // === Subscriptions (per-household premium entitlement) ===
 
   // Insert or update by original_transaction_id (the stable subscription key).
+  // A signed transaction is bound to the FIRST household that claims it — the
+  // ON CONFLICT path deliberately never reassigns group_id/user_id, so a leaked
+  // JWS replayed by another household can't steal (or ping-pong) the entitlement.
+  // Renewals only refresh product/expiry/status. Comp entitlements use a
+  // per-group synthetic transaction id, so they never collide across groups.
   upsertSubscription(sub) {
     return new Promise((resolve, reject) => {
       this.db.run(
         `INSERT INTO subscriptions (group_id, user_id, product_id, original_transaction_id, expires_at, environment, status, updated_at)
          VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
          ON CONFLICT(original_transaction_id) DO UPDATE SET
-           group_id = excluded.group_id,
-           user_id = excluded.user_id,
            product_id = excluded.product_id,
            expires_at = excluded.expires_at,
            environment = excluded.environment,

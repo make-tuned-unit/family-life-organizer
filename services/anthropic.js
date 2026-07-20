@@ -138,6 +138,11 @@ async function streamClaudeRaw({ messages, system, tools, maxTokens = 2000, mode
         case 'message_delta':
           if (evt.delta && evt.delta.stop_reason) stopReason = evt.delta.stop_reason;
           break;
+        case 'error':
+          // A mid-stream error (e.g. overloaded_error) must not be swallowed —
+          // otherwise the caller treats the partial content as a complete turn
+          // and reports success. Surface it so the request fails honestly.
+          throw new Error(`stream error: ${evt.error?.type || 'unknown'}${evt.error?.message ? ` — ${evt.error.message}` : ''}`);
         default:
           break;
       }

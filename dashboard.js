@@ -342,6 +342,15 @@ function parseMoney(value) {
   return Number.isFinite(n) ? n : null;
 }
 
+// Clamp a client-supplied ?limit into a sane positive range. A raw
+// `parseInt(x) || def` lets `limit=-1` through, and SQLite reads LIMIT -1 as
+// "no limit" — one request can then dump an entire (photo-bearing) table slice.
+function clampLimit(value, def, max = 200) {
+  const n = parseInt(value, 10);
+  if (!Number.isInteger(n) || n <= 0) return def;
+  return Math.min(n, max);
+}
+
 // The caller may only act on contacts they created (contacts are owner-scoped).
 async function userOwnsContact(db, contactId, userId) {
   return !!(await dbGet(db, 'SELECT 1 FROM contacts WHERE id = ? AND added_by = ?', [contactId, userId]));
@@ -1464,7 +1473,7 @@ app.get('/app', requireAuth, async (req, res) => {
   try {
     const userId = req.session.user?.id;
     const summary = await db.getDailySummary(userId);
-    const groceries = await db.getGroceries('needed');
+    const groceries = await db.getGroceries('needed', userId);
     const tasks = await db.getTasks({ status: 'active' }, userId);
     const appointments = await db.getAppointments({}, userId);
     const tasksByCategory = {};
@@ -2661,6 +2670,7 @@ app.get('/api/receipts', requireAuth, async (req, res) => {
     if (req.query.month) filters.month = req.query.month;
     if (req.query.category) filters.category = req.query.category;
     const groupId = await db.getUserHouseholdId(req.session.user?.id);
+    if (!groupId) return res.json([]);
     const receipts = await db.getReceipts(filters, groupId);
     res.json(receipts);
   } catch (err) {
@@ -2678,6 +2688,14 @@ app.get('/api/budget/stats', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
     const groupId = await db.getUserHouseholdId(req.session.user?.id);
+    if (!groupId) {
+      const ym = new Date().toLocaleDateString('en-CA').slice(0, 7);
+      return res.json({
+        month: ym, monthly: [], byCategory: [], budgetVsActual: [],
+        currentTotal: 0, previousTotal: 0, momPct: null, trailingAvg: 0,
+        projectedMonthEnd: 0, recurringMonthly: 0, variableThisMonth: 0, overBudget: [],
+      });
+    }
     const months = parseInt(req.query.months) || 6;
     const stats = await db.getSpendingStats(groupId, months);
     const budgetVsActual = await db.getBudgetSummary(stats.thisMonth, groupId);
@@ -2726,6 +2744,7 @@ app.get('/api/budget/:month', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
     const groupId = await db.getUserHouseholdId(req.session.user?.id);
+    if (!groupId) return res.json([]);
     const budget = await db.getBudgetSummary(req.params.month, groupId);
     res.json(budget);
   } catch (err) {
@@ -2740,6 +2759,7 @@ app.get('/api/recurring-payments', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
     const groupId = await db.getUserHouseholdId(req.session.user?.id);
+    if (!groupId) return res.json([]);
     const items = await db.getRecurringPayments(groupId);
     res.json(items);
   } catch (err) {
@@ -2758,6 +2778,7 @@ app.post('/api/recurring-payments', requireAuth, async (req, res) => {
     if (!groupId) return res.status(403).json({ error: 'Join a household first' });
     const result = await db.addRecurringPayment({
       ...req.body,
+      amount: parseMoney(req.body.amount),
       created_by: req.session.user?.username || req.session.user?.name,
       group_id: groupId,
     });
@@ -2773,7 +2794,9 @@ app.put('/api/recurring-payments/:id', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
     if (!(await requireHouseholdRow(db, 'recurring_payments', req.params.id, req, res))) return;
-    await db.updateRecurringPayment(req.params.id, req.body);
+    const rpUpdates = { ...req.body };
+    if (rpUpdates.amount !== undefined) rpUpdates.amount = parseMoney(rpUpdates.amount);
+    await db.updateRecurringPayment(req.params.id, rpUpdates);
     res.json({ success: true });
   } catch (err) {
     sendServerError(res, err);
@@ -2894,6 +2917,7 @@ app.get('/api/budget-categories', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
     const groupId = await db.getUserHouseholdId(req.session.user?.id);
+    if (!groupId) return res.json([]);
     const categories = await db.getBudgetCategories(groupId);
     res.json(categories);
   } catch (err) {
@@ -2912,6 +2936,7 @@ app.post('/api/budget-categories', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'Invalid monthly limit' });
     }
     const groupId = await db.getUserHouseholdId(req.session.user?.id);
+    if (!groupId) return res.status(403).json({ error: 'Join a household first' });
     const result = await db.addBudgetCategory(name, monthly_limit, color, groupId);
     res.json({ success: true, id: result.id });
   } catch (err) {
@@ -3123,17 +3148,24 @@ app.delete('/api/receipts/:id', requireAuth, async (req, res) => {
 // Expand a recurrence rule into dates within [rangeStart, rangeEnd)
 function expandRecurrence(rule, origin, rangeStart, rangeEnd, endDate) {
   const dates = [];
-  let cursor = new Date(origin);
+  const originDate = new Date(origin);
+  const anchorDay = originDate.getDate();
   const step = { daily: 1, weekly: 7, biweekly: 14 }[rule];
-  for (let i = 0; i < 400; i++) {
+  for (let i = 1; i <= 400; i++) {
+    let cursor;
     if (step) {
-      cursor = new Date(cursor.getTime() + step * 86400000);
-    } else if (rule === 'monthly') {
-      cursor = new Date(cursor);
-      cursor.setMonth(cursor.getMonth() + 1);
-    } else if (rule === 'yearly') {
-      cursor = new Date(cursor);
-      cursor.setFullYear(cursor.getFullYear() + 1);
+      cursor = new Date(originDate.getTime() + i * step * 86400000);
+    } else if (rule === 'monthly' || rule === 'yearly') {
+      // Anchor each occurrence to the origin's day-of-month rather than mutating
+      // a cursor: setMonth on Jan 31 overflows to Mar 2/3 and the drift compounds
+      // forever. Shift from day 1 to avoid overflow, then clamp the anchor day to
+      // the target month's length so Jan 31 -> Feb 28/29 -> Mar 31, as expected.
+      const monthsToAdd = rule === 'monthly' ? i : i * 12;
+      cursor = new Date(originDate);
+      cursor.setDate(1);
+      cursor.setMonth(originDate.getMonth() + monthsToAdd);
+      const daysInMonth = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 0).getDate();
+      cursor.setDate(Math.min(anchorDay, daysInMonth));
     } else {
       break;
     }
@@ -3189,6 +3221,7 @@ app.get('/api/pantry', requireAuth, async (req, res) => {
     if (req.query.location) filters.location = req.query.location;
     if (req.query.category) filters.category = req.query.category;
     const groupId = await db.getUserHouseholdId(req.session.user?.id);
+    if (!groupId) return res.json([]);
     const items = await db.getPantry(filters, groupId);
     res.json(items);
   } catch (err) {
@@ -3469,6 +3502,7 @@ app.post('/api/cook/suggest', requireAuth, conciergeLimiter, aiDailyLimiter, asy
   const db = new FamilyDB();
   try {
     const groupId = await db.getUserHouseholdId(req.session.user?.id);
+    if (!groupId) return res.status(403).json({ error: 'Join a household first' });
     const pantryItems = await db.getPantry({}, groupId);
     const pantryList = pantryItems.map(i => i.item + ' (' + (i.quantity || 1) + (i.unit ? ' ' + i.unit : '') + ')').join(', ');
     const query = req.body.query || 'What can I make for dinner?';
@@ -3537,7 +3571,9 @@ app.post('/api/cook/deduct', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
     const { ingredients } = req.body;
+    if (!Array.isArray(ingredients)) return res.status(400).json({ error: 'ingredients must be an array' });
     const groupId = await db.getUserHouseholdId(req.session.user?.id);
+    if (!groupId) return res.status(403).json({ error: 'Join a household first' });
     const pantryItems = await db.getPantry({}, groupId);
     for (const name of ingredients) {
       const match = pantryItems.find(p => p.item.toLowerCase() === name.toLowerCase());
@@ -3566,6 +3602,7 @@ app.get('/api/trips', requireAuth, async (req, res) => {
     if (req.query.status) filters.status = req.query.status;
     if (req.query.traveler) filters.traveler = req.query.traveler;
     const groupId = await db.getUserHouseholdId(req.session.user?.id);
+    if (!groupId) return res.json([]);
     const trips = await db.getTrips(filters, groupId);
     res.json(trips);
   } catch (err) {
@@ -3579,6 +3616,7 @@ app.post('/api/trips', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
     const groupId = await db.getUserHouseholdId(req.session.user?.id);
+    if (!groupId) return res.status(403).json({ error: 'Join a household first' });
     const result = await db.createTrip({ ...req.body, group_id: groupId });
     res.json({ success: true, id: result.id });
   } catch (err) {
@@ -3645,6 +3683,7 @@ app.get('/api/addresses', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
     const groupId = await db.getUserHouseholdId(req.session.user?.id);
+    if (!groupId) return res.json([]);
     const addresses = await db.getFamilyAddresses(groupId);
     res.json(addresses);
   } catch (err) {
@@ -3658,6 +3697,7 @@ app.post('/api/addresses', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
     const groupId = await db.getUserHouseholdId(req.session.user?.id);
+    if (!groupId) return res.status(403).json({ error: 'Join a household first' });
     const result = await db.addFamilyAddress({ ...req.body, group_id: groupId });
     res.json({ success: true, id: result.id });
   } catch (err) {
@@ -3885,7 +3925,11 @@ app.post('/api/rivalries', requireAuth, async (req, res) => {
       if (data.initiator_name && data.opponent_name) {
         data.group_id = await db.getSharedGroupByNames(data.initiator_name, data.opponent_name);
       }
-      if (!data.group_id) {
+      // The derived group must actually contain the caller — otherwise the two
+      // body-supplied names could point at a group the caller isn't in, letting
+      // them inject a rivalry (and spoofed "challenged you" pushes) into a
+      // household/clan they don't belong to. Fall back to the caller's own household.
+      if (!data.group_id || !(await db.isGroupMember(data.group_id, req.session.user.id))) {
         data.group_id = await db.getUserHouseholdId(req.session.user.id);
       }
     }
@@ -3901,7 +3945,7 @@ app.post('/api/rivalries', requireAuth, async (req, res) => {
     if (!opponents.length && data.opponent_name) opponents = [data.opponent_name];
     const ct = (data.challenge_type || 'challenge').replace(/_/g, ' ');
     for (const opName of opponents) {
-      const opId = await db.getUserIdByName(opName);
+      const opId = await db.getUserIdByName(opName, data.group_id);
       if (opId) {
         push.pushToUser(db, opId, `${senderName} challenged you!`,
           pick(RIVALRY_CHALLENGE_PUSH)(senderName, ct),
@@ -3968,6 +4012,19 @@ app.post('/api/rivalries/:id/entries', requireAuth, async (req, res) => {
     if (entry.value === null) {
       return res.status(400).json({ error: 'Invalid entry value' });
     }
+    // member_name must be an actual participant of this rivalry — otherwise a
+    // group member could log entries under an arbitrary name to rig totals or
+    // fire false "you're behind" pushes.
+    const rivalryRow = await db.getRivalryById(rivalryId);
+    let rosterNames;
+    try { rosterNames = JSON.parse(rivalryRow?.participants || '[]'); } catch { rosterNames = []; }
+    if (!rosterNames.length) rosterNames = [rivalryRow?.initiator_name, rivalryRow?.opponent_name];
+    const isParticipant = rosterNames
+      .filter(Boolean)
+      .some(n => n.toLowerCase() === String(entry.member_name || '').toLowerCase());
+    if (!isParticipant) {
+      return res.status(400).json({ error: 'member_name must be a participant of this rivalry' });
+    }
     await db.addRivalryEntry(entry);
     res.json({ success: true });
 
@@ -3990,7 +4047,7 @@ app.post('/api/rivalries/:id/entries', requireAuth, async (req, res) => {
 
         for (const pName of participants) {
           if (nameMatch(pName, loggerName)) continue;
-          const pId = await db.getUserIdByName(pName);
+          const pId = await db.getUserIdByName(pName, rivalry.group_id);
           if (!pId) continue;
 
           const myTotal = findTotal(pName);
@@ -4363,6 +4420,7 @@ app.get('/api/gifts/people', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
     const groupId = await db.getUserHouseholdId(req.session.user?.id);
+    if (!groupId) return res.json([]);
     const people = await db.getGiftPeople(groupId);
     res.json(people);
   } catch (err) {
@@ -4376,6 +4434,7 @@ app.post('/api/gifts/people', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
     const groupId = await db.getUserHouseholdId(req.session.user?.id);
+    if (!groupId) return res.status(403).json({ error: 'Join a household first' });
     const result = await db.addGiftPerson({ ...req.body, group_id: groupId });
     res.json({ success: true, id: result.id });
   } catch (err) {
@@ -4389,6 +4448,7 @@ app.get('/api/gifts/ideas', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
     const groupId = await db.getUserHouseholdId(req.session.user?.id);
+    if (!groupId) return res.json([]);
     const ideas = await db.getGiftIdeas(req.query.person_id ? Number(req.query.person_id) : null, groupId);
     res.json(ideas);
   } catch (err) {
@@ -4402,6 +4462,7 @@ app.post('/api/gifts/ideas', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
     const groupId = await db.getUserHouseholdId(req.session.user?.id);
+    if (!groupId) return res.status(403).json({ error: 'Join a household first' });
     const result = await db.addGiftIdea({ ...req.body, group_id: groupId });
     res.json({ success: true, id: result.id });
   } catch (err) {
@@ -4441,6 +4502,7 @@ app.get('/api/gifts/events', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
     const groupId = await db.getUserHouseholdId(req.session.user?.id);
+    if (!groupId) return res.json([]);
     const events = await db.getSpecialEvents(groupId);
     res.json(events);
   } catch (err) {
@@ -4456,6 +4518,7 @@ app.post('/api/gifts/events', requireAuth, async (req, res) => {
     const data = { ...req.body };
     if (data.date) data.date = normalizeDate(data.date);
     data.group_id = await db.getUserHouseholdId(req.session.user?.id);
+    if (!data.group_id) return res.status(403).json({ error: 'Join a household first' });
     const result = await db.addSpecialEvent(data);
     res.json({ success: true, id: result.id });
   } catch (err) {
@@ -4978,7 +5041,7 @@ app.get('/api/groups/:id/feed', requireAuth, async (req, res) => {
       return res.status(403).json({ error: 'Not a member of this group' });
     }
     const posts = await db.getFeedPosts(req.params.id, {
-      limit: parseInt(req.query.limit) || 50,
+      limit: clampLimit(req.query.limit, 50),
       before_id: req.query.before_id ? parseInt(req.query.before_id) : undefined
     });
     res.json(posts);
@@ -5120,6 +5183,7 @@ app.get('/api/projects', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
     const groupId = await db.getUserHouseholdId(req.session.user?.id);
+    if (!groupId) return res.json([]);
     const projects = await db.getProjects(groupId);
     res.json(projects);
   } catch (err) {
@@ -5133,7 +5197,8 @@ app.post('/api/projects', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
     const groupId = await db.getUserHouseholdId(req.session.user?.id);
-    const result = await db.addProject({ ...req.body, group_id: groupId });
+    if (!groupId) return res.status(403).json({ error: 'Join a household first' });
+    const result = await db.addProject({ ...req.body, budget: parseMoney(req.body.budget), group_id: groupId });
     res.json({ success: true, id: result.id });
   } catch (err) {
     sendServerError(res, err);
@@ -5174,7 +5239,7 @@ app.post('/api/projects/:id/expenses', requireAuth, async (req, res) => {
   try {
     if (!(await requireHouseholdRow(db, 'budget_projects', req.params.id, req, res))) return;
     const groupId = await db.getUserHouseholdId(req.session.user?.id);
-    const result = await db.addProjectExpense(req.params.id, req.body, groupId);
+    const result = await db.addProjectExpense(req.params.id, { ...req.body, amount: parseMoney(req.body.amount) }, groupId);
     res.json({ success: true, id: result.id });
   } catch (err) {
     sendServerError(res, err);
@@ -5223,7 +5288,7 @@ app.get('/api/messages/:partnerId', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
     const messages = await db.getMessages(req.session.user.id, parseInt(req.params.partnerId), {
-      limit: parseInt(req.query.limit) || 50,
+      limit: clampLimit(req.query.limit, 50),
       before_id: req.query.before_id ? parseInt(req.query.before_id) : undefined
     });
     res.json(messages);
@@ -5293,7 +5358,7 @@ app.get('/api/activity', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
     const userId = req.session.user?.id;
-    const feed = await db.getActivityFeed(parseInt(req.query.limit) || 20, userId);
+    const feed = await db.getActivityFeed(clampLimit(req.query.limit, 20), userId);
     res.json(feed);
   } catch (err) {
     sendServerError(res, err);

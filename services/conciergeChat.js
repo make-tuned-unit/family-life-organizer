@@ -107,7 +107,13 @@ async function handleChat(db, { userId, userName, message, conversationId }) {
     messages.push({ role: 'user', content: toolResults });
   }
 
-  if (!reply) reply = "Done — let me know if there's anything else.";
+  // No closing text can mean either "nothing more to say" or that we ran out of
+  // tool-use turns mid-task. Don't imply completion in the latter case.
+  if (!reply) {
+    reply = actions.length
+      ? "I've taken care of those updates. Ask me to continue if there's more to do."
+      : "Done — let me know if there's anything else.";
+  }
 
   await db.addConciergeMessage(conversationId, 'assistant', reply);
   await db.touchConciergeConversation(conversationId);
@@ -186,7 +192,13 @@ async function handleChatStream(db, { userId, userName, message, conversationId 
     messages.push({ role: 'user', content: toolResults });
   }
 
-  if (!reply) reply = "Done — let me know if there's anything else.";
+  // No closing text can mean either "nothing more to say" or that we ran out of
+  // tool-use turns mid-task. Don't imply completion in the latter case.
+  if (!reply) {
+    reply = actions.length
+      ? "I've taken care of those updates. Ask me to continue if there's more to do."
+      : "Done — let me know if there's anything else.";
+  }
 
   await db.addConciergeMessage(conversationId, 'assistant', reply);
   await db.touchConciergeConversation(conversationId);

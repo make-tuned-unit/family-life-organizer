@@ -757,6 +757,7 @@ const TOOLS = [
       required: ['person_id', 'title'],
     },
     async run(ctx, input) {
+      await assertHousehold(ctx, 'gift_people', input.person_id);
       await ctx.db.addGiftIdea({
         person_id: input.person_id, title: input.title, notes: input.notes || null,
         link_url: input.link_url || null, estimated_price: input.estimated_price || null,
@@ -771,13 +772,14 @@ const TOOLS = [
   // ---- Coverage & Addresses (read) ----
   {
     name: 'get_coverage',
-    description: 'List childcare/coverage requests where you are being asked to help (incoming).',
+    description: 'List coverage/childcare requests YOU created (outgoing). Use this to get the id for cancel_coverage_request. For requests where someone is asking YOU to help, use get_incoming_coverage.',
     write: false,
     input_schema: { type: 'object', properties: {} },
     async run(ctx) {
-      const rows = await ctx.db.getIncomingCoverageRequests(ctx.userId);
+      const rows = await ctx.db.getCoverageRequests(ctx.userId);
       return { result: rows.map(c => ({
-        id: c.id, reason: c.reason, note: c.note, from: c.requester_name, status: c.recipient_status,
+        id: c.id, reason: c.reason, note: c.note, status: c.status,
+        recipients: c.recipient_count, approvals: c.approval_count,
       })) };
     },
   },
