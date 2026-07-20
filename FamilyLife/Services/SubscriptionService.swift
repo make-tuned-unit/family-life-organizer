@@ -7,6 +7,7 @@ import StoreKit
 /// per-HOUSEHOLD and the backend is authoritative: this device may have no local
 /// transaction yet still be entitled because another household member subscribed —
 /// so `refresh` always reconciles with the server, which also reports the tier.
+@MainActor
 @Observable
 final class SubscriptionService {
     enum Tier: String { case lite, premium }

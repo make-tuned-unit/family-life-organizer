@@ -146,6 +146,8 @@ struct SignUpView: View {
                     householdName: !hasInviteCode && !householdName.isEmpty ? householdName : nil
                 )
                 dismiss()
+            } catch APIError.serverMessage(409, let message) {
+                errorMessage = message
             } catch APIError.serverError(409) {
                 errorMessage = "Username already taken"
             } catch {

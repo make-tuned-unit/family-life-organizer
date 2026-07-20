@@ -10,7 +10,7 @@ struct PreparedFeedItem: Identifiable {
     let accentColor: Color
     let isOwnPost: Bool
 
-    var id: UUID { item.id }
+    var id: String { item.id }
 }
 
 @MainActor

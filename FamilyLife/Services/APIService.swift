@@ -1023,7 +1023,6 @@ final class APIService {
     // MARK: - Activity Feed
 
     struct ActivityItem: Codable, Identifiable {
-        let id = UUID()
         let feed_type: String   // decision | event | coverage | post
         let ref_id: Int
         let title: String?
@@ -1038,8 +1037,10 @@ final class APIService {
         let group_name: String?
         let has_photo: Int?    // 1 when a feed post carries a photo (fetched lazily)
 
-        /// Stable key for notification watermarking (not affected by UUID regeneration)
+        /// Stable key for notification watermarking and list identity
         var stableKey: String { "\(feed_type)-\(ref_id)-\(created_at ?? "")" }
+
+        var id: String { stableKey }
 
         private enum CodingKeys: String, CodingKey {
             case feed_type, ref_id, title, body, author, author_id, status, created_at, reaction_count, comment_count, group_id, group_name, has_photo

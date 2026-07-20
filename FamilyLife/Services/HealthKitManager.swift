@@ -1,6 +1,7 @@
 import Foundation
 import HealthKit
 
+@MainActor
 @Observable
 final class HealthKitManager {
     var isAvailable: Bool
