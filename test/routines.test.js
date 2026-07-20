@@ -130,6 +130,49 @@ test('routines: sleep-training routine attaches age-based guidance', async () =>
   assert.ok(detail.body.guidance.safe_sleep.length > 0);
 });
 
+test('routines: sleep-training guidance picks the right phase across ages', async () => {
+  const pat = makeClient();
+  await pat('POST', '/api/auth/register', { username: 'pat_rt', password: 'password123', name: 'Pat Phase' });
+  const daysAgo = (d) => new Date(Date.now() - d * 86400000).toLocaleDateString('en-CA');
+
+  // (age in days) -> expected phase key + whether formal training is age-appropriate.
+  // The 112/113-day pair pins the ~4-month readiness boundary exactly.
+  const cases = [
+    [30, 'newborn', false], [112, 'newborn', false], [113, 'foundations', true],
+    [200, 'consolidate', true], [400, 'toddler_transition', true],
+    [700, 'preschool_routine', true], [1300, 'big_kid', true], [3000, 'big_kid', true],
+  ];
+  for (const [days, phase, ready] of cases) {
+    const c = await pat('POST', '/api/routines', {
+      name: 'st', routine_type: 'sleep_training', subject_birthdate: daysAgo(days),
+    });
+    const d = await pat('GET', `/api/routines/${c.body.id}`);
+    const g = d.body.guidance;
+    assert.ok(g, `age ${days}d has guidance`);
+    assert.equal(g.current_phase.key, phase, `age ${days}d -> phase ${phase}`);
+    assert.equal(g.ready_for_training, ready, `age ${days}d -> ready=${ready}`);
+    // Contract: guidance phases OMIT min_days/max_days (iOS SleepPhase marks them
+    // optional). If the server ever added them here it wouldn't break decode, but
+    // this documents the shape the app relies on.
+    assert.ok(!('min_days' in g.current_phase), `age ${days}d guidance phase omits min_days`);
+    await pat('DELETE', `/api/routines/${c.body.id}`);
+  }
+});
+
+test('routines: template age bands are contiguous and cover 0..~5yr', async () => {
+  const con = makeClient();
+  await con('POST', '/api/auth/register', { username: 'con_rt', password: 'password123', name: 'Con Tiguous' });
+  const tpl = await con('GET', '/api/routines/templates/sleep-training');
+  const phases = [...tpl.body.phases].sort((a, b) => a.min_days - b.min_days);
+  assert.equal(phases[0].min_days, 0, 'first band starts at day 0');
+  for (let i = 1; i < phases.length; i++) {
+    assert.equal(phases[i].min_days, phases[i - 1].max_days + 1,
+      `band ${phases[i].key} is contiguous with ${phases[i - 1].key}`);
+    assert.ok(phases[i].method && phases[i].method.name, `${phases[i].key} names a method`);
+  }
+  assert.ok(phases[phases.length - 1].max_days >= 1826, 'coverage extends to ~5 years');
+});
+
 test('routines: sleep-training template is served with phases and sources', async () => {
   const t = makeClient();
   await t('POST', '/api/auth/register', { username: 'tem_rt', password: 'password123', name: 'Tem Plate' });
