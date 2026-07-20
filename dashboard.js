@@ -5293,6 +5293,134 @@ app.delete('/api/projects/:projectId/expenses/:id', requireAuth, async (req, res
   }
 });
 
+// ============================================
+// Routines (period / baby-sleep / sleep-training / custom trackers)
+// Route order: the static template + guidance paths are registered before the
+// `/api/routines/:id` sibling so they don't get shadowed.
+// ============================================
+const sleepTraining = require('./services/sleepTraining');
+
+// The guided sleep-training program (age-banded phases). Static, read-only —
+// still behind auth so it isn't a public scrape target.
+app.get('/api/routines/templates/sleep-training', requireAuth, (req, res) => {
+  res.json(sleepTraining.template());
+});
+
+app.get('/api/routines', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const groupId = await db.getUserHouseholdId(req.session.user?.id);
+    if (!groupId) return res.json([]);
+    res.json(await db.getRoutines(groupId));
+  } catch (err) { sendServerError(res, err); }
+  finally { db.close(); }
+});
+
+app.post('/api/routines', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const groupId = await db.getUserHouseholdId(req.session.user?.id);
+    if (!groupId) return res.status(403).json({ error: 'Join a household first' });
+    const name = String(req.body.name || '').trim();
+    if (!name) return res.status(400).json({ error: 'name is required' });
+    const type = ['period', 'baby_sleep', 'sleep_training', 'custom'].includes(req.body.routine_type)
+      ? req.body.routine_type : 'custom';
+    const result = await db.createRoutine({
+      group_id: groupId,
+      created_by: req.session.user?.id,
+      name,
+      routine_type: type,
+      subject_name: req.body.subject_name,
+      subject_birthdate: req.body.subject_birthdate ? normalizeDate(req.body.subject_birthdate) : null,
+      config: req.body.config,
+      color: req.body.color,
+      icon: req.body.icon,
+      start_date: req.body.start_date ? normalizeDate(req.body.start_date) : todayLocal(),
+    });
+    res.json({ success: true, id: result.id });
+  } catch (err) { sendServerError(res, err); }
+  finally { db.close(); }
+});
+
+app.get('/api/routines/:id', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    if (!(await requireHouseholdRow(db, 'routines', req.params.id, req, res))) return;
+    const routine = await db.getRoutineById(req.params.id);
+    const entries = await db.getRoutineEntries(req.params.id, {});
+    // For age-based routines, attach the current program phase/guidance.
+    let guidance = null;
+    if (routine.routine_type === 'sleep_training' && routine.subject_birthdate) {
+      guidance = sleepTraining.guidanceForBirthdate(routine.subject_birthdate);
+    }
+    res.json({ ...routine, entries, guidance });
+  } catch (err) { sendServerError(res, err); }
+  finally { db.close(); }
+});
+
+app.put('/api/routines/:id', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    if (!(await requireHouseholdRow(db, 'routines', req.params.id, req, res))) return;
+    const updates = { ...req.body };
+    if (updates.subject_birthdate) updates.subject_birthdate = normalizeDate(updates.subject_birthdate);
+    if (updates.start_date) updates.start_date = normalizeDate(updates.start_date);
+    await db.updateRoutine(req.params.id, updates);
+    res.json({ success: true });
+  } catch (err) { sendServerError(res, err); }
+  finally { db.close(); }
+});
+
+app.delete('/api/routines/:id', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    if (!(await requireHouseholdRow(db, 'routines', req.params.id, req, res))) return;
+    await db.deleteRoutine(req.params.id);
+    res.json({ success: true });
+  } catch (err) { sendServerError(res, err); }
+  finally { db.close(); }
+});
+
+app.get('/api/routines/:id/entries', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    if (!(await requireHouseholdRow(db, 'routines', req.params.id, req, res))) return;
+    const entries = await db.getRoutineEntries(req.params.id, {
+      from: req.query.from, to: req.query.to, limit: clampLimit(req.query.limit, 200, 1000),
+    });
+    res.json(entries);
+  } catch (err) { sendServerError(res, err); }
+  finally { db.close(); }
+});
+
+app.post('/api/routines/:id/entries', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    if (!(await requireHouseholdRow(db, 'routines', req.params.id, req, res))) return;
+    const entry_date = req.body.entry_date ? normalizeDate(req.body.entry_date) : todayLocal();
+    const result = await db.addRoutineEntry(req.params.id, {
+      entry_date,
+      entry_time: req.body.entry_time,
+      entry_type: req.body.entry_type,
+      value: req.body.value,
+      notes: req.body.notes,
+      created_by: req.session.user?.id,
+    });
+    res.json({ success: true, id: result.id });
+  } catch (err) { sendServerError(res, err); }
+  finally { db.close(); }
+});
+
+app.delete('/api/routines/:id/entries/:entryId', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    if (!(await requireHouseholdRow(db, 'routines', req.params.id, req, res))) return;
+    await db.deleteRoutineEntry(req.params.entryId, req.params.id);
+    res.json({ success: true });
+  } catch (err) { sendServerError(res, err); }
+  finally { db.close(); }
+});
+
 // Activity feed (unified home feed)
 // ============================================
 // Direct Messages

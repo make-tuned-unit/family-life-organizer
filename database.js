@@ -4230,6 +4230,113 @@ class FamilyDB {
     });
   }
 
+  // ============================================
+  // Routines (period / baby-sleep / sleep-training / custom trackers)
+  // ============================================
+
+  getRoutines(groupId) {
+    return new Promise((resolve, reject) => {
+      if (groupId == null) return resolve([]);
+      this.db.all(
+        `SELECT r.*,
+          (SELECT COUNT(*) FROM routine_entries WHERE routine_id = r.id) AS entry_count,
+          (SELECT MAX(entry_date) FROM routine_entries WHERE routine_id = r.id) AS last_entry_date
+         FROM routines r
+         WHERE r.group_id = ?
+         ORDER BY r.active DESC, r.created_at DESC`,
+        [groupId], (err, rows) => err ? reject(err) : resolve(rows || []));
+    });
+  }
+
+  getRoutineById(id) {
+    return new Promise((resolve, reject) => {
+      this.db.get('SELECT * FROM routines WHERE id = ?', [id],
+        (err, row) => err ? reject(err) : resolve(row));
+    });
+  }
+
+  createRoutine(r) {
+    return new Promise((resolve, reject) => {
+      this.db.run(
+        `INSERT INTO routines
+          (group_id, created_by, name, routine_type, subject_name, subject_birthdate, config, color, icon, start_date, active)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`,
+        [r.group_id, r.created_by || null, r.name, r.routine_type || 'custom',
+         r.subject_name || null, r.subject_birthdate || null,
+         r.config ? (typeof r.config === 'string' ? r.config : JSON.stringify(r.config)) : null,
+         r.color || null, r.icon || null, r.start_date || null],
+        function (err) { err ? reject(err) : resolve({ id: this.lastID }); });
+    });
+  }
+
+  updateRoutine(id, updates) {
+    return new Promise((resolve, reject) => {
+      const ALLOWED = new Set(['name', 'subject_name', 'subject_birthdate', 'config', 'color', 'icon', 'start_date', 'active']);
+      const sets = [], params = [];
+      for (const key of Object.keys(updates)) {
+        if (!ALLOWED.has(key)) continue;
+        let val = updates[key];
+        if (key === 'config' && val != null && typeof val !== 'string') val = JSON.stringify(val);
+        sets.push(`${key} = ?`);
+        params.push(val);
+      }
+      if (!sets.length) return resolve({ changed: 0 });
+      params.push(id);
+      this.db.run(`UPDATE routines SET ${sets.join(', ')} WHERE id = ?`, params,
+        function (err) { err ? reject(err) : resolve({ changed: this.changes }); });
+    });
+  }
+
+  deleteRoutine(id) {
+    return new Promise((resolve, reject) => {
+      // Entries cascade via the FK, but delete them explicitly for older DBs
+      // created before ON DELETE CASCADE was reliably enforced.
+      this.db.serialize(() => {
+        this.db.run('DELETE FROM routine_entries WHERE routine_id = ?', [id]);
+        this.db.run('DELETE FROM routines WHERE id = ?', [id],
+          function (err) { err ? reject(err) : resolve({ deleted: this.changes }); });
+      });
+    });
+  }
+
+  getRoutineEntries(routineId, { from, to, limit = 200 } = {}) {
+    return new Promise((resolve, reject) => {
+      let sql = 'SELECT * FROM routine_entries WHERE routine_id = ?';
+      const params = [routineId];
+      if (from) { sql += ' AND entry_date >= ?'; params.push(from); }
+      if (to) { sql += ' AND entry_date <= ?'; params.push(to); }
+      sql += ' ORDER BY entry_date DESC, COALESCE(entry_time, "") DESC, id DESC LIMIT ?';
+      params.push(Math.max(1, Math.min(1000, parseInt(limit) || 200)));
+      this.db.all(sql, params, (err, rows) => err ? reject(err) : resolve(rows || []));
+    });
+  }
+
+  addRoutineEntry(routineId, e) {
+    return new Promise((resolve, reject) => {
+      this.db.run(
+        `INSERT INTO routine_entries (routine_id, entry_date, entry_time, entry_type, value, notes, created_by)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [routineId, e.entry_date, e.entry_time || null, e.entry_type || null,
+         e.value ? (typeof e.value === 'string' ? e.value : JSON.stringify(e.value)) : null,
+         e.notes || null, e.created_by || null],
+        function (err) { err ? reject(err) : resolve({ id: this.lastID }); });
+    });
+  }
+
+  getRoutineEntryById(id) {
+    return new Promise((resolve, reject) => {
+      this.db.get('SELECT * FROM routine_entries WHERE id = ?', [id],
+        (err, row) => err ? reject(err) : resolve(row));
+    });
+  }
+
+  deleteRoutineEntry(id, routineId) {
+    return new Promise((resolve, reject) => {
+      this.db.run('DELETE FROM routine_entries WHERE id = ? AND routine_id = ?', [id, routineId],
+        function (err) { err ? reject(err) : resolve({ deleted: this.changes }); });
+    });
+  }
+
   // Snapshot the live DB into destPath. VACUUM INTO produces a consistent,
   // compacted copy even while writers are active under WAL.
   backupTo(destPath) {

@@ -877,3 +877,38 @@ CREATE TABLE IF NOT EXISTS waitlist (
 CREATE UNIQUE INDEX IF NOT EXISTS idx_waitlist_ref_code ON waitlist(ref_code);
 CREATE INDEX IF NOT EXISTS idx_waitlist_referred_by ON waitlist(referred_by);
 CREATE INDEX IF NOT EXISTS idx_waitlist_created ON waitlist(created_at DESC);
+
+-- Routines: recurring life-pattern trackers — menstrual cycles, baby sleep
+-- schedules, the guided sleep-training program, and freeform custom routines.
+-- Household-scoped like every other feature. `config` and each entry's `value`
+-- hold type-specific JSON so one pair of tables serves every routine kind.
+CREATE TABLE IF NOT EXISTS routines (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    group_id INTEGER REFERENCES groups(id),
+    created_by INTEGER REFERENCES users(id),
+    name TEXT NOT NULL,
+    routine_type TEXT NOT NULL DEFAULT 'custom', -- period | baby_sleep | sleep_training | custom
+    subject_name TEXT,               -- e.g. the baby's name, or whose cycle this is
+    subject_birthdate TEXT,          -- YYYY-MM-DD; drives age for baby_sleep / sleep_training
+    config TEXT,                     -- JSON: type-specific settings (avg cycle length, goals…)
+    color TEXT,
+    icon TEXT,                       -- SF Symbol override; else derived from routine_type
+    start_date TEXT,
+    active INTEGER DEFAULT 1,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_routines_group ON routines(group_id);
+
+CREATE TABLE IF NOT EXISTS routine_entries (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    routine_id INTEGER NOT NULL REFERENCES routines(id) ON DELETE CASCADE,
+    entry_date TEXT NOT NULL,        -- YYYY-MM-DD
+    entry_time TEXT,                 -- HH:MM (optional)
+    entry_type TEXT,                 -- period_start | period_end | nap | night_sleep | wake | milestone | note
+    value TEXT,                      -- JSON: {flow,symptoms} | {sleep_start,sleep_end,wake_count,method} | …
+    notes TEXT,
+    created_by INTEGER REFERENCES users(id),
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_routine_entries_routine ON routine_entries(routine_id);
+CREATE INDEX IF NOT EXISTS idx_routine_entries_date ON routine_entries(routine_id, entry_date);
