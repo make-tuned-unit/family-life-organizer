@@ -4247,6 +4247,16 @@ app.post('/api/itineraries/:id/stays', requireAuth, async (req, res) => {
       return res.status(403).json({ error: 'Forbidden' });
     }
     const stay = { ...req.body, itinerary_id: Number(req.params.id) };
+    // A host must be someone the traveler actually shares a group with —
+    // otherwise a stay request would push "X wants to stay with you" (with dates
+    // and notes) to an arbitrary user id.
+    if (stay.host_user_id != null && stay.host_user_id !== '') {
+      const hostId = parseInt(stay.host_user_id);
+      if (!Number.isInteger(hostId) || !(await usersShareGroup(db, req.session.user.id, hostId))) {
+        return res.status(403).json({ error: 'Host must be someone you share a household or clan with' });
+      }
+      stay.host_user_id = hostId;
+    }
     const result = await db.addItineraryStay(stay);
     res.json({ success: true, id: result.id });
   } catch (err) {
@@ -4263,7 +4273,15 @@ app.put('/api/itineraries/:id/stays/:stayId', requireAuth, async (req, res) => {
     if (!itinerary || itinerary.traveler_id !== req.session.user.id) {
       return res.status(403).json({ error: 'Forbidden' });
     }
-    await db.updateItineraryStay(req.params.stayId, req.body, req.params.id);
+    const stayUpdates = { ...req.body };
+    if (stayUpdates.host_user_id != null && stayUpdates.host_user_id !== '') {
+      const hostId = parseInt(stayUpdates.host_user_id);
+      if (!Number.isInteger(hostId) || !(await usersShareGroup(db, req.session.user.id, hostId))) {
+        return res.status(403).json({ error: 'Host must be someone you share a household or clan with' });
+      }
+      stayUpdates.host_user_id = hostId;
+    }
+    await db.updateItineraryStay(req.params.stayId, stayUpdates, req.params.id);
     res.json({ success: true });
   } catch (err) {
     sendServerError(res, err);
