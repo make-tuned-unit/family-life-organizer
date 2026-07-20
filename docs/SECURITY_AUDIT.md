@@ -3,6 +3,44 @@
 Date: 2026-06-25. Scope: full-codebase review (auth, authz/isolation, AI/concierge,
 payments, email, DB, deploy, iOS) followed by remediation of P0/P1 findings.
 
+## 2026-07-20 — stability & isolation sweep
+
+A second multi-surface review (backend, concierge tools, iOS) with remediation:
+
+- **Cross-household isolation (P0).** ~14 household-scoped read/write endpoints
+  (receipts, budget, pantry, trips, addresses, gifts, projects, recurring
+  payments, cook) treated a `null` groupId as "no filter", so a household-less
+  caller (`POST /api/groups/:id/leave`) could read/write every household's data.
+  All now guard `if (!groupId)`. The legacy `/app` SSR grocery list was
+  scoped to the caller (was global).
+- **Boot-time membership rewrite (P0).** The hardcoded jesse/sophie household
+  seed ran on every boot, force-rewriting `group_members` (evicting invited
+  members, absorbing any stranger named `sophie`). Now gated one-time behind an
+  `app_meta` flag; the NULL-only backfill remains idempotent.
+- **Coverage IDOR (P0).** Coverage recipients / push targets were resolved by a
+  forgeable display-name match. Now additionally require a shared-group link to
+  the contact's owner, so renaming yourself can't harvest another family's
+  requests, invite tokens, or approvals. Rivalry name→user push resolution is
+  likewise group-scoped.
+- **Subscriptions (P1).** Each StoreKit transaction is now bound to its
+  first-claiming household (blocks JWS replay / entitlement ping-pong), and
+  Sandbox transactions are rejected in production (`STOREKIT_ALLOW_SANDBOX=1`
+  to allow in dev/TestFlight).
+- **Rivalries (P1).** Callers must belong to a name-derived rivalry group;
+  entry `member_name` is validated against the roster.
+- **Concierge/injection (P1/P2).** Display name sanitized in the brief system
+  prompt; `add_gift_idea` now `assertHousehold`s its `person_id`; mid-stream
+  API errors surface instead of a false "Done"; `get_coverage` lists your own
+  requests so cancel works.
+- **Correctness/DoS (P2).** `?limit` clamped (`limit=-1` was unbounded);
+  monthly/yearly recurrence anchored to origin day; money routed through
+  `parseMoney` on recurring payments/projects/expenses; waitlist notify email
+  HTML-escaped.
+- **iOS (P1/P2).** Fixed a logout race that could resurrect a revoked session,
+  bounded silent-relogin recursion, stopped rivalry HealthKit sync from spamming
+  opponents with pushes, and fixed a DM watermark key mismatch that re-notified
+  already-delivered messages.
+
 ## Email 2FA rollout (go-live sequence — do in order)
 
 Email two-factor login is **deployed but OFF** (`AUTH_2FA_ENABLED` unset) so it
