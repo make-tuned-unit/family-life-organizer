@@ -107,6 +107,27 @@ final class NotificationService {
         return eta?.expectedTravelTime
     }
 
+    // MARK: - Activity routine confirmations
+
+    /// Best-effort local nudge to confirm an activity session after its calendar
+    /// event (e.g. "Did you go to violin?"), deep-linking to the routine. The
+    /// identifier is stable per (routine, date) so re-scheduling can't duplicate.
+    func scheduleActivityConfirmation(routineId: Int, activity: String, date: String, hour: Int = 19) {
+        let content = UNMutableNotificationContent()
+        content.title = "Did you go to \(activity)?"
+        content.body = "Tap to confirm — it counts toward your milestones."
+        content.sound = .default
+        content.categoryIdentifier = "ROUTINE_CONFIRM"
+        content.userInfo = ["type": "routine", "ref_id": routineId]
+
+        let hh = String(format: "%02d:00", max(0, min(23, hour)))
+        guard let fire = parseDateTime(date: date, time: hh, minutesBefore: 0), fire > Date() else { return }
+        let components = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute], from: fire)
+        let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
+        let request = UNNotificationRequest(identifier: "routine-confirm-\(routineId)-\(date)", content: content, trigger: trigger)
+        UNUserNotificationCenter.current().add(request)
+    }
+
     // MARK: - Pantry expiry alerts
 
     func schedulePantryExpiryAlert(id: Int, itemName: String, expiryDate: String) {

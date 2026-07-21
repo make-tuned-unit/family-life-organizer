@@ -12,6 +12,10 @@ struct NewRoutineView: View {
     @State private var name = ""
     @State private var subjectName = ""
     @State private var birthdate = Date()
+    @State private var cycleMode = "period"          // period | ttc
+    @State private var activityKind = ""             // e.g. "Violin"
+    @State private var calendarKeyword = ""          // matches calendar event titles
+    @State private var goalPerWeek = 1
     @State private var isSaving = false
     @State private var errorMessage: String?
 
@@ -44,6 +48,46 @@ struct NewRoutineView: View {
                         Text("We use this to find the right phase and age-appropriate guidance — nothing is shared outside your household.")
                             .font(.flFootnote)
                             .foregroundStyle(WarmPalette.ink3)
+                    }
+
+                    if type.isCycle {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("What are you tracking?")
+                                .font(.flCaption.weight(.semibold))
+                                .foregroundStyle(WarmPalette.ink3)
+                            Picker("Mode", selection: $cycleMode) {
+                                Text("My period").tag("period")
+                                Text("Trying to conceive").tag("ttc")
+                            }
+                            .pickerStyle(.segmented)
+                            .tint(accent)
+                        }
+                        Text(cycleMode == "ttc"
+                             ? "We'll estimate your fertile window from your cycle history. It's informational only — not medical advice, and not a form of birth control."
+                             : "Log the first day of your period and we'll help you see your patterns and plan ahead.")
+                            .font(.flFootnote)
+                            .foregroundStyle(WarmPalette.ink3)
+                    }
+
+                    if type.isActivity {
+                        field(label: "Activity") {
+                            TextField("e.g. Violin, Swimming, Baseball", text: $activityKind)
+                                .font(.flBody)
+                                .textInputAutocapitalization(.words)
+                        }
+                        field(label: "Match calendar events containing") {
+                            TextField(activityKind.isEmpty ? "e.g. violin" : activityKind.lowercased(), text: $calendarKeyword)
+                                .font(.flBody)
+                                .textInputAutocapitalization(.never)
+                                .autocorrectionDisabled()
+                        }
+                        Text("We'll find events with this word in their title so you can confirm each one and watch your milestones add up.")
+                            .font(.flFootnote)
+                            .foregroundStyle(WarmPalette.ink3)
+                        field(label: "Goal per week") {
+                            Stepper("\(goalPerWeek) time\(goalPerWeek == 1 ? "" : "s") a week", value: $goalPerWeek, in: 1...14)
+                                .font(.flBody)
+                        }
                     }
                 }
                 .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
@@ -124,6 +168,7 @@ struct NewRoutineView: View {
         case .period: "e.g. My cycle"
         case .babySleep: "e.g. Wren's sleep"
         case .sleepTraining: "e.g. Wren's sleep training"
+        case .activity: "e.g. Mia's violin"
         case .custom: "e.g. Morning routine"
         }
     }
@@ -133,6 +178,7 @@ struct NewRoutineView: View {
         case .period: "My cycle"
         case .babySleep: "Baby's sleep"
         case .sleepTraining: "Sleep training"
+        case .activity: ""
         case .custom: ""
         }
     }
@@ -151,6 +197,18 @@ struct NewRoutineView: View {
             fmt.locale = Locale(identifier: "en_US_POSIX")
             fmt.dateFormat = "yyyy-MM-dd"
             body["subject_birthdate"] = fmt.string(from: birthdate)
+        }
+        if type.isCycle {
+            body["config"] = ["mode": cycleMode]
+        }
+        if type.isActivity {
+            let kind = activityKind.trimmingCharacters(in: .whitespaces)
+            let keyword = calendarKeyword.trimmingCharacters(in: .whitespaces).lowercased()
+            body["config"] = [
+                "activity_kind": kind,
+                "calendar_keyword": keyword.isEmpty ? kind.lowercased() : keyword,
+                "goal_per_week": goalPerWeek,
+            ]
         }
         do {
             try await api.addRoutine(body)

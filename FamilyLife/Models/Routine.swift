@@ -9,6 +9,7 @@ enum RoutineType: String, Codable, CaseIterable, Identifiable {
     case period
     case babySleep = "baby_sleep"
     case sleepTraining = "sleep_training"
+    case activity
     case custom
 
     var id: String { rawValue }
@@ -18,6 +19,7 @@ enum RoutineType: String, Codable, CaseIterable, Identifiable {
         case .period:        "Cycle"
         case .babySleep:     "Baby sleep"
         case .sleepTraining: "Sleep training"
+        case .activity:      "Activity"
         case .custom:        "Custom"
         }
     }
@@ -25,9 +27,10 @@ enum RoutineType: String, Codable, CaseIterable, Identifiable {
     /// One-line description shown when picking a type.
     var blurb: String {
         switch self {
-        case .period:        "Track your menstrual cycle and symptoms."
+        case .period:        "Track your menstrual cycle, or your fertile window."
         case .babySleep:     "Log naps, night sleep, and wake-ups."
         case .sleepTraining: "A guided program from newborn to 4 years."
+        case .activity:      "Practice like violin or swimming — earn milestones."
         case .custom:        "Track any habit or routine, your way."
         }
     }
@@ -38,11 +41,14 @@ enum RoutineType: String, Codable, CaseIterable, Identifiable {
         case .period:        "drop.fill"
         case .babySleep:     "moon.zzz.fill"
         case .sleepTraining: "moon.stars.fill"
+        case .activity:      "figure.run"
         case .custom:        "repeat"
         }
     }
 
     var needsBirthdate: Bool { self == .babySleep || self == .sleepTraining }
+    var isActivity: Bool { self == .activity }
+    var isCycle: Bool { self == .period }
 }
 
 struct RoutineResponse: Codable, Identifiable {
@@ -90,8 +96,85 @@ struct RoutineDetailResponse: Codable, Identifiable {
     let created_at: String?
     let entries: [RoutineEntryResponse]
     let guidance: SleepGuidance?
+    let cycle: CyclePrediction?
+    let achievements: RoutineAchievements?
 
     var type: RoutineType { RoutineType(rawValue: routine_type) ?? .custom }
+}
+
+// MARK: - Cycle tracking (period + trying-to-conceive)
+
+struct FertileWindow: Codable {
+    let start: String
+    let end: String
+}
+
+struct CyclePrediction: Codable {
+    let mode: String                       // "period" | "ttc"
+    let disclaimer: String
+    let cycles_tracked: Int
+    let insufficient: Bool?
+    let note: String?
+    let current_cycle_day: Int?
+    let average_cycle_length: Int?
+    let cycle_variability_days: Int?
+    let period_length: Int?
+    let next_period_date: String?
+    let days_until_period: Int?
+    let is_late: Bool?
+    let late_by_days: Int?
+    let current_phase: String?             // menstrual | follicular | fertile | ovulation | luteal
+    let confidence: String?               // low | medium | high
+    let irregular: Bool?
+    // TTC only
+    let predicted_ovulation_date: String?
+    let fertile_window: FertileWindow?
+    let fertile_note: String?
+
+    var isTTC: Bool { mode == "ttc" }
+}
+
+// MARK: - Activity achievements
+
+struct AchievementBadge: Codable, Identifiable {
+    let count: Int
+    let title: String
+    let blurb: String
+    var id: Int { count }
+}
+
+struct NextMilestone: Codable {
+    let count: Int
+    let title: String
+    let blurb: String
+    let remaining: Int
+}
+
+struct RoutineAchievements: Codable {
+    let total_sessions: Int
+    let current_streak_weeks: Int
+    let last_session_date: String?
+    let earned: [AchievementBadge]
+    let next_milestone: NextMilestone?
+    let latest: String?
+}
+
+// MARK: - Activity calendar occurrences
+
+struct RoutineOccurrence: Codable, Identifiable {
+    let date: String
+    let confirmed: Bool
+    let past: Bool
+    let today: Bool
+    var id: String { date }
+}
+
+struct RoutineOccurrences: Codable {
+    let keyword: String?
+    let occurrences: [RoutineOccurrence]
+    let scheduled: Int
+    let attended: Int
+    let pending: [RoutineOccurrence]?
 }
 
 // MARK: - Sleep-training program (static template + age-based guidance)

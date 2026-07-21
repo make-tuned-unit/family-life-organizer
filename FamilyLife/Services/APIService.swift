@@ -651,6 +651,10 @@ final class APIService {
         try await get("/api/routines/templates/sleep-training")
     }
 
+    func fetchRoutineOccurrences(id: Int) async throws -> RoutineOccurrences {
+        try await get("/api/routines/\(id)/occurrences")
+    }
+
     // MARK: - Rivalries
 
     func fetchRivalries(status: String? = nil) async throws -> [RivalryResponse] {

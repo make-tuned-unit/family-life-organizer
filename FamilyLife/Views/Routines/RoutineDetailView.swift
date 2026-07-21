@@ -10,6 +10,7 @@ struct RoutineDetailView: View {
     let routineId: Int
 
     @State private var detail: RoutineDetailResponse?
+    @State private var occurrences: RoutineOccurrences?
     @State private var isLoading = true
     @State private var errorMessage: String?
     @State private var showingDeleteConfirm = false
@@ -32,6 +33,17 @@ struct RoutineDetailView: View {
                     VStack(spacing: 16) {
                         if let guidance = detail.guidance {
                             SleepGuidanceCard(guidance: guidance)
+                        }
+                        if let cycle = detail.cycle {
+                            CycleCard(cycle: cycle)
+                        }
+                        if let achievements = detail.achievements {
+                            ActivityAchievementCard(achievements: achievements)
+                        }
+                        if detail.type.isActivity, let occ = occurrences, !(occ.pending ?? []).isEmpty {
+                            ConfirmAttendanceCard(pending: occ.pending ?? [], activity: detail.name) { date, attended in
+                                Task { await confirm(date: date, attended: attended) }
+                            }
                         }
 
                         quickLog(for: detail.type)
@@ -87,6 +99,9 @@ struct RoutineDetailView: View {
                     logButton("Night sleep", "moon.fill", entryType: "night_sleep")
                     logButton("Woke up", "sunrise.fill", entryType: "wake")
                     logButton("Milestone", "star.fill", entryType: "milestone")
+                case .activity:
+                    logButton("Did it today", "checkmark.circle.fill", entryType: "session")
+                    logButton("Skipped", "xmark.circle", entryType: "session", value: ["status": "skipped"])
                 case .custom:
                     logButton("Done today", "checkmark", entryType: "note")
                 }
@@ -97,9 +112,9 @@ struct RoutineDetailView: View {
         .flCard()
     }
 
-    private func logButton(_ title: String, _ icon: String, entryType: String) -> some View {
+    private func logButton(_ title: String, _ icon: String, entryType: String, value: [String: Any]? = nil) -> some View {
         Button {
-            Task { await log(entryType: entryType) }
+            Task { await log(entryType: entryType, value: value) }
         } label: {
             Label(title, systemImage: icon)
                 .font(.flFootnote.weight(.semibold))
@@ -138,17 +153,37 @@ struct RoutineDetailView: View {
 
     private func load() async {
         do {
-            detail = try await api.fetchRoutine(id: routineId)
+            let d = try await api.fetchRoutine(id: routineId)
+            detail = d
             errorMessage = nil
+            if d.type.isActivity {
+                let occ = try? await api.fetchRoutineOccurrences(id: routineId)
+                occurrences = occ
+                // Schedule a "did you go?" nudge for each upcoming linked event.
+                if let occ, await NotificationService.shared.isAuthorized() {
+                    let label = occ.keyword?.capitalized ?? d.name
+                    for o in occ.occurrences where !o.confirmed && !o.past {
+                        NotificationService.shared.scheduleActivityConfirmation(routineId: routineId, activity: label, date: o.date)
+                    }
+                }
+            }
         } catch {
             errorMessage = "Couldn't load this routine."
         }
         isLoading = false
     }
 
-    private func log(entryType: String) async {
+    // Confirm (or mark skipped) attendance for a specific linked calendar date.
+    private func confirm(date: String, attended: Bool) async {
+        await log(entryType: "session", value: attended ? nil : ["status": "skipped"], date: date)
+    }
+
+    private func log(entryType: String, value: [String: Any]? = nil, date: String? = nil) async {
+        var data: [String: Any] = ["entry_type": entryType]
+        if let value { data["value"] = value }
+        if let date { data["entry_date"] = date }
         do {
-            try await api.addRoutineEntry(id: routineId, data: ["entry_type": entryType])
+            try await api.addRoutineEntry(id: routineId, data: data)
             await load()
         } catch {
             errorMessage = "Couldn't save that entry. Please try again."
