@@ -128,6 +128,13 @@ final class NotificationService {
         UNUserNotificationCenter.current().add(request)
     }
 
+    /// Cancel the pending "Did you go?" nudge once the user has confirmed (or
+    /// skipped) that date directly, so it can't fire after they've answered.
+    func cancelActivityConfirmation(routineId: Int, date: String) {
+        UNUserNotificationCenter.current()
+            .removePendingNotificationRequests(withIdentifiers: ["routine-confirm-\(routineId)-\(date)"])
+    }
+
     // MARK: - Pantry expiry alerts
 
     func schedulePantryExpiryAlert(id: Int, itemName: String, expiryDate: String) {

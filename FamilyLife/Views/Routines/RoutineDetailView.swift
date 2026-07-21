@@ -175,6 +175,8 @@ struct RoutineDetailView: View {
 
     // Confirm (or mark skipped) attendance for a specific linked calendar date.
     private func confirm(date: String, attended: Bool) async {
+        // The user has answered directly, so retire the pending "did you go?" nudge.
+        NotificationService.shared.cancelActivityConfirmation(routineId: routineId, date: date)
         await log(entryType: "session", value: attended ? nil : ["status": "skipped"], date: date)
     }
 
@@ -218,7 +220,7 @@ private struct EntryRow: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(label)
                     .font(.flSubheadline.weight(.medium))
-                    .foregroundStyle(WarmPalette.ink1)
+                    .foregroundStyle(isSkippedSession ? WarmPalette.ink3 : WarmPalette.ink1)
                 Text(entry.entry_time != nil ? "\(entry.entry_date) · \(entry.entry_time!)" : entry.entry_date)
                     .font(.flCaption)
                     .foregroundStyle(WarmPalette.ink3)
@@ -241,6 +243,7 @@ private struct EntryRow: View {
     }
 
     private var label: String {
+        if isSkippedSession { return "Skipped" }
         switch entry.entry_type {
         case "period_start": "Period started"
         case "period_end": "Period ended"
@@ -249,9 +252,20 @@ private struct EntryRow: View {
         case "night_sleep": "Night sleep"
         case "wake": "Woke up"
         case "milestone": "Milestone"
+        case "session", "attended": "Session"
         case "note", .none: "Logged"
         case .some(let t): t.replacingOccurrences(of: "_", with: " ").capitalized
         }
+    }
+
+    // A session entry whose stored value marks it skipped — shown muted so it's
+    // distinct from an attended session, matching the backend's milestone rule.
+    private var isSkippedSession: Bool {
+        guard entry.entry_type == "session" || entry.entry_type == "attended",
+              let raw = entry.value?.data(using: .utf8),
+              let obj = try? JSONSerialization.jsonObject(with: raw) as? [String: Any]
+        else { return false }
+        return obj["status"] as? String == "skipped"
     }
 }
 
