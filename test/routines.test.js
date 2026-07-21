@@ -136,9 +136,11 @@ test('routines: sleep-training guidance picks the right phase across ages', asyn
   const daysAgo = (d) => new Date(Date.now() - d * 86400000).toLocaleDateString('en-CA');
 
   // (age in days) -> expected phase key + whether formal training is age-appropriate.
-  // The 112/113-day pair pins the ~4-month readiness boundary exactly.
+  // Ages sit clear of the band edges so a ±1-day wall-clock/timezone boundary
+  // between the test's daysAgo() and the server's own "today" can't flip a phase.
+  // The exact ~4-month readiness boundary is pinned deterministically below.
   const cases = [
-    [30, 'newborn', false], [112, 'newborn', false], [113, 'foundations', true],
+    [30, 'newborn', false], [105, 'newborn', false], [121, 'foundations', true],
     [200, 'consolidate', true], [400, 'toddler_transition', true],
     [700, 'preschool_routine', true], [1300, 'big_kid', true], [3000, 'big_kid', true],
   ];
@@ -171,6 +173,11 @@ test('routines: template age bands are contiguous and cover 0..~5yr', async () =
     assert.ok(phases[i].method && phases[i].method.name, `${phases[i].key} names a method`);
   }
   assert.ok(phases[phases.length - 1].max_days >= 1826, 'coverage extends to ~5 years');
+  // Pin the ~4-month readiness boundary deterministically (pure band data, no
+  // now-dependency): day 112 is still 'newborn', day 113 opens 'foundations'.
+  const bandFor = (day) => phases.find(p => day >= p.min_days && day <= p.max_days)?.key;
+  assert.equal(bandFor(112), 'newborn', 'day 112 is the last newborn day');
+  assert.equal(bandFor(113), 'foundations', 'day 113 opens the foundations band (~4 months)');
 });
 
 test('routines: sleep-training template is served with phases and sources', async () => {
@@ -301,9 +308,11 @@ test('routines: cycle — period routine predicts next period and phase', async 
   const c = detail.body.cycle;
   assert.equal(c.mode, 'period');
   assert.equal(c.average_cycle_length, 28, `avg cycle ~28 (got ${c.average_cycle_length})`);
-  assert.equal(c.current_cycle_day, 1, 'just started -> day 1');
+  // Tolerate a ±1 wall-clock boundary between the test's daysAgo() and the
+  // server's own "today" — cycle day is 1 (or 2 right at midnight).
+  assert.ok(c.current_cycle_day >= 1 && c.current_cycle_day <= 2, `cycle just started (got day ${c.current_cycle_day})`);
   assert.ok(c.next_period_date, 'has a next-period estimate');
-  assert.equal(c.current_phase, 'menstrual', 'day 1 -> menstrual');
+  assert.equal(c.current_phase, 'menstrual', 'early cycle -> menstrual');
   assert.ok(!('fertile_window' in c), 'period mode never surfaces a fertile window');
   assert.ok(c.disclaimer.toLowerCase().includes('not a form of birth control'), 'carries the non-contraception disclaimer');
 });
@@ -336,6 +345,7 @@ test('routines: cycle — one logged period is insufficient for predictions', as
   await one('POST', `/api/routines/${rid}/entries`, { entry_type: 'period_start', entry_date: daysAgo(3) });
   const c = (await one('GET', `/api/routines/${rid}`)).body.cycle;
   assert.equal(c.insufficient, true, 'one period -> insufficient');
-  assert.equal(c.current_cycle_day, 4, 'still shows the current cycle day');
+  // ~3 days ago -> day 4, ±1 for a wall-clock/timezone boundary.
+  assert.ok(c.current_cycle_day >= 3 && c.current_cycle_day <= 5, `still shows the current cycle day (got ${c.current_cycle_day})`);
   assert.ok(!c.fertile_window, 'no fertile window from a single period');
 });
