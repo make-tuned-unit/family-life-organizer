@@ -9,7 +9,7 @@ Website: https://kinrows.com
 Modern family life is spread across too many places: one parent's phone calendar, a fridge whiteboard, group chats, a budgeting app, a notes app, sticky notes. The result is missed events, duplicated effort, and an invisible "mental load" that usually lands on one person who holds the whole picture in their head.
 
 ## Solution
-Kinrows is a single, private home organizer for the whole household. It brings the family's calendar, to-do and shopping lists, pantry and meals, group decisions, budget and expenses, trips and itineraries, gifts and milestones, care coverage, notes, messages, and a family feed into one calm place that everyone can see and contribute to.
+Kinrows is a single, private home organizer for the whole household. It brings the family's calendar, to-do and shopping lists, pantry and meals, group decisions, budget and expenses, trips and itineraries, gifts and milestones, routines (including a guided sleep-training program), care coverage, notes, messages, and a family feed into one calm place that everyone can see and contribute to.
 
 ## Differentiator
 1. Private by design. Each household's data is isolated at the database level — not merely hidden in the UI. No ads, no data sale, no training of AI models on your content.
@@ -37,6 +37,7 @@ Kinrows is a single, private home organizer for the whole household. It brings t
 - Decisions: family polls and discussions with votes, comments, and expiry.
 - Rivalries: family competitions on steps, stairs, or anything else, with automatic Apple Health syncing. 1v1, multiplayer and team modes, XP levels, and completion celebrations.
 - People & gifts: profiles for kids and family members; milestone logging ("first steps"); key dates; a year-in-review recap; and gift ideas per person with purchased / wrapped / given tracking.
+- Routines: recurring life-pattern trackers — menstrual cycles, a baby's sleep, and freeform custom routines — plus a guided, research-backed sleep-training program from newborn to 4 years, with age-banded phases (each with an evidence-based method, daily steps and tips), AAP-aligned safe-sleep guidance, and a phase that adapts to the child's age.
 - Care coverage: ask your care team for babysitting, pet or house coverage with proposed time windows. Helpers approve via a share link (no app needed) or in-app; approved windows land on both parties' calendars.
 - Notes: private notes that can be shared with household members and co-edited. (The Concierge can also create, update and delete notes — "take a note to call the plumber.")
 - Messages: private DMs and group chats with photos, quoted items (share a list, event or decision into a chat), and in-chat polls.
