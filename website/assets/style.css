@@ -389,7 +389,13 @@ a:focus-visible, button:focus-visible, input:focus-visible,
   background-repeat:no-repeat;background-position:center;
 }
 
-/* everything-inside grid */
+/* everything-inside grid — grouped into labelled buckets so the full toolkit
+   scans as ~4 chunks instead of one wall of 18 tiles (chunking / Hick's law). */
+.gf-groups{display:flex;flex-direction:column;gap:40px}
+.gf-group-title{font-family:var(--sans);font-weight:600;font-size:.8rem;letter-spacing:.13em;
+  text-transform:uppercase;color:var(--ink-3);margin-bottom:16px;
+  display:flex;align-items:center;gap:14px}
+.gf-group-title::after{content:"";flex:1;height:1px;background:var(--line-soft)}
 .grid-features{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
 .gf{background:var(--card);border:1px solid var(--line-soft);border-radius:20px;padding:20px 18px;
   box-shadow:var(--shadow-sm);transition:transform .2s ease, box-shadow .25s ease;}
