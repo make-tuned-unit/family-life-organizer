@@ -770,6 +770,23 @@ class FamilyDB {
     });
   }
 
+  // Appointments in a household whose title contains `keyword` — the calendar
+  // link for an activity routine (e.g. keyword "violin" finds the lessons).
+  // Returns the base events (recurrence expanded by the caller).
+  getAppointmentsMatching(groupId, keyword, from, to) {
+    return new Promise((resolve, reject) => {
+      if (groupId == null || !keyword) return resolve([]);
+      let sql = `SELECT id, title, appointment_date, appointment_time, category,
+                        recurrence_rule, recurrence_end
+                 FROM appointments WHERE group_id = ? AND LOWER(title) LIKE ?`;
+      const params = [groupId, '%' + String(keyword).toLowerCase().replace(/[%_]/g, '') + '%'];
+      if (from) { sql += ' AND (appointment_date >= ? OR recurrence_rule IS NOT NULL)'; params.push(from); }
+      if (to) { sql += ' AND appointment_date <= ?'; params.push(to); }
+      sql += ' ORDER BY appointment_date, appointment_time';
+      this.db.all(sql, params, (err, rows) => err ? reject(err) : resolve(rows || []));
+    });
+  }
+
   getAppointmentsByMonth(year, month, userId = null) {
     return new Promise((resolve, reject) => {
       const startDate = `${year}-${String(month).padStart(2, '0')}-01`;

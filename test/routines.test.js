@@ -226,3 +226,116 @@ test('routines: a household-less caller cannot create a routine', async () => {
   assert.deepEqual(list.body, [], 'no household -> empty list, never a leak');
   assert.ok(me.body.user, 'sanity: caller was authenticated');
 });
+
+const daysAgo = (d) => new Date(Date.now() - d * 86400000).toLocaleDateString('en-CA');
+
+test('routines: activity — sessions accumulate into achievement milestones', async () => {
+  const av = makeClient();
+  await av('POST', '/api/auth/register', { username: 'act_rt', password: 'password123', name: 'Ava Activity' });
+  const r = await av('POST', '/api/routines', {
+    name: "Mia's violin", routine_type: 'activity', subject_name: 'Mia',
+    config: { activity_kind: 'Violin', calendar_keyword: 'violin', goal_per_week: 1 },
+  });
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  const rid = r.body.id;
+
+  // Log five weekly sessions.
+  for (let w = 5; w >= 1; w--) {
+    const e = await av('POST', `/api/routines/${rid}/entries`, { entry_type: 'session', entry_date: daysAgo(w * 7) });
+    assert.equal(e.status, 200);
+  }
+  const detail = await av('GET', `/api/routines/${rid}`);
+  assert.equal(detail.status, 200);
+  assert.ok(detail.body.achievements, 'activity routine carries achievements');
+  const a = detail.body.achievements;
+  assert.equal(a.total_sessions, 5);
+  assert.ok(a.earned.some(m => m.count === 5), 'earned the 5-session milestone');
+  assert.ok(a.earned.some(m => m.count === 1), 'earned the first-session milestone');
+  assert.equal(a.next_milestone.count, 10, 'next milestone is 10');
+  assert.equal(a.next_milestone.remaining, 5);
+  // A skipped session does not count toward the total.
+  await av('POST', `/api/routines/${rid}/entries`, { entry_type: 'session', entry_date: daysAgo(1), value: { status: 'skipped' } });
+  const after = await av('GET', `/api/routines/${rid}`);
+  assert.equal(after.body.achievements.total_sessions, 5, 'skipped session not counted');
+});
+
+test('routines: activity — occurrences link to calendar events and flag confirmations', async () => {
+  const cl = makeClient();
+  await cl('POST', '/api/auth/register', { username: 'cal_rt', password: 'password123', name: 'Cal Endar' });
+  // A weekly "Violin lesson" on the calendar, starting 4 weeks ago.
+  const appt = await cl('POST', '/api/appointments', {
+    title: 'Violin lesson', appointment_date: daysAgo(28), appointment_time: '16:00', recurrence_rule: 'weekly',
+  });
+  assert.equal(appt.status, 200, JSON.stringify(appt.body));
+  const r = await cl('POST', '/api/routines', {
+    name: 'Violin', routine_type: 'activity', config: { calendar_keyword: 'violin' },
+  });
+  const rid = r.body.id;
+
+  const occ1 = await cl('GET', `/api/routines/${rid}/occurrences`);
+  assert.equal(occ1.status, 200);
+  assert.equal(occ1.body.keyword, 'violin');
+  assert.ok(occ1.body.scheduled >= 4, `weekly recurrence expands to several occurrences (got ${occ1.body.scheduled})`);
+  assert.equal(occ1.body.attended, 0, 'nothing confirmed yet');
+  assert.ok(occ1.body.pending.length >= 1, 'past unconfirmed occurrences are pending');
+
+  // Confirm attendance on the earliest pending occurrence by logging a session that day.
+  const target = occ1.body.pending[0].date;
+  await cl('POST', `/api/routines/${rid}/entries`, { entry_type: 'session', entry_date: target });
+  const occ2 = await cl('GET', `/api/routines/${rid}/occurrences`);
+  assert.equal(occ2.body.attended, 1, 'the confirmed occurrence is now attended');
+  assert.ok(occ2.body.occurrences.find(o => o.date === target).confirmed, 'that date is marked confirmed');
+});
+
+test('routines: cycle — period routine predicts next period and phase', async () => {
+  const cy = makeClient();
+  await cy('POST', '/api/auth/register', { username: 'cyc_rt', password: 'password123', name: 'Cy Cle' });
+  const r = await cy('POST', '/api/routines', { name: 'My cycle', routine_type: 'period', config: { mode: 'period' } });
+  const rid = r.body.id;
+  // Four period starts ~28 days apart.
+  for (const d of [daysAgo(84), daysAgo(56), daysAgo(28), daysAgo(0)]) {
+    await cy('POST', `/api/routines/${rid}/entries`, { entry_type: 'period_start', entry_date: d });
+  }
+  const detail = await cy('GET', `/api/routines/${rid}`);
+  assert.ok(detail.body.cycle, 'period routine carries cycle prediction');
+  const c = detail.body.cycle;
+  assert.equal(c.mode, 'period');
+  assert.equal(c.average_cycle_length, 28, `avg cycle ~28 (got ${c.average_cycle_length})`);
+  assert.equal(c.current_cycle_day, 1, 'just started -> day 1');
+  assert.ok(c.next_period_date, 'has a next-period estimate');
+  assert.equal(c.current_phase, 'menstrual', 'day 1 -> menstrual');
+  assert.ok(!('fertile_window' in c), 'period mode never surfaces a fertile window');
+  assert.ok(c.disclaimer.toLowerCase().includes('not a form of birth control'), 'carries the non-contraception disclaimer');
+});
+
+test('routines: cycle — TTC mode surfaces a fertile-window RANGE with enough history', async () => {
+  const ttc = makeClient();
+  await ttc('POST', '/api/auth/register', { username: 'ttc_rt', password: 'password123', name: 'Tara TTC' });
+  const r = await ttc('POST', '/api/routines', { name: 'TTC', routine_type: 'period', config: { mode: 'ttc' } });
+  const rid = r.body.id;
+  // Regular ~28-day cycles (need >=3 cycles = 4 starts), last period 14 days ago.
+  for (const d of [daysAgo(98), daysAgo(70), daysAgo(42), daysAgo(14)]) {
+    await ttc('POST', `/api/routines/${rid}/entries`, { entry_type: 'period_start', entry_date: d });
+  }
+  const detail = await ttc('GET', `/api/routines/${rid}`);
+  const c = detail.body.cycle;
+  assert.equal(c.mode, 'ttc');
+  assert.ok(c.fertile_window && c.fertile_window.start && c.fertile_window.end, 'TTC + >=3 cycles -> a fertile window range');
+  assert.ok(c.predicted_ovulation_date, 'has a predicted ovulation date');
+  // Ovulation is anchored to next period - 14 (luteal), so it sits before next period.
+  assert.ok(c.predicted_ovulation_date < c.next_period_date, 'ovulation precedes the next period');
+  assert.ok(c.fertile_window.start <= c.predicted_ovulation_date && c.predicted_ovulation_date <= c.fertile_window.end,
+    'ovulation falls inside the fertile window');
+});
+
+test('routines: cycle — one logged period is insufficient for predictions', async () => {
+  const one = makeClient();
+  await one('POST', '/api/auth/register', { username: 'one_rt', password: 'password123', name: 'One Cycle' });
+  const r = await one('POST', '/api/routines', { name: 'New cycle', routine_type: 'period', config: { mode: 'ttc' } });
+  const rid = r.body.id;
+  await one('POST', `/api/routines/${rid}/entries`, { entry_type: 'period_start', entry_date: daysAgo(3) });
+  const c = (await one('GET', `/api/routines/${rid}`)).body.cycle;
+  assert.equal(c.insufficient, true, 'one period -> insufficient');
+  assert.equal(c.current_cycle_day, 4, 'still shows the current cycle day');
+  assert.ok(!c.fertile_window, 'no fertile window from a single period');
+});

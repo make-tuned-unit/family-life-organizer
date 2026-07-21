@@ -359,6 +359,11 @@ function todayLocal() {
   return new Date().toLocaleDateString('en-CA');
 }
 
+// Server-local YYYY-MM-DD offset from today by `offsetDays` (may be negative).
+function fromLocalDate(offsetDays) {
+  return new Date(Date.now() + offsetDays * 86400000).toLocaleDateString('en-CA');
+}
+
 // The caller may only act on contacts they created (contacts are owner-scoped).
 async function userOwnsContact(db, contactId, userId) {
   return !!(await dbGet(db, 'SELECT 1 FROM contacts WHERE id = ? AND added_by = ?', [contactId, userId]));
@@ -5299,6 +5304,8 @@ app.delete('/api/projects/:projectId/expenses/:id', requireAuth, async (req, res
 // `/api/routines/:id` sibling so they don't get shadowed.
 // ============================================
 const sleepTraining = require('./services/sleepTraining');
+const cycleTracking = require('./services/cycleTracking');
+const routineAchievements = require('./services/routineAchievements');
 
 // The guided sleep-training program (age-banded phases). Static, read-only —
 // still behind auth so it isn't a public scrape target.
@@ -5323,7 +5330,7 @@ app.post('/api/routines', requireAuth, async (req, res) => {
     if (!groupId) return res.status(403).json({ error: 'Join a household first' });
     const name = String(req.body.name || '').trim();
     if (!name) return res.status(400).json({ error: 'name is required' });
-    const type = ['period', 'baby_sleep', 'sleep_training', 'custom'].includes(req.body.routine_type)
+    const type = ['period', 'baby_sleep', 'sleep_training', 'activity', 'custom'].includes(req.body.routine_type)
       ? req.body.routine_type : 'custom';
     const result = await db.createRoutine({
       group_id: groupId,
@@ -5348,12 +5355,16 @@ app.get('/api/routines/:id', requireAuth, async (req, res) => {
     if (!(await requireHouseholdRow(db, 'routines', req.params.id, req, res))) return;
     const routine = await db.getRoutineById(req.params.id);
     const entries = await db.getRoutineEntries(req.params.id, {});
-    // For age-based routines, attach the current program phase/guidance.
-    let guidance = null;
+    // Attach type-specific derived data the client renders.
+    let guidance = null, cycle = null, achievements = null;
     if (routine.routine_type === 'sleep_training' && routine.subject_birthdate) {
       guidance = sleepTraining.guidanceForBirthdate(routine.subject_birthdate);
+    } else if (routine.routine_type === 'period') {
+      cycle = cycleTracking.predict(entries, routine.config);
+    } else if (routine.routine_type === 'activity') {
+      achievements = routineAchievements.compute(entries, {});
     }
-    res.json({ ...routine, entries, guidance });
+    res.json({ ...routine, entries, guidance, cycle, achievements });
   } catch (err) { sendServerError(res, err); }
   finally { db.close(); }
 });
@@ -5417,6 +5428,64 @@ app.delete('/api/routines/:id/entries/:entryId', requireAuth, async (req, res) =
     if (!(await requireHouseholdRow(db, 'routines', req.params.id, req, res))) return;
     await db.deleteRoutineEntry(req.params.entryId, req.params.id);
     res.json({ success: true });
+  } catch (err) { sendServerError(res, err); }
+  finally { db.close(); }
+});
+
+// Calendar occurrences for an activity routine: the linked events (by the
+// routine's config.calendar_keyword), recurrence expanded, each flagged as
+// confirmed if a session was logged that day. Powers the "how often does this
+// happen" cadence, the pending-confirmation list, and confirmation nudges.
+app.get('/api/routines/:id/occurrences', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    if (!(await requireHouseholdRow(db, 'routines', req.params.id, req, res))) return;
+    const routine = await db.getRoutineById(req.params.id);
+    let cfg = {};
+    try { cfg = JSON.parse(routine.config || '{}'); } catch {}
+    const keyword = (cfg.calendar_keyword || '').trim();
+    if (!keyword) return res.json({ keyword: null, occurrences: [], scheduled: 0, attended: 0 });
+
+    const groupId = await db.getUserHouseholdId(req.session.user?.id);
+    const today = todayLocal();
+    const windowStart = fromLocalDate(-90);  // look back ~3 months
+    const windowEnd = fromLocalDate(30);     // and ~1 month ahead
+    const base = await db.getAppointmentsMatching(groupId, keyword, null, windowEnd);
+
+    // Expand each matching event's occurrences within the window.
+    const rangeStart = new Date(windowStart + 'T00:00:00');
+    const rangeEnd = new Date(windowEnd + 'T00:00:00');
+    const dates = new Set();
+    for (const appt of base) {
+      const origin = new Date(appt.appointment_date + 'T00:00:00');
+      if (appt.appointment_date >= windowStart && appt.appointment_date <= windowEnd) {
+        dates.add(appt.appointment_date);
+      }
+      if (appt.recurrence_rule) {
+        const endDate = appt.recurrence_end ? new Date(appt.recurrence_end + 'T00:00:00') : null;
+        for (const d of expandRecurrence(appt.recurrence_rule, origin, rangeStart, rangeEnd, endDate)) {
+          dates.add(d.toLocaleDateString('en-CA'));
+        }
+      }
+    }
+
+    // Which dates already have a logged session.
+    const entries = await db.getRoutineEntries(req.params.id, {});
+    const confirmed = new Set(entries
+      .filter(e => e.entry_type === 'session' || e.entry_type === 'attended')
+      .map(e => e.entry_date));
+
+    const occurrences = [...dates].sort().map(d => ({
+      date: d, confirmed: confirmed.has(d), past: d < today, today: d === today,
+    }));
+    const pending = occurrences.filter(o => o.past && !o.confirmed);
+    res.json({
+      keyword,
+      occurrences,
+      scheduled: occurrences.length,
+      attended: occurrences.filter(o => o.confirmed).length,
+      pending,
+    });
   } catch (err) { sendServerError(res, err); }
   finally { db.close(); }
 });
