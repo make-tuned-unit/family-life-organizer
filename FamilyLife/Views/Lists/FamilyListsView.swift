@@ -369,6 +369,7 @@ struct ListDetailSection: View {
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
         .environment(\.editMode, .constant(.active))
+        .flMinimizesTabBar()
     }
 
     // MARK: - Grocery Grouped (ScrollView, no reorder)
@@ -453,6 +454,7 @@ struct ListDetailSection: View {
             }
             .padding(.bottom, DesignTokens.Spacing.bottomBuffer)
         }
+        .flMinimizesTabBar()
     }
 
     // MARK: - Item Row (used in List for flat lists)
@@ -954,6 +956,7 @@ struct TasksDetailSection: View {
                 }
                 .padding(.bottom, DesignTokens.Spacing.bottomBuffer)
             }
+            .flMinimizesTabBar()
         }
         .task { await loadTasks() }
     }

@@ -58,6 +58,7 @@ struct HomeView: View {
             }
             .padding(.bottom, DesignTokens.Spacing.bottomBuffer)
         }
+        .flMinimizesTabBar()
         .refreshable {
             await viewModel.loadAll(api: api, userName: auth.currentUser?.name, username: auth.currentUser?.username)
             checkFeedNotifications()

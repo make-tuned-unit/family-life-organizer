@@ -53,6 +53,7 @@ struct CalendarView: View {
             }
             .padding(.bottom, DesignTokens.Spacing.bottomBuffer)
         }
+        .flMinimizesTabBar()
         .background { AmbientBackground(style: .calendar) }
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackgroundVisibility(.hidden, for: .navigationBar)

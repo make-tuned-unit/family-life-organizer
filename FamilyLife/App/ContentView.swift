@@ -16,6 +16,18 @@ enum MainTab: Hashable, CaseIterable {
         }
     }
 
+    /// Spoken name for the icon-only tab buttons.
+    var title: String {
+        switch self {
+        case .calendar:   "Calendar"
+        case .lists:      "Lists"
+        case .home:       "Home"
+        case .concierge:  "Concierge"
+        case .budget:     "Budget"
+        case .more:       "More"
+        }
+    }
+
     /// Tabs shown in the floating bar. Concierge is intentionally excluded —
     /// it's an opt-in AI surface reached from its own floating button.
     static var barTabs: [MainTab] { [.calendar, .lists, .home, .budget, .more] }
@@ -126,12 +138,16 @@ struct MainTabView: View {
     @State private var showingDeepTravel = false
     @AppStorage("aiConciergeEnabled") private var aiConciergeEnabled = false
     @State private var ptt = PushToTalkController()
+    /// Shrinks the floating bar (and its companion buttons) while scrolling down.
+    @State private var tabChrome = TabBarChrome()
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         ZStack(alignment: .bottom) {
             ForEach(MainTab.allCases, id: \.self) { tab in
                 if loadedTabs.contains(tab) {
                     tabView(for: tab)
+                        .environment(\.flTabIdentity, tab)
                         .opacity(selectedTab == tab ? 1 : 0)
                         .allowsHitTesting(selectedTab == tab)
                 }
@@ -139,7 +155,12 @@ struct MainTabView: View {
 
             VStack {
                 Spacer()
-                FloatingTabBar(selectedTab: $selectedTab, onSelect: switchTab)
+                FloatingTabBar(
+                    selectedTab: $selectedTab,
+                    onSelect: switchTab,
+                    isMinimized: tabChrome.isMinimized,
+                    onExpand: { tabChrome.expand() }
+                )
             }
 
             // Floating chat button — visible on all tabs
@@ -166,6 +187,10 @@ struct MainTabView: View {
                             }
                         }
                     }
+                    // Recede with the tab bar so the whole bottom chrome gets
+                    // out of the way together while reading.
+                    .scaleEffect(tabChrome.isMinimized ? 0.84 : 1)
+                    .opacity(tabChrome.isMinimized ? 0.7 : 1)
                     .padding(.trailing, 20)
                     .padding(.bottom, 80)
                 }
@@ -182,6 +207,8 @@ struct MainTabView: View {
                             loadedTabs.insert(.concierge)
                             switchTab(to: .concierge)
                         }
+                        .scaleEffect(tabChrome.isMinimized ? 0.84 : 1)
+                        .opacity(tabChrome.isMinimized ? 0.7 : 1)
                         .padding(.leading, 20)
                         .padding(.bottom, 80)
                         Spacer()
@@ -193,8 +220,18 @@ struct MainTabView: View {
             }
         }
         .ignoresSafeArea(.keyboard)
+        .environment(tabChrome)
+        .onAppear {
+            tabChrome.reduceMotion = reduceMotion
+            tabChrome.activeTab = selectedTab
+        }
+        .onChange(of: reduceMotion) { tabChrome.reduceMotion = reduceMotion }
         .onChange(of: selectedTab) {
             loadedTabs.insert(selectedTab)  // backstop for non-switchTab writers
+            // A fresh tab always starts with the full bar, and only its own
+            // scroll views may shrink it.
+            tabChrome.activeTab = selectedTab
+            tabChrome.expand()
         }
         .sheet(isPresented: $showingChat) {
             ChatSheet(initialThread: chatInitialThread)
@@ -541,13 +578,25 @@ struct FloatingTabBar: View {
     /// Owner's tab switch (preloads the destination, then animates). Falls back
     /// to a plain animated write if not supplied.
     var onSelect: ((MainTab) -> Void)? = nil
+    /// Collapsed to a single-icon pill while the user is scrolling down.
+    var isMinimized: Bool = false
+    /// Tapping the collapsed pill brings the full bar back.
+    var onExpand: (() -> Void)? = nil
     @Namespace private var pill
+
+    /// Minimized, the bar keeps only the tab you're on — a "you are here" dot
+    /// that expands on tap, so the row of icons never blocks what you're reading.
+    private var visibleTabs: [MainTab] {
+        isMinimized ? [selectedTab] : MainTab.barTabs
+    }
 
     var body: some View {
         HStack(spacing: 0) {
-            ForEach(MainTab.barTabs, id: \.self) { tab in
+            ForEach(visibleTabs, id: \.self) { tab in
                 Button {
-                    if let onSelect {
+                    if isMinimized {
+                        onExpand?()
+                    } else if let onSelect {
                         onSelect(tab)
                     } else {
                         withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
@@ -556,30 +605,34 @@ struct FloatingTabBar: View {
                     }
                 } label: {
                     Image(systemName: tab.icon)
-                        .font(.system(size: 18, weight: .medium))
+                        .font(.system(size: isMinimized ? 16 : 18, weight: .medium))
                         .symbolRenderingMode(.hierarchical)
                         .foregroundStyle(selectedTab == tab ? accentColor(for: tab) : WarmPalette.ink3)
-                        .frame(maxWidth: .infinity, minHeight: 44)
+                        .frame(maxWidth: isMinimized ? nil : CGFloat.infinity,
+                               minHeight: isMinimized ? 36 : 44)
+                        .frame(width: isMinimized ? 44 : nil)
                         .contentShape(Rectangle())
                         .background {
                             if selectedTab == tab {
                                 // One pill that slides between tabs rather than
                                 // blinking in per-tab.
                                 Circle()
-                                    .fill(accentColor(for: tab).opacity(0.15))
-                                    .frame(width: 40, height: 40)
+                                    .fill(accentColor(for: tab).opacity(DesignTokens.Opacity.interactiveTint))
+                                    .frame(width: isMinimized ? 34 : 40, height: isMinimized ? 34 : 40)
                                     .matchedGeometryEffect(id: "tab-pill", in: pill)
                             }
                         }
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel(tab.title)
+                .accessibilityHint(isMinimized ? "Shows all tabs" : "")
             }
         }
         .padding(.horizontal, 4)
         .padding(.vertical, 4)
         .background(.ultraThinMaterial, in: Capsule())
         .overlay(Capsule().stroke(.white.opacity(0.2), lineWidth: 0.5))
-        .shadow(color: .black.opacity(0.1), radius: 12, y: 4)
+        .shadow(color: .black.opacity(0.1), radius: isMinimized ? 8 : 12, y: 4)
         .padding(.horizontal, 40)
         .padding(.bottom, 20)
     }

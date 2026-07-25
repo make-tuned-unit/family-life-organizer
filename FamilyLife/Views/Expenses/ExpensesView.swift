@@ -32,6 +32,7 @@ struct ExpensesView: View {
             }
             .padding(.bottom, DesignTokens.Spacing.bottomBuffer)
         }
+        .flMinimizesTabBar()
         .background { AmbientBackground(style: .expenses) }
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackgroundVisibility(.hidden, for: .navigationBar)

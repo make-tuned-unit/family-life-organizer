@@ -30,6 +30,7 @@ struct ConciergeView: View {
                 .padding(.top, 8)
                 .padding(.bottom, DesignTokens.Spacing.bottomBuffer)
             }
+            .flMinimizesTabBar()
             .refreshable { await viewModel.load(api: api, force: true) }
         }
         .navigationBarTitleDisplayMode(.inline)

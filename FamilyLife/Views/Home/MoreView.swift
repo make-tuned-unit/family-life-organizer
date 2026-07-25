@@ -67,6 +67,7 @@ struct MoreView: View {
             }
             .padding(.bottom, DesignTokens.Spacing.bottomBuffer)
         }
+        .flMinimizesTabBar()
         .background { AmbientBackground(style: .home) }
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackgroundVisibility(.hidden, for: .navigationBar)
