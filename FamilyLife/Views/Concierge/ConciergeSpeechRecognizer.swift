@@ -44,6 +44,14 @@ final class ConciergeSpeechRecognizer {
     /// while the mic spins up. Safe to call repeatedly; cheap once warmed.
     func prewarm() async {
         if !authorized { _ = await requestAuthorization() }
+        // `prepare()` initializes the engine graph, which pulls in the input
+        // node. When there's no usable input route (the Simulator always, or a
+        // device whose mic hasn't come up), the input format is 0 Hz and
+        // AVAudioEngineGraph::Initialize throws an Obj-C NSException that Swift
+        // can't catch — SIGABRT. This fires on every press of the launcher
+        // (even a quick tap), so guard the format before touching the graph.
+        let format = audioEngine.inputNode.outputFormat(forBus: 0)
+        guard format.sampleRate > 0, format.channelCount > 0 else { return }
         // `prepare()` allocates the engine's render resources without activating
         // the session or ducking other audio, so a stray tap won't interrupt music.
         if !audioEngine.isRunning { audioEngine.prepare() }
@@ -80,6 +88,17 @@ final class ConciergeSpeechRecognizer {
 
             let input = audioEngine.inputNode
             let format = input.outputFormat(forBus: 0)
+            // A zero sample-rate / zero-channel format means there's no usable
+            // audio input route (common on the Simulator, or a device whose mic
+            // route hasn't come up yet). Installing a tap or starting the engine
+            // with such a format throws an Obj-C NSException from AVAudioEngine
+            // ("<compose failure>") that Swift's do/catch can't catch — it
+            // SIGABRTs the whole app. Bail gracefully instead.
+            guard format.sampleRate > 0, format.channelCount > 0 else {
+                errorMessage = "Voice input isn't available on this device."
+                stop()
+                return
+            }
             input.installTap(onBus: 0, bufferSize: 1024, format: format) { [weak self] buffer, _ in
                 self?.request?.append(buffer)
             }
