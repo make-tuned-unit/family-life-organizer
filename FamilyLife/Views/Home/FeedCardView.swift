@@ -57,6 +57,21 @@ struct FeedCard: View {
                 }
             }
 
+            // Per-type detail line — the one extra fact worth reading without
+            // opening the row: when the event is, how far off a key date is,
+            // who a shared routine is for.
+            if let detailLine {
+                HStack(spacing: 5) {
+                    Image(systemName: detailIcon)
+                        .font(.system(size: 11))
+                    Text(detailLine)
+                        .font(.flCaption.weight(.medium))
+                }
+                .foregroundStyle(WarmPalette.ink3)
+                .padding(.horizontal, 14)
+                .padding(.bottom, 10)
+            }
+
             // Body text — for posts (attributed) and non-posts (plain)
             if let body = prepared.body {
                 Text(body)
@@ -575,6 +590,55 @@ struct FeedCard: View {
         mentionSuggestions = []
     }
 
+    /// The detail line, formatted for its type. Dates become relative ("Tomorrow
+    /// 9:30am", "in 6 days") because that's what you actually want to know from
+    /// a feed; everything else passes through as the server sent it.
+    private var detailLine: String? {
+        guard let detail = item.detail, !detail.isEmpty else { return nil }
+        switch item.feed_type {
+        case "event":
+            return Self.relativeDateTime(detail)
+        case "key_date":
+            guard let date = DateFormatter.isoDate.date(from: String(detail.prefix(10))) else { return nil }
+            let days = Calendar.current.dateComponents(
+                [.day], from: Calendar.current.startOfDay(for: Date()),
+                to: Calendar.current.startOfDay(for: date)).day ?? 0
+            if days <= 0 { return "Today" }
+            if days == 1 { return "Tomorrow" }
+            return "in \(days) days · \(DateFormatter.shortMonthDay.string(from: date))"
+        case "post" where item.status == "routine":
+            return "For \(detail)"
+        default:
+            return detail
+        }
+    }
+
+    private var detailIcon: String {
+        switch item.feed_type {
+        case "event": "clock"
+        case "key_date": "calendar.badge.clock"
+        case "rivalry": "star"
+        case "post" where item.status == "routine": "person"
+        default: "info.circle"
+        }
+    }
+
+    /// "2026-07-28 09:30" → "Tomorrow 9:30am". Falls back to the raw string
+    /// rather than showing nothing if the shape isn't what we expect.
+    private static func relativeDateTime(_ raw: String) -> String {
+        let parts = raw.split(separator: " ", maxSplits: 1).map(String.init)
+        guard let date = DateFormatter.isoDate.date(from: parts[0]) else { return raw }
+        let cal = Calendar.current
+        let dayText: String
+        if cal.isDateInToday(date) { dayText = "Today" }
+        else if cal.isDateInTomorrow(date) { dayText = "Tomorrow" }
+        else { dayText = DateFormatter.shortMonthDay.string(from: date) }
+
+        guard parts.count > 1,
+              let time = DateFormatter.hourMinute.date(from: parts[1]) else { return dayText }
+        return "\(dayText) \(DateFormatter.shortTime.string(from: time))"
+    }
+
     /// The feature's canonical symbol, so a feed row and the tab it opens are
     /// marked the same way. Posts fall through to their post_type.
     private var typeIcon: String {
@@ -675,7 +739,8 @@ final class FeedPhotoCache {
                     group_id: 1,
                     group_name: "Fairbanks",
                     has_photo: 0,
-                    is_private_flag: 0
+                    is_private_flag: 0,
+                    detail: nil
                 ),
                 body: AttributedString("Took the kids to Point Pleasant Park."),
                 time: "2 hours ago",

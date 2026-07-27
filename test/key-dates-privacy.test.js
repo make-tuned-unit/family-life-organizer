@@ -150,6 +150,58 @@ test('key dates: privacy can be toggled after the fact', async () => {
   assert.ok((await sophie('GET', '/api/gifts/events')).body.some(e => e.id === id), 'shared again');
 });
 
+test('milestones: privacy is the author\'s alone to change', async () => {
+  const [jesse, invite] = await member('ms_own', 'Owner MS');
+  const [sophie] = await member('ms_other', 'Other MS', invite);
+  const person = await jesse('POST', '/api/people', { name: 'Guarded MS' });
+
+  const priv = await jesse('POST', '/api/milestones', {
+    person_id: person.body.id, title: 'Kept quiet',
+    milestone_date: '2026-07-20', shared_scope: 'private',
+  });
+  const id = priv.body.id;
+
+  // A housemate can't reach it by id — and gets 404, not 403, so the response
+  // doesn't confirm the row exists.
+  assert.equal((await sophie('PUT', `/api/milestones/${id}`, { shared_scope: 'household' })).status, 404);
+  assert.equal((await sophie('DELETE', `/api/milestones/${id}`)).status, 404);
+  assert.ok(!(await sophie('GET', '/api/milestones')).body.some(m => m.id === id), 'still hidden');
+
+  // The author can share it, and then it's visible.
+  assert.equal((await jesse('PUT', `/api/milestones/${id}`, { shared_scope: 'household' })).status, 200);
+  assert.ok((await sophie('GET', '/api/milestones')).body.some(m => m.id === id), 'now shared');
+
+  // A housemate can edit a SHARED milestone's content but cannot re-hide it.
+  assert.equal((await sophie('PUT', `/api/milestones/${id}`, { title: 'Edited by Sophie' })).status, 200);
+  await sophie('PUT', `/api/milestones/${id}`, { shared_scope: 'private' });
+  const stillVisible = (await sophie('GET', '/api/milestones')).body.find(m => m.id === id);
+  assert.ok(stillVisible, 'a housemate cannot make someone else\'s milestone private');
+  assert.equal(stillVisible.title, 'Edited by Sophie', 'but their content edit stuck');
+});
+
+test('feed rows carry a per-type detail', async () => {
+  const [jesse] = await member('det_rt', 'Detail RT');
+  const person = await jesse('POST', '/api/people', { name: 'Detail Person' });
+
+  const tomorrow = new Date(Date.now() + 86400000).toLocaleDateString('en-CA');
+  await jesse('POST', '/api/appointments', {
+    title: 'Dentist', appointment_date: tomorrow, appointment_time: '09:30', location: '155 Water St',
+  });
+  await jesse('POST', '/api/gifts/events', {
+    person_id: person.body.id, title: 'Anniversary', date: upcoming(6),
+    is_recurring: true, event_type: 'anniversary',
+  });
+
+  const feed = (await jesse('GET', '/api/activity')).body;
+  const event = feed.find(r => r.feed_type === 'event' && r.title === 'Dentist');
+  assert.ok(event, 'the event is in the feed');
+  assert.equal(event.detail, `${tomorrow} 09:30`, 'events carry date and time');
+
+  const keyDate = feed.find(r => r.feed_type === 'key_date' && r.title === 'Anniversary');
+  assert.ok(keyDate?.detail, 'key dates carry their next occurrence');
+  assert.match(keyDate.detail, /^\d{4}-\d{2}-\d{2}$/);
+});
+
 test('milestones: a private one is celebrated nowhere', async () => {
   const [jesse, invite] = await member('ms_jesse', 'Jesse MS');
   const [sophie] = await member('ms_sophie', 'Sophie MS', invite);

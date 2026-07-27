@@ -636,6 +636,7 @@ struct EditMilestoneSheet: View {
     /// nil = untouched, .some(nil) = removed, .some(data) = replaced
     @State private var photoChange: Data?? = nil
     @State private var selectedPhoto: PhotosPickerItem?
+    @State private var keepPrivate: Bool
     @State private var isSaving = false
     @State private var error: String?
 
@@ -647,6 +648,7 @@ struct EditMilestoneSheet: View {
         _note = State(initialValue: milestone.description ?? "")
         _date = State(initialValue: DateFormatter.isoDate.date(from: String(milestone.milestone_date.prefix(10))) ?? Date())
         _category = State(initialValue: milestone.categoryEnum)
+        _keepPrivate = State(initialValue: milestone.shared_scope == "private")
     }
 
     private var currentImage: UIImage? {
@@ -675,6 +677,13 @@ struct EditMilestoneSheet: View {
                         }
                     }
                     .pickerStyle(.menu)
+                }
+                Section {
+                    Toggle("Keep this to myself", isOn: $keepPrivate)
+                } footer: {
+                    Text(keepPrivate
+                         ? "Only you can see this milestone."
+                         : "Everyone at home can see it. Sharing it now won't re-post it to the feed.")
                 }
                 Section("Photo") {
                     if let img = currentImage {
@@ -726,6 +735,7 @@ struct EditMilestoneSheet: View {
             "title": title.trimmingCharacters(in: .whitespaces),
             "milestone_date": DateFormatter.isoDate.string(from: date),
             "category": category.rawValue,
+            "shared_scope": keepPrivate ? "private" : "household",
         ]
         let trimmedNote = note.trimmingCharacters(in: .whitespacesAndNewlines)
         data["description"] = trimmedNote.isEmpty ? NSNull() : trimmedNote

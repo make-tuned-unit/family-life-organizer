@@ -1107,6 +1107,10 @@ final class APIService {
         /// The backend already filters these out for everyone else — this only
         /// drives the lock badge the owner sees.
         let is_private_flag: Int?
+        /// Per-type extra the row can show under its title: an event's date and
+        /// time, a key date's next occurrence, a rivalry's points, the person a
+        /// shared routine is for. Null when the type has nothing to add.
+        let detail: String?
 
         /// Stable key for notification watermarking and list identity
         var stableKey: String { "\(feed_type)-\(ref_id)-\(created_at ?? "")" }
@@ -1116,6 +1120,7 @@ final class APIService {
         private enum CodingKeys: String, CodingKey {
             case feed_type, ref_id, title, body, author, author_id, status, created_at, reaction_count, comment_count, group_id, group_name, has_photo
             case is_private_flag = "is_private"
+            case detail
         }
 
         var is_private: Bool { (is_private_flag ?? 0) == 1 }

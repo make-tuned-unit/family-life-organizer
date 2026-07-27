@@ -4767,8 +4767,19 @@ app.post('/api/milestones', requireAuth, async (req, res) => {
 app.put('/api/milestones/:id', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
-    if (!(await requireHouseholdRow(db, 'milestones', req.params.id, req, res))) return;
-    await db.updateMilestone(req.params.id, req.body);
+    const row = await requireMilestoneAccess(db, req.params.id, req, res);
+    if (!row) return;
+    const updates = { ...req.body };
+    // Only the person who logged it decides who sees it, and only between
+    // private and household — a clan share is set when the milestone is created.
+    if ('shared_scope' in updates) {
+      if (row.created_by !== req.session.user?.id) {
+        delete updates.shared_scope;
+      } else {
+        updates.shared_scope = updates.shared_scope === 'private' ? 'private' : 'household';
+      }
+    }
+    await db.updateMilestone(req.params.id, updates);
     res.json({ success: true });
   } catch (err) {
     sendServerError(res, err);
@@ -4780,7 +4791,7 @@ app.put('/api/milestones/:id', requireAuth, async (req, res) => {
 app.delete('/api/milestones/:id', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
-    if (!(await requireHouseholdRow(db, 'milestones', req.params.id, req, res))) return;
+    if (!(await requireMilestoneAccess(db, req.params.id, req, res))) return;
     await db.deleteMilestone(req.params.id);
     res.json({ success: true });
   } catch (err) {
@@ -5346,6 +5357,21 @@ async function requireRoutineAccess(db, id, req, res, { owner = false } = {}) {
   if (owner) { res.status(403).json({ error: 'Only the person who created this routine can change that' }); return null; }
   // Same 403 a non-member gets: never reveal that a private routine exists.
   if (row.shared_scope !== 'household') { res.status(403).json({ error: 'Forbidden' }); return null; }
+  return row;
+}
+
+// Milestones follow the same rule as key dates: household-visible unless marked
+// private, and a private one is reachable only by whoever logged it.
+async function requireMilestoneAccess(db, id, req, res) {
+  const userId = req.session.user?.id;
+  const row = await dbGet(db, 'SELECT group_id, created_by, shared_scope FROM milestones WHERE id = ?', [id]);
+  if (!row) { res.status(404).json({ error: 'Not found' }); return null; }
+  if (row.group_id == null || !(await db.isHouseholdMember(row.group_id, userId))) {
+    res.status(403).json({ error: 'Forbidden' }); return null;
+  }
+  if (row.shared_scope === 'private' && row.created_by !== userId) {
+    res.status(404).json({ error: 'Not found' }); return null;
+  }
   return row;
 }
 

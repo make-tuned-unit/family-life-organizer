@@ -2232,7 +2232,7 @@ class FamilyDB {
   }
 
   updateMilestone(id, updates) {
-    const ALLOWED = new Set(['title', 'description', 'milestone_date', 'category', 'photo_data']);
+    const ALLOWED = new Set(['title', 'description', 'milestone_date', 'category', 'photo_data', 'shared_scope']);
     return new Promise((resolve, reject) => {
       const fields = [];
       const params = [];
@@ -3365,7 +3365,8 @@ class FamilyDB {
       const sql = `
         SELECT 'decision' as feed_type, d.id as ref_id, d.title, NULL as body,
           d.creator_name as author, d.status, d.created_at as created_at,
-          0 as reaction_count, 0 as comment_count, NULL as author_id, d.group_id, g.name as group_name, 0 as has_photo, 0 as is_private
+          0 as reaction_count, 0 as comment_count, NULL as author_id, d.group_id, g.name as group_name, 0 as has_photo, 0 as is_private,
+          d.decision_type as detail
         FROM decisions d LEFT JOIN groups g ON g.id = d.group_id
         WHERE d.status = 'active'${uid ? `
           AND d.group_id IN (${myGroups})` : ''}
@@ -3373,7 +3374,8 @@ class FamilyDB {
         SELECT 'event' as feed_type, a.id as ref_id, a.title, a.location as body,
           COALESCE(au.name, au.username, 'Family') as author, 'upcoming' as status,
           a.created_at,
-          0 as reaction_count, 0 as comment_count, a.created_by as author_id, a.group_id, g.name as group_name, 0 as has_photo, 0 as is_private
+          0 as reaction_count, 0 as comment_count, a.created_by as author_id, a.group_id, g.name as group_name, 0 as has_photo, 0 as is_private,
+          a.appointment_date || COALESCE(' ' || NULLIF(a.appointment_time, ''), '') as detail
         FROM appointments a
         LEFT JOIN groups g ON g.id = a.group_id
         LEFT JOIN users au ON au.id = a.created_by
@@ -3394,7 +3396,8 @@ class FamilyDB {
         SELECT 'coverage' as feed_type, cr.id as ref_id, cr.reason as title, cr.note as body,
           COALESCE(u.name, u.username, 'Family') as author, cr.status,
           cr.created_at,
-          0 as reaction_count, 0 as comment_count, cr.requester_id as author_id, NULL as group_id, NULL as group_name, 0 as has_photo, 0 as is_private
+          0 as reaction_count, 0 as comment_count, cr.requester_id as author_id, NULL as group_id, NULL as group_name, 0 as has_photo, 0 as is_private,
+          NULL as detail
         FROM coverage_requests cr
         LEFT JOIN users u ON u.id = cr.requester_id
         WHERE cr.status IN ('pending', 'approved')${uid ? `
@@ -3407,7 +3410,8 @@ class FamilyDB {
         SELECT 'rivalry' as feed_type, r.id as ref_id, r.title, r.challenge_type as body,
           r.initiator_name as author, r.status,
           r.created_at,
-          0 as reaction_count, 0 as comment_count, NULL as author_id, r.group_id, g.name as group_name, 0 as has_photo, 0 as is_private
+          0 as reaction_count, 0 as comment_count, NULL as author_id, r.group_id, g.name as group_name, 0 as has_photo, 0 as is_private,
+          CASE WHEN r.point_value > 0 THEN r.point_value || ' pts' ELSE NULL END as detail
         FROM rivalries r
         LEFT JOIN groups g ON g.id = r.group_id
         WHERE r.status = 'active' AND r.created_at >= datetime('now', '-14 days')${uid ? `
@@ -3419,7 +3423,10 @@ class FamilyDB {
           (SELECT COUNT(*) FROM feed_reactions WHERE post_id = fp.id) as reaction_count,
           (SELECT COUNT(*) FROM feed_comments WHERE post_id = fp.id) as comment_count,
           fp.author_id, fp.group_id, g.name as group_name,
-          CASE WHEN fp.photo_url IS NOT NULL AND fp.photo_url != '' THEN 1 ELSE 0 END as has_photo, 0 as is_private
+          CASE WHEN fp.photo_url IS NOT NULL AND fp.photo_url != '' THEN 1 ELSE 0 END as has_photo, 0 as is_private,
+          CASE WHEN fp.reference_type = 'routine'
+            THEN (SELECT subject_name FROM routines WHERE id = fp.reference_id)
+            ELSE NULL END as detail
         FROM feed_posts fp
         LEFT JOIN users u ON u.id = fp.author_id
         LEFT JOIN groups g ON g.id = fp.group_id
@@ -3436,7 +3443,7 @@ class FamilyDB {
           u.name as author, 'comment' as status,
           fc.created_at,
           0 as reaction_count, 0 as comment_count, fc.user_id as author_id,
-          fp2.group_id, g2.name as group_name, 0 as has_photo, 0 as is_private
+          fp2.group_id, g2.name as group_name, 0 as has_photo, 0 as is_private, NULL as detail
         FROM feed_comments fc
         JOIN users u ON u.id = fc.user_id
         LEFT JOIN feed_posts fp2 ON fp2.id = fc.post_id
@@ -3451,7 +3458,7 @@ class FamilyDB {
           u.name as author, 'reaction' as status,
           fr.created_at,
           0 as reaction_count, 0 as comment_count, fr.user_id as author_id,
-          fp3.group_id, g3.name as group_name, 0 as has_photo, 0 as is_private
+          fp3.group_id, g3.name as group_name, 0 as has_photo, 0 as is_private, NULL as detail
         FROM feed_reactions fr
         JOIN users u ON u.id = fr.user_id
         LEFT JOIN feed_posts fp3 ON fp3.id = fr.post_id
@@ -3468,7 +3475,8 @@ class FamilyDB {
         -- that a reminder about your anniversary isn't your partner's business.
         SELECT feed_type, ref_id, title, body, author, status,
           datetime(occurs_on, '-14 days') AS created_at,
-          reaction_count, comment_count, author_id, group_id, group_name, has_photo, is_private
+          reaction_count, comment_count, author_id, group_id, group_name, has_photo, is_private,
+          occurs_on AS detail
         FROM (
           SELECT 'key_date' AS feed_type, se.id AS ref_id, se.title,
             se.notes AS body,

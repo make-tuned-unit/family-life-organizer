@@ -55,8 +55,14 @@ struct MilestoneResponse: Codable, Identifiable {
     let milestone_date: String
     let category: String?
     let photo_data: String?
+    /// "household" (everyone at home), "group" (shared to a clan too), or
+    /// "private" — visible only to whoever logged it, celebrated nowhere.
+    let shared_scope: String?
+    let created_by: Int?
     let creator_name: String?
     let created_at: String?
+
+    var isPrivate: Bool { shared_scope == "private" }
 
     var categoryEnum: MilestoneCategory { MilestoneCategory(rawValue: category ?? "") ?? .moment }
 }
