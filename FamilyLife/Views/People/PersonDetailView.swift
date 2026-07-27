@@ -735,8 +735,13 @@ struct EditMilestoneSheet: View {
             "title": title.trimmingCharacters(in: .whitespaces),
             "milestone_date": DateFormatter.isoDate.string(from: date),
             "category": category.rawValue,
-            "shared_scope": keepPrivate ? "private" : "household",
         ]
+        // Only send the scope when it actually changed. Sending it on every edit
+        // asks the server to re-decide a milestone's audience during a rename,
+        // which is how a clan share got downgraded.
+        if keepPrivate != (milestone.shared_scope == "private") {
+            data["shared_scope"] = keepPrivate ? "private" : "household"
+        }
         let trimmedNote = note.trimmingCharacters(in: .whitespacesAndNewlines)
         data["description"] = trimmedNote.isEmpty ? NSNull() : trimmedNote
         if case .some(let change) = photoChange {

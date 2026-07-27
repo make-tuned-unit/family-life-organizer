@@ -4804,7 +4804,13 @@ app.put('/api/milestones/:id', requireAuth, async (req, res) => {
       if (owner != null && owner !== req.session.user?.id) {
         delete updates.shared_scope;
       } else {
-        updates.shared_scope = updates.shared_scope === 'private' ? 'private' : 'household';
+        // The edit sheet's toggle only expresses private vs not-private. Taking
+        // "not private" literally as 'household' silently downgraded a
+        // clan-shared milestone to household-only on an unrelated edit (a
+        // rename), orphaning its shared_group_id — so preserve 'group'.
+        updates.shared_scope = updates.shared_scope === 'private'
+          ? 'private'
+          : (row.shared_scope === 'group' ? 'group' : 'household');
         if (updates.shared_scope === 'private' && owner == null) {
           // Same trap as key dates: an unowned row made private is lost to all.
           await dbRun(db, 'UPDATE milestones SET created_by = ? WHERE id = ? AND created_by IS NULL',

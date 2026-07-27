@@ -356,6 +356,38 @@ test('deleting a routine or milestone retracts its feed post', async () => {
     'the milestone post is gone with the milestone');
 });
 
+test('editing a clan-shared milestone keeps the clan share', async () => {
+  // The edit sheet's toggle only says private/not-private. Taking "not private"
+  // as 'household' downgraded a clan-shared milestone on an unrelated edit.
+  const [jesse] = await member('clan_a', 'Clan A');
+  const person = await jesse('POST', '/api/people', { name: 'Clan Person' });
+
+  const clan = await jesse('POST', '/api/groups', { name: 'Sharratt Clan Test', group_type: 'family' });
+  assert.equal(clan.status, 200, JSON.stringify(clan.body));
+
+  const ms = await jesse('POST', '/api/milestones', {
+    person_id: person.body.id, title: 'Clan moment', milestone_date: '2026-07-20',
+    shared_group_id: clan.body.id,
+  });
+  const id = ms.body.id;
+  const before = (await jesse('GET', '/api/milestones')).body.find(m => m.id === id);
+  assert.equal(before.shared_scope, 'group', 'starts clan-shared');
+
+  // A plain rename, exactly as the edit sheet sends it.
+  assert.equal((await jesse('PUT', `/api/milestones/${id}`,
+    { title: 'Clan moment!', shared_scope: 'household' })).status, 200);
+
+  const after = (await jesse('GET', '/api/milestones')).body.find(m => m.id === id);
+  assert.equal(after.title, 'Clan moment!', 'the rename applied');
+  assert.equal(after.shared_scope, 'group', 'and the clan share survived it');
+  assert.equal(after.shared_group_id, clan.body.id, 'still pointing at the clan');
+
+  // Going private is still honoured, and coming back out does not resurrect
+  // a stale 'household' in place of the clan.
+  await jesse('PUT', `/api/milestones/${id}`, { shared_scope: 'private' });
+  assert.equal((await jesse('GET', '/api/milestones')).body.find(m => m.id === id).shared_scope, 'private');
+});
+
 test('feed rows carry a per-type detail', async () => {
   const [jesse] = await member('det_rt', 'Detail RT');
   const person = await jesse('POST', '/api/people', { name: 'Detail Person' });
