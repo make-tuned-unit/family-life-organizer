@@ -4832,6 +4832,8 @@ app.delete('/api/milestones/:id', requireAuth, async (req, res) => {
   try {
     if (!(await requireMilestoneAccess(db, req.params.id, req, res))) return;
     await db.deleteMilestone(req.params.id);
+    try { await db.deleteFeedPostsByReference('milestone', req.params.id); }
+    catch (e) { console.error('Milestone feed cleanup error:', e.message); }
     res.json({ success: true });
   } catch (err) {
     sendServerError(res, err);
@@ -5163,7 +5165,12 @@ app.post('/api/groups/:id/feed', requireAuth, async (req, res) => {
     if (!(await db.isGroupMember(groupId, userId))) {
       return res.status(403).json({ error: 'Not a member of this group' });
     }
-    const result = await db.addFeedPost({ ...req.body, group_id: groupId, author_id: userId });
+    // reference_type/reference_id are set by the SERVER when it announces a
+    // milestone or a shared routine — a user post has nothing to reference, and
+    // accepting them would let a caller forge a row that points at someone
+    // else's record.
+    const { reference_type, reference_id, ...postBody } = req.body || {};
+    const result = await db.addFeedPost({ ...postBody, group_id: groupId, author_id: userId });
     res.json({ success: true, id: result.id });
     // Push to group members (fire-and-forget). Include the group name so the
     // tap opens the exact group thread (the client router needs `name`).
@@ -5509,6 +5516,10 @@ app.delete('/api/routines/:id', requireAuth, async (req, res) => {
   try {
     if (!(await requireRoutineAccess(db, req.params.id, req, res, { owner: true }))) return;
     await db.deleteRoutine(req.params.id);
+    // Otherwise the "shared a routine" post outlives the routine and its deep
+    // link opens a detail page that can never load.
+    try { await db.deleteFeedPostsByReference('routine', req.params.id); }
+    catch (e) { console.error('Routine feed cleanup error:', e.message); }
     res.json({ success: true });
   } catch (err) { sendServerError(res, err); }
   finally { db.close(); }

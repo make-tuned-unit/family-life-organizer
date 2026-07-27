@@ -131,7 +131,7 @@ struct AddAppointmentView: View {
                                 Text(contact.name)
                                     .foregroundStyle(.primary)
                                 if let rel = contact.relationship {
-                                    Text(rel.capitalized)
+                                    Text(rel.relationshipLabel)
                                         .font(.flCaption)
                                         .foregroundStyle(WarmPalette.ink3)
                                 }

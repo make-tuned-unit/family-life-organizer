@@ -62,7 +62,7 @@ struct SendToSheet: View {
                                     Text(member.name)
                                         .font(.flSubheadline.weight(.medium))
                                     if let rel = member.relationship {
-                                        Text(rel.capitalized)
+                                        Text(rel.relationshipLabel)
                                             .font(.flCaption)
                                             .foregroundStyle(WarmPalette.ink3)
                                     }

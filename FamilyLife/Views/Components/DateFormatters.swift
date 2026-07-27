@@ -168,3 +168,14 @@ final class ServerDateFormatter: ISO8601DateFormatter, @unchecked Sendable {
 extension ISO8601DateFormatter {
     static let flexible: ISO8601DateFormatter = ServerDateFormatter()
 }
+
+/// A relationship label is either a lowercase keyword we chose ("wife",
+/// "household") or a group's own name ("The Sharratt Clan"). Capitalizing the
+/// second kind mangles it — Foundation's `.capitalized` lowercases the rest of
+/// each word, turning "MacDonald Clan" into "Macdonald Clan" and "O'Brien" into
+/// "O'brien". So only touch the strings that are entirely lowercase.
+extension String {
+    var relationshipLabel: String {
+        self == lowercased() ? capitalized : self
+    }
+}

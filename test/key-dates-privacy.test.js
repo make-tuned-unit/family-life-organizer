@@ -302,6 +302,60 @@ test('a post feed row points at what it is ABOUT, not at itself', async () => {
   assert.equal((await jesse('GET', `/api/routines/${row.target_id}`)).status, 200);
 });
 
+test('a forged reference cannot surface a private routine\'s subject', async () => {
+  // The feed renders a routine's subject_name for share posts. reference_id was
+  // client-settable, so an unscoped lookup would have let anyone point a post of
+  // their own at someone else's private routine and read the subject out of it.
+  const [jesse, invite] = await member('leak_a', 'Leak A');
+  const [sophie] = await member('leak_b', 'Leak B', invite);
+
+  const secret = await sophie('POST', '/api/routines', {
+    name: 'Sophie cycle', routine_type: 'period', subject_name: 'SECRETNAME',
+  });
+  const secretId = secret.body.id;
+
+  const groups = await jesse('GET', '/api/groups');
+  const householdId = (groups.body || []).find(g => g.group_type === 'household').id;
+  const forged = await jesse('POST', `/api/groups/${householdId}/feed`, {
+    body: 'innocent looking post', post_type: 'routine',
+    reference_type: 'routine', reference_id: secretId,
+  });
+  assert.equal(forged.status, 200, 'the post itself is allowed');
+
+  const feed = (await jesse('GET', '/api/activity')).body;
+  assert.ok(!JSON.stringify(feed).includes('SECRETNAME'),
+    'the private routine\'s subject never appears in the feed');
+  const row = feed.find(r => r.feed_type === 'post' && r.ref_id === forged.body.id);
+  assert.ok(row, 'the forged post is there');
+  assert.equal(row.detail, null, 'with no detail borrowed from the private routine');
+  assert.equal(row.target_id, null, 'and no deep link into it');
+});
+
+test('deleting a routine or milestone retracts its feed post', async () => {
+  const [jesse, invite] = await member('del_a', 'Delete A');
+  const [sophie] = await member('del_b', 'Delete B', invite);
+  const person = await jesse('POST', '/api/people', { name: 'Delete Person' });
+
+  // A shared routine, announced, then deleted — the post must go too, or its
+  // deep link opens a routine that no longer exists.
+  const routine = await jesse('POST', '/api/routines', {
+    name: 'Doomed routine', routine_type: 'baby_sleep',
+  });
+  await jesse('PUT', `/api/routines/${routine.body.id}/share`, { shared_scope: 'household' });
+  assert.ok((await sophie('GET', '/api/activity')).body.some(r => (r.title || '').includes('Doomed routine')));
+  await jesse('DELETE', `/api/routines/${routine.body.id}`);
+  assert.ok(!(await sophie('GET', '/api/activity')).body.some(r => (r.title || '').includes('Doomed routine')),
+    'the routine post is gone with the routine');
+
+  const ms = await jesse('POST', '/api/milestones', {
+    person_id: person.body.id, title: 'Doomed moment', milestone_date: '2026-07-20',
+  });
+  assert.ok((await sophie('GET', '/api/activity')).body.some(r => (r.title || '').includes('Doomed moment')));
+  await jesse('DELETE', `/api/milestones/${ms.body.id}`);
+  assert.ok(!(await sophie('GET', '/api/activity')).body.some(r => (r.title || '').includes('Doomed moment')),
+    'the milestone post is gone with the milestone');
+});
+
 test('feed rows carry a per-type detail', async () => {
   const [jesse] = await member('det_rt', 'Detail RT');
   const person = await jesse('POST', '/api/people', { name: 'Detail Person' });

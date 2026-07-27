@@ -3437,7 +3437,13 @@ class FamilyDB {
           fp.author_id, fp.group_id, g.name as group_name,
           CASE WHEN fp.photo_url IS NOT NULL AND fp.photo_url != '' THEN 1 ELSE 0 END as has_photo, 0 as is_private,
           CASE WHEN fp.reference_type = 'routine'
-            THEN (SELECT subject_name FROM routines WHERE id = fp.reference_id)
+            -- Scoped deliberately: reference_id has been client-settable, so an
+            -- unqualified lookup here would render the subject of a PRIVATE or
+            -- another household's routine to whoever forged the reference.
+            THEN (SELECT subject_name FROM routines
+                  WHERE id = fp.reference_id
+                    AND group_id = fp.group_id
+                    AND shared_scope = 'household')
             ELSE NULL END as detail,
           fp.reference_id as target_id
         FROM feed_posts fp
