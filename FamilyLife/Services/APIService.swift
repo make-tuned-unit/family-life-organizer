@@ -662,6 +662,22 @@ final class APIService {
         try await get("/api/routines/\(id)/occurrences")
     }
 
+    /// Start a sleep that's happening right now; it stays open until `endSleep`.
+    @discardableResult
+    func startSleep(routineId: Int, kind: String) async throws -> IDResponse {
+        try await post("/api/routines/\(routineId)/sleep/start", body: ["kind": kind])
+    }
+
+    func endSleep(routineId: Int, wakeCount: Int?) async throws {
+        var body: [String: Any] = [:]
+        if let wakeCount { body["wake_count"] = wakeCount }
+        let _: SuccessResponse = try await put("/api/routines/\(routineId)/sleep/end", body: body)
+    }
+
+    func fetchSleepStats(routineId: Int) async throws -> SleepStats {
+        try await get("/api/routines/\(routineId)/sleep-stats")
+    }
+
     // MARK: - Rivalries
 
     func fetchRivalries(status: String? = nil) async throws -> [RivalryResponse] {

@@ -109,6 +109,80 @@ struct RoutineDetailResponse: Codable, Identifiable {
     var isSharedWithHousehold: Bool { shared_scope == "household" }
 }
 
+// MARK: - Sleep statistics
+
+/// GET /api/routines/:id/sleep-stats — what the logged sleeps actually say,
+/// measured against the age-appropriate AASM/AAP range, plus earned tips.
+struct SleepStats: Codable {
+    let window_days: Int?
+    let days: [SleepDay]
+    let totals: SleepTotals
+    let bedtime: SleepClock?
+    let wake_time: SleepClock?
+    let trend: SleepTrend?
+    let guidance: SleepStatsGuidance?
+    let tips: [SleepTip]
+
+    var hasData: Bool { (totals.days_logged ?? 0) > 0 }
+}
+
+struct SleepDay: Codable, Identifiable {
+    let date: String
+    let total_minutes: Int
+    let night_minutes: Int
+    let nap_minutes: Int
+    let nap_count: Int
+    let wake_count: Int
+
+    var id: String { date }
+}
+
+struct SleepTotals: Codable {
+    let nights_logged: Int?
+    let days_logged: Int?
+    let avg_daily_minutes: Int?
+    let avg_night_minutes: Int?
+    let avg_nap_minutes: Int?
+    let avg_naps_per_day: Double?
+    let avg_wakings: Double?
+    let longest_stretch_minutes: Int?
+    let last_night_minutes: Int?
+}
+
+struct SleepClock: Codable {
+    let average: String?
+    let earliest: String?
+    let latest: String?
+    let spread_minutes: Int?
+}
+
+struct SleepTrend: Codable {
+    let daily_delta_minutes: Int?
+    let prior_avg_daily_minutes: Int?
+}
+
+struct SleepStatsGuidance: Codable {
+    let age_label: String?
+    let recommended_min_minutes: Int?
+    let recommended_max_minutes: Int?
+    let recommended_label: String?
+    let nap_label: String?
+    let note: String?
+    let source: String?
+}
+
+struct SleepTip: Codable, Identifiable {
+    let key: String
+    let severity: String?
+    let title: String
+    let detail: String
+    let source: String?
+
+    var id: String { key }
+    /// 'watch' tips are worth a second look; everything else is reassurance.
+    var isWatch: Bool { severity == "watch" }
+}
+
 // MARK: - Cycle tracking (period + trying-to-conceive)
 
 struct FertileWindow: Codable {

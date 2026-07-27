@@ -10,6 +10,7 @@
 // This prevents the model from being talked into touching another household's data.
 
 const { announceRivalryCompletion } = require('./rivalryAnnounce');
+const sleepStats = require('./sleepStats');
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -72,32 +73,6 @@ async function assertRoutineAccess(ctx, id) {
     // Same message as a missing row — don't confirm that it exists.
     throw new Error(`No routine #${id} found`);
   }
-}
-
-// Builds a sleep span from a date + two HH:MM times. An end at or before the
-// start means it ran past midnight, so the end lands on the next day — the
-// normal case for a night sleep.
-function sleepSpan(date, startTime, endTime) {
-  const parse = (t) => {
-    const m = /^(\d{1,2}):(\d{2})$/.exec(String(t || '').trim());
-    if (!m) return null;
-    const h = parseInt(m[1]), min = parseInt(m[2]);
-    return (h >= 0 && h < 24 && min >= 0 && min < 60) ? { h, min } : null;
-  };
-  const s = parse(startTime), e = parse(endTime);
-  if (!s || !e || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
-  const startAt = new Date(`${date}T00:00:00Z`);
-  startAt.setUTCMinutes(startAt.getUTCMinutes() + s.h * 60 + s.min);
-  const endAt = new Date(`${date}T00:00:00Z`);
-  endAt.setUTCMinutes(endAt.getUTCMinutes() + e.h * 60 + e.min);
-  if (endAt <= startAt) endAt.setUTCDate(endAt.getUTCDate() + 1);
-  const fmt = (d) => `${d.toISOString().slice(0, 10)} ${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`;
-  const pad = (v) => String(v).padStart(2, '0');
-  return {
-    start: fmt(startAt), end: fmt(endAt),
-    startTime: `${pad(s.h)}:${pad(s.min)}`, endTime: `${pad(e.h)}:${pad(e.min)}`,
-    minutes: Math.round((endAt - startAt) / 60000),
-  };
 }
 
 // Guard for contacts (owner-scoped by added_by, no group_id column).
@@ -934,7 +909,7 @@ const TOOLS = [
     async run(ctx, input) {
       await assertRoutineAccess(ctx, input.routine_id);
       const date = input.date ? requireDate(input.date, 'date') : ctx.today;
-      const span = sleepSpan(date, input.start_time, input.end_time);
+      const span = sleepStats.span(date, input.start_time, input.end_time);
       if (!span) throw new Error('start_time and end_time must be times like "19:30" and "06:45"');
       const value = { sleep_start: span.start, sleep_end: span.end, duration_minutes: span.minutes };
       if (input.kind === 'night_sleep' && input.wake_count != null) {
@@ -948,6 +923,92 @@ const TOOLS = [
       const summary = `Logged a ${input.kind === 'nap' ? 'nap' : 'night sleep'} of ${hrs ? `${hrs}h ` : ''}${mins}m (${span.startTime}–${span.endTime})`;
       return { result: { ok: true, id: r.id, duration_minutes: span.minutes, summary },
                action: { tool: 'log_sleep', summary } };
+    },
+  },
+  {
+    name: 'start_sleep',
+    description: "Start a sleep that is happening RIGHT NOW — use when the user says someone 'just went down', 'started his nap', or 'is asleep'. Leaves it running until end_sleep. If they already know both times, use log_sleep instead.",
+    write: true,
+    input_schema: {
+      type: 'object',
+      properties: {
+        routine_id: { type: 'number' },
+        kind: { type: 'string', enum: ['nap', 'night_sleep'] },
+        time: { type: 'string', description: 'When they fell asleep, HH:MM (24h). Defaults to now.' },
+        date: { type: 'string', description: 'YYYY-MM-DD, defaults to today' },
+      },
+      required: ['routine_id', 'kind'],
+    },
+    async run(ctx, input) {
+      await assertRoutineAccess(ctx, input.routine_id);
+      const open = await ctx.db.getOpenSleepEntry(input.routine_id);
+      if (open) throw new Error('A sleep is already running on this routine — end that one first.');
+      const date = input.date ? requireDate(input.date, 'date') : ctx.today;
+      const time = input.time || ctx.nowTime || '00:00';
+      const span = sleepStats.span(date, time, time);
+      if (!span) throw new Error('time must look like "13:00"');
+      const r = await ctx.db.addRoutineEntry(input.routine_id, {
+        entry_date: date, entry_time: span.startTime, entry_type: input.kind,
+        value: { sleep_start: span.start, in_progress: true },
+        created_by: ctx.userId,
+      });
+      const summary = `Started a ${input.kind === 'nap' ? 'nap' : 'night sleep'} at ${span.startTime}`;
+      return { result: { ok: true, id: r.id, summary }, action: { tool: 'start_sleep', summary } };
+    },
+  },
+  {
+    name: 'end_sleep',
+    description: "End the sleep currently running on a routine — use when the user says someone 'is awake', 'woke up', or 'is up'. Fills in the end time and the duration.",
+    write: true,
+    input_schema: {
+      type: 'object',
+      properties: {
+        routine_id: { type: 'number' },
+        time: { type: 'string', description: 'When they woke, HH:MM (24h). Defaults to now.' },
+        wake_count: { type: 'number', description: 'Night wakings during the sleep' },
+        notes: { type: 'string' },
+      },
+      required: ['routine_id'],
+    },
+    async run(ctx, input) {
+      await assertRoutineAccess(ctx, input.routine_id);
+      const open = await ctx.db.getOpenSleepEntry(input.routine_id);
+      if (!open) throw new Error('No sleep is running on this routine — use log_sleep to record one that already finished.');
+      const stored = JSON.parse(open.value || '{}');
+      const startDay = String(stored.sleep_start || '').slice(0, 10);
+      const startTime = String(stored.sleep_start || '').slice(11, 16);
+      const endTime = input.time || ctx.nowTime || '00:00';
+      const span = sleepStats.span(startDay, startTime, endTime);
+      if (!span) throw new Error('time must look like "06:45"');
+      const value = { sleep_start: span.start, sleep_end: span.end, duration_minutes: span.minutes };
+      if (input.wake_count != null) value.wake_count = Math.max(0, parseInt(input.wake_count) || 0);
+      await ctx.db.closeSleepEntry(open.id, input.routine_id, value, input.notes || null);
+      const summary = `Ended the sleep at ${span.endTime} — ${sleepStats.fmtHm(span.minutes)} total`;
+      return { result: { ok: true, id: open.id, duration_minutes: span.minutes, summary },
+               action: { tool: 'end_sleep', summary } };
+    },
+  },
+  {
+    name: 'get_sleep_stats',
+    description: "Sleep statistics and age-appropriate guidance for a baby-sleep or sleep-training routine — averages, bedtime consistency, night wakings, and tips grounded in the AASM/AAP research. Use for 'how is Jude sleeping', 'is he getting enough sleep', 'any tips'.",
+    write: false,
+    input_schema: {
+      type: 'object',
+      properties: {
+        routine_id: { type: 'number' },
+        window_days: { type: 'number', description: 'How many days to average over (default 7)' },
+      },
+      required: ['routine_id'],
+    },
+    async run(ctx, input) {
+      await assertRoutineAccess(ctx, input.routine_id);
+      const routine = await ctx.db.getRoutineById(input.routine_id);
+      const entries = await ctx.db.getRoutineEntries(input.routine_id, { limit: 400 });
+      return { result: sleepStats.compute(entries, {
+        birthdate: routine?.subject_birthdate || null,
+        today: ctx.today,
+        windowDays: Math.min(30, Math.max(1, parseInt(input.window_days) || 7)),
+      }) };
     },
   },
   {
@@ -2577,8 +2638,9 @@ const GROUPS = {
     incoming: 'get_incoming_coverage', approve: 'approve_incoming_coverage' } },
   notes: { desc: 'Private/household notes (take/jot/write a note).', actions: {
     list: 'list_notes', add: 'add_note', update: 'update_note', delete: 'delete_note' } },
-  routines: { desc: 'Routines: baby sleep / sleep-training logs, cycle tracking, activity streaks.', actions: {
-    list: 'list_routines', get: 'get_routine', log_sleep: 'log_sleep', log_entry: 'log_routine_entry' } },
+  routines: { desc: 'Routines: baby sleep / sleep-training logs, cycle tracking, activity streaks. Sleep can be logged after the fact (log_sleep) or live (start_sleep now, end_sleep on waking).', actions: {
+    list: 'list_routines', get: 'get_routine', log_sleep: 'log_sleep', log_entry: 'log_routine_entry',
+    start_sleep: 'start_sleep', end_sleep: 'end_sleep', stats: 'get_sleep_stats' } },
   people: { desc: 'Household people (adults, kids) and their milestones.', actions: {
     list: 'list_people', add: 'add_person', update: 'update_person', delete: 'delete_person',
     list_milestones: 'list_milestones', log_milestone: 'log_milestone',

@@ -217,6 +217,14 @@ test('routines: another household cannot read or delete your routine', async () 
   assert.equal(stillThere.status, 200);
 });
 
+// "2026-07-18" + "06:30" -> "2026-07-19 06:30" — the morning after a night that
+// started on the given date.
+function nextDay(date, time) {
+  const d = new Date(`${date}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + 1);
+  return `${d.toISOString().slice(0, 10)} ${time}`;
+}
+
 // Registers `username` and returns [client, inviteCode]; pass an invite code to
 // join an existing household instead of getting a fresh one.
 async function member(username, name, inviteCode) {
@@ -352,6 +360,132 @@ test('routines: a sleep entry round-trips its span, duration and wakings', async
   const napValue = JSON.parse(entries.find(e => e.id === nap.body.id).value);
   assert.equal(napValue.duration_minutes, 80);
   assert.equal(napValue.wake_count, undefined, 'naps carry no wake count');
+});
+
+test('routines: a live sleep starts open and closes with a duration', async () => {
+  const [parent] = await member('live_rt', 'Live RT');
+  const created = await parent('POST', '/api/routines', {
+    name: 'Jude live', routine_type: 'baby_sleep', subject_name: 'Jude',
+  });
+  const id = created.body.id;
+
+  const start = await parent('POST', `/api/routines/${id}/sleep/start`,
+    { kind: 'nap', date: '2026-07-22', time: '13:00' });
+  assert.equal(start.status, 200, JSON.stringify(start.body));
+
+  // While it's running it has no duration — stats must not count it yet.
+  const openEntry = (await parent('GET', `/api/routines/${id}/entries`)).body[0];
+  const openValue = JSON.parse(openEntry.value);
+  assert.equal(openValue.in_progress, true);
+  assert.equal(openValue.duration_minutes, undefined);
+  const midStats = await parent('GET', `/api/routines/${id}/sleep-stats`);
+  assert.equal(midStats.body.totals.days_logged, 0, 'an open sleep is not counted');
+
+  // Only one at a time.
+  const second = await parent('POST', `/api/routines/${id}/sleep/start`, { kind: 'nap' });
+  assert.equal(second.status, 409, 'a second concurrent sleep is refused');
+
+  const end = await parent('PUT', `/api/routines/${id}/sleep/end`, { time: '14:20' });
+  assert.equal(end.status, 200);
+  assert.equal(end.body.duration_minutes, 80);
+
+  const closed = JSON.parse((await parent('GET', `/api/routines/${id}/entries`)).body[0].value);
+  assert.equal(closed.sleep_end, '2026-07-22 14:20');
+  assert.equal(closed.in_progress, undefined, 'the in-progress flag is cleared');
+
+  // Ending with nothing running is a 404, not a silent no-op.
+  assert.equal((await parent('PUT', `/api/routines/${id}/sleep/end`, {})).status, 404);
+
+  // An overnight live sleep still rolls the end onto the next day.
+  await parent('POST', `/api/routines/${id}/sleep/start`,
+    { kind: 'night_sleep', date: '2026-07-22', time: '19:30' });
+  const night = await parent('PUT', `/api/routines/${id}/sleep/end`, { time: '06:45', wake_count: 2 });
+  assert.equal(night.body.duration_minutes, 675);
+});
+
+test('routines: sleep stats average the window and earn their tips', async () => {
+  const [parent] = await member('stat_rt', 'Stat RT');
+  // ~10 months old, so the 4–12 month band (12–16h) applies.
+  const created = await parent('POST', '/api/routines', {
+    name: 'Jude sleep', routine_type: 'baby_sleep', subject_name: 'Jude',
+    subject_birthdate: '2025-09-20',
+  });
+  const id = created.body.id;
+
+  const empty = await parent('GET', `/api/routines/${id}/sleep-stats`);
+  assert.equal(empty.status, 200);
+  assert.equal(empty.body.tips[0].key, 'no_data', 'no entries earns no advice');
+
+  // Four nights of 11h + a 1h30 nap each day = 12.5h/day, inside the band.
+  // Bedtimes deliberately steady at 19:30.
+  for (const day of ['2026-07-18', '2026-07-19', '2026-07-20', '2026-07-21']) {
+    await parent('POST', `/api/routines/${id}/entries`, {
+      entry_date: day, entry_type: 'night_sleep', entry_time: '19:30',
+      value: { sleep_start: `${day} 19:30`, sleep_end: nextDay(day, '06:30'), duration_minutes: 660, wake_count: 1 },
+    });
+    await parent('POST', `/api/routines/${id}/entries`, {
+      entry_date: day, entry_type: 'nap', entry_time: '13:00',
+      value: { sleep_start: `${day} 13:00`, sleep_end: `${day} 14:30`, duration_minutes: 90 },
+    });
+  }
+
+  const stats = (await parent('GET', `/api/routines/${id}/sleep-stats`)).body;
+  assert.equal(stats.totals.days_logged, 4);
+  assert.equal(stats.totals.avg_daily_minutes, 750, '11h night + 1h30 nap');
+  assert.equal(stats.totals.avg_naps_per_day, 1);
+  assert.equal(stats.totals.avg_wakings, 1);
+  assert.equal(stats.totals.longest_stretch_minutes, 660);
+  assert.equal(stats.bedtime.average, '7:30pm');
+  assert.equal(stats.bedtime.spread_minutes, 0, 'identical bedtimes have no spread');
+  assert.equal(stats.guidance.age_label, '4–12 months');
+  assert.equal(stats.guidance.recommended_min_minutes, 720);
+
+  const keys = stats.tips.map(t => t.key);
+  assert.ok(keys.includes('in_range'), '12.5h/day sits inside 12–16h');
+  assert.ok(keys.includes('bedtime_consistent'), 'a steady bedtime is called out');
+  assert.ok(!keys.includes('below_range') && !keys.includes('above_range'));
+  assert.ok(stats.tips.every(t => t.title && t.detail), 'every tip says something concrete');
+});
+
+test('routines: sleep stats flag a short sleeper and a roaming bedtime', async () => {
+  const [parent] = await member('shrt_rt', 'Short RT');
+  const created = await parent('POST', '/api/routines', {
+    name: 'Short sleeper', routine_type: 'baby_sleep', subject_birthdate: '2025-09-20',
+  });
+  const id = created.body.id;
+
+  // 9h nights, no naps, bedtime swinging between 6:30pm and 10:30pm.
+  const bedtimes = ['18:30', '22:30', '19:00', '21:45'];
+  const dates = ['2026-07-18', '2026-07-19', '2026-07-20', '2026-07-21'];
+  for (let i = 0; i < dates.length; i++) {
+    await parent('POST', `/api/routines/${id}/entries`, {
+      entry_date: dates[i], entry_type: 'night_sleep', entry_time: bedtimes[i],
+      value: { sleep_start: `${dates[i]} ${bedtimes[i]}`, sleep_end: nextDay(dates[i], '05:00'),
+               duration_minutes: 540, wake_count: 4 },
+    });
+  }
+
+  const stats = (await parent('GET', `/api/routines/${id}/sleep-stats`)).body;
+  const keys = stats.tips.map(t => t.key);
+  assert.ok(keys.includes('below_range'), '9h/day is under the 12–16h band');
+  assert.ok(keys.includes('bedtime_variable'), 'a 4-hour bedtime swing is flagged');
+  assert.ok(keys.includes('wakings_high'), '4 wakings a night is flagged');
+  assert.ok(stats.bedtime.spread_minutes >= 45);
+  const belowTip = stats.tips.find(t => t.key === 'below_range');
+  assert.match(belowTip.title, /9h/, 'the tip names the observed number');
+  assert.ok(belowTip.source, 'the range is attributed');
+});
+
+test('routines: a newborn gets no invented sleep-duration range', async () => {
+  const [parent] = await member('nb_rt', 'Newborn RT');
+  const today = new Date().toLocaleDateString('en-CA');
+  const created = await parent('POST', '/api/routines', {
+    name: 'Newborn', routine_type: 'baby_sleep', subject_birthdate: today,
+  });
+  const stats = (await parent('GET', `/api/routines/${created.body.id}/sleep-stats`)).body;
+  assert.equal(stats.guidance.age_label, 'Under 4 months');
+  assert.equal(stats.guidance.recommended_min_minutes, null, 'no consensus range below 4 months');
+  assert.match(stats.guidance.note, /no expert-agreed range/i);
 });
 
 test('routines: a household-less caller cannot create a routine', async () => {

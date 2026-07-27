@@ -5,7 +5,7 @@
 const ai = require('./anthropic');
 const tools = require('./conciergeTools');
 const push = require('../push');
-const { todayISO } = require('./conciergeContext');
+const { todayISO, nowTimeHM } = require('./conciergeContext');
 
 const MAX_TURNS = 4;          // safety cap on tool-use round-trips (each = 1 API call)
 const HISTORY_LIMIT = 10;     // prior turns replayed for context (smaller = cheaper input)
@@ -76,7 +76,7 @@ async function handleChat(db, { userId, userName, message, conversationId }) {
 
   const memories = await db.getConciergeMemory(groupId);
   const system = buildSystem(userName, today, memories);
-  const ctx = { db, userId, userName, groupId, push, today };
+  const ctx = { db, userId, userName, groupId, push, today, nowTime: nowTimeHM() };
   const toolDefs = tools.definitions();
 
   const actions = [];
@@ -162,7 +162,7 @@ async function handleChatStream(db, { userId, userName, message, conversationId 
 
   const memories = await db.getConciergeMemory(groupId);
   const system = buildSystem(userName, today, memories);
-  const ctx = { db, userId, userName, groupId, push, today };
+  const ctx = { db, userId, userName, groupId, push, today, nowTime: nowTimeHM() };
   const toolDefs = tools.definitions();
 
   const actions = [];

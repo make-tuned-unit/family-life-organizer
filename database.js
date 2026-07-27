@@ -4361,6 +4361,33 @@ class FamilyDB {
     });
   }
 
+  // The open sleep on a routine, if one is running: an entry whose stored value
+  // is still marked in_progress. Newest first so a stray older one (app killed
+  // mid-nap, never closed) can't shadow the sleep happening right now.
+  getOpenSleepEntry(routineId) {
+    return new Promise((resolve, reject) => {
+      this.db.get(
+        `SELECT * FROM routine_entries
+         WHERE routine_id = ? AND entry_type IN ('nap', 'night_sleep')
+           AND value LIKE '%"in_progress":true%'
+         ORDER BY entry_date DESC, id DESC LIMIT 1`,
+        [routineId], (err, row) => err ? reject(err) : resolve(row));
+    });
+  }
+
+  // Close an open sleep by rewriting its value with the end and duration. Scoped
+  // by routine_id as well as id so an entry can't be closed from another routine.
+  closeSleepEntry(id, routineId, value, notes = null) {
+    return new Promise((resolve, reject) => {
+      // COALESCE keeps any note written when the sleep started if none is given
+      // on waking — ending a sleep should never erase what was already there.
+      this.db.run(
+        'UPDATE routine_entries SET value = ?, notes = COALESCE(?, notes) WHERE id = ? AND routine_id = ?',
+        [JSON.stringify(value), notes, id, routineId],
+        function (err) { err ? reject(err) : resolve({ changed: this.changes }); });
+    });
+  }
+
   getRoutineEntryById(id) {
     return new Promise((resolve, reject) => {
       this.db.get('SELECT * FROM routine_entries WHERE id = ?', [id],

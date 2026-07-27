@@ -359,6 +359,12 @@ function todayLocal() {
   return new Date().toLocaleDateString('en-CA');
 }
 
+// Server-local HH:MM — the default "now" when a live sleep is started or ended
+// without an explicit time.
+function nowTimeLocal() {
+  return new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false });
+}
+
 // Server-local YYYY-MM-DD offset from today by `offsetDays` (may be negative).
 function fromLocalDate(offsetDays) {
   return new Date(Date.now() + offsetDays * 86400000).toLocaleDateString('en-CA');
@@ -5304,6 +5310,7 @@ app.delete('/api/projects/:projectId/expenses/:id', requireAuth, async (req, res
 // `/api/routines/:id` sibling so they don't get shadowed.
 // ============================================
 const sleepTraining = require('./services/sleepTraining');
+const sleepStats = require('./services/sleepStats');
 const cycleTracking = require('./services/cycleTracking');
 const routineAchievements = require('./services/routineAchievements');
 
@@ -5489,6 +5496,66 @@ app.delete('/api/routines/:id/entries/:entryId', requireAuth, async (req, res) =
     if (!(await requireRoutineAccess(db, req.params.id, req, res))) return;
     await db.deleteRoutineEntry(req.params.entryId, req.params.id);
     res.json({ success: true });
+  } catch (err) { sendServerError(res, err); }
+  finally { db.close(); }
+});
+
+// A sleep happening right now: POST starts it, PUT ends it. Stored as an
+// ordinary entry whose value is marked in_progress until it closes, so nothing
+// downstream needs a second table — and stats skip it until it has a duration.
+app.post('/api/routines/:id/sleep/start', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    if (!(await requireRoutineAccess(db, req.params.id, req, res))) return;
+    const open = await db.getOpenSleepEntry(req.params.id);
+    if (open) return res.status(409).json({ error: 'A sleep is already running', entry_id: open.id });
+    const kind = req.body.kind === 'night_sleep' ? 'night_sleep' : 'nap';
+    const date = req.body.date ? normalizeDate(req.body.date) : todayLocal();
+    const time = req.body.time || nowTimeLocal();
+    const span = sleepStats.span(date, time, time);
+    if (!span) return res.status(400).json({ error: 'time must be HH:MM' });
+    const result = await db.addRoutineEntry(req.params.id, {
+      entry_date: date, entry_time: span.startTime, entry_type: kind,
+      value: { sleep_start: span.start, in_progress: true },
+      notes: req.body.notes, created_by: req.session.user?.id,
+    });
+    res.json({ success: true, id: result.id, started_at: span.start });
+  } catch (err) { sendServerError(res, err); }
+  finally { db.close(); }
+});
+
+app.put('/api/routines/:id/sleep/end', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    if (!(await requireRoutineAccess(db, req.params.id, req, res))) return;
+    const open = await db.getOpenSleepEntry(req.params.id);
+    if (!open) return res.status(404).json({ error: 'No sleep is running' });
+    let stored = {};
+    try { stored = JSON.parse(open.value || '{}'); } catch {}
+    const span = sleepStats.span(String(stored.sleep_start || '').slice(0, 10),
+                                 String(stored.sleep_start || '').slice(11, 16),
+                                 req.body.time || nowTimeLocal());
+    if (!span) return res.status(400).json({ error: 'time must be HH:MM' });
+    const value = { sleep_start: span.start, sleep_end: span.end, duration_minutes: span.minutes };
+    if (req.body.wake_count != null) value.wake_count = Math.max(0, parseInt(req.body.wake_count) || 0);
+    await db.closeSleepEntry(open.id, req.params.id, value, req.body.notes || null);
+    res.json({ success: true, id: open.id, duration_minutes: span.minutes });
+  } catch (err) { sendServerError(res, err); }
+  finally { db.close(); }
+});
+
+// Sleep statistics + age-appropriate guidance and tips for this routine.
+app.get('/api/routines/:id/sleep-stats', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    if (!(await requireRoutineAccess(db, req.params.id, req, res))) return;
+    const routine = await db.getRoutineById(req.params.id);
+    const entries = await db.getRoutineEntries(req.params.id, { limit: 400 });
+    res.json(sleepStats.compute(entries, {
+      birthdate: routine?.subject_birthdate || null,
+      today: todayLocal(),
+      windowDays: clampLimit(req.query.window_days, 7, 30),
+    }));
   } catch (err) { sendServerError(res, err); }
   finally { db.close(); }
 });

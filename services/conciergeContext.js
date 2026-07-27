@@ -11,6 +11,12 @@ function todayISO() {
   return new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD in server TZ
 }
 
+// HH:MM in the server's timezone — the default "now" for a live sleep the user
+// starts or ends without naming a time.
+function nowTimeHM() {
+  return new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false });
+}
+
 function currentMonth() {
   return todayISO().slice(0, 7); // YYYY-MM
 }
@@ -171,4 +177,4 @@ async function buildSnapshot(db, userId) {
   };
 }
 
-module.exports = { buildSnapshot, daysUntil, daysUntilAnnual, todayISO };
+module.exports = { buildSnapshot, daysUntil, daysUntilAnnual, todayISO, nowTimeHM };

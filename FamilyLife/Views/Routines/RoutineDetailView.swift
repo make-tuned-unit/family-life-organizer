@@ -17,6 +17,8 @@ struct RoutineDetailView: View {
     @State private var showingDeleteConfirm = false
     @State private var isSharing = false
     @State private var sleepToLog: SleepKind?
+    @State private var sleepStats: SleepStats?
+    @State private var isTogglingLiveSleep = false
 
     private let accent = TabAccent.routines.color
 
@@ -51,7 +53,15 @@ struct RoutineDetailView: View {
                             }
                         }
 
+                        if detail.type == .babySleep || detail.type == .sleepTraining {
+                            liveSleepCard(detail)
+                        }
+
                         quickLog(for: detail.type)
+
+                        if let stats = sleepStats {
+                            SleepStatsCard(stats: stats, accent: accent)
+                        }
 
                         entriesSection(detail.entries)
                     }
@@ -149,6 +159,91 @@ struct RoutineDetailView: View {
         }
     }
 
+    // MARK: - Live sleep
+
+    /// The in-progress sleep, if one is running: an entry that has a start but
+    /// no end yet. One tap starts it, one tap ends it — for the 2am case where
+    /// nobody is going to fill in a form.
+    private func openSleep(_ detail: RoutineDetailResponse) -> RoutineEntryResponse? {
+        detail.entries.first { entry in
+            guard entry.entry_type == "nap" || entry.entry_type == "night_sleep",
+                  let raw = entry.value?.data(using: .utf8),
+                  let obj = try? JSONSerialization.jsonObject(with: raw) as? [String: Any]
+            else { return false }
+            return obj["in_progress"] as? Bool == true
+        }
+    }
+
+    @ViewBuilder
+    private func liveSleepCard(_ detail: RoutineDetailResponse) -> some View {
+        if let open = openSleep(detail) {
+            let started = open.entry_time ?? ""
+            HStack(spacing: 12) {
+                Image(systemName: "moon.zzz.fill")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(accent)
+                    .frame(width: 34, height: 34)
+                    .background(accent.opacity(0.15))
+                    .clipShape(Circle())
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(open.entry_type == "nap" ? "Napping now" : "Asleep for the night")
+                        .font(.flSubheadline.weight(.semibold))
+                        .foregroundStyle(WarmPalette.ink1)
+                    Text(started.isEmpty ? "In progress" : "Since \(started)")
+                        .font(.flFootnote)
+                        .foregroundStyle(WarmPalette.ink3)
+                }
+                Spacer()
+                Button("Awake") { Task { await endLiveSleep() } }
+                    .buttonStyle(.flCTA)
+                    .disabled(isTogglingLiveSleep)
+            }
+            .padding(12)
+            .flCard(tint: accent.opacity(0.08))
+        } else {
+            HStack(spacing: 8) {
+                Text("Happening now")
+                    .font(.flCaption.weight(.semibold))
+                    .foregroundStyle(WarmPalette.ink3)
+                Spacer()
+                Button { Task { await startLiveSleep(kind: "nap") } } label: {
+                    chip("Nap started", "sun.max")
+                }
+                .buttonStyle(.plain)
+                .disabled(isTogglingLiveSleep)
+                Button { Task { await startLiveSleep(kind: "night_sleep") } } label: {
+                    chip("Down for the night", "moon")
+                }
+                .buttonStyle(.plain)
+                .disabled(isTogglingLiveSleep)
+            }
+            .padding(12)
+            .flCard()
+        }
+    }
+
+    private func startLiveSleep(kind: String) async {
+        isTogglingLiveSleep = true
+        defer { isTogglingLiveSleep = false }
+        do {
+            try await api.startSleep(routineId: routineId, kind: kind)
+            await load()
+        } catch {
+            errorMessage = "Couldn't start that sleep. Please try again."
+        }
+    }
+
+    private func endLiveSleep() async {
+        isTogglingLiveSleep = true
+        defer { isTogglingLiveSleep = false }
+        do {
+            try await api.endSleep(routineId: routineId, wakeCount: nil)
+            await load()
+        } catch {
+            errorMessage = "Couldn't end that sleep. Please try again."
+        }
+    }
+
     // MARK: - Quick log
 
     @ViewBuilder
@@ -236,6 +331,9 @@ struct RoutineDetailView: View {
             let d = try await api.fetchRoutine(id: routineId)
             detail = d
             errorMessage = nil
+            if d.type == .babySleep || d.type == .sleepTraining {
+                sleepStats = try? await api.fetchSleepStats(routineId: routineId)
+            }
             if d.type.isActivity {
                 let occ = try? await api.fetchRoutineOccurrences(id: routineId)
                 occurrences = occ
@@ -454,6 +552,170 @@ private struct LogSleepSheet: View {
             notes: notes.trimmingCharacters(in: .whitespaces)
         ))
         dismiss()
+    }
+}
+
+// MARK: - Sleep stats
+
+/// The averages, the age-appropriate range, and the tips the data earned.
+/// Deliberately reads top-down: how much sleep, how it's trending, then what
+/// (if anything) to do about it.
+private struct SleepStatsCard: View {
+    let stats: SleepStats
+    let accent: Color
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 7) {
+                Image(systemName: "chart.bar")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(WarmPalette.ink3)
+                Text("Sleep")
+                    .font(.flHeadline)
+                    .foregroundStyle(WarmPalette.ink1)
+                Spacer()
+                if let days = stats.window_days, stats.hasData {
+                    Text("Last \(days) days")
+                        .font(.flFootnote)
+                        .foregroundStyle(WarmPalette.ink3)
+                }
+            }
+
+            if stats.hasData {
+                headline
+                metrics
+                if let bedtime = stats.bedtime, let avg = bedtime.average {
+                    bedtimeRow(avg, spread: bedtime.spread_minutes, wake: stats.wake_time?.average)
+                }
+            }
+
+            if !stats.tips.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    ForEach(stats.tips) { tip in
+                        TipRow(tip: tip, accent: accent)
+                    }
+                }
+            }
+
+            Text("Educational only — not medical advice. Check anything that worries you with your pediatrician.")
+                .font(.flCaption2)
+                .foregroundStyle(WarmPalette.ink4)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(14)
+        .flCard()
+    }
+
+    private var headline: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(minutesText(stats.totals.avg_daily_minutes))
+                .font(.flStat)
+                .foregroundStyle(WarmPalette.ink1)
+                .contentTransition(.numericText())
+            HStack(spacing: 6) {
+                Text("average a day")
+                    .font(.flFootnote)
+                    .foregroundStyle(WarmPalette.ink3)
+                if let delta = stats.trend?.daily_delta_minutes, abs(delta) >= 5 {
+                    Label(minutesText(abs(delta)), systemImage: delta > 0 ? "arrow.up" : "arrow.down")
+                        .font(.flCaption.weight(.semibold))
+                        .foregroundStyle(delta > 0 ? WarmPalette.good : WarmPalette.warn)
+                }
+            }
+            if let label = stats.guidance?.recommended_label {
+                Text("Typical for \(stats.guidance?.age_label?.lowercased() ?? "this age"): \(label)")
+                    .font(.flCaption)
+                    .foregroundStyle(WarmPalette.ink3)
+            }
+        }
+    }
+
+    private var metrics: some View {
+        HStack(spacing: 8) {
+            WarmStatTile(label: "Nights", value: minutesText(stats.totals.avg_night_minutes),
+                         sub: "average", icon: "moon")
+            WarmStatTile(label: "Naps", value: napsText, sub: "a day", icon: "sun.max")
+            WarmStatTile(label: "Wakings", value: wakingsText, sub: "a night", icon: "eye")
+        }
+    }
+
+    private func bedtimeRow(_ average: String, spread: Int?, wake: String?) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: "bed.double")
+                .font(.system(size: 12))
+                .foregroundStyle(WarmPalette.ink3)
+            Text("Bedtime around \(average)")
+                .font(.flFootnote)
+                .foregroundStyle(WarmPalette.ink2)
+            if let spread, spread > 0 {
+                Text("· ±\(spread)m")
+                    .font(.flFootnote)
+                    .foregroundStyle(WarmPalette.ink3)
+            }
+            if let wake {
+                Text("· up \(wake)")
+                    .font(.flFootnote)
+                    .foregroundStyle(WarmPalette.ink3)
+            }
+        }
+    }
+
+    private var napsText: String {
+        guard let n = stats.totals.avg_naps_per_day else { return "—" }
+        return n == n.rounded() ? "\(Int(n))" : String(format: "%.1f", n)
+    }
+
+    private var wakingsText: String {
+        guard let n = stats.totals.avg_wakings else { return "—" }
+        return n == n.rounded() ? "\(Int(n))" : String(format: "%.1f", n)
+    }
+
+    private func minutesText(_ minutes: Int?) -> String {
+        guard let minutes else { return "—" }
+        return SleepValue.durationText(minutes: minutes)
+    }
+}
+
+private struct TipRow: View {
+    let tip: SleepTip
+    let accent: Color
+    @State private var expanded = false
+
+    var body: some View {
+        Button {
+            withAnimation(.snappy) { expanded.toggle() }
+        } label: {
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(alignment: .top, spacing: 8) {
+                    Image(systemName: tip.isWatch ? "exclamationmark.circle.fill" : "lightbulb")
+                        .font(.system(size: 13))
+                        .foregroundStyle(tip.isWatch ? AccentTheme.terracotta.color : accent)
+                    Text(tip.title)
+                        .font(.flSubheadline.weight(.medium))
+                        .foregroundStyle(WarmPalette.ink1)
+                        .multilineTextAlignment(.leading)
+                    Spacer(minLength: 4)
+                    Image(systemName: expanded ? "chevron.up" : "chevron.down")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(WarmPalette.ink4)
+                }
+                if expanded {
+                    Text(tip.detail)
+                        .font(.flFootnote)
+                        .foregroundStyle(WarmPalette.ink2)
+                        .multilineTextAlignment(.leading)
+                    if let source = tip.source {
+                        Text(source)
+                            .font(.flCaption2)
+                            .foregroundStyle(WarmPalette.ink4)
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(11)
+            .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.small))
+        }
+        .buttonStyle(.plain)
     }
 }
 
