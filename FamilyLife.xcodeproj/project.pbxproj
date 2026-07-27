@@ -55,12 +55,6 @@
 		AA00002F /* NewDecisionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00002F /* NewDecisionView.swift */; };
 		AA000030 /* DecisionDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000030 /* DecisionDetailView.swift */; };
 		AA000031 /* Gift.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000031 /* Gift.swift */; };
-		AA000213 /* Routine.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000213 /* Routine.swift */; };
-		AA000214 /* NewRoutineView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000214 /* NewRoutineView.swift */; };
-		AA000215 /* RoutineCards.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000215 /* RoutineCards.swift */; };
-		AA000216 /* RoutineDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000216 /* RoutineDetailView.swift */; };
-		AA000217 /* RoutinesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000217 /* RoutinesView.swift */; };
-		AA000218 /* SleepTrainingProgramView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000218 /* SleepTrainingProgramView.swift */; };
 		AA000033 /* PersonGiftListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000033 /* PersonGiftListView.swift */; };
 		AA000034 /* AddGiftPersonView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000034 /* AddGiftPersonView.swift */; };
 		AA000035 /* AddGiftIdeaView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000035 /* AddGiftIdeaView.swift */; };
@@ -130,6 +124,12 @@
 		AA000210 /* Person.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000210 /* Person.swift */; };
 		AA000211 /* PeopleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000211 /* PeopleView.swift */; };
 		AA000212 /* PersonDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000212 /* PersonDetailView.swift */; };
+		AA000213 /* Routine.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000213 /* Routine.swift */; };
+		AA000214 /* NewRoutineView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000214 /* NewRoutineView.swift */; };
+		AA000215 /* RoutineCards.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000215 /* RoutineCards.swift */; };
+		AA000216 /* RoutineDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000216 /* RoutineDetailView.swift */; };
+		AA000217 /* RoutinesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000217 /* RoutinesView.swift */; };
+		AA000218 /* SleepTrainingProgramView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000218 /* SleepTrainingProgramView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -181,12 +181,6 @@
 		BB00002F /* NewDecisionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewDecisionView.swift; sourceTree = "<group>"; };
 		BB000030 /* DecisionDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecisionDetailView.swift; sourceTree = "<group>"; };
 		BB000031 /* Gift.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Gift.swift; sourceTree = "<group>"; };
-		BB000213 /* Routine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Routine.swift; sourceTree = "<group>"; };
-		BB000214 /* NewRoutineView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewRoutineView.swift; sourceTree = "<group>"; };
-		BB000215 /* RoutineCards.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoutineCards.swift; sourceTree = "<group>"; };
-		BB000216 /* RoutineDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoutineDetailView.swift; sourceTree = "<group>"; };
-		BB000217 /* RoutinesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoutinesView.swift; sourceTree = "<group>"; };
-		BB000218 /* SleepTrainingProgramView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SleepTrainingProgramView.swift; sourceTree = "<group>"; };
 		BB000033 /* PersonGiftListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersonGiftListView.swift; sourceTree = "<group>"; };
 		BB000034 /* AddGiftPersonView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddGiftPersonView.swift; sourceTree = "<group>"; };
 		BB000035 /* AddGiftIdeaView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddGiftIdeaView.swift; sourceTree = "<group>"; };
@@ -256,6 +250,12 @@
 		BB000210 /* Person.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Person.swift; sourceTree = "<group>"; };
 		BB000211 /* PeopleView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PeopleView.swift; sourceTree = "<group>"; };
 		BB000212 /* PersonDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersonDetailView.swift; sourceTree = "<group>"; };
+		BB000213 /* Routine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Routine.swift; sourceTree = "<group>"; };
+		BB000214 /* NewRoutineView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewRoutineView.swift; sourceTree = "<group>"; };
+		BB000215 /* RoutineCards.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoutineCards.swift; sourceTree = "<group>"; };
+		BB000216 /* RoutineDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoutineDetailView.swift; sourceTree = "<group>"; };
+		BB000217 /* RoutinesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoutinesView.swift; sourceTree = "<group>"; };
+		BB000218 /* SleepTrainingProgramView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SleepTrainingProgramView.swift; sourceTree = "<group>"; };
 		CC000001 /* FamilyLife.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = FamilyLife.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -270,18 +270,6 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		EE000023 /* Routines */ = {
-			isa = PBXGroup;
-			children = (
-				BB000214 /* NewRoutineView.swift */,
-				BB000215 /* RoutineCards.swift */,
-				BB000216 /* RoutineDetailView.swift */,
-				BB000217 /* RoutinesView.swift */,
-				BB000218 /* SleepTrainingProgramView.swift */,
-			);
-			path = Routines;
-			sourceTree = "<group>";
-		};
 		EE000001 = {
 			isa = PBXGroup;
 			children = (
@@ -566,6 +554,18 @@
 			path = People;
 			sourceTree = "<group>";
 		};
+		EE000023 /* Routines */ = {
+			isa = PBXGroup;
+			children = (
+				BB000214 /* NewRoutineView.swift */,
+				BB000215 /* RoutineCards.swift */,
+				BB000216 /* RoutineDetailView.swift */,
+				BB000217 /* RoutinesView.swift */,
+				BB000218 /* SleepTrainingProgramView.swift */,
+			);
+			path = Routines;
+			sourceTree = "<group>";
+		};
 		GG000001 /* Care */ = {
 			isa = PBXGroup;
 			children = (
@@ -816,7 +816,7 @@
 				CODE_SIGN_ENTITLEMENTS = FamilyLife/FamilyLife.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 213;
+				CURRENT_PROJECT_VERSION = 214;
 				DEVELOPMENT_ASSET_PATHS = "";
 				DEVELOPMENT_TEAM = GANM22MFCH;
 				ENABLE_PREVIEWS = YES;
@@ -827,6 +827,7 @@
 				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "Kinrows shows your existing calendar events (including synced Google calendars) alongside your family schedule.";
 				INFOPLIST_KEY_NSCameraUsageDescription = "Kinrows uses your camera to scan receipts.";
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "Kinrows uses your step count to track fitness rivalries and show daily activity on your dashboard.";
+				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Kinrows does not write any data to Health. This permission is only requested because the app uses the HealthKit framework to read your step count and flights climbed.";
 				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "Kinrows can keep sharing your trip location in the background until you arrive or cancel the trip.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Kinrows uses your location during active trips to share your ETA, and (only if you turn it on) to show your approximate place on your family's presence row.";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Kinrows uses the microphone so you can talk to your Concierge instead of typing.";
@@ -860,7 +861,7 @@
 				CODE_SIGN_ENTITLEMENTS = FamilyLife/FamilyLife.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 213;
+				CURRENT_PROJECT_VERSION = 214;
 				DEVELOPMENT_ASSET_PATHS = "";
 				DEVELOPMENT_TEAM = GANM22MFCH;
 				ENABLE_PREVIEWS = YES;
@@ -871,6 +872,7 @@
 				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "Kinrows shows your existing calendar events (including synced Google calendars) alongside your family schedule.";
 				INFOPLIST_KEY_NSCameraUsageDescription = "Kinrows uses your camera to scan receipts.";
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "Kinrows uses your step count to track fitness rivalries and show daily activity on your dashboard.";
+				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Kinrows does not write any data to Health. This permission is only requested because the app uses the HealthKit framework to read your step count and flights climbed.";
 				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "Kinrows can keep sharing your trip location in the background until you arrive or cancel the trip.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Kinrows uses your location during active trips to share your ETA, and (only if you turn it on) to show your approximate place on your family's presence row.";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Kinrows uses the microphone so you can talk to your Concierge instead of typing.";
