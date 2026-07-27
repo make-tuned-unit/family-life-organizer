@@ -7,6 +7,10 @@ struct FeedCard: View {
     var onRivalryTap: ((Int) -> Void)?
     var onCoverageTap: (() -> Void)?
     var onGroupTap: ((APIService.GroupResponse) -> Void)?
+    var onRoutineTap: ((Int) -> Void)?
+    var onMilestoneTap: ((Int) -> Void)?
+    var onDecisionTap: ((Int) -> Void)?
+    var onKeyDateTap: ((Int) -> Void)?
 
     @Environment(APIService.self) private var api
     @Environment(AuthService.self) private var auth
@@ -136,12 +140,25 @@ struct FeedCard: View {
                     Text(item.author ?? "Someone")
                         .font(.flSubheadline.weight(.semibold))
                         .foregroundStyle(WarmPalette.ink1)
-                    Text(typeBadge)
-                        .font(.flOverline)
-                        .foregroundStyle(prepared.accentColor)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(prepared.accentColor.opacity(0.1), in: Capsule())
+                    // Glyph + word together: the icon is what you scan for, the
+                    // word is what disambiguates two features sharing a symbol.
+                    HStack(spacing: 3) {
+                        Image(systemName: typeIcon)
+                            .font(.system(size: 9, weight: .bold))
+                        Text(typeBadge)
+                            .font(.flOverline)
+                    }
+                    .foregroundStyle(prepared.accentColor)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(prepared.accentColor.opacity(0.1), in: Capsule())
+
+                    if isPrivateToMe {
+                        Image(systemName: "lock.fill")
+                            .font(.system(size: 9, weight: .semibold))
+                            .foregroundStyle(WarmPalette.ink4)
+                            .accessibilityLabel("Only you can see this")
+                    }
                 }
                 HStack(spacing: 4) {
                     Text(prepared.time)
@@ -172,7 +189,10 @@ struct FeedCard: View {
 
             Spacer()
 
-            if !prepared.isPost {
+            // Chevron means "this opens something". Driven by `navigates` rather
+            // than by post-vs-not, so a milestone or shared-routine post shows it
+            // and a plain text post doesn't promise a screen that isn't there.
+            if navigates {
                 Image(systemName: "chevron.right")
                     .font(.system(size: 10, weight: .medium))
                     .foregroundStyle(WarmPalette.ink4)
@@ -482,20 +502,49 @@ struct FeedCard: View {
 
     // MARK: - Helpers
 
+    /// Every row goes somewhere. A feed item that does nothing when tapped
+    /// trains people to stop tapping, so the only rows that merely expand are
+    /// the ones whose whole content is already on screen (text posts and their
+    /// comments/reactions).
     private func tapped() {
         switch item.feed_type {
-        case "decision": break // decisions accessed via chat/feed
+        case "decision": onDecisionTap?(item.ref_id)
         case "event": onEventTap?(item.ref_id)
         case "rivalry": onRivalryTap?(item.ref_id)
         case "coverage": onCoverageTap?()
-        case "post", "comment", "reaction":
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
-                isExpanded.toggle()
+        case "key_date": onKeyDateTap?(item.ref_id)
+        case "post":
+            // A post that stands for something else (a milestone, a shared
+            // routine, an event) opens that thing; a plain post expands.
+            switch item.status {
+            case "routine": onRoutineTap?(item.ref_id)
+            case "milestone": onMilestoneTap?(item.ref_id)
+            case "event": onEventTap?(item.ref_id)
+            case "rivalry": onRivalryTap?(item.ref_id)
+            default: toggleExpanded()
             }
-            if isExpanded && !metaLoaded {
-                Task { await loadMeta() }
-            }
+        case "comment", "reaction":
+            toggleExpanded()
         default: break
+        }
+    }
+
+    private func toggleExpanded() {
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+            isExpanded.toggle()
+        }
+        if isExpanded && !metaLoaded {
+            Task { await loadMeta() }
+        }
+    }
+
+    /// Whether tapping leaves the feed — drives the chevron affordance, so a row
+    /// only advertises a destination when it actually has one.
+    private var navigates: Bool {
+        switch item.feed_type {
+        case "event", "rivalry", "coverage", "decision", "key_date": true
+        case "post": ["routine", "milestone", "event", "rivalry"].contains(item.status ?? "")
+        default: false
         }
     }
 
@@ -526,12 +575,55 @@ struct FeedCard: View {
         mentionSuggestions = []
     }
 
+    /// The feature's canonical symbol, so a feed row and the tab it opens are
+    /// marked the same way. Posts fall through to their post_type.
+    private var typeIcon: String {
+        switch item.feed_type {
+        case "decision": "chart.bar"
+        case "event": "calendar"
+        case "coverage": "hands.and.sparkles"
+        case "rivalry": "flag.2.crossed"
+        case "key_date": keyDateIcon
+        case "comment": "bubble.left"
+        case "reaction": "heart"
+        case "post":
+            switch item.status {
+            case "event": "calendar"
+            case "rivalry": "flag.2.crossed"
+            case "decision", "poll": "chart.bar"
+            case "photo": "photo"
+            case "link": "link"
+            case "milestone": "sparkles"
+            case "routine": "repeat"
+            default: "text.bubble"
+            }
+        default: "bell"
+        }
+    }
+
+    /// Key dates carry their own kind in `status` — a birthday and an
+    /// anniversary shouldn't look the same at a glance.
+    private var keyDateIcon: String {
+        switch item.status {
+        case "birthday": "birthday.cake"
+        case "anniversary": "heart.circle"
+        default: "star.circle"
+        }
+    }
+
+    /// A private key date shows a lock so it's obvious at a glance that this
+    /// row is yours alone — the backend already guarantees nobody else gets it.
+    private var isPrivateToMe: Bool {
+        item.feed_type == "key_date" && item.author_id == auth.currentUser?.id && item.is_private == true
+    }
+
     private var typeBadge: String {
         switch item.feed_type {
         case "decision": "Decision"
         case "event": "Event"
         case "coverage": "Coverage"
         case "rivalry": "Challenge"
+        case "key_date": keyDateBadge
         case "post":
             // Use post_type (stored in status) for more specific badges
             switch item.status {
@@ -542,9 +634,18 @@ struct FeedCard: View {
             case "link": "Link"
             case "milestone": "Milestone"
             case "routine": "Routine"
+            case "note": "Note"
             default: "Post"
             }
         default: "Update"
+        }
+    }
+
+    private var keyDateBadge: String {
+        switch item.status {
+        case "birthday": "Birthday"
+        case "anniversary": "Anniversary"
+        default: "Key date"
         }
     }
 }
@@ -573,7 +674,8 @@ final class FeedPhotoCache {
                     comment_count: 1,
                     group_id: 1,
                     group_name: "Fairbanks",
-                    has_photo: 0
+                    has_photo: 0,
+                    is_private_flag: 0
                 ),
                 body: AttributedString("Took the kids to Point Pleasant Park."),
                 time: "2 hours ago",

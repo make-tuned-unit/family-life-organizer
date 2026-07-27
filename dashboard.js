@@ -4546,7 +4546,7 @@ app.get('/api/gifts/events', requireAuth, async (req, res) => {
   try {
     const groupId = await db.getUserHouseholdId(req.session.user?.id);
     if (!groupId) return res.json([]);
-    const events = await db.getSpecialEvents(groupId);
+    const events = await db.getSpecialEvents(groupId, req.session.user?.id);
     res.json(events);
   } catch (err) {
     sendServerError(res, err);
@@ -4562,6 +4562,10 @@ app.post('/api/gifts/events', requireAuth, async (req, res) => {
     if (data.date) data.date = normalizeDate(data.date);
     data.group_id = await db.getUserHouseholdId(req.session.user?.id);
     if (!data.group_id) return res.status(403).json({ error: 'Join a household first' });
+    // Ownership is what makes a private key date reachable by its author — without
+    // it a private row would be invisible to everyone, including whoever added it.
+    data.created_by = req.session.user?.id;
+    data.shared_scope = data.shared_scope === 'private' ? 'private' : 'household';
     const result = await db.addSpecialEvent(data);
     res.json({ success: true, id: result.id });
   } catch (err) {
@@ -4574,7 +4578,7 @@ app.post('/api/gifts/events', requireAuth, async (req, res) => {
 app.put('/api/gifts/events/:id', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
-    if (!(await requireHouseholdRow(db, 'special_events', req.params.id, req, res))) return;
+    if (!(await requireSpecialEventAccess(db, req.params.id, req, res))) return;
     const data = { ...req.body };
     if (data.date) data.date = normalizeDate(data.date);
     delete data.group_id;
@@ -4590,7 +4594,7 @@ app.put('/api/gifts/events/:id', requireAuth, async (req, res) => {
 app.delete('/api/gifts/events/:id', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
-    if (!(await requireHouseholdRow(db, 'special_events', req.params.id, req, res))) return;
+    if (!(await requireSpecialEventAccess(db, req.params.id, req, res))) return;
     await db.deleteSpecialEvent(req.params.id);
     res.json({ success: true });
   } catch (err) {
@@ -4683,7 +4687,7 @@ app.get('/api/milestones', requireAuth, async (req, res) => {
     const groupId = await db.getUserHouseholdId(req.session.user?.id);
     if (!groupId) return res.json([]);
     const personId = req.query.person_id ? Number(req.query.person_id) : null;
-    res.json(await db.getMilestones(groupId, Number.isInteger(personId) ? personId : null));
+    res.json(await db.getMilestones(groupId, Number.isInteger(personId) ? personId : null, req.session.user?.id));
   } catch (err) {
     sendServerError(res, err);
   } finally {
@@ -4706,9 +4710,11 @@ app.post('/api/milestones', requireAuth, async (req, res) => {
     // the household always gets the feed post; a clan share ADDS a post in
     // that clan's feed too (clan members may not overlap the household, e.g.
     // a Jesse∩Ariel clan that Sophie isn't in — she'd miss a clan-only post).
-    let sharedScope = 'household';
+    // `private` wins over any clan share: a milestone kept to yourself gets no
+    // feed post and no push anywhere, and only you can see the row.
+    let sharedScope = req.body.shared_scope === 'private' ? 'private' : 'household';
     let sharedGroupId = null;
-    if (req.body.shared_group_id) {
+    if (sharedScope !== 'private' && req.body.shared_group_id) {
       const gid = parseInt(req.body.shared_group_id);
       if (!Number.isInteger(gid) || !(await db.isGroupMember(gid, userId))) {
         return res.status(403).json({ error: 'Cannot share to that group' });
@@ -4730,7 +4736,10 @@ app.post('/api/milestones', requireAuth, async (req, res) => {
     res.json({ success: true, id: result.id });
 
     // Celebrate: feed post + push in the household, and in the clan if shared.
-    const celebrateIn = [groupId, ...(sharedGroupId ? [sharedGroupId] : [])];
+    // A private milestone is celebrated nowhere — that is the whole point of it.
+    const celebrateIn = sharedScope === 'private'
+      ? []
+      : [groupId, ...(sharedGroupId ? [sharedGroupId] : [])];
     for (const gid of celebrateIn) {
       try {
         await db.addFeedPost({
@@ -5338,6 +5347,22 @@ async function requireRoutineAccess(db, id, req, res, { owner = false } = {}) {
   // Same 403 a non-member gets: never reveal that a private routine exists.
   if (row.shared_scope !== 'household') { res.status(403).json({ error: 'Forbidden' }); return null; }
   return row;
+}
+
+// Key dates are household-visible unless marked private, in which case only the
+// person who added them can see or touch them — otherwise a housemate could flip
+// a private anniversary back to shared by id and read it.
+async function requireSpecialEventAccess(db, id, req, res) {
+  const userId = req.session.user?.id;
+  const row = await dbGet(db, 'SELECT group_id, created_by, shared_scope FROM special_events WHERE id = ?', [id]);
+  if (!row) { res.status(404).json({ error: 'Not found' }); return false; }
+  if (row.group_id == null || !(await db.isHouseholdMember(row.group_id, userId))) {
+    res.status(403).json({ error: 'Forbidden' }); return false;
+  }
+  if (row.shared_scope === 'private' && row.created_by !== userId) {
+    res.status(404).json({ error: 'Not found' }); return false;
+  }
+  return true;
 }
 
 app.get('/api/routines', requireAuth, async (req, res) => {

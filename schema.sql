@@ -335,6 +335,8 @@ CREATE TABLE IF NOT EXISTS special_events (
     is_recurring BOOLEAN DEFAULT 1,
     event_type TEXT DEFAULT 'custom',
     notes TEXT,
+    created_by INTEGER REFERENCES users(id),
+    shared_scope TEXT DEFAULT 'household', -- household | private (creator only)
     group_id INTEGER REFERENCES groups(id),
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (person_id) REFERENCES gift_people(id) ON DELETE CASCADE
@@ -354,7 +356,7 @@ CREATE TABLE IF NOT EXISTS milestones (
     milestone_date TEXT NOT NULL,
     category TEXT DEFAULT 'moment',         -- first | school | sports | growth | moment
     photo_data TEXT,
-    shared_scope TEXT DEFAULT 'household',  -- household | group
+    shared_scope TEXT DEFAULT 'household',  -- household | group | private (creator only)
     shared_group_id INTEGER REFERENCES groups(id),
     created_by INTEGER REFERENCES users(id),
     creator_name TEXT,

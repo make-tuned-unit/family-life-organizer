@@ -1103,6 +1103,10 @@ final class APIService {
         let group_id: Int?
         let group_name: String?
         let has_photo: Int?    // 1 when a feed post carries a photo (fetched lazily)
+        /// 1 when the row is visible only to its author (private key dates).
+        /// The backend already filters these out for everyone else — this only
+        /// drives the lock badge the owner sees.
+        let is_private_flag: Int?
 
         /// Stable key for notification watermarking and list identity
         var stableKey: String { "\(feed_type)-\(ref_id)-\(created_at ?? "")" }
@@ -1111,7 +1115,10 @@ final class APIService {
 
         private enum CodingKeys: String, CodingKey {
             case feed_type, ref_id, title, body, author, author_id, status, created_at, reaction_count, comment_count, group_id, group_name, has_photo
+            case is_private_flag = "is_private"
         }
+
+        var is_private: Bool { (is_private_flag ?? 0) == 1 }
     }
 
     struct FeedPhotoResponse: Codable {

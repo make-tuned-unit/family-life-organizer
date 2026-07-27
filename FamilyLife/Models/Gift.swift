@@ -38,5 +38,11 @@ struct SpecialEventResponse: Codable, Identifiable {
     let is_recurring: Int?
     let event_type: String
     let notes: String?
+    /// "household" (everyone at home) or "private" (only whoever added it).
+    /// Absent on rows written before key dates had a visibility.
+    let shared_scope: String?
+    let created_by: Int?
     let created_at: String?
+
+    var isPrivate: Bool { shared_scope == "private" }
 }

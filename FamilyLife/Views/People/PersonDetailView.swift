@@ -508,6 +508,7 @@ struct AddMilestoneSheet: View {
     @State private var date = Date()
     @State private var category: MilestoneCategory = .moment
     @State private var shareGroupId: Int?
+    @State private var keepPrivate = false
     @State private var selectedPhoto: PhotosPickerItem?
     @State private var selectedImageData: Data?
     @State private var isSaving = false
@@ -552,10 +553,22 @@ struct AddMilestoneSheet: View {
                         }
                     }
                 }
-                ShareWithSection(selectedGroupId: $shareGroupId)
+                Section {
+                    Toggle("Keep this to myself", isOn: $keepPrivate)
+                } footer: {
+                    Text(keepPrivate
+                         ? "Only you will see this milestone. No feed post, no nudge, nobody told."
+                         : "Everyone at home will see it.")
+                }
+
+                if !keepPrivate {
+                    ShareWithSection(selectedGroupId: $shareGroupId)
+                }
 
                 Section {
-                    Text("Your household always gets a feed post and a nudge to cheer \(person.name) on. Sharing with a circle celebrates it there too.")
+                    Text(keepPrivate
+                         ? "Private milestones stay on \(person.name)'s card for you alone \u{2014} you can share it later by logging it again."
+                         : "Your household always gets a feed post and a nudge to cheer \(person.name) on. Sharing with a circle celebrates it there too.")
                         .font(.flFootnote)
                         .foregroundStyle(WarmPalette.ink3)
                 }
@@ -585,7 +598,11 @@ struct AddMilestoneSheet: View {
         ]
         let trimmedNote = note.trimmingCharacters(in: .whitespacesAndNewlines)
         if !trimmedNote.isEmpty { data["description"] = trimmedNote }
-        if let shareGroupId { data["shared_group_id"] = shareGroupId }
+        if keepPrivate {
+            data["shared_scope"] = "private"
+        } else if let shareGroupId {
+            data["shared_group_id"] = shareGroupId
+        }
         if let imageData = selectedImageData,
            let compressed = UIImage(data: imageData)?.jpegData(compressionQuality: 0.7) {
             data["photo_data"] = compressed.base64EncodedString()
@@ -744,6 +761,7 @@ struct AddKeyDateSheet: View {
     @State private var title = ""
     @State private var date = Date()
     @State private var repeatsAnnually = true
+    @State private var keepPrivate = false
     @State private var notes = ""
     @State private var isSaving = false
     @State private var error: String?
@@ -756,6 +774,13 @@ struct AddKeyDateSheet: View {
                         .textInputAutocapitalization(.sentences)
                     DatePicker("When", selection: $date, displayedComponents: .date)
                     Toggle("Repeats every year", isOn: $repeatsAnnually)
+                }
+                Section {
+                    Toggle("Keep this to myself", isOn: $keepPrivate)
+                } footer: {
+                    Text(keepPrivate
+                         ? "Only you will see this date and its reminders \u{2014} it won't appear in anyone else's feed."
+                         : "Everyone at home will see this date and its reminders.")
                 }
                 Section("Notes") {
                     TextField("A little detail (optional)", text: $notes, axis: .vertical)
@@ -785,6 +810,7 @@ struct AddKeyDateSheet: View {
             "date": DateFormatter.isoDate.string(from: date),
             "event_type": "custom",
             "is_recurring": repeatsAnnually,
+            "shared_scope": keepPrivate ? "private" : "household",
         ]
         let trimmedNotes = notes.trimmingCharacters(in: .whitespacesAndNewlines)
         if !trimmedNotes.isEmpty { data["notes"] = trimmedNotes }
@@ -813,6 +839,7 @@ struct EditKeyDateSheet: View {
     @State private var title: String
     @State private var date: Date
     @State private var repeatsAnnually: Bool
+    @State private var keepPrivate: Bool
     @State private var notes: String
     @State private var isSaving = false
     @State private var error: String?
@@ -824,6 +851,7 @@ struct EditKeyDateSheet: View {
         _title = State(initialValue: event.title)
         _date = State(initialValue: DateFormatter.isoDate.date(from: String(event.date.prefix(10))) ?? Date())
         _repeatsAnnually = State(initialValue: (event.is_recurring ?? 0) != 0)
+        _keepPrivate = State(initialValue: event.shared_scope == "private")
         _notes = State(initialValue: event.notes ?? "")
     }
 
@@ -835,6 +863,13 @@ struct EditKeyDateSheet: View {
                         .textInputAutocapitalization(.sentences)
                     DatePicker("When", selection: $date, displayedComponents: .date)
                     Toggle("Repeats every year", isOn: $repeatsAnnually)
+                }
+                Section {
+                    Toggle("Keep this to myself", isOn: $keepPrivate)
+                } footer: {
+                    Text(keepPrivate
+                         ? "Only you will see this date and its reminders \u{2014} it won't appear in anyone else's feed."
+                         : "Everyone at home will see this date and its reminders.")
                 }
                 Section("Notes") {
                     TextField("A little detail (optional)", text: $notes, axis: .vertical)
@@ -862,6 +897,7 @@ struct EditKeyDateSheet: View {
             "title": title.trimmingCharacters(in: .whitespaces),
             "date": DateFormatter.isoDate.string(from: date),
             "is_recurring": repeatsAnnually,
+            "shared_scope": keepPrivate ? "private" : "household",
         ]
         let trimmedNotes = notes.trimmingCharacters(in: .whitespacesAndNewlines)
         data["notes"] = trimmedNotes.isEmpty ? NSNull() : trimmedNotes

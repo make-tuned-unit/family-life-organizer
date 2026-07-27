@@ -184,6 +184,11 @@ class FamilyDB {
         this.db.run('ALTER TABLE waitlist ADD COLUMN referred_by TEXT', () => {});
         this.db.run('CREATE UNIQUE INDEX IF NOT EXISTS idx_waitlist_ref_code ON waitlist(ref_code)', () => {});
         this.db.run('CREATE INDEX IF NOT EXISTS idx_waitlist_referred_by ON waitlist(referred_by)', () => {});
+        // Key dates can be personal: a reminder about your own anniversary
+        // shouldn't land in your partner's feed. Existing rows keep the old
+        // household-wide behaviour; privacy is opt-in per date.
+        this.db.run('ALTER TABLE special_events ADD COLUMN created_by INTEGER REFERENCES users(id)', () => {});
+        this.db.run(`ALTER TABLE special_events ADD COLUMN shared_scope TEXT DEFAULT 'household'`, () => {});
         // Routines are private to their creator until explicitly shared. The
         // DEFAULT applies to existing rows too, so anything created before this
         // migration fails closed (a cycle tracker never silently stays visible).
@@ -2029,9 +2034,11 @@ class FamilyDB {
   addSpecialEvent(event) {
     return new Promise((resolve, reject) => {
       this.db.run(
-        `INSERT INTO special_events (person_id, title, date, is_recurring, event_type, notes, group_id)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        [event.person_id || null, event.title, event.date, event.is_recurring ? 1 : 0, event.event_type || 'custom', event.notes || null, event.group_id || null],
+        `INSERT INTO special_events (person_id, title, date, is_recurring, event_type, notes, created_by, shared_scope, group_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [event.person_id || null, event.title, event.date, event.is_recurring ? 1 : 0,
+         event.event_type || 'custom', event.notes || null, event.created_by || null,
+         event.shared_scope === 'private' ? 'private' : 'household', event.group_id || null],
         function(err) {
           if (err) reject(err);
           else resolve({ id: this.lastID, ...event });
@@ -2040,18 +2047,23 @@ class FamilyDB {
     });
   }
 
-  getSpecialEvents(groupId = null) {
+  // Household key dates plus your own private ones. `userId` is what makes the
+  // privacy filter possible — without it a private date has nothing to be
+  // compared against, so callers that omit it see only shared dates.
+  getSpecialEvents(groupId = null, userId = null) {
     return new Promise((resolve, reject) => {
       if (groupId == null) return resolve([]);
-      const sql = groupId != null
-        ? 'SELECT * FROM special_events WHERE group_id = ? ORDER BY date'
-        : 'SELECT * FROM special_events ORDER BY date';
-      this.db.all(sql, groupId != null ? [groupId] : [], (err, rows) => err ? reject(err) : resolve(rows));
+      this.db.all(
+        `SELECT * FROM special_events
+         WHERE group_id = ?
+           AND (COALESCE(shared_scope, 'household') != 'private' OR created_by = ?)
+         ORDER BY date`,
+        [groupId, userId], (err, rows) => err ? reject(err) : resolve(rows || []));
     });
   }
 
   updateSpecialEvent(id, updates) {
-    const ALLOWED = new Set(['person_id', 'title', 'date', 'is_recurring', 'event_type', 'notes']);
+    const ALLOWED = new Set(['person_id', 'title', 'date', 'is_recurring', 'event_type', 'notes', 'shared_scope']);
     return new Promise((resolve, reject) => {
       const fields = [];
       const params = [];
@@ -2189,13 +2201,16 @@ class FamilyDB {
   // Milestones — the family's memory line
   // ==========================================================================
 
-  getMilestones(groupId, personId = null) {
+  // Household milestones plus your own private ones. Same shape as
+  // getSpecialEvents: a private milestone is visible only to whoever logged it.
+  getMilestones(groupId, personId = null, userId = null) {
     return new Promise((resolve, reject) => {
       let sql = `
         SELECT m.*, p.name AS person_name
         FROM milestones m JOIN gift_people p ON p.id = m.person_id
-        WHERE m.group_id = ?`;
-      const params = [groupId];
+        WHERE m.group_id = ?
+          AND (COALESCE(m.shared_scope, 'household') != 'private' OR m.created_by = ?)`;
+      const params = [groupId, userId];
       if (personId != null) { sql += ' AND m.person_id = ?'; params.push(personId); }
       sql += ' ORDER BY m.milestone_date DESC, m.id DESC';
       this.db.all(sql, params, (err, rows) => err ? reject(err) : resolve(rows || []));
@@ -3350,7 +3365,7 @@ class FamilyDB {
       const sql = `
         SELECT 'decision' as feed_type, d.id as ref_id, d.title, NULL as body,
           d.creator_name as author, d.status, d.created_at as created_at,
-          0 as reaction_count, 0 as comment_count, NULL as author_id, d.group_id, g.name as group_name, 0 as has_photo
+          0 as reaction_count, 0 as comment_count, NULL as author_id, d.group_id, g.name as group_name, 0 as has_photo, 0 as is_private
         FROM decisions d LEFT JOIN groups g ON g.id = d.group_id
         WHERE d.status = 'active'${uid ? `
           AND d.group_id IN (${myGroups})` : ''}
@@ -3358,7 +3373,7 @@ class FamilyDB {
         SELECT 'event' as feed_type, a.id as ref_id, a.title, a.location as body,
           COALESCE(au.name, au.username, 'Family') as author, 'upcoming' as status,
           a.created_at,
-          0 as reaction_count, 0 as comment_count, a.created_by as author_id, a.group_id, g.name as group_name, 0 as has_photo
+          0 as reaction_count, 0 as comment_count, a.created_by as author_id, a.group_id, g.name as group_name, 0 as has_photo, 0 as is_private
         FROM appointments a
         LEFT JOIN groups g ON g.id = a.group_id
         LEFT JOIN users au ON au.id = a.created_by
@@ -3379,7 +3394,7 @@ class FamilyDB {
         SELECT 'coverage' as feed_type, cr.id as ref_id, cr.reason as title, cr.note as body,
           COALESCE(u.name, u.username, 'Family') as author, cr.status,
           cr.created_at,
-          0 as reaction_count, 0 as comment_count, cr.requester_id as author_id, NULL as group_id, NULL as group_name, 0 as has_photo
+          0 as reaction_count, 0 as comment_count, cr.requester_id as author_id, NULL as group_id, NULL as group_name, 0 as has_photo, 0 as is_private
         FROM coverage_requests cr
         LEFT JOIN users u ON u.id = cr.requester_id
         WHERE cr.status IN ('pending', 'approved')${uid ? `
@@ -3392,7 +3407,7 @@ class FamilyDB {
         SELECT 'rivalry' as feed_type, r.id as ref_id, r.title, r.challenge_type as body,
           r.initiator_name as author, r.status,
           r.created_at,
-          0 as reaction_count, 0 as comment_count, NULL as author_id, r.group_id, g.name as group_name, 0 as has_photo
+          0 as reaction_count, 0 as comment_count, NULL as author_id, r.group_id, g.name as group_name, 0 as has_photo, 0 as is_private
         FROM rivalries r
         LEFT JOIN groups g ON g.id = r.group_id
         WHERE r.status = 'active' AND r.created_at >= datetime('now', '-14 days')${uid ? `
@@ -3404,7 +3419,7 @@ class FamilyDB {
           (SELECT COUNT(*) FROM feed_reactions WHERE post_id = fp.id) as reaction_count,
           (SELECT COUNT(*) FROM feed_comments WHERE post_id = fp.id) as comment_count,
           fp.author_id, fp.group_id, g.name as group_name,
-          CASE WHEN fp.photo_url IS NOT NULL AND fp.photo_url != '' THEN 1 ELSE 0 END as has_photo
+          CASE WHEN fp.photo_url IS NOT NULL AND fp.photo_url != '' THEN 1 ELSE 0 END as has_photo, 0 as is_private
         FROM feed_posts fp
         LEFT JOIN users u ON u.id = fp.author_id
         LEFT JOIN groups g ON g.id = fp.group_id
@@ -3421,7 +3436,7 @@ class FamilyDB {
           u.name as author, 'comment' as status,
           fc.created_at,
           0 as reaction_count, 0 as comment_count, fc.user_id as author_id,
-          fp2.group_id, g2.name as group_name, 0 as has_photo
+          fp2.group_id, g2.name as group_name, 0 as has_photo, 0 as is_private
         FROM feed_comments fc
         JOIN users u ON u.id = fc.user_id
         LEFT JOIN feed_posts fp2 ON fp2.id = fc.post_id
@@ -3436,7 +3451,7 @@ class FamilyDB {
           u.name as author, 'reaction' as status,
           fr.created_at,
           0 as reaction_count, 0 as comment_count, fr.user_id as author_id,
-          fp3.group_id, g3.name as group_name, 0 as has_photo
+          fp3.group_id, g3.name as group_name, 0 as has_photo, 0 as is_private
         FROM feed_reactions fr
         JOIN users u ON u.id = fr.user_id
         LEFT JOIN feed_posts fp3 ON fp3.id = fr.post_id
@@ -3444,6 +3459,39 @@ class FamilyDB {
         WHERE fr.created_at >= datetime('now', '-7 days')
           AND fp3.post_type != 'text'
           AND fp3.group_id IN (${myGroups})
+        ${uid ? `UNION ALL
+        -- Key dates (birthdays, anniversaries) entering their two-week run-up.
+        -- The timestamp is the START of that window, not the date itself: a
+        -- future date would otherwise pin itself to the top of the feed forever,
+        -- and the row's own created_at would bury a date added a year ago.
+        -- Private dates are visible only to whoever added them — the point is
+        -- that a reminder about your anniversary isn't your partner's business.
+        SELECT feed_type, ref_id, title, body, author, status,
+          datetime(occurs_on, '-14 days') AS created_at,
+          reaction_count, comment_count, author_id, group_id, group_name, has_photo, is_private
+        FROM (
+          SELECT 'key_date' AS feed_type, se.id AS ref_id, se.title,
+            se.notes AS body,
+            COALESCE(u.name, u.username, 'Family') AS author,
+            se.event_type AS status,
+            0 AS reaction_count, 0 AS comment_count,
+            se.created_by AS author_id, se.group_id, g4.name AS group_name, 0 AS has_photo,
+            CASE WHEN COALESCE(se.shared_scope, 'household') = 'private' THEN 1 ELSE 0 END AS is_private,
+            CASE
+              WHEN se.is_recurring = 1 AND
+                   date(strftime('%Y', 'now', 'localtime') || substr(se.date, 5)) >= date('now', 'localtime')
+                THEN date(strftime('%Y', 'now', 'localtime') || substr(se.date, 5))
+              WHEN se.is_recurring = 1
+                THEN date((strftime('%Y', 'now', 'localtime') + 1) || substr(se.date, 5))
+              ELSE date(se.date)
+            END AS occurs_on
+          FROM special_events se
+          LEFT JOIN users u ON u.id = se.created_by
+          LEFT JOIN groups g4 ON g4.id = se.group_id
+          WHERE se.group_id IN (${myGroups})
+            AND (COALESCE(se.shared_scope, 'household') != 'private' OR se.created_by = ${uid})
+        )
+        WHERE occurs_on BETWEEN date('now', 'localtime') AND date('now', 'localtime', '+14 days')` : ''}
         ORDER BY created_at DESC
         LIMIT ?
       `;

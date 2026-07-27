@@ -1303,7 +1303,7 @@ const TOOLS = [
     },
     async run(ctx, input) {
       if (input.person_id != null) await assertHousehold(ctx, 'gift_people', input.person_id);
-      const rows = await ctx.db.getMilestones(ctx.groupId, input.person_id ?? null);
+      const rows = await ctx.db.getMilestones(ctx.groupId, input.person_id ?? null, ctx.userId);
       const result = rows.slice(0, 30).map(m => ({
         id: m.id, person: m.person_name, title: m.title,
         date: m.milestone_date, category: m.category,
@@ -1910,7 +1910,7 @@ const TOOLS = [
     write: false,
     input_schema: { type: 'object', properties: {} },
     async run(ctx) {
-      const rows = await ctx.db.getSpecialEvents(ctx.groupId);
+      const rows = await ctx.db.getSpecialEvents(ctx.groupId, ctx.userId);
       return { result: rows.map(e => ({
         id: e.id, title: e.title, date: e.date, type: e.event_type,
         recurring: !!e.is_recurring, person_id: e.person_id, notes: e.notes,

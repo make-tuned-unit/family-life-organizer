@@ -24,6 +24,13 @@ struct HomeView: View {
     @State private var showingFeedFilter = false
     @State private var selectedFeedEvent: AppointmentResponse?
     @State private var selectedFeedRivalry: RivalryResponse?
+    /// A routine opened straight from its feed row. Int is Identifiable via the
+    /// wrapper below so `.sheet(item:)` can drive it.
+    @State private var selectedFeedRoutine: FeedRoutineTarget?
+    @State private var selectedFeedDecision: DecisionResponse?
+    /// Milestones and key dates both live on the People hub — there's no tab for
+    /// it, so the feed opens it as a sheet rather than dead-ending.
+    @State private var showingPeople = false
     /// Tasks mid-checkoff in Up Next — held for the filled-dot + strikethrough
     /// beat before they poof away.
     @State private var completingTaskIds: Set<Int> = []
@@ -151,6 +158,41 @@ struct HomeView: View {
                 }
             }
         }
+        .sheet(isPresented: $showingPeople) {
+            NavigationStack {
+                PeopleView()
+                    .toolbar {
+                        ToolbarItem(placement: .topBarLeading) {
+                            Button("Done") { showingPeople = false }
+                                .foregroundStyle(WarmPalette.ink2)
+                        }
+                    }
+            }
+        }
+        .sheet(item: $selectedFeedDecision) { decision in
+            NavigationStack {
+                DecisionDetailView(decision: decision) {
+                    await viewModel.loadAll(api: api)
+                }
+                .toolbar {
+                    ToolbarItem(placement: .topBarLeading) {
+                        Button("Done") { selectedFeedDecision = nil }
+                            .foregroundStyle(WarmPalette.ink2)
+                    }
+                }
+            }
+        }
+        .sheet(item: $selectedFeedRoutine) { target in
+            NavigationStack {
+                RoutineDetailView(routineId: target.id)
+                    .toolbar {
+                        ToolbarItem(placement: .topBarLeading) {
+                            Button("Done") { selectedFeedRoutine = nil }
+                                .foregroundStyle(WarmPalette.ink2)
+                        }
+                    }
+            }
+        }
         .sheet(item: $selectedFeedRivalry) { rivalry in
             NavigationStack {
                 RivalryDetailView(rivalry: rivalry)
@@ -230,6 +272,16 @@ struct HomeView: View {
             let recent = try await api.fetchAppointments(dateFrom: today, dateTo: nextWeek)
             if let appt = recent.first(where: { $0.id == id }) {
                 selectedFeedEvent = appt
+            }
+        } catch {}
+    }
+
+    // The feed row carries only a summary, so fetch the real decision to open it.
+    private func openFeedDecision(id: Int) async {
+        do {
+            let decisions = try await api.fetchDecisions()
+            if let decision = decisions.first(where: { $0.id == id }) {
+                selectedFeedDecision = decision
             }
         } catch {}
     }
@@ -712,7 +764,14 @@ struct HomeView: View {
                     selectedTab: $selectedTab,
                     onEventTap: { eventId in Task { await openFeedEvent(id: eventId) } },
                     onRivalryTap: { rivalryId in Task { await openFeedRivalry(id: rivalryId) } },
-                    onCoverageTap: { selectedTab = .calendar }
+                    onCoverageTap: { selectedTab = .calendar },
+                    // A shared routine opens the routine itself. Milestones and
+                    // key dates live under People, and decisions have their own
+                    // tab — send each row to where the thing actually lives.
+                    onRoutineTap: { routineId in selectedFeedRoutine = FeedRoutineTarget(id: routineId) },
+                    onMilestoneTap: { _ in showingPeople = true },
+                    onDecisionTap: { decisionId in Task { await openFeedDecision(id: decisionId) } },
+                    onKeyDateTap: { _ in showingPeople = true }
                 )
                 .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
                 .padding(.bottom, 10)
@@ -753,4 +812,10 @@ struct HomeView: View {
     .environment(AuthService())
     .environment(ProfileImageCache())
     .environment(CalendarService())
+}
+
+/// Wraps a routine id so `.sheet(item:)` can present it — Int isn't Identifiable
+/// and a bare Bool + separate id pair drops the id on fast re-taps.
+struct FeedRoutineTarget: Identifiable {
+    let id: Int
 }
