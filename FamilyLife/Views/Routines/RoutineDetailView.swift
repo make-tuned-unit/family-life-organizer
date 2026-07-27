@@ -16,6 +16,7 @@ struct RoutineDetailView: View {
     @State private var errorMessage: String?
     @State private var showingDeleteConfirm = false
     @State private var isSharing = false
+    @State private var sleepToLog: SleepKind?
 
     private let accent = TabAccent.routines.color
 
@@ -82,6 +83,12 @@ struct RoutineDetailView: View {
         .confirmationDialog("Delete this routine and all its entries?", isPresented: $showingDeleteConfirm, titleVisibility: .visible) {
             Button("Delete", role: .destructive) { Task { await deleteRoutine() } }
             Button("Cancel", role: .cancel) {}
+        }
+        .sheet(item: $sleepToLog) { kind in
+            LogSleepSheet(kind: kind, accent: accent) { payload in
+                await log(entryType: kind.entryType, value: payload.value,
+                          date: payload.date, time: payload.time, notes: payload.notes)
+            }
         }
         .inlineError(errorMessage) { errorMessage = nil }
         .task { await load() }
@@ -157,8 +164,10 @@ struct RoutineDetailView: View {
                     logButton("Period ended", "drop", entryType: "period_end")
                     logButton("Symptom", "waveform.path.ecg", entryType: "symptom")
                 case .babySleep, .sleepTraining:
-                    logButton("Nap", "sun.max.fill", entryType: "nap")
-                    logButton("Night sleep", "moon.fill", entryType: "night_sleep")
+                    // Sleep is a span, not a moment — these open a sheet for the
+                    // start and end times rather than stamping "now".
+                    sheetButton("Nap", "sun.max.fill", kind: .nap)
+                    sheetButton("Night sleep", "moon.fill", kind: .night)
                     logButton("Woke up", "sunrise.fill", entryType: "wake")
                     logButton("Milestone", "star.fill", entryType: "milestone")
                 case .activity:
@@ -178,14 +187,23 @@ struct RoutineDetailView: View {
         Button {
             Task { await log(entryType: entryType, value: value) }
         } label: {
-            Label(title, systemImage: icon)
-                .font(.flFootnote.weight(.semibold))
-                .foregroundStyle(accent)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .background(accent.opacity(0.12), in: Capsule())
+            chip(title, icon)
         }
         .buttonStyle(.plain)
+    }
+
+    private func sheetButton(_ title: String, _ icon: String, kind: SleepKind) -> some View {
+        Button { sleepToLog = kind } label: { chip(title, icon) }
+            .buttonStyle(.plain)
+    }
+
+    private func chip(_ title: String, _ icon: String) -> some View {
+        Label(title, systemImage: icon)
+            .font(.flFootnote.weight(.semibold))
+            .foregroundStyle(accent)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(accent.opacity(0.12), in: Capsule())
     }
 
     // MARK: - Entries
@@ -242,10 +260,13 @@ struct RoutineDetailView: View {
         await log(entryType: "session", value: attended ? nil : ["status": "skipped"], date: date)
     }
 
-    private func log(entryType: String, value: [String: Any]? = nil, date: String? = nil) async {
+    private func log(entryType: String, value: [String: Any]? = nil, date: String? = nil,
+                     time: String? = nil, notes: String? = nil) async {
         var data: [String: Any] = ["entry_type": entryType]
         if let value { data["value"] = value }
         if let date { data["entry_date"] = date }
+        if let time { data["entry_time"] = time }
+        if let notes, !notes.isEmpty { data["notes"] = notes }
         do {
             try await api.addRoutineEntry(id: routineId, data: data)
             await load()
@@ -273,6 +294,204 @@ struct RoutineDetailView: View {
     }
 }
 
+// MARK: - Sleep logging
+
+/// The two sleep spans you log after the fact. `Identifiable` so it can drive
+/// `.sheet(item:)` — which also guarantees the sheet is rebuilt (and its
+/// defaults recomputed) each time it opens.
+enum SleepKind: String, Identifiable {
+    case nap, night
+
+    var id: String { rawValue }
+    var entryType: String { self == .nap ? "nap" : "night_sleep" }
+    var title: String { self == .nap ? "Log a nap" : "Log night sleep" }
+    var icon: String { self == .nap ? "sun.max.fill" : "moon.fill" }
+}
+
+/// What a sleep entry carries: the span itself, precomputed minutes so nothing
+/// downstream has to re-derive it, and (for nights) how many times they woke.
+struct SleepPayload {
+    let value: [String: Any]
+    let date: String
+    let time: String
+    let notes: String
+}
+
+/// Start, end, and a running duration. Every field is editable because sleep is
+/// nearly always logged afterwards — mid-nap is the one time nobody reaches for
+/// their phone.
+private struct LogSleepSheet: View {
+    let kind: SleepKind
+    let accent: Color
+    let onSave: (SleepPayload) async -> Void
+
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var start: Date
+    @State private var end: Date
+    @State private var wakeCount = 0
+    @State private var notes = ""
+    @State private var isSaving = false
+
+    init(kind: SleepKind, accent: Color, onSave: @escaping (SleepPayload) async -> Void) {
+        self.kind = kind
+        self.accent = accent
+        self.onSave = onSave
+        // Defaults that match how each is actually logged: a nap gets written up
+        // right after it ends, a night the morning after it started.
+        let now = Date()
+        _end = State(initialValue: now)
+        _start = State(initialValue: kind == .nap
+                       ? now.addingTimeInterval(-3600)
+                       : Calendar.current.date(byAdding: .hour, value: -12, to: now) ?? now)
+    }
+
+    /// End before start means it ran past midnight — the normal case for a night
+    /// sleep, and possible for a late nap. Roll the end forward a day rather than
+    /// rejecting it, so nobody has to fight the date picker at 6am.
+    private var resolvedEnd: Date {
+        end > start ? end : (Calendar.current.date(byAdding: .day, value: 1, to: end) ?? end)
+    }
+
+    private var minutes: Int { max(0, Int(resolvedEnd.timeIntervalSince(start) / 60)) }
+    private var crossesMidnight: Bool { end <= start }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView(showsIndicators: false) {
+                VStack(alignment: .leading, spacing: DesignTokens.Spacing.large) {
+                    durationCard
+
+                    field(label: "Fell asleep") {
+                        DatePicker("", selection: $start)
+                            .labelsHidden()
+                            .tint(accent)
+                    }
+
+                    field(label: "Woke up") {
+                        DatePicker("", selection: $end, displayedComponents: crossesMidnight ? [.hourAndMinute] : [.date, .hourAndMinute])
+                            .labelsHidden()
+                            .tint(accent)
+                    }
+
+                    if kind == .night {
+                        field(label: "Night wakings") {
+                            Stepper("\(wakeCount) time\(wakeCount == 1 ? "" : "s")", value: $wakeCount, in: 0...20)
+                                .font(.flBody)
+                        }
+                    }
+
+                    field(label: "Notes (optional)") {
+                        TextField(kind == .nap ? "e.g. in the carrier" : "e.g. teething", text: $notes, axis: .vertical)
+                            .font(.flBody)
+                            .lineLimit(1...3)
+                    }
+
+                    Button {
+                        Task { await save() }
+                    } label: {
+                        Text("Save").frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.flCTA)
+                    .disabled(isSaving || minutes == 0)
+                }
+                .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
+                .padding(.top, 8)
+                .padding(.bottom, DesignTokens.Spacing.bottomBuffer)
+            }
+            .background { AmbientBackground(style: .home) }
+            .navigationTitle(kind.title)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+            }
+        }
+    }
+
+    private var durationCard: some View {
+        VStack(spacing: 6) {
+            Text(SleepValue.durationText(minutes: minutes))
+                .font(.flStat)
+                .foregroundStyle(WarmPalette.ink1)
+                .contentTransition(.numericText())
+            Text(crossesMidnight ? "Overnight · ends the next day" : "Total sleep")
+                .font(.flFootnote)
+                .foregroundStyle(WarmPalette.ink3)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 18)
+        .flCard(tint: accent.opacity(0.08))
+    }
+
+    @ViewBuilder
+    private func field<Content: View>(label: String, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(label)
+                .font(.flCaption.weight(.semibold))
+                .foregroundStyle(WarmPalette.ink3)
+            content()
+                .padding(12)
+                .flCard()
+        }
+    }
+
+    private func save() async {
+        isSaving = true
+        var value: [String: Any] = [
+            "sleep_start": DateFormatter.dateTimeMinute.string(from: start),
+            "sleep_end": DateFormatter.dateTimeMinute.string(from: resolvedEnd),
+            "duration_minutes": minutes,
+        ]
+        if kind == .night { value["wake_count"] = wakeCount }
+        await onSave(SleepPayload(
+            value: value,
+            // Filed under the day it STARTED, so a 7pm–6am night belongs to the
+            // evening it began rather than splitting across two dates.
+            date: DateFormatter.isoDate.string(from: start),
+            time: DateFormatter.hourMinute.string(from: start),
+            notes: notes.trimmingCharacters(in: .whitespaces)
+        ))
+        dismiss()
+    }
+}
+
+/// Reads back what the sheet wrote. Kept in one place so the history row and the
+/// sheet can never disagree about the shape of a sleep entry.
+enum SleepValue {
+    static func durationText(minutes: Int) -> String {
+        let h = minutes / 60, m = minutes % 60
+        if h == 0 { return "\(m)m" }
+        if m == 0 { return "\(h)h" }
+        return "\(h)h \(m)m"
+    }
+
+    /// "9:30 PM – 6:45 AM · 9h 15m", or nil for entries logged before sleep
+    /// spans existed (they simply show their type and date as they always did).
+    static func summary(from raw: String?) -> String? {
+        guard let raw, let data = raw.data(using: .utf8),
+              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+        else { return nil }
+
+        let minutes = (obj["duration_minutes"] as? Int)
+            ?? (obj["duration_minutes"] as? NSNumber)?.intValue
+        guard let startText = obj["sleep_start"] as? String,
+              let endText = obj["sleep_end"] as? String,
+              let start = DateFormatter.dateTimeMinute.date(from: startText),
+              let end = DateFormatter.dateTimeMinute.date(from: endText)
+        else { return minutes.map { durationText(minutes: $0) } }
+
+        let span = "\(DateFormatter.shortTime.string(from: start)) – \(DateFormatter.shortTime.string(from: end))"
+        let mins = minutes ?? max(0, Int(end.timeIntervalSince(start) / 60))
+        var text = "\(span) · \(durationText(minutes: mins))"
+        if let wakes = (obj["wake_count"] as? Int) ?? (obj["wake_count"] as? NSNumber)?.intValue, wakes > 0 {
+            text += " · woke \(wakes)×"
+        }
+        return text
+    }
+}
+
 private struct EntryRow: View {
     let entry: RoutineEntryResponse
     let onDelete: () -> Void
@@ -283,9 +502,20 @@ private struct EntryRow: View {
                 Text(label)
                     .font(.flSubheadline.weight(.medium))
                     .foregroundStyle(isSkippedSession ? WarmPalette.ink3 : WarmPalette.ink1)
-                Text(entry.entry_time != nil ? "\(entry.entry_date) · \(entry.entry_time!)" : entry.entry_date)
-                    .font(.flCaption)
-                    .foregroundStyle(WarmPalette.ink3)
+                // A sleep entry leads with its span and duration; everything else
+                // keeps the date/time stamp it has always shown.
+                if let sleep = SleepValue.summary(from: entry.value), isSleep {
+                    Text(sleep)
+                        .font(.flCaption.weight(.medium))
+                        .foregroundStyle(WarmPalette.ink2)
+                    Text(entry.entry_date)
+                        .font(.flCaption)
+                        .foregroundStyle(WarmPalette.ink3)
+                } else {
+                    Text(entry.entry_time != nil ? "\(entry.entry_date) · \(entry.entry_time!)" : entry.entry_date)
+                        .font(.flCaption)
+                        .foregroundStyle(WarmPalette.ink3)
+                }
                 if let notes = entry.notes, !notes.isEmpty {
                     Text(notes)
                         .font(.flFootnote)
@@ -318,6 +548,10 @@ private struct EntryRow: View {
         case "note", .none: "Logged"
         case .some(let t): t.replacingOccurrences(of: "_", with: " ").capitalized
         }
+    }
+
+    private var isSleep: Bool {
+        entry.entry_type == "nap" || entry.entry_type == "night_sleep"
     }
 
     // A session entry whose stored value marks it skipped — shown muted so it's

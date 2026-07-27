@@ -310,6 +310,43 @@ test('routines: shared_scope cannot ride in on a plain update', async () => {
     'but shared_scope is ignored outside /share');
 });
 
+test('routines: a sleep entry round-trips its span, duration and wakings', async () => {
+  const [parent] = await member('slp_rt', 'Sleep RT');
+  const created = await parent('POST', '/api/routines', {
+    name: "Wren's sleep", routine_type: 'baby_sleep', subject_name: 'Wren',
+  });
+  const routineId = created.body.id;
+
+  // A night that crosses midnight: the client resolves the end date and sends
+  // precomputed minutes, filed under the evening it started.
+  const night = await parent('POST', `/api/routines/${routineId}/entries`, {
+    entry_date: '2026-07-20', entry_time: '19:30', entry_type: 'night_sleep',
+    value: { sleep_start: '2026-07-20 19:30', sleep_end: '2026-07-21 06:45', duration_minutes: 675, wake_count: 2 },
+    notes: 'teething',
+  });
+  assert.equal(night.status, 200);
+
+  const nap = await parent('POST', `/api/routines/${routineId}/entries`, {
+    entry_date: '2026-07-21', entry_time: '13:00', entry_type: 'nap',
+    value: { sleep_start: '2026-07-21 13:00', sleep_end: '2026-07-21 14:20', duration_minutes: 80 },
+  });
+  assert.equal(nap.status, 200);
+
+  const entries = (await parent('GET', `/api/routines/${routineId}/entries`)).body;
+  const nightRow = entries.find(e => e.id === night.body.id);
+  assert.equal(nightRow.entry_time, '19:30', 'start time is kept');
+  assert.equal(nightRow.notes, 'teething');
+  const nightValue = JSON.parse(nightRow.value);
+  assert.equal(nightValue.sleep_start, '2026-07-20 19:30');
+  assert.equal(nightValue.sleep_end, '2026-07-21 06:45', 'overnight end lands on the next day');
+  assert.equal(nightValue.duration_minutes, 675);
+  assert.equal(nightValue.wake_count, 2);
+
+  const napValue = JSON.parse(entries.find(e => e.id === nap.body.id).value);
+  assert.equal(napValue.duration_minutes, 80);
+  assert.equal(napValue.wake_count, undefined, 'naps carry no wake count');
+});
+
 test('routines: a household-less caller cannot create a routine', async () => {
   const loner = makeClient();
   await loner('POST', '/api/auth/register', { username: 'lon_rt', password: 'password123', name: 'Loner RT' });
