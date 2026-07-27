@@ -108,6 +108,14 @@ private struct RoutineCard: View {
                             .font(.flCaption)
                             .foregroundStyle(WarmPalette.ink3)
                     }
+                    // Private is the default, so the badge marks what's SHARED —
+                    // the state worth double-checking at a glance.
+                    if routine.isSharedWithHousehold {
+                        Image(systemName: "person.2.fill")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(WarmPalette.ink4)
+                            .accessibilityLabel("Shared with your household")
+                    }
                 }
                 Text(subtitle)
                     .font(.flFootnote)

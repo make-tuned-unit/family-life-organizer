@@ -184,6 +184,10 @@ class FamilyDB {
         this.db.run('ALTER TABLE waitlist ADD COLUMN referred_by TEXT', () => {});
         this.db.run('CREATE UNIQUE INDEX IF NOT EXISTS idx_waitlist_ref_code ON waitlist(ref_code)', () => {});
         this.db.run('CREATE INDEX IF NOT EXISTS idx_waitlist_referred_by ON waitlist(referred_by)', () => {});
+        // Routines are private to their creator until explicitly shared. The
+        // DEFAULT applies to existing rows too, so anything created before this
+        // migration fails closed (a cycle tracker never silently stays visible).
+        this.db.run(`ALTER TABLE routines ADD COLUMN shared_scope TEXT DEFAULT 'private'`, () => {});
         // Per-day HealthKit totals: one synced row per member per calendar day
         this.db.run('ALTER TABLE rivalry_entries ADD COLUMN activity_date TEXT', () => {});
         this.db.run(`CREATE UNIQUE INDEX IF NOT EXISTS idx_rivalry_entries_daily
@@ -4251,17 +4255,21 @@ class FamilyDB {
   // Routines (period / baby-sleep / sleep-training / custom trackers)
   // ============================================
 
-  getRoutines(groupId) {
+  // Your own routines (any scope) plus the ones your household has shared.
+  // userId is required — without it there is nothing to compare created_by
+  // against, so returning household rows would leak every private routine.
+  getRoutines(groupId, userId) {
     return new Promise((resolve, reject) => {
-      if (groupId == null) return resolve([]);
+      if (groupId == null || userId == null) return resolve([]);
       this.db.all(
         `SELECT r.*,
           (SELECT COUNT(*) FROM routine_entries WHERE routine_id = r.id) AS entry_count,
           (SELECT MAX(entry_date) FROM routine_entries WHERE routine_id = r.id) AS last_entry_date
          FROM routines r
          WHERE r.group_id = ?
+           AND (r.created_by = ? OR r.shared_scope = 'household')
          ORDER BY r.active DESC, r.created_at DESC`,
-        [groupId], (err, rows) => err ? reject(err) : resolve(rows || []));
+        [groupId, userId], (err, rows) => err ? reject(err) : resolve(rows || []));
     });
   }
 
@@ -4276,11 +4284,12 @@ class FamilyDB {
     return new Promise((resolve, reject) => {
       this.db.run(
         `INSERT INTO routines
-          (group_id, created_by, name, routine_type, subject_name, subject_birthdate, config, color, icon, start_date, active)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`,
+          (group_id, created_by, name, routine_type, subject_name, subject_birthdate, config, shared_scope, color, icon, start_date, active)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`,
         [r.group_id, r.created_by || null, r.name, r.routine_type || 'custom',
          r.subject_name || null, r.subject_birthdate || null,
          r.config ? (typeof r.config === 'string' ? r.config : JSON.stringify(r.config)) : null,
+         r.shared_scope === 'household' ? 'household' : 'private',
          r.color || null, r.icon || null, r.start_date || null],
         function (err) { err ? reject(err) : resolve({ id: this.lastID }); });
     });
@@ -4301,6 +4310,18 @@ class FamilyDB {
       params.push(id);
       this.db.run(`UPDATE routines SET ${sets.join(', ')} WHERE id = ?`, params,
         function (err) { err ? reject(err) : resolve({ changed: this.changes }); });
+    });
+  }
+
+  // Sharing is the creator's call alone: the `created_by` check lives in the
+  // WHERE clause so a household member can never flip someone else's routine
+  // (in either direction), even if they can otherwise edit a shared one.
+  setRoutineScope(id, userId, scope) {
+    return new Promise((resolve, reject) => {
+      const next = scope === 'household' ? 'household' : 'private';
+      this.db.run('UPDATE routines SET shared_scope = ? WHERE id = ? AND created_by = ?',
+        [next, id, userId],
+        function (err) { err ? reject(err) : resolve({ changed: this.changes, scope: next }); });
     });
   }
 

@@ -16,6 +16,7 @@ struct NewRoutineView: View {
     @State private var activityKind = ""             // e.g. "Violin"
     @State private var calendarKeyword = ""          // matches calendar event titles
     @State private var goalPerWeek = 1
+    @State private var shareWithHousehold = false    // private until you say otherwise
     @State private var isSaving = false
     @State private var errorMessage: String?
 
@@ -45,7 +46,7 @@ struct NewRoutineView: View {
                                 .labelsHidden()
                                 .tint(accent)
                         }
-                        Text("We use this to find the right phase and age-appropriate guidance — nothing is shared outside your household.")
+                        Text("We use this to find the right phase and age-appropriate guidance. It stays on this routine — nobody sees it unless you share it.")
                             .font(.flFootnote)
                             .foregroundStyle(WarmPalette.ink3)
                     }
@@ -89,6 +90,8 @@ struct NewRoutineView: View {
                                 .font(.flBody)
                         }
                     }
+
+                    shareToggle
                 }
                 .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
                 .padding(.top, 8)
@@ -108,6 +111,34 @@ struct NewRoutineView: View {
                 }
             }
             .inlineError(errorMessage) { errorMessage = nil }
+        }
+    }
+
+    /// Off by default — a routine belongs to whoever made it until they say
+    /// otherwise. Sharing makes it visible AND loggable to the whole household.
+    private var shareToggle: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Toggle(isOn: $shareWithHousehold) {
+                HStack(spacing: 10) {
+                    Image(systemName: shareWithHousehold ? "person.2.fill" : "lock.fill")
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundStyle(shareWithHousehold ? accent : WarmPalette.ink3)
+                        .frame(width: 28)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(shareWithHousehold ? "Shared with your household" : "Just for you")
+                            .font(.flSubheadline.weight(.semibold))
+                            .foregroundStyle(WarmPalette.ink1)
+                        Text(shareWithHousehold
+                             ? "Everyone at home can see this and log to it."
+                             : "Only you can see this. You can share it any time.")
+                            .font(.flFootnote)
+                            .foregroundStyle(WarmPalette.ink3)
+                    }
+                }
+            }
+            .tint(accent)
+            .padding(12)
+            .flCard(tint: shareWithHousehold ? accent.opacity(0.06) : .clear)
         }
     }
 
@@ -188,6 +219,7 @@ struct NewRoutineView: View {
         var body: [String: Any] = [
             "name": name.trimmingCharacters(in: .whitespaces),
             "routine_type": type.rawValue,
+            "shared_scope": shareWithHousehold ? "household" : "private",
         ]
         let subject = subjectName.trimmingCharacters(in: .whitespaces)
         if !subject.isEmpty { body["subject_name"] = subject }

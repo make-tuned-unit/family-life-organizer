@@ -5313,12 +5313,33 @@ app.get('/api/routines/templates/sleep-training', requireAuth, (req, res) => {
   res.json(sleepTraining.template());
 });
 
+// Authorization guard for routine rows. Routines are private to their creator
+// unless shared, so household membership alone is NOT enough: a private routine
+// is 403 to everyone but its author. `{ owner: true }` additionally demands
+// authorship, for the operations only the creator may perform (share/unshare,
+// delete). Returns the row on success, null after sending 404/403.
+async function requireRoutineAccess(db, id, req, res, { owner = false } = {}) {
+  const userId = req.session.user?.id;
+  const row = await dbGet(db, 'SELECT id, group_id, created_by, shared_scope FROM routines WHERE id = ?', [id]);
+  if (!row) { res.status(404).json({ error: 'Not found' }); return null; }
+  if (row.group_id == null || !(await db.isHouseholdMember(row.group_id, userId))) {
+    res.status(403).json({ error: 'Forbidden' }); return null;
+  }
+  const isOwner = row.created_by != null && row.created_by === userId;
+  if (isOwner) return row;
+  if (owner) { res.status(403).json({ error: 'Only the person who created this routine can change that' }); return null; }
+  // Same 403 a non-member gets: never reveal that a private routine exists.
+  if (row.shared_scope !== 'household') { res.status(403).json({ error: 'Forbidden' }); return null; }
+  return row;
+}
+
 app.get('/api/routines', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
-    const groupId = await db.getUserHouseholdId(req.session.user?.id);
+    const userId = req.session.user?.id;
+    const groupId = await db.getUserHouseholdId(userId);
     if (!groupId) return res.json([]);
-    res.json(await db.getRoutines(groupId));
+    res.json(await db.getRoutines(groupId, userId));
   } catch (err) { sendServerError(res, err); }
   finally { db.close(); }
 });
@@ -5340,6 +5361,8 @@ app.post('/api/routines', requireAuth, async (req, res) => {
       subject_name: req.body.subject_name,
       subject_birthdate: req.body.subject_birthdate ? normalizeDate(req.body.subject_birthdate) : null,
       config: req.body.config,
+      // Private unless the client explicitly opts in at creation time.
+      shared_scope: req.body.shared_scope === 'household' ? 'household' : 'private',
       color: req.body.color,
       icon: req.body.icon,
       start_date: req.body.start_date ? normalizeDate(req.body.start_date) : todayLocal(),
@@ -5352,7 +5375,7 @@ app.post('/api/routines', requireAuth, async (req, res) => {
 app.get('/api/routines/:id', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
-    if (!(await requireHouseholdRow(db, 'routines', req.params.id, req, res))) return;
+    if (!(await requireRoutineAccess(db, req.params.id, req, res))) return;
     const routine = await db.getRoutineById(req.params.id);
     const entries = await db.getRoutineEntries(req.params.id, {});
     // Attach type-specific derived data the client renders.
@@ -5372,7 +5395,7 @@ app.get('/api/routines/:id', requireAuth, async (req, res) => {
 app.put('/api/routines/:id', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
-    if (!(await requireHouseholdRow(db, 'routines', req.params.id, req, res))) return;
+    if (!(await requireRoutineAccess(db, req.params.id, req, res))) return;
     const updates = { ...req.body };
     if (updates.subject_birthdate) updates.subject_birthdate = normalizeDate(updates.subject_birthdate);
     if (updates.start_date) updates.start_date = normalizeDate(updates.start_date);
@@ -5382,12 +5405,28 @@ app.put('/api/routines/:id', requireAuth, async (req, res) => {
   finally { db.close(); }
 });
 
+// Deleting a routine takes its whole history with it — creator only, even when
+// the routine is shared and the rest of the household can log to it.
 app.delete('/api/routines/:id', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
-    if (!(await requireHouseholdRow(db, 'routines', req.params.id, req, res))) return;
+    if (!(await requireRoutineAccess(db, req.params.id, req, res, { owner: true }))) return;
     await db.deleteRoutine(req.params.id);
     res.json({ success: true });
+  } catch (err) { sendServerError(res, err); }
+  finally { db.close(); }
+});
+
+// The share toggle. Creator-only (enforced again in SQL by setRoutineScope), and
+// deliberately its own route so `shared_scope` can never ride in on a PUT body.
+app.put('/api/routines/:id/share', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    if (!(await requireRoutineAccess(db, req.params.id, req, res, { owner: true }))) return;
+    const scope = req.body.shared_scope === 'household' || req.body.shared === true
+      ? 'household' : 'private';
+    const result = await db.setRoutineScope(req.params.id, req.session.user?.id, scope);
+    res.json({ success: true, shared_scope: result.scope });
   } catch (err) { sendServerError(res, err); }
   finally { db.close(); }
 });
@@ -5395,7 +5434,7 @@ app.delete('/api/routines/:id', requireAuth, async (req, res) => {
 app.get('/api/routines/:id/entries', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
-    if (!(await requireHouseholdRow(db, 'routines', req.params.id, req, res))) return;
+    if (!(await requireRoutineAccess(db, req.params.id, req, res))) return;
     const entries = await db.getRoutineEntries(req.params.id, {
       from: req.query.from, to: req.query.to, limit: clampLimit(req.query.limit, 200, 1000),
     });
@@ -5407,7 +5446,7 @@ app.get('/api/routines/:id/entries', requireAuth, async (req, res) => {
 app.post('/api/routines/:id/entries', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
-    if (!(await requireHouseholdRow(db, 'routines', req.params.id, req, res))) return;
+    if (!(await requireRoutineAccess(db, req.params.id, req, res))) return;
     const entry_date = req.body.entry_date ? normalizeDate(req.body.entry_date) : todayLocal();
     const result = await db.addRoutineEntry(req.params.id, {
       entry_date,
@@ -5425,7 +5464,7 @@ app.post('/api/routines/:id/entries', requireAuth, async (req, res) => {
 app.delete('/api/routines/:id/entries/:entryId', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
-    if (!(await requireHouseholdRow(db, 'routines', req.params.id, req, res))) return;
+    if (!(await requireRoutineAccess(db, req.params.id, req, res))) return;
     await db.deleteRoutineEntry(req.params.entryId, req.params.id);
     res.json({ success: true });
   } catch (err) { sendServerError(res, err); }
@@ -5439,7 +5478,7 @@ app.delete('/api/routines/:id/entries/:entryId', requireAuth, async (req, res) =
 app.get('/api/routines/:id/occurrences', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
-    if (!(await requireHouseholdRow(db, 'routines', req.params.id, req, res))) return;
+    if (!(await requireRoutineAccess(db, req.params.id, req, res))) return;
     const routine = await db.getRoutineById(req.params.id);
     let cfg = {};
     try { cfg = JSON.parse(routine.config || '{}'); } catch {}

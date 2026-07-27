@@ -217,47 +217,97 @@ test('routines: another household cannot read or delete your routine', async () 
   assert.equal(stillThere.status, 200);
 });
 
-test('routines: a household member sees and can co-log the same routine', async () => {
-  const owner = makeClient();
-  const reg = await owner('POST', '/api/auth/register', {
-    username: 'shr_rt', password: 'password123', name: 'Sharer RT',
+// Registers `username` and returns [client, inviteCode]; pass an invite code to
+// join an existing household instead of getting a fresh one.
+async function member(username, name, inviteCode) {
+  const c = makeClient();
+  const reg = await c('POST', '/api/auth/register', {
+    username, password: 'password123', name, ...(inviteCode ? { invite_code: inviteCode } : {}),
   });
-  const inviteCode = reg.body.household?.invite_code;
-  assert.ok(inviteCode, 'register returns the household invite code');
+  assert.equal(reg.status, 200, JSON.stringify(reg.body));
+  return [c, reg.body.household?.invite_code];
+}
+
+test('routines: private by default — a household member cannot see or reach it', async () => {
+  const [owner, invite] = await member('priv_rt', 'Private RT');
+  const [partner] = await member('prpt_rt', 'Partner Priv RT', invite);
+
+  const created = await owner('POST', '/api/routines', { name: 'My cycle', routine_type: 'period' });
+  const routineId = created.body.id;
+
+  // Not opted in → private, even though they share a household.
+  const mine = await owner('GET', '/api/routines');
+  assert.equal(mine.body.find(r => r.id === routineId)?.shared_scope, 'private',
+    'routines are created private');
+
+  const list = await partner('GET', '/api/routines');
+  assert.ok(!list.body.some(r => r.id === routineId), 'household member does not see a private routine');
+  assert.equal((await partner('GET', `/api/routines/${routineId}`)).status, 403);
+  assert.equal((await partner('GET', `/api/routines/${routineId}/entries`)).status, 403);
+  assert.equal((await partner('POST', `/api/routines/${routineId}/entries`,
+    { entry_type: 'note', notes: 'x' })).status, 403, 'cannot log to a private routine');
+  assert.equal((await partner('PUT', `/api/routines/${routineId}`, { name: 'nope' })).status, 403);
+  assert.equal((await partner('DELETE', `/api/routines/${routineId}`)).status, 403);
+
+  // The owner still has full access to their own private routine.
+  assert.equal((await owner('GET', `/api/routines/${routineId}`)).status, 200);
+});
+
+test('routines: sharing opts a routine in, and un-sharing takes it back', async () => {
+  const [owner, invite] = await member('shr_rt', 'Sharer RT');
+  const [partner] = await member('prt_rt', 'Partner RT', invite);
 
   const created = await owner('POST', '/api/routines', {
     name: 'Jude bedtime', routine_type: 'baby_sleep', subject_name: 'Jude',
   });
-  assert.equal(created.status, 200, JSON.stringify(created.body));
   const routineId = created.body.id;
+  assert.equal((await partner('GET', `/api/routines/${routineId}`)).status, 403, 'private first');
 
-  // Partner joins the SAME household via the invite code.
-  const partner = makeClient();
-  const preg = await partner('POST', '/api/auth/register', {
-    username: 'prt_rt', password: 'password123', name: 'Partner RT', invite_code: inviteCode,
-  });
-  assert.equal(preg.status, 200, JSON.stringify(preg.body));
+  // Toggle on.
+  const share = await owner('PUT', `/api/routines/${routineId}/share`, { shared_scope: 'household' });
+  assert.equal(share.status, 200);
+  assert.equal(share.body.shared_scope, 'household');
 
-  // Shared by default: it shows up in the partner's list and detail read.
   const list = await partner('GET', '/api/routines');
-  assert.equal(list.status, 200);
-  assert.ok(list.body.some(r => r.id === routineId), 'partner sees the household routine');
-  const detail = await partner('GET', `/api/routines/${routineId}`);
-  assert.equal(detail.status, 200, 'partner can read the routine');
+  assert.ok(list.body.some(r => r.id === routineId), 'partner now sees it');
+  assert.equal((await partner('GET', `/api/routines/${routineId}`)).status, 200);
 
-  // The partner can log an entry, and the owner sees it.
+  // A shared routine is genuinely collaborative: the partner can log and edit.
   const entry = await partner('POST', `/api/routines/${routineId}/entries`, {
     entry_date: '2026-07-10', entry_type: 'night_sleep', value: { wake_count: 2 },
   });
   assert.equal(entry.status, 200, 'partner can log entries');
   const ownerSees = await owner('GET', `/api/routines/${routineId}/entries`);
   assert.ok(ownerSees.body.some(e => e.id === entry.body.id), 'owner sees the partner entry');
-
-  // …and edit the routine itself.
   const rename = await partner('PUT', `/api/routines/${routineId}`, { name: 'Jude bedtime v2' });
-  assert.equal(rename.status, 200, 'partner can edit a household routine');
-  const renamed = await owner('GET', `/api/routines/${routineId}`);
-  assert.equal(renamed.body.name, 'Jude bedtime v2');
+  assert.equal(rename.status, 200, 'partner can edit a shared routine');
+  assert.equal((await owner('GET', `/api/routines/${routineId}`)).body.name, 'Jude bedtime v2');
+
+  // …but sharing and deleting stay with the creator.
+  assert.equal((await partner('PUT', `/api/routines/${routineId}/share`, { shared_scope: 'private' })).status,
+    403, 'partner cannot un-share someone else\'s routine');
+  assert.equal((await partner('DELETE', `/api/routines/${routineId}`)).status,
+    403, 'partner cannot delete someone else\'s routine');
+
+  // Toggle back off — the partner loses access, entries survive for the owner.
+  assert.equal((await owner('PUT', `/api/routines/${routineId}/share`, { shared_scope: 'private' })).status, 200);
+  assert.equal((await partner('GET', `/api/routines/${routineId}`)).status, 403, 'un-shared again');
+  assert.ok(!(await partner('GET', '/api/routines')).body.some(r => r.id === routineId));
+  assert.equal((await owner('GET', `/api/routines/${routineId}`)).body.entries.length, 1,
+    'the partner-logged entry is still there for the owner');
+});
+
+test('routines: shared_scope cannot ride in on a plain update', async () => {
+  const [owner, invite] = await member('mass_rt', 'Mass RT');
+  const [partner] = await member('mspt_rt', 'Partner Mass RT', invite);
+  const created = await owner('POST', '/api/routines', { name: 'Sneaky', routine_type: 'custom' });
+  const routineId = created.body.id;
+
+  // The owner's own PUT must not be a back door into the sharing flag either.
+  const put = await owner('PUT', `/api/routines/${routineId}`, { shared_scope: 'household' });
+  assert.equal(put.status, 200, 'the update itself succeeds');
+  assert.equal((await partner('GET', `/api/routines/${routineId}`)).status, 403,
+    'but shared_scope is ignored outside /share');
 });
 
 test('routines: a household-less caller cannot create a routine', async () => {

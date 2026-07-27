@@ -880,8 +880,10 @@ CREATE INDEX IF NOT EXISTS idx_waitlist_created ON waitlist(created_at DESC);
 
 -- Routines: recurring life-pattern trackers — menstrual cycles, baby sleep
 -- schedules, the guided sleep-training program, and freeform custom routines.
--- Household-scoped like every other feature. `config` and each entry's `value`
--- hold type-specific JSON so one pair of tables serves every routine kind.
+-- Unlike most features these are PRIVATE to their creator by default (cycle and
+-- sleep data is personal); `shared_scope = 'household'` opts one in to the rest
+-- of the household. `config` and each entry's `value` hold type-specific JSON so
+-- one pair of tables serves every routine kind.
 CREATE TABLE IF NOT EXISTS routines (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     group_id INTEGER REFERENCES groups(id),
@@ -891,6 +893,7 @@ CREATE TABLE IF NOT EXISTS routines (
     subject_name TEXT,               -- e.g. the baby's name, or whose cycle this is
     subject_birthdate TEXT,          -- YYYY-MM-DD; drives age for baby_sleep / sleep_training
     config TEXT,                     -- JSON: type-specific settings (avg cycle length, goals…)
+    shared_scope TEXT DEFAULT 'private', -- private (creator only) | household
     color TEXT,
     icon TEXT,                       -- SF Symbol override; else derived from routine_type
     start_date TEXT,

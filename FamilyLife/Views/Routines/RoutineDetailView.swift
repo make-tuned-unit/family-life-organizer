@@ -5,6 +5,7 @@ import SwiftUI
 /// the full program.
 struct RoutineDetailView: View {
     @Environment(APIService.self) private var api
+    @Environment(AuthService.self) private var auth
     @Environment(\.dismiss) private var dismiss
 
     let routineId: Int
@@ -14,6 +15,7 @@ struct RoutineDetailView: View {
     @State private var isLoading = true
     @State private var errorMessage: String?
     @State private var showingDeleteConfirm = false
+    @State private var isSharing = false
 
     private let accent = TabAccent.routines.color
 
@@ -31,6 +33,8 @@ struct RoutineDetailView: View {
                     )
 
                     VStack(spacing: 16) {
+                        shareCard(detail)
+
                         if let guidance = detail.guidance {
                             SleepGuidanceCard(guidance: guidance)
                         }
@@ -60,14 +64,18 @@ struct RoutineDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackgroundVisibility(.hidden, for: .navigationBar)
         .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Menu {
-                    Button(role: .destructive) { showingDeleteConfirm = true } label: {
-                        Label("Delete routine", systemImage: "trash")
+            // Deleting is the creator's alone — a shared routine can be logged to
+            // by anyone at home, but only its author can take it away.
+            if detail == nil || detail?.created_by == nil || detail?.created_by == auth.currentUser?.id {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Menu {
+                        Button(role: .destructive) { showingDeleteConfirm = true } label: {
+                            Label("Delete routine", systemImage: "trash")
+                        }
+                    } label: {
+                        Image(systemName: "ellipsis.circle")
+                            .foregroundStyle(accent)
                     }
-                } label: {
-                    Image(systemName: "ellipsis.circle")
-                        .foregroundStyle(accent)
                 }
             }
         }
@@ -78,6 +86,60 @@ struct RoutineDetailView: View {
         .inlineError(errorMessage) { errorMessage = nil }
         .task { await load() }
         .refreshable { await load() }
+    }
+
+    // MARK: - Sharing
+
+    /// The creator gets a toggle; everyone else just gets told it's shared (they
+    /// can only be looking at it because it is). Sharing is per-routine, so a
+    /// cycle tracker can stay private while the baby's sleep log is shared.
+    @ViewBuilder
+    private func shareCard(_ detail: RoutineDetailResponse) -> some View {
+        let isShared = detail.isSharedWithHousehold
+        let isOwner = detail.created_by == nil || detail.created_by == auth.currentUser?.id
+        HStack(spacing: 12) {
+            Image(systemName: isShared ? "person.2.fill" : "lock.fill")
+                .font(.system(size: 15, weight: .medium))
+                .foregroundStyle(isShared ? accent : WarmPalette.ink3)
+                .frame(width: 30, height: 30)
+                .background(isShared ? accent.opacity(0.15) : WarmPalette.ink4.opacity(0.12))
+                .clipShape(Circle())
+            VStack(alignment: .leading, spacing: 2) {
+                Text(isShared ? "Shared with your household" : "Just for you")
+                    .font(.flSubheadline.weight(.semibold))
+                    .foregroundStyle(WarmPalette.ink1)
+                Text(isShared
+                     ? "Everyone at home can see this and log to it."
+                     : "Only you can see this.")
+                    .font(.flFootnote)
+                    .foregroundStyle(WarmPalette.ink3)
+            }
+            Spacer()
+            if isOwner {
+                Toggle("", isOn: Binding(
+                    get: { isShared },
+                    set: { newValue in Task { await setShared(newValue) } }
+                ))
+                .labelsHidden()
+                .tint(accent)
+                .disabled(isSharing)
+            }
+        }
+        .padding(12)
+        .flCard(tint: isShared ? accent.opacity(0.06) : .clear)
+    }
+
+    private func setShared(_ shared: Bool) async {
+        isSharing = true
+        defer { isSharing = false }
+        do {
+            try await api.setRoutineShared(id: routineId, shared: shared)
+            await load()
+        } catch {
+            errorMessage = shared
+                ? "Couldn't share this routine. Please try again."
+                : "Couldn't make this routine private. Please try again."
+        }
     }
 
     // MARK: - Quick log
@@ -285,4 +347,5 @@ private struct FlowButtons<Content: View>: View {
         RoutineDetailView(routineId: 1)
     }
     .environment(APIService())
+    .environment(AuthService())
 }

@@ -58,6 +58,8 @@ struct RoutineResponse: Codable, Identifiable {
     let subject_name: String?
     let subject_birthdate: String?
     let config: String?
+    let shared_scope: String?
+    let created_by: Int?
     let color: String?
     let icon: String?
     let start_date: String?
@@ -67,6 +69,8 @@ struct RoutineResponse: Codable, Identifiable {
     let last_entry_date: String?
 
     var type: RoutineType { RoutineType(rawValue: routine_type) ?? .custom }
+    /// Routines are private unless explicitly shared with the household.
+    var isSharedWithHousehold: Bool { shared_scope == "household" }
 }
 
 struct RoutineEntryResponse: Codable, Identifiable {
@@ -89,6 +93,8 @@ struct RoutineDetailResponse: Codable, Identifiable {
     let subject_name: String?
     let subject_birthdate: String?
     let config: String?
+    let shared_scope: String?
+    let created_by: Int?
     let color: String?
     let icon: String?
     let start_date: String?
@@ -100,6 +106,7 @@ struct RoutineDetailResponse: Codable, Identifiable {
     let achievements: RoutineAchievements?
 
     var type: RoutineType { RoutineType(rawValue: routine_type) ?? .custom }
+    var isSharedWithHousehold: Bool { shared_scope == "household" }
 }
 
 // MARK: - Cycle tracking (period + trying-to-conceive)

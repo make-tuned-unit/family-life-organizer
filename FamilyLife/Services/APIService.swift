@@ -634,6 +634,13 @@ final class APIService {
         let _: SuccessResponse = try await delete("/api/routines/\(id)")
     }
 
+    /// Share a routine with the household, or pull it back to private. Creator
+    /// only — `shared_scope` is deliberately ignored by `updateRoutine`.
+    func setRoutineShared(id: Int, shared: Bool) async throws {
+        let _: SuccessResponse = try await put("/api/routines/\(id)/share",
+                                               body: ["shared_scope": shared ? "household" : "private"])
+    }
+
     func fetchRoutineEntries(id: Int) async throws -> [RoutineEntryResponse] {
         try await get("/api/routines/\(id)/entries")
     }
