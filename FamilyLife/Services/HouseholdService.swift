@@ -127,7 +127,12 @@ final class HouseholdService {
                         combined.append(APIService.ContactResponse(
                             id: member.user_id.map { -$0 } ?? (member.contact_id ?? member.id),
                             name: name,
-                            relationship: "household",
+                            // This loop walks EVERY group the user belongs to, not
+                            // just their household — clan members (a sibling in
+                            // their own household, say) were all being labelled
+                            // "Household", which is exactly wrong. Name the group
+                            // they actually come from instead.
+                            relationship: isHouseholdGroup ? "household" : group.name,
                             phone: nil,
                             email: nil,
                             birthday: nil,

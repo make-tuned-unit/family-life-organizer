@@ -201,22 +201,27 @@ struct RoutineDetailView: View {
             .padding(12)
             .flCard(tint: accent.opacity(0.08))
         } else {
-            HStack(spacing: 8) {
+            // The label sits on its own line above the buttons: side-by-side,
+            // "Down for the night" wrapped to two lines and the pair looked
+            // cramped against the label.
+            VStack(alignment: .leading, spacing: 10) {
                 Text("Happening now")
                     .font(.flCaption.weight(.semibold))
                     .foregroundStyle(WarmPalette.ink3)
-                Spacer()
-                Button { Task { await startLiveSleep(kind: "nap") } } label: {
-                    chip("Nap started", "sun.max")
+                HStack(spacing: 8) {
+                    Button { Task { await startLiveSleep(kind: "nap") } } label: {
+                        chip("Nap started", "sun.max", expands: true)
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isTogglingLiveSleep)
+                    Button { Task { await startLiveSleep(kind: "night_sleep") } } label: {
+                        chip("Down for the night", "moon", expands: true)
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isTogglingLiveSleep)
                 }
-                .buttonStyle(.plain)
-                .disabled(isTogglingLiveSleep)
-                Button { Task { await startLiveSleep(kind: "night_sleep") } } label: {
-                    chip("Down for the night", "moon")
-                }
-                .buttonStyle(.plain)
-                .disabled(isTogglingLiveSleep)
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
             .padding(12)
             .flCard()
         }
@@ -292,12 +297,18 @@ struct RoutineDetailView: View {
             .buttonStyle(.plain)
     }
 
-    private func chip(_ title: String, _ icon: String) -> some View {
+    /// `expands` widens the pill itself rather than centring a content-sized
+    /// pill in a wide frame — the frame has to be applied BEFORE the background
+    /// or the capsule stays small and the row looks broken.
+    private func chip(_ title: String, _ icon: String, expands: Bool = false) -> some View {
         Label(title, systemImage: icon)
             .font(.flFootnote.weight(.semibold))
             .foregroundStyle(accent)
+            .lineLimit(1)
+            .minimumScaleFactor(0.85)
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
+            .frame(maxWidth: expands ? .infinity : nil)
             .background(accent.opacity(0.12), in: Capsule())
     }
 

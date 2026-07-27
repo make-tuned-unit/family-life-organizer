@@ -275,6 +275,33 @@ test('going private retracts the feed post that announced it', async () => {
     'un-sharing retracts the routine post too');
 });
 
+test('a post feed row points at what it is ABOUT, not at itself', async () => {
+  // ref_id on a post is the post's own id (reactions and comments need it), so
+  // a deep link that used ref_id opened routine #<postId> — a routine that
+  // doesn't exist. target_id carries the referenced thing.
+  const [jesse] = await member('tgt_rt', 'Target RT');
+
+  // Filler posts so the post id and the routine id can't coincide by accident.
+  for (let i = 0; i < 3; i++) {
+    await jesse('POST', '/api/feed', { body: `filler ${i}` });
+  }
+
+  const routine = await jesse('POST', '/api/routines', {
+    name: 'Target routine', routine_type: 'baby_sleep', subject_name: 'Jude',
+  });
+  const routineId = routine.body.id;
+  await jesse('PUT', `/api/routines/${routineId}/share`, { shared_scope: 'household' });
+
+  const row = (await jesse('GET', '/api/activity')).body
+    .find(r => r.feed_type === 'post' && r.status === 'routine');
+  assert.ok(row, 'the share post is in the feed');
+  assert.equal(row.target_id, routineId, 'target_id is the routine');
+  assert.notEqual(row.ref_id, routineId, 'and ref_id is NOT (it is the post)');
+
+  // Following the link has to actually load.
+  assert.equal((await jesse('GET', `/api/routines/${row.target_id}`)).status, 200);
+});
+
 test('feed rows carry a per-type detail', async () => {
   const [jesse] = await member('det_rt', 'Detail RT');
   const person = await jesse('POST', '/api/people', { name: 'Detail Person' });

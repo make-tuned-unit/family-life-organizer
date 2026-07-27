@@ -531,11 +531,13 @@ struct FeedCard: View {
         case "post":
             // A post that stands for something else (a milestone, a shared
             // routine, an event) opens that thing; a plain post expands.
+            // linkTargetId, NOT ref_id: for a post, ref_id is the post itself,
+            // so routing on it opened a routine that doesn't exist.
             switch item.status {
-            case "routine": onRoutineTap?(item.ref_id)
-            case "milestone": onMilestoneTap?(item.ref_id)
-            case "event": onEventTap?(item.ref_id)
-            case "rivalry": onRivalryTap?(item.ref_id)
+            case "routine": onRoutineTap?(item.linkTargetId)
+            case "milestone": onMilestoneTap?(item.linkTargetId)
+            case "event": onEventTap?(item.linkTargetId)
+            case "rivalry": onRivalryTap?(item.linkTargetId)
             default: toggleExpanded()
             }
         case "comment", "reaction":
@@ -743,7 +745,8 @@ final class FeedPhotoCache {
                     group_name: "Fairbanks",
                     has_photo: 0,
                     is_private_flag: 0,
-                    detail: nil
+                    detail: nil,
+                    target_id: nil
                 ),
                 body: AttributedString("Took the kids to Point Pleasant Park."),
                 time: "2 hours ago",

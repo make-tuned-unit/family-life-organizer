@@ -3378,7 +3378,7 @@ class FamilyDB {
         SELECT 'decision' as feed_type, d.id as ref_id, d.title, NULL as body,
           d.creator_name as author, d.status, d.created_at as created_at,
           0 as reaction_count, 0 as comment_count, NULL as author_id, d.group_id, g.name as group_name, 0 as has_photo, 0 as is_private,
-          d.decision_type as detail
+          d.decision_type as detail, NULL as target_id
         FROM decisions d LEFT JOIN groups g ON g.id = d.group_id
         WHERE d.status = 'active'${uid ? `
           AND d.group_id IN (${myGroups})` : ''}
@@ -3387,7 +3387,7 @@ class FamilyDB {
           COALESCE(au.name, au.username, 'Family') as author, 'upcoming' as status,
           a.created_at,
           0 as reaction_count, 0 as comment_count, a.created_by as author_id, a.group_id, g.name as group_name, 0 as has_photo, 0 as is_private,
-          a.appointment_date || COALESCE(' ' || NULLIF(a.appointment_time, ''), '') as detail
+          a.appointment_date || COALESCE(' ' || NULLIF(a.appointment_time, ''), '') as detail, NULL as target_id
         FROM appointments a
         LEFT JOIN groups g ON g.id = a.group_id
         LEFT JOIN users au ON au.id = a.created_by
@@ -3409,7 +3409,7 @@ class FamilyDB {
           COALESCE(u.name, u.username, 'Family') as author, cr.status,
           cr.created_at,
           0 as reaction_count, 0 as comment_count, cr.requester_id as author_id, NULL as group_id, NULL as group_name, 0 as has_photo, 0 as is_private,
-          NULL as detail
+          NULL as detail, NULL as target_id
         FROM coverage_requests cr
         LEFT JOIN users u ON u.id = cr.requester_id
         WHERE cr.status IN ('pending', 'approved')${uid ? `
@@ -3423,7 +3423,7 @@ class FamilyDB {
           r.initiator_name as author, r.status,
           r.created_at,
           0 as reaction_count, 0 as comment_count, NULL as author_id, r.group_id, g.name as group_name, 0 as has_photo, 0 as is_private,
-          CASE WHEN r.point_value > 0 THEN r.point_value || ' pts' ELSE NULL END as detail
+          CASE WHEN r.point_value > 0 THEN r.point_value || ' pts' ELSE NULL END as detail, NULL as target_id
         FROM rivalries r
         LEFT JOIN groups g ON g.id = r.group_id
         WHERE r.status = 'active' AND r.created_at >= datetime('now', '-14 days')${uid ? `
@@ -3438,7 +3438,8 @@ class FamilyDB {
           CASE WHEN fp.photo_url IS NOT NULL AND fp.photo_url != '' THEN 1 ELSE 0 END as has_photo, 0 as is_private,
           CASE WHEN fp.reference_type = 'routine'
             THEN (SELECT subject_name FROM routines WHERE id = fp.reference_id)
-            ELSE NULL END as detail
+            ELSE NULL END as detail,
+          fp.reference_id as target_id
         FROM feed_posts fp
         LEFT JOIN users u ON u.id = fp.author_id
         LEFT JOIN groups g ON g.id = fp.group_id
@@ -3455,7 +3456,7 @@ class FamilyDB {
           u.name as author, 'comment' as status,
           fc.created_at,
           0 as reaction_count, 0 as comment_count, fc.user_id as author_id,
-          fp2.group_id, g2.name as group_name, 0 as has_photo, 0 as is_private, NULL as detail
+          fp2.group_id, g2.name as group_name, 0 as has_photo, 0 as is_private, NULL as detail, fc.post_id as target_id
         FROM feed_comments fc
         JOIN users u ON u.id = fc.user_id
         LEFT JOIN feed_posts fp2 ON fp2.id = fc.post_id
@@ -3470,7 +3471,7 @@ class FamilyDB {
           u.name as author, 'reaction' as status,
           fr.created_at,
           0 as reaction_count, 0 as comment_count, fr.user_id as author_id,
-          fp3.group_id, g3.name as group_name, 0 as has_photo, 0 as is_private, NULL as detail
+          fp3.group_id, g3.name as group_name, 0 as has_photo, 0 as is_private, NULL as detail, fr.post_id as target_id
         FROM feed_reactions fr
         JOIN users u ON u.id = fr.user_id
         LEFT JOIN feed_posts fp3 ON fp3.id = fr.post_id
@@ -3488,7 +3489,7 @@ class FamilyDB {
         SELECT feed_type, ref_id, title, body, author, status,
           datetime(occurs_on, '-14 days') AS created_at,
           reaction_count, comment_count, author_id, group_id, group_name, has_photo, is_private,
-          occurs_on AS detail
+          occurs_on AS detail, target_id
         FROM (
           SELECT 'key_date' AS feed_type, se.id AS ref_id, se.title,
             se.notes AS body,
@@ -3497,6 +3498,7 @@ class FamilyDB {
             0 AS reaction_count, 0 AS comment_count,
             se.created_by AS author_id, se.group_id, g4.name AS group_name, 0 AS has_photo,
             CASE WHEN COALESCE(se.shared_scope, 'household') = 'private' THEN 1 ELSE 0 END AS is_private,
+            se.person_id AS target_id,
             CASE
               WHEN se.is_recurring = 1 AND
                    date(strftime('%Y', 'now', 'localtime') || substr(se.date, 5)) >= date('now', 'localtime')
