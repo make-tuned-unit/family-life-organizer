@@ -59,6 +59,47 @@ async function assertListAccess(ctx, listId) {
   if (!row) throw new Error(`No list #${listId} in your household`);
 }
 
+// Guard for routines. Household membership is not enough: a routine is private
+// to its creator until shared, and the concierge must not become the back door
+// into a housemate's cycle tracker.
+async function assertRoutineAccess(ctx, id) {
+  const row = await dbGet(ctx, 'SELECT group_id, created_by, shared_scope FROM routines WHERE id = ?', [id]);
+  if (!row) throw new Error(`No routine #${id} found`);
+  if (ctx.groupId == null || row.group_id !== ctx.groupId) {
+    throw new Error(`#${id} is not in your household`);
+  }
+  if (row.created_by !== ctx.userId && row.shared_scope !== 'household') {
+    // Same message as a missing row — don't confirm that it exists.
+    throw new Error(`No routine #${id} found`);
+  }
+}
+
+// Builds a sleep span from a date + two HH:MM times. An end at or before the
+// start means it ran past midnight, so the end lands on the next day — the
+// normal case for a night sleep.
+function sleepSpan(date, startTime, endTime) {
+  const parse = (t) => {
+    const m = /^(\d{1,2}):(\d{2})$/.exec(String(t || '').trim());
+    if (!m) return null;
+    const h = parseInt(m[1]), min = parseInt(m[2]);
+    return (h >= 0 && h < 24 && min >= 0 && min < 60) ? { h, min } : null;
+  };
+  const s = parse(startTime), e = parse(endTime);
+  if (!s || !e || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
+  const startAt = new Date(`${date}T00:00:00Z`);
+  startAt.setUTCMinutes(startAt.getUTCMinutes() + s.h * 60 + s.min);
+  const endAt = new Date(`${date}T00:00:00Z`);
+  endAt.setUTCMinutes(endAt.getUTCMinutes() + e.h * 60 + e.min);
+  if (endAt <= startAt) endAt.setUTCDate(endAt.getUTCDate() + 1);
+  const fmt = (d) => `${d.toISOString().slice(0, 10)} ${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`;
+  const pad = (v) => String(v).padStart(2, '0');
+  return {
+    start: fmt(startAt), end: fmt(endAt),
+    startTime: `${pad(s.h)}:${pad(s.min)}`, endTime: `${pad(e.h)}:${pad(e.min)}`,
+    minutes: Math.round((endAt - startAt) / 60000),
+  };
+}
+
 // Guard for contacts (owner-scoped by added_by, no group_id column).
 async function assertContactOwner(ctx, id) {
   const row = await dbGet(ctx, 'SELECT added_by FROM contacts WHERE id = ?', [id]);
@@ -855,6 +896,107 @@ const TOOLS = [
       await ctx.db.deleteAppointment(input.id);
       const summary = `Deleted event #${input.id}`;
       return { result: { ok: true, summary }, action: { tool: 'delete_appointment', summary } };
+    },
+  },
+
+  // ---- Routines ----
+  {
+    name: 'list_routines',
+    description: "List the household's routines (sleep logs, cycle trackers, activity streaks) with their ids. Use this first to find the routine id for logging.",
+    write: false,
+    input_schema: { type: 'object', properties: {} },
+    async run(ctx) {
+      const rows = await ctx.db.getRoutines(ctx.groupId, ctx.userId);
+      return { result: rows.map(r => ({
+        id: r.id, name: r.name, type: r.routine_type, subject: r.subject_name,
+        entries: r.entry_count, last_entry: r.last_entry_date,
+        shared: r.shared_scope === 'household',
+      })) };
+    },
+  },
+  {
+    name: 'log_sleep',
+    description: "Log a nap or a night's sleep on a baby-sleep or sleep-training routine. Give the times the person fell asleep and woke up; an end time earlier than the start is treated as crossing midnight. Use list_routines to find routine_id.",
+    write: true,
+    input_schema: {
+      type: 'object',
+      properties: {
+        routine_id: { type: 'number' },
+        kind: { type: 'string', enum: ['nap', 'night_sleep'], description: 'nap or night_sleep' },
+        start_time: { type: 'string', description: 'When they fell asleep, HH:MM (24h)' },
+        end_time: { type: 'string', description: 'When they woke up, HH:MM (24h)' },
+        date: { type: 'string', description: 'Date the sleep STARTED, YYYY-MM-DD. Defaults to today.' },
+        wake_count: { type: 'number', description: 'Night wakings (night_sleep only)' },
+        notes: { type: 'string' },
+      },
+      required: ['routine_id', 'kind', 'start_time', 'end_time'],
+    },
+    async run(ctx, input) {
+      await assertRoutineAccess(ctx, input.routine_id);
+      const date = input.date ? requireDate(input.date, 'date') : ctx.today;
+      const span = sleepSpan(date, input.start_time, input.end_time);
+      if (!span) throw new Error('start_time and end_time must be times like "19:30" and "06:45"');
+      const value = { sleep_start: span.start, sleep_end: span.end, duration_minutes: span.minutes };
+      if (input.kind === 'night_sleep' && input.wake_count != null) {
+        value.wake_count = Math.max(0, parseInt(input.wake_count) || 0);
+      }
+      const r = await ctx.db.addRoutineEntry(input.routine_id, {
+        entry_date: date, entry_time: span.startTime, entry_type: input.kind,
+        value, notes: input.notes || null, created_by: ctx.userId,
+      });
+      const hrs = Math.floor(span.minutes / 60), mins = span.minutes % 60;
+      const summary = `Logged a ${input.kind === 'nap' ? 'nap' : 'night sleep'} of ${hrs ? `${hrs}h ` : ''}${mins}m (${span.startTime}–${span.endTime})`;
+      return { result: { ok: true, id: r.id, duration_minutes: span.minutes, summary },
+               action: { tool: 'log_sleep', summary } };
+    },
+  },
+  {
+    name: 'log_routine_entry',
+    description: "Log a non-sleep entry on a routine — a period start/end, a milestone, an activity session, or a plain note. For naps and night sleep use log_sleep instead.",
+    write: true,
+    input_schema: {
+      type: 'object',
+      properties: {
+        routine_id: { type: 'number' },
+        entry_type: { type: 'string', description: 'period_start | period_end | symptom | wake | milestone | session | note' },
+        date: { type: 'string', description: 'YYYY-MM-DD, defaults to today' },
+        time: { type: 'string', description: 'HH:MM (optional)' },
+        notes: { type: 'string' },
+      },
+      required: ['routine_id', 'entry_type'],
+    },
+    async run(ctx, input) {
+      await assertRoutineAccess(ctx, input.routine_id);
+      const date = input.date ? requireDate(input.date, 'date') : ctx.today;
+      const r = await ctx.db.addRoutineEntry(input.routine_id, {
+        entry_date: date, entry_time: input.time || null, entry_type: input.entry_type,
+        notes: input.notes || null, created_by: ctx.userId,
+      });
+      const summary = `Logged ${input.entry_type.replace(/_/g, ' ')} on ${date}`;
+      return { result: { ok: true, id: r.id, summary }, action: { tool: 'log_routine_entry', summary } };
+    },
+  },
+  {
+    name: 'get_routine',
+    description: 'Read one routine with its recent entries — use to answer "how did Jude sleep last night" or "when did my last period start".',
+    write: false,
+    input_schema: {
+      type: 'object',
+      properties: { routine_id: { type: 'number' } },
+      required: ['routine_id'],
+    },
+    async run(ctx, input) {
+      await assertRoutineAccess(ctx, input.routine_id);
+      const routine = await ctx.db.getRoutineById(input.routine_id);
+      const entries = await ctx.db.getRoutineEntries(input.routine_id, { limit: 30 });
+      return { result: {
+        id: routine.id, name: routine.name, type: routine.routine_type, subject: routine.subject_name,
+        entries: entries.map(e => {
+          let value = null;
+          try { value = e.value ? JSON.parse(e.value) : null; } catch {}
+          return { date: e.entry_date, time: e.entry_time, type: e.entry_type, notes: e.notes, ...(value || {}) };
+        }),
+      } };
     },
   },
 
@@ -2435,6 +2577,8 @@ const GROUPS = {
     incoming: 'get_incoming_coverage', approve: 'approve_incoming_coverage' } },
   notes: { desc: 'Private/household notes (take/jot/write a note).', actions: {
     list: 'list_notes', add: 'add_note', update: 'update_note', delete: 'delete_note' } },
+  routines: { desc: 'Routines: baby sleep / sleep-training logs, cycle tracking, activity streaks.', actions: {
+    list: 'list_routines', get: 'get_routine', log_sleep: 'log_sleep', log_entry: 'log_routine_entry' } },
   people: { desc: 'Household people (adults, kids) and their milestones.', actions: {
     list: 'list_people', add: 'add_person', update: 'update_person', delete: 'delete_person',
     list_milestones: 'list_milestones', log_milestone: 'log_milestone',

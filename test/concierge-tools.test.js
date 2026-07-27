@@ -137,6 +137,72 @@ test('gifts: idea lifecycle to purchased', async () => {
   assert.equal((await tools.run('gifts', ctx, { action: 'delete_idea', id: lego.id })).result.ok, true);
 });
 
+test('routines: concierge logs a nap and an overnight sleep', async () => {
+  const created = await run(
+    "INSERT INTO routines (group_id, created_by, name, routine_type, subject_name, shared_scope) VALUES (?, ?, 'Jude sleep', 'baby_sleep', 'Jude', 'private')",
+    [ctx.groupId, ctx.userId]);
+  const routineId = created.lastID;
+
+  const listed = await tools.run('routines', ctx, { action: 'list' });
+  assert.ok(listed.result.some(r => r.id === routineId), 'own routine is listed');
+
+  // A nap inside one day.
+  const nap = await tools.run('routines', ctx, {
+    action: 'log_sleep', routine_id: routineId, kind: 'nap', start_time: '13:00', end_time: '14:20',
+  });
+  assert.equal(nap.result.ok, true, JSON.stringify(nap.result));
+  assert.equal(nap.result.duration_minutes, 80);
+
+  // A night that crosses midnight — the end must land on the NEXT day.
+  const night = await tools.run('routines', ctx, {
+    action: 'log_sleep', routine_id: routineId, kind: 'night_sleep',
+    start_time: '19:30', end_time: '06:45', date: '2026-07-10', wake_count: 2,
+  });
+  assert.equal(night.result.duration_minutes, 675, '7:30pm→6:45am is 11h15m');
+  const nightRow = await get('SELECT * FROM routine_entries WHERE id = ?', [night.result.id]);
+  const value = JSON.parse(nightRow.value);
+  assert.equal(value.sleep_start, '2026-07-10 19:30');
+  assert.equal(value.sleep_end, '2026-07-11 06:45', 'end rolls to the next day');
+  assert.equal(value.wake_count, 2);
+  assert.equal(nightRow.entry_date, '2026-07-10', 'filed under the evening it started');
+
+  // Reading it back.
+  const read = await tools.run('routines', ctx, { action: 'get', routine_id: routineId });
+  assert.equal(read.result.entries.length, 2);
+  assert.ok(read.result.entries.some(e => e.duration_minutes === 675));
+
+  // A garbled time is refused rather than stored as a zero-length sleep.
+  const bad = await tools.run('routines', ctx, {
+    action: 'log_sleep', routine_id: routineId, kind: 'nap', start_time: 'lunchtime', end_time: '2pm',
+  });
+  assert.ok(bad.result.ok !== true, 'unparseable times are refused');
+});
+
+test('routines: the concierge cannot read a housemate\'s private routine', async () => {
+  // Quinn shares Pam's household but the routine is Quinn's and unshared.
+  const priv = await run(
+    "INSERT INTO routines (group_id, created_by, name, routine_type, shared_scope) VALUES (?, ?, 'Quinn cycle', 'period', 'private')",
+    [ctx.groupId, quinnId]);
+  const id = priv.lastID;
+
+  assert.ok(!(await tools.run('routines', ctx, { action: 'list' })).result.some(r => r.id === id),
+    'a housemate\'s private routine is not listed');
+  const read = await tools.run('routines', ctx, { action: 'get', routine_id: id });
+  assert.ok(read.result.ok !== true && !read.result.entries, 'reading it is refused');
+  const write = await tools.run('routines', ctx, {
+    action: 'log_entry', routine_id: id, entry_type: 'period_start',
+  });
+  assert.ok(write.result.ok !== true, 'logging to it is refused');
+  assert.equal((await get('SELECT COUNT(*) AS n FROM routine_entries WHERE routine_id = ?', [id])).n, 0);
+
+  // Once Quinn shares it, the household can log to it.
+  await run("UPDATE routines SET shared_scope = 'household' WHERE id = ?", [id]);
+  const shared = await tools.run('routines', ctx, {
+    action: 'log_entry', routine_id: id, entry_type: 'period_start',
+  });
+  assert.equal(shared.result.ok, true, JSON.stringify(shared.result));
+});
+
 test('cross-household: tools refuse to touch another household\'s rows', async () => {
   // Second household with its own task, receipt, and decision.
   const u3 = await run("INSERT INTO users (username, name, password_hash) VALUES ('rex_t', 'Rex Other', 'x')");

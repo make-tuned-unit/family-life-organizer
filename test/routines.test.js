@@ -289,6 +289,13 @@ test('routines: sharing opts a routine in, and un-sharing takes it back', async 
   assert.equal((await partner('DELETE', `/api/routines/${routineId}`)).status,
     403, 'partner cannot delete someone else\'s routine');
 
+  // Sharing announces itself — the household finds out from the feed.
+  // (Feed posts surface as feed_type 'post' with post_type carried in `status`.)
+  const feed = await partner('GET', '/api/activity');
+  const post = (feed.body || []).find(p => p.feed_type === 'post' && p.status === 'routine');
+  assert.ok(post, 'sharing posts to the household feed');
+  assert.match(post.title, /Jude bedtime/, 'the post names the routine');
+
   // Toggle back off — the partner loses access, entries survive for the owner.
   assert.equal((await owner('PUT', `/api/routines/${routineId}/share`, { shared_scope: 'private' })).status, 200);
   assert.equal((await partner('GET', `/api/routines/${routineId}`)).status, 403, 'un-shared again');

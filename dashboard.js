@@ -5422,11 +5422,33 @@ app.delete('/api/routines/:id', requireAuth, async (req, res) => {
 app.put('/api/routines/:id/share', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
-    if (!(await requireRoutineAccess(db, req.params.id, req, res, { owner: true }))) return;
+    const row = await requireRoutineAccess(db, req.params.id, req, res, { owner: true });
+    if (!row) return;
     const scope = req.body.shared_scope === 'household' || req.body.shared === true
       ? 'household' : 'private';
     const result = await db.setRoutineScope(req.params.id, req.session.user?.id, scope);
     res.json({ success: true, shared_scope: result.scope });
+
+    // Announce it once, on the transition into sharing — this is the moment the
+    // rest of the household can suddenly see and log to it. Un-sharing stays
+    // quiet: nobody needs a feed post saying something was taken away. Fired
+    // after the response so a feed failure can't fail the toggle itself.
+    if (scope === 'household' && row.shared_scope !== 'household' && result.changed) {
+      const routine = await db.getRoutineById(req.params.id);
+      try {
+        await db.addFeedPost({
+          group_id: row.group_id,
+          author_id: req.session.user?.id,
+          post_type: 'routine',
+          title: `Shared a routine: ${routine?.name || 'Routine'}`,
+          body: routine?.subject_name ? `For ${routine.subject_name}` : null,
+          reference_type: 'routine',
+          reference_id: Number(req.params.id),
+        });
+      } catch (e) { console.error('Routine share feed post error:', e.message); }
+      push.pushToGroup(db, row.group_id, req.session.user?.id, 'A routine was shared',
+        `${routine?.name || 'A routine'} is now shared with your household`);
+    }
   } catch (err) { sendServerError(res, err); }
   finally { db.close(); }
 });

@@ -541,6 +541,7 @@ struct FeedCard: View {
             case "photo": "Photo"
             case "link": "Link"
             case "milestone": "Milestone"
+            case "routine": "Routine"
             default: "Post"
             }
         default: "Update"
