@@ -345,7 +345,7 @@ struct ExpensesView: View {
     @ViewBuilder
     private var categoriesSection: some View {
         if !viewModel.budgetItems.isEmpty {
-            WarmSectionHeader(title: "Categories", trailing: "\(viewModel.budgetItems.count) total")
+            WarmSectionHeader(title: "Categories", trailing: "\(viewModel.budgetItems.count) total", icon: "square.grid.2x2")
                 .padding(.bottom, 8)
 
             VStack(spacing: 8) {
@@ -546,7 +546,7 @@ struct ReceiptDetailView: View {
                     let lines = notes.split(separator: "\n").map(String.init)
                     let hasItems = lines.contains(where: { $0.contains(" — $") })
 
-                    WarmSectionHeader(title: hasItems ? "Items" : "Notes")
+                    WarmSectionHeader(title: hasItems ? "Items" : "Notes", icon: hasItems ? "list.bullet" : "note.text")
                         .padding(.bottom, 6)
 
                     if hasItems {

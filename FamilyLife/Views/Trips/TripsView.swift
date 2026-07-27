@@ -38,7 +38,7 @@ struct TripsView: View {
 
                 // Trip history
                 if !viewModel.pastTrips.isEmpty {
-                    WarmSectionHeader(title: "Trip History", trailing: "\(viewModel.pastTrips.count)")
+                    WarmSectionHeader(title: "Trip History", trailing: "\(viewModel.pastTrips.count)", icon: "clock.arrow.circlepath")
                         .padding(.top, 8)
 
                     VStack(spacing: 8) {

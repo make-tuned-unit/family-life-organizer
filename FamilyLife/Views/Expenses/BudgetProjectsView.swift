@@ -265,7 +265,7 @@ struct ProjectDetailView: View {
 
                     // Expenses list
                     if !expenses.isEmpty {
-                        WarmSectionHeader(title: "Expenses", trailing: "\(expenses.count)")
+                        WarmSectionHeader(title: "Expenses", trailing: "\(expenses.count)", icon: "creditcard")
                             .padding(.bottom, 6)
 
                         VStack(spacing: 0) {
@@ -431,7 +431,7 @@ struct ExpenseDetailView: View {
 
                 // Notes / receipt items
                 if let notes = expense.notes, !notes.isEmpty {
-                    WarmSectionHeader(title: "Receipt Details")
+                    WarmSectionHeader(title: "Receipt Details", icon: "doc.text")
                         .padding(.bottom, 6)
 
                     VStack(alignment: .leading, spacing: 8) {

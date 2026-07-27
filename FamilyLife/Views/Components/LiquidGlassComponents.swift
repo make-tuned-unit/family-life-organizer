@@ -268,13 +268,29 @@ struct WarmStatTile: View {
     let label: String
     let value: String
     let sub: String
+    /// Optional SF Symbol shown beside the label. Outline forms read best here —
+    /// the tile is content, not a selected chip.
+    var icon: String? = nil
+    /// Tints the glyph only; the number stays ink1 so a row of tiles still scans
+    /// as one block rather than a set of competing colours.
+    var tint: Color? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(label.uppercased())
-                .font(.flOverline)
-                .foregroundStyle(WarmPalette.ink3)
-                .tracking(0.4)
+            HStack(spacing: 4) {
+                if let icon {
+                    Image(systemName: icon)
+                        // Glyph point sizes are exempt from the no-hardcoded-size
+                        // rule; this one is matched to the overline it sits on.
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(tint ?? WarmPalette.ink3)
+                }
+                Text(label.uppercased())
+                    .font(.flOverline)
+                    .foregroundStyle(WarmPalette.ink3)
+                    .tracking(0.4)
+                    .lineLimit(1)
+            }
             Text(value)
                 .font(.flTitle)
                 .foregroundStyle(WarmPalette.ink1)
@@ -402,9 +418,18 @@ struct GlassIconButton: View {
 struct WarmSectionHeader: View {
     let title: String
     var trailing: String? = nil
+    /// Optional SF Symbol before the title — use the feature's canonical symbol
+    /// so the same section reads the same way wherever it appears.
+    var icon: String? = nil
+    var tint: Color? = nil
 
     var body: some View {
-        HStack {
+        HStack(spacing: 7) {
+            if let icon {
+                Image(systemName: icon)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(tint ?? WarmPalette.ink3)
+            }
             Text(title)
                 .font(.flHeadline)
                 .foregroundStyle(WarmPalette.ink1)

@@ -16,7 +16,7 @@ struct EventAttachmentsSection: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack {
-                WarmSectionHeader(title: "Attached")
+                WarmSectionHeader(title: "Attached", icon: "paperclip")
                 Spacer()
                 Button { showingPicker = true } label: {
                     Image(systemName: "plus.circle.fill")

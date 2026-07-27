@@ -129,7 +129,7 @@ struct BudgetStatsView: View {
 
     private func trendCard(_ s: BudgetStats) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            WarmSectionHeader(title: "Monthly trend", trailing: "Last \(s.monthly.count) mo")
+            WarmSectionHeader(title: "Monthly trend", trailing: "Last \(s.monthly.count) mo", icon: "chart.line.uptrend.xyaxis")
             Chart(s.monthly) { p in
                 AreaMark(x: .value("Month", p.shortMonth), y: .value("Spent", p.total))
                     .foregroundStyle(.linearGradient(colors: [AccentTheme.terracotta.color.opacity(0.35), AccentTheme.terracotta.color.opacity(0.02)], startPoint: .top, endPoint: .bottom))
@@ -220,7 +220,7 @@ struct BudgetStatsView: View {
         let top = Array(s.byCategory.prefix(6))
         let maxSpent = top.map(\.spent).max() ?? 1
         return VStack(alignment: .leading, spacing: 12) {
-            WarmSectionHeader(title: "By category", trailing: s.month)
+            WarmSectionHeader(title: "By category", trailing: s.month, icon: "chart.bar")
             Chart(top) { c in
                 BarMark(x: .value("Spent", c.spent), y: .value("Category", c.category))
                     .foregroundStyle(AccentTheme.terracotta.color.gradient)
@@ -246,7 +246,7 @@ struct BudgetStatsView: View {
         let total = max(s.recurringMonthly + s.variableThisMonth, 1)
         let fixedFrac = s.recurringMonthly / total
         return VStack(alignment: .leading, spacing: 10) {
-            WarmSectionHeader(title: "Fixed vs variable")
+            WarmSectionHeader(title: "Fixed vs variable", icon: "chart.pie")
             GeometryReader { geo in
                 HStack(spacing: 0) {
                     Rectangle().fill(AccentTheme.ocean.color)

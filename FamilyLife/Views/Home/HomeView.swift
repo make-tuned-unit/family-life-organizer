@@ -277,14 +277,26 @@ struct HomeView: View {
     }
 
     private var familyStatusSubtitle: some View {
-        Text(familyStatusText)
-            .font(.flSubheadline)
-            .foregroundStyle(WarmPalette.ink2)
+        let status = familyStatus
+        return HStack(spacing: 6) {
+            Image(systemName: status.icon)
+                .font(.system(size: 13))
+                .foregroundStyle(WarmPalette.ink3)
+                .symbolRenderingMode(.hierarchical)
+            Text(status.text)
+                .font(.flSubheadline)
+                .foregroundStyle(WarmPalette.ink2)
+        }
     }
 
-    private var familyStatusText: String {
+    private var familyStatusText: String { familyStatus.text }
+
+    /// The line under the greeting, paired with a glyph for whichever state it
+    /// landed on — someone travelling, someone out, a busy day, or a quiet one.
+    /// Icon and text are derived together so they can never drift apart.
+    private var familyStatus: (icon: String, text: String) {
         if let trip = viewModel.activeTrips.first {
-            return "\(trip.traveler.capitalized) is on the way to \(trip.destination)."
+            return ("car.fill", "\(trip.traveler.capitalized) is on the way to \(trip.destination).")
         }
 
         let othersAway = presenceMembers.filter { member in
@@ -296,9 +308,9 @@ struct HomeView: View {
 
         if othersAway.count > 1 {
             let names = ListFormatter.localizedString(byJoining: othersAway.map(\.name))
-            return "\(names) are out."
+            return ("figure.walk", "\(names) are out.")
         } else if let away = othersAway.first {
-            return "\(away.name) is at \(away.last_location_name ?? "away")."
+            return ("figure.walk", "\(away.name) is at \(away.last_location_name ?? "away").")
         }
 
         // Everyone's home — reflect time + what's actually on the schedule
@@ -308,15 +320,15 @@ struct HomeView: View {
 
         if events > 0 {
             let when = hour < 12 ? "today" : hour < 17 ? "this afternoon" : "tonight"
-            return "\(events) event\(events == 1 ? "" : "s") \(when)."
+            return ("calendar", "\(events) event\(events == 1 ? "" : "s") \(when).")
         }
 
         if tasks > 0 {
-            return "\(tasks) task\(tasks == 1 ? "" : "s") on the list."
+            return ("checkmark.circle", "\(tasks) task\(tasks == 1 ? "" : "s") on the list.")
         }
 
         let quiet = hour < 12 ? "Easy morning ahead." : hour < 17 ? "Quiet afternoon." : "Quiet night ahead."
-        return "Everyone's home. \(quiet)"
+        return ("house", "Everyone's home. \(quiet)")
     }
 
     // MARK: - Presence Row
@@ -365,15 +377,22 @@ struct HomeView: View {
 
     private func heroCard(_ appt: AppointmentResponse, label: String, subtitle: String?, showDismiss: Bool) -> some View {
         VStack(alignment: .leading, spacing: 14) {
-            HStack {
+            HStack(spacing: 6) {
+                Image(systemName: "calendar")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(TabAccent.home.color)
                 Text(label)
                     .font(.flOverline)
                     .foregroundStyle(TabAccent.home.color)
                 Spacer()
                 if let subtitle {
-                    Text(subtitle)
-                        .font(.flFootnote)
-                        .foregroundStyle(WarmPalette.ink3)
+                    HStack(spacing: 4) {
+                        Image(systemName: "clock")
+                            .font(.system(size: 11))
+                        Text(subtitle)
+                            .font(.flFootnote)
+                    }
+                    .foregroundStyle(WarmPalette.ink3)
                 }
             }
 
@@ -382,10 +401,15 @@ struct HomeView: View {
                 .foregroundStyle(WarmPalette.ink1)
 
             if let location = appt.location, !location.isEmpty {
-                Text(location)
-                    .font(.flSubheadline)
-                    .foregroundStyle(WarmPalette.ink2)
-                    .padding(.bottom, 2)
+                HStack(spacing: 5) {
+                    Image(systemName: "mappin.and.ellipse")
+                        .font(.system(size: 12))
+                        .foregroundStyle(WarmPalette.ink3)
+                    Text(location)
+                        .font(.flSubheadline)
+                        .foregroundStyle(WarmPalette.ink2)
+                }
+                .padding(.bottom, 2)
             }
 
             HStack(spacing: 8) {
@@ -396,7 +420,7 @@ struct HomeView: View {
                             UIApplication.shared.open(url)
                         }
                     } label: {
-                        Text("Get directions")
+                        Label("Get directions", systemImage: "arrow.triangle.turn.up.right.circle.fill")
                     }
                     .buttonStyle(.flCTA)
                 }
@@ -404,7 +428,7 @@ struct HomeView: View {
                     Button {
                         viewModel.dismissHeroCard()
                     } label: {
-                        Text("Done")
+                        Label("Done", systemImage: "checkmark")
                             .font(.flSubheadline.weight(.semibold))
                             .foregroundStyle(WarmPalette.ink1)
                             .padding(.horizontal, 18)
@@ -456,13 +480,20 @@ struct HomeView: View {
 
     private var statsGrid: some View {
         HStack(spacing: 8) {
-            WarmStatTile(label: "Tasks", value: "\(viewModel.summary?.active_tasks ?? viewModel.summary?.tasks_today ?? 0)", sub: "to do")
+            WarmStatTile(label: "Tasks", value: "\(viewModel.summary?.active_tasks ?? viewModel.summary?.tasks_today ?? 0)", sub: "to do",
+                         icon: "checkmark.circle")
                 .onTapGesture { pendingListName = "Tasks"; selectedTab = .lists }
-            WarmStatTile(label: "Events", value: "\(eventCount)", sub: eventSub)
+            WarmStatTile(label: "Events", value: "\(eventCount)", sub: eventSub,
+                         icon: "calendar")
                 .onTapGesture { withAnimation { eventRange = (eventRange + 1) % 3 } }
-            WarmStatTile(label: viewModel.summary?.pinned_list_name ?? "List", value: "\(viewModel.summary?.groceries_needed ?? 0)", sub: "items")
+            WarmStatTile(label: viewModel.summary?.pinned_list_name ?? "List", value: "\(viewModel.summary?.groceries_needed ?? 0)", sub: "items",
+                         icon: "list.bullet.rectangle")
                 .onTapGesture { pendingListName = viewModel.summary?.pinned_list_name; selectedTab = .lists }
-            WarmStatTile(label: "Overdue", value: "\(viewModel.summary?.overdue_tasks ?? 0)", sub: "tasks")
+            // The one tile that earns a colour: overdue is the number you want
+            // your eye pulled to.
+            WarmStatTile(label: "Overdue", value: "\(viewModel.summary?.overdue_tasks ?? 0)", sub: "tasks",
+                         icon: "exclamationmark.triangle",
+                         tint: (viewModel.summary?.overdue_tasks ?? 0) > 0 ? AccentTheme.terracotta.color : nil)
                 .onTapGesture { pendingListName = "Tasks"; selectedTab = .lists }
         }
         .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
@@ -535,7 +566,7 @@ struct HomeView: View {
     private var upNextSection: some View {
         if !viewModel.todayAppointments.isEmpty || !viewModel.activeTasks.isEmpty {
             VStack(spacing: 6) {
-                WarmSectionHeader(title: "Up next", trailing: "This evening")
+                WarmSectionHeader(title: "Up next", trailing: "This evening", icon: "clock")
                     .padding(.bottom, 6)
 
                 VStack(spacing: 0) {
@@ -601,6 +632,16 @@ struct HomeView: View {
         }
     }
 
+    /// Mirrors `feedFilterLabel` — the glyph makes the active filter readable at
+    /// a glance without reading the word next to it.
+    private var feedFilterIcon: String {
+        switch feedFilter {
+        case .all: "square.grid.2x2"
+        case .forYou: "person.crop.circle"
+        case .group: "person.2"
+        }
+    }
+
     /// All groups the user belongs to (for feed filter dropdown)
     private var feedGroups: [(id: Int, name: String)] {
         userGroups.map { (id: $0.id, name: $0.name) }.sorted { $0.name < $1.name }
@@ -634,13 +675,18 @@ struct HomeView: View {
     private var activityFeedSection: some View {
         if !viewModel.activityFeed.isEmpty {
             // Feed header with group filter
-            HStack {
+            HStack(spacing: 7) {
+                Image(systemName: "bubble.left.and.text.bubble.right")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(WarmPalette.ink3)
                 Text("Feed")
                     .font(.flHeadline)
                     .foregroundStyle(WarmPalette.ink1)
                 Spacer()
                 Button { showingFeedFilter = true } label: {
                     HStack(spacing: 4) {
+                        Image(systemName: feedFilterIcon)
+                            .font(.system(size: 11, weight: .semibold))
                         Text(feedFilterLabel)
                             .font(.flFootnote.weight(.medium))
                         Image(systemName: "chevron.down")

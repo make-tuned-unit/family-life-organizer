@@ -159,7 +159,7 @@ struct PantryView: View {
             let grouped = Dictionary(grouping: items) { $0.location?.capitalized ?? "Other" }
             ForEach(grouped.keys.sorted(), id: \.self) { location in
                 VStack(spacing: 0) {
-                    WarmSectionHeader(title: location, trailing: "\(grouped[location]?.count ?? 0) items")
+                    WarmSectionHeader(title: location, trailing: "\(grouped[location]?.count ?? 0) items", icon: "cabinet")
                         .padding(.bottom, 8)
 
                     LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {

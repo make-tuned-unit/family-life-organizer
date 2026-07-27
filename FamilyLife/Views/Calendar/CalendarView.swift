@@ -467,7 +467,8 @@ struct CalendarView: View {
 
             WarmSectionHeader(
                 title: viewModel.selectedDateString,
-                trailing: eventCount == 0 ? nil : "\(eventCount) event\(eventCount == 1 ? "" : "s")"
+                trailing: eventCount == 0 ? nil : "\(eventCount) event\(eventCount == 1 ? "" : "s")",
+                icon: "calendar"
             )
             .padding(.bottom, 6)
 
@@ -556,7 +557,8 @@ struct CalendarView: View {
             // Full day header
             WarmSectionHeader(
                 title: viewModel.selectedDateString,
-                trailing: eventCount == 0 ? nil : "\(eventCount) event\(eventCount == 1 ? "" : "s")"
+                trailing: eventCount == 0 ? nil : "\(eventCount) event\(eventCount == 1 ? "" : "s")",
+                icon: "calendar"
             )
             .padding(.bottom, 6)
 

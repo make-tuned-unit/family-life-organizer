@@ -73,11 +73,21 @@ struct MoreView: View {
         .toolbarBackgroundVisibility(.hidden, for: .navigationBar)
     }
 
+    /// The canonical symbol for each More group. Unknown titles get no glyph
+    /// rather than a wrong one.
+    private func sectionIcon(_ title: String) -> String? {
+        switch title {
+        case "Family": "person.2"
+        case "Household": "house"
+        default: nil
+        }
+    }
+
     @ViewBuilder
     private func section<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
         VStack(spacing: 10) {
             if !title.isEmpty {
-                WarmSectionHeader(title: title)
+                WarmSectionHeader(title: title, icon: sectionIcon(title))
             }
             content()
         }

@@ -191,7 +191,7 @@ struct DecisionsView: View {
     @ViewBuilder
     private var resolvedList: some View {
         if !resolvedDecisions.isEmpty {
-            WarmSectionHeader(title: "Resolved")
+            WarmSectionHeader(title: "Resolved", icon: "checkmark.seal")
                 .padding(.top, 8)
                 .padding(.bottom, 8)
 

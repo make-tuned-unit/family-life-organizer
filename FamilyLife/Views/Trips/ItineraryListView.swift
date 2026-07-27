@@ -16,7 +16,7 @@ struct ItineraryListView: View {
                 // Pending stay requests from others
                 if !pendingRequests.isEmpty {
                     VStack(alignment: .leading, spacing: 8) {
-                        WarmSectionHeader(title: "Stay Requests")
+                        WarmSectionHeader(title: "Stay Requests", icon: "bed.double")
                         ForEach(pendingRequests) { request in
                             StayRequestCard(stay: request) {
                                 await loadAll()
@@ -38,7 +38,7 @@ struct ItineraryListView: View {
                 } else {
                     VStack(alignment: .leading, spacing: 8) {
                         if !itineraries.isEmpty {
-                            WarmSectionHeader(title: "My Itineraries")
+                            WarmSectionHeader(title: "My Itineraries", icon: "airplane")
                         }
                         ForEach(itineraries) { itinerary in
                             NavigationLink(destination: ItineraryDetailView(itinerary: itinerary)) {

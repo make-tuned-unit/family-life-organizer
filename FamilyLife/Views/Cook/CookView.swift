@@ -281,7 +281,7 @@ struct CookView: View {
     private var moreIdeas: some View {
         let others = Array(viewModel.recipes.dropFirst())
         if !others.isEmpty {
-            WarmSectionHeader(title: "\(others.count) more idea\(others.count == 1 ? "" : "s")")
+            WarmSectionHeader(title: "\(others.count) more idea\(others.count == 1 ? "" : "s")", icon: "lightbulb")
                 .padding(.bottom, 8)
 
             VStack(spacing: 10) {

@@ -106,7 +106,7 @@ struct EventDetailView: View {
                 // People
                 if let tags = appointment.person_tags, !tags.isEmpty,
                    !tags.contains("[object Object]") {
-                    WarmSectionHeader(title: "People")
+                    WarmSectionHeader(title: "People", icon: "person.2")
                         .padding(.bottom, 8)
 
                     let names = Array(Set(tags.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty && !$0.hasPrefix("[") }))

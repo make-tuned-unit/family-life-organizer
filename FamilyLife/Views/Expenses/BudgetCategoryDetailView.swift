@@ -58,7 +58,7 @@ struct BudgetCategoryDetailView: View {
 
                 // Receipts list
                 if !receipts.isEmpty {
-                    WarmSectionHeader(title: "Receipts", trailing: "\(receipts.count) total")
+                    WarmSectionHeader(title: "Receipts", trailing: "\(receipts.count) total", icon: "doc.text")
                         .padding(.bottom, 8)
 
                     VStack(spacing: 0) {

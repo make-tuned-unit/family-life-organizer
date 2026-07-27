@@ -146,7 +146,7 @@ struct ConciergeView: View {
             if brief.isAllClear {
                 allClearCard
             } else {
-                WarmSectionHeader(title: "Needs you", trailing: "\(brief.cards.count)")
+                WarmSectionHeader(title: "Needs you", trailing: "\(brief.cards.count)", icon: "sparkles")
                 VStack(spacing: DesignTokens.Spacing.cardGap) {
                     ForEach(brief.cards) { card in
                         cardRow(card)

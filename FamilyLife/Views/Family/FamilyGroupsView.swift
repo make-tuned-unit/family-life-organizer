@@ -133,7 +133,7 @@ struct FamilyGroupsView: View {
         VStack(spacing: 0) {
             let nonHousehold = groups.filter { $0.group_type != "household" }
             if !nonHousehold.isEmpty {
-                WarmSectionHeader(title: "Groups", trailing: "\(nonHousehold.count)")
+                WarmSectionHeader(title: "Groups", trailing: "\(nonHousehold.count)", icon: "person.3")
                     .padding(.bottom, 8)
 
                 ForEach(nonHousehold) { group in
@@ -167,7 +167,7 @@ struct FamilyGroupsView: View {
     private var contactsSection: some View {
         VStack(spacing: 0) {
             if !widerFamilyContacts.isEmpty {
-                WarmSectionHeader(title: "Family Members", trailing: "\(widerFamilyContacts.count)")
+                WarmSectionHeader(title: "Family Members", trailing: "\(widerFamilyContacts.count)", icon: "person.2")
                     .padding(.bottom, 8)
                     .padding(.top, 4)
 
