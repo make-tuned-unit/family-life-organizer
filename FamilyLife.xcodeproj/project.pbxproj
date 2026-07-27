@@ -55,6 +55,12 @@
 		AA00002F /* NewDecisionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00002F /* NewDecisionView.swift */; };
 		AA000030 /* DecisionDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000030 /* DecisionDetailView.swift */; };
 		AA000031 /* Gift.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000031 /* Gift.swift */; };
+		AA000213 /* Routine.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000213 /* Routine.swift */; };
+		AA000214 /* NewRoutineView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000214 /* NewRoutineView.swift */; };
+		AA000215 /* RoutineCards.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000215 /* RoutineCards.swift */; };
+		AA000216 /* RoutineDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000216 /* RoutineDetailView.swift */; };
+		AA000217 /* RoutinesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000217 /* RoutinesView.swift */; };
+		AA000218 /* SleepTrainingProgramView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000218 /* SleepTrainingProgramView.swift */; };
 		AA000033 /* PersonGiftListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000033 /* PersonGiftListView.swift */; };
 		AA000034 /* AddGiftPersonView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000034 /* AddGiftPersonView.swift */; };
 		AA000035 /* AddGiftIdeaView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000035 /* AddGiftIdeaView.swift */; };
@@ -175,6 +181,12 @@
 		BB00002F /* NewDecisionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewDecisionView.swift; sourceTree = "<group>"; };
 		BB000030 /* DecisionDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecisionDetailView.swift; sourceTree = "<group>"; };
 		BB000031 /* Gift.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Gift.swift; sourceTree = "<group>"; };
+		BB000213 /* Routine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Routine.swift; sourceTree = "<group>"; };
+		BB000214 /* NewRoutineView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewRoutineView.swift; sourceTree = "<group>"; };
+		BB000215 /* RoutineCards.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoutineCards.swift; sourceTree = "<group>"; };
+		BB000216 /* RoutineDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoutineDetailView.swift; sourceTree = "<group>"; };
+		BB000217 /* RoutinesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoutinesView.swift; sourceTree = "<group>"; };
+		BB000218 /* SleepTrainingProgramView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SleepTrainingProgramView.swift; sourceTree = "<group>"; };
 		BB000033 /* PersonGiftListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersonGiftListView.swift; sourceTree = "<group>"; };
 		BB000034 /* AddGiftPersonView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddGiftPersonView.swift; sourceTree = "<group>"; };
 		BB000035 /* AddGiftIdeaView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddGiftIdeaView.swift; sourceTree = "<group>"; };
@@ -258,6 +270,18 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		EE000023 /* Routines */ = {
+			isa = PBXGroup;
+			children = (
+				BB000214 /* NewRoutineView.swift */,
+				BB000215 /* RoutineCards.swift */,
+				BB000216 /* RoutineDetailView.swift */,
+				BB000217 /* RoutinesView.swift */,
+				BB000218 /* SleepTrainingProgramView.swift */,
+			);
+			path = Routines;
+			sourceTree = "<group>";
+		};
 		EE000001 = {
 			isa = PBXGroup;
 			children = (
@@ -315,6 +339,7 @@
 				BB000083 /* Itinerary.swift */,
 				BB000100 /* EventAttachment.swift */,
 				BB000210 /* Person.swift */,
+				BB000213 /* Routine.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -355,6 +380,7 @@
 				GG000001 /* Care */,
 				GG000002 /* Lists */,
 				GG000003 /* Family */,
+				EE000023 /* Routines */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -714,6 +740,12 @@
 				AA000026 /* HealthKitManager.swift in Sources */,
 				AA000150 /* CalendarService.swift in Sources */,
 				AA000027 /* RivalriesView.swift in Sources */,
+				AA000213 /* Routine.swift in Sources */,
+				AA000214 /* NewRoutineView.swift in Sources */,
+				AA000215 /* RoutineCards.swift in Sources */,
+				AA000216 /* RoutineDetailView.swift in Sources */,
+				AA000217 /* RoutinesView.swift in Sources */,
+				AA000218 /* SleepTrainingProgramView.swift in Sources */,
 				AA000028 /* StartRivalryView.swift in Sources */,
 				AA000029 /* RivalryDetailView.swift in Sources */,
 				AA00002A /* LogProgressView.swift in Sources */,

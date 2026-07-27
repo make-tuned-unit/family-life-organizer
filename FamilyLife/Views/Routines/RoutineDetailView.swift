@@ -244,7 +244,7 @@ private struct EntryRow: View {
 
     private var label: String {
         if isSkippedSession { return "Skipped" }
-        switch entry.entry_type {
+        return switch entry.entry_type {
         case "period_start": "Period started"
         case "period_end": "Period ended"
         case "symptom": "Symptom"

@@ -33,7 +33,9 @@ final class SubscriptionService {
     private(set) var isPurchasing = false
     var lastError: String?
 
-    private var updatesTask: Task<Void, Never>?
+    // `nonisolated(unsafe)` so the nonisolated `deinit` can cancel it. Only ever
+    // assigned on the main actor, and `Task.cancel()` is safe to call anywhere.
+    nonisolated(unsafe) private var updatesTask: Task<Void, Never>?
 
     /// Begin listening for transaction updates and load initial state.
     func start(api: APIService) {
