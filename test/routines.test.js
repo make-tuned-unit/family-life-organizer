@@ -217,6 +217,49 @@ test('routines: another household cannot read or delete your routine', async () 
   assert.equal(stillThere.status, 200);
 });
 
+test('routines: a household member sees and can co-log the same routine', async () => {
+  const owner = makeClient();
+  const reg = await owner('POST', '/api/auth/register', {
+    username: 'shr_rt', password: 'password123', name: 'Sharer RT',
+  });
+  const inviteCode = reg.body.household?.invite_code;
+  assert.ok(inviteCode, 'register returns the household invite code');
+
+  const created = await owner('POST', '/api/routines', {
+    name: 'Jude bedtime', routine_type: 'baby_sleep', subject_name: 'Jude',
+  });
+  assert.equal(created.status, 200, JSON.stringify(created.body));
+  const routineId = created.body.id;
+
+  // Partner joins the SAME household via the invite code.
+  const partner = makeClient();
+  const preg = await partner('POST', '/api/auth/register', {
+    username: 'prt_rt', password: 'password123', name: 'Partner RT', invite_code: inviteCode,
+  });
+  assert.equal(preg.status, 200, JSON.stringify(preg.body));
+
+  // Shared by default: it shows up in the partner's list and detail read.
+  const list = await partner('GET', '/api/routines');
+  assert.equal(list.status, 200);
+  assert.ok(list.body.some(r => r.id === routineId), 'partner sees the household routine');
+  const detail = await partner('GET', `/api/routines/${routineId}`);
+  assert.equal(detail.status, 200, 'partner can read the routine');
+
+  // The partner can log an entry, and the owner sees it.
+  const entry = await partner('POST', `/api/routines/${routineId}/entries`, {
+    entry_date: '2026-07-10', entry_type: 'night_sleep', value: { wake_count: 2 },
+  });
+  assert.equal(entry.status, 200, 'partner can log entries');
+  const ownerSees = await owner('GET', `/api/routines/${routineId}/entries`);
+  assert.ok(ownerSees.body.some(e => e.id === entry.body.id), 'owner sees the partner entry');
+
+  // …and edit the routine itself.
+  const rename = await partner('PUT', `/api/routines/${routineId}`, { name: 'Jude bedtime v2' });
+  assert.equal(rename.status, 200, 'partner can edit a household routine');
+  const renamed = await owner('GET', `/api/routines/${routineId}`);
+  assert.equal(renamed.body.name, 'Jude bedtime v2');
+});
+
 test('routines: a household-less caller cannot create a routine', async () => {
   const loner = makeClient();
   await loner('POST', '/api/auth/register', { username: 'lon_rt', password: 'password123', name: 'Loner RT' });

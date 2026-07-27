@@ -2765,7 +2765,7 @@ class FamilyDB {
       'gift_people', 'gift_ideas', 'special_events', 'family_addresses', 'feed_posts',
       'itineraries', 'itinerary_stays', 'subscriptions', 'concierge_memory', 'concierge_nudges',
       'concierge_conversations', 'recurring_payments', 'notes', 'event_attachments',
-      'synced_calendar_events', 'milestones'];
+      'synced_calendar_events', 'milestones', 'routines'];
   }
 
   // Permanently erase a user and their personal data (App Store 5.1.1(v)).
