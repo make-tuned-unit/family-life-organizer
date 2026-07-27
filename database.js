@@ -3211,6 +3211,18 @@ class FamilyDB {
     });
   }
 
+  // Retract the feed post(s) that announced something, for when that thing is
+  // made private after the fact. Without this, "keep this to myself" would hide
+  // the record while leaving the announcement of it sitting in everyone's feed.
+  deleteFeedPostsByReference(referenceType, referenceId) {
+    return new Promise((resolve, reject) => {
+      this.db.run(
+        'DELETE FROM feed_posts WHERE reference_type = ? AND reference_id = ?',
+        [referenceType, parseInt(referenceId)],
+        function (err) { err ? reject(err) : resolve({ deleted: this.changes }); });
+    });
+  }
+
   deleteFeedPost(id) {
     return new Promise((resolve, reject) => {
       this.db.run('DELETE FROM feed_posts WHERE id = ?', [id], (err) => {

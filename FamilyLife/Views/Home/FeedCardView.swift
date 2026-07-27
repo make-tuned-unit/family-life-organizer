@@ -627,7 +627,10 @@ struct FeedCard: View {
     /// rather than showing nothing if the shape isn't what we expect.
     private static func relativeDateTime(_ raw: String) -> String {
         let parts = raw.split(separator: " ", maxSplits: 1).map(String.init)
-        guard let date = DateFormatter.isoDate.date(from: parts[0]) else { return raw }
+        // A whitespace-only value splits to nothing — indexing it would trap, so
+        // bail to the raw string rather than crash the whole feed on one row.
+        guard let first = parts.first,
+              let date = DateFormatter.isoDate.date(from: first) else { return raw }
         let cal = Calendar.current
         let dayText: String
         if cal.isDateInToday(date) { dayText = "Today" }

@@ -159,7 +159,12 @@ function compute(entries, { birthdate = null, today = null, windowDays = 7 } = {
     avg_nap_minutes: mean(days.map(d => d.nap_minutes)) == null ? null : Math.round(mean(days.map(d => d.nap_minutes))),
     avg_naps_per_day: mean(days.map(d => d.nap_count)) == null ? null : Math.round(mean(days.map(d => d.nap_count)) * 10) / 10,
     avg_wakings: mean(days.map(d => d.wake_count)) == null ? null : Math.round(mean(days.map(d => d.wake_count)) * 10) / 10,
-    longest_stretch_minutes: sleeps.length ? Math.max(...sleeps.map(s => s.minutes)) : null,
+    // Scoped to the window like every other figure here — an all-time maximum
+    // sitting under a "last 7 days" heading would be quietly wrong.
+    longest_stretch_minutes: (() => {
+      const inWindow = sleeps.filter(s => window.includes(s.date));
+      return inWindow.length ? Math.max(...inWindow.map(s => s.minutes)) : null;
+    })(),
     last_night_minutes: days[0] ? days[0].night_minutes : null,
   };
 

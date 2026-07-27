@@ -459,6 +459,14 @@ function dbGet(db, sql, params = []) {
   });
 }
 
+// Companion to dbGet for the handful of small, targeted UPDATEs that don't
+// warrant a FamilyDB method of their own.
+function dbRun(db, sql, params = []) {
+  return new Promise((resolve, reject) => {
+    db.db.run(sql, params, function (err) { err ? reject(err) : resolve(this); });
+  });
+}
+
 // Authorization guard for household-scoped `:id` routes. Confirms the row in
 // `table` belongs to the caller's household before the handler mutates/reads it.
 // Sends 404 (missing) or 403 (other household) and returns false on failure.
@@ -4578,10 +4586,29 @@ app.post('/api/gifts/events', requireAuth, async (req, res) => {
 app.put('/api/gifts/events/:id', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
-    if (!(await requireSpecialEventAccess(db, req.params.id, req, res))) return;
+    const row = await requireSpecialEventAccess(db, req.params.id, req, res);
+    if (!row) return;
     const data = { ...req.body };
     if (data.date) data.date = normalizeDate(data.date);
     delete data.group_id;
+    delete data.created_by;
+    if ('shared_scope' in data) {
+      // Only two values are meaningful, and only the owner may choose — the same
+      // rule milestones follow, so the two features can't drift.
+      const owner = row.created_by;
+      if (owner != null && owner !== req.session.user?.id) {
+        delete data.shared_scope;
+      } else {
+        data.shared_scope = data.shared_scope === 'private' ? 'private' : 'household';
+        // Key dates added before this feature have no owner. Privatising one
+        // without adopting it would hide it from EVERYONE, its author included,
+        // with no way back — the guard would 404 for all of them.
+        if (data.shared_scope === 'private' && owner == null) {
+          await dbRun(db, 'UPDATE special_events SET created_by = ? WHERE id = ? AND created_by IS NULL',
+            [req.session.user?.id, req.params.id]);
+        }
+      }
+    }
     await db.updateSpecialEvent(req.params.id, data);
     res.json({ success: true });
   } catch (err) {
@@ -4773,13 +4800,25 @@ app.put('/api/milestones/:id', requireAuth, async (req, res) => {
     // Only the person who logged it decides who sees it, and only between
     // private and household — a clan share is set when the milestone is created.
     if ('shared_scope' in updates) {
-      if (row.created_by !== req.session.user?.id) {
+      const owner = row.created_by;
+      if (owner != null && owner !== req.session.user?.id) {
         delete updates.shared_scope;
       } else {
         updates.shared_scope = updates.shared_scope === 'private' ? 'private' : 'household';
+        if (updates.shared_scope === 'private' && owner == null) {
+          // Same trap as key dates: an unowned row made private is lost to all.
+          await dbRun(db, 'UPDATE milestones SET created_by = ? WHERE id = ? AND created_by IS NULL',
+            [req.session.user?.id, req.params.id]);
+        }
       }
     }
     await db.updateMilestone(req.params.id, updates);
+    // Going private has to retract the celebration too, or the record hides
+    // while the feed post announcing it stays in everyone's feed.
+    if (updates.shared_scope === 'private') {
+      try { await db.deleteFeedPostsByReference('milestone', req.params.id); }
+      catch (e) { console.error('Milestone feed retract error:', e.message); }
+    }
     res.json({ success: true });
   } catch (err) {
     sendServerError(res, err);
@@ -5381,14 +5420,14 @@ async function requireMilestoneAccess(db, id, req, res) {
 async function requireSpecialEventAccess(db, id, req, res) {
   const userId = req.session.user?.id;
   const row = await dbGet(db, 'SELECT group_id, created_by, shared_scope FROM special_events WHERE id = ?', [id]);
-  if (!row) { res.status(404).json({ error: 'Not found' }); return false; }
+  if (!row) { res.status(404).json({ error: 'Not found' }); return null; }
   if (row.group_id == null || !(await db.isHouseholdMember(row.group_id, userId))) {
-    res.status(403).json({ error: 'Forbidden' }); return false;
+    res.status(403).json({ error: 'Forbidden' }); return null;
   }
   if (row.shared_scope === 'private' && row.created_by !== userId) {
-    res.status(404).json({ error: 'Not found' }); return false;
+    res.status(404).json({ error: 'Not found' }); return null;
   }
-  return true;
+  return row;
 }
 
 app.get('/api/routines', requireAuth, async (req, res) => {
@@ -5486,6 +5525,12 @@ app.put('/api/routines/:id/share', requireAuth, async (req, res) => {
       ? 'household' : 'private';
     const result = await db.setRoutineScope(req.params.id, req.session.user?.id, scope);
     res.json({ success: true, shared_scope: result.scope });
+
+    // Pulling a routine back to private retracts the post that announced it.
+    if (scope === 'private' && row.shared_scope === 'household') {
+      try { await db.deleteFeedPostsByReference('routine', req.params.id); }
+      catch (e) { console.error('Routine feed retract error:', e.message); }
+    }
 
     // Announce it once, on the transition into sharing — this is the moment the
     // rest of the household can suddenly see and log to it. Un-sharing stays

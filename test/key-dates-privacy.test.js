@@ -8,6 +8,7 @@ const { spawn } = require('node:child_process');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
+const sqlite3 = require('sqlite3');
 
 const PORT = 3992;
 const BASE = `http://127.0.0.1:${PORT}`;
@@ -57,6 +58,18 @@ after(() => {
   if (server) server.kill('SIGKILL');
   if (tmpDir) fs.rmSync(tmpDir, { recursive: true, force: true });
 });
+
+// Reach past the API to forge the one state it can't produce: a row from before
+// created_by existed. The server owns this file; a single short write is safe.
+function clearOwner(table, id) {
+  return new Promise((resolve, reject) => {
+    const db = new sqlite3.Database(path.join(tmpDir, 'family.db'));
+    db.run(`UPDATE ${table} SET created_by = NULL WHERE id = ?`, [id], function (err) {
+      db.close();
+      err ? reject(err) : resolve(this.changes);
+    });
+  });
+}
 
 async function member(username, name, inviteCode) {
   const c = makeClient();
@@ -177,6 +190,89 @@ test('milestones: privacy is the author\'s alone to change', async () => {
   const stillVisible = (await sophie('GET', '/api/milestones')).body.find(m => m.id === id);
   assert.ok(stillVisible, 'a housemate cannot make someone else\'s milestone private');
   assert.equal(stillVisible.title, 'Edited by Sophie', 'but their content edit stuck');
+});
+
+test('key dates: privatising a legacy row adopts it instead of losing it', async () => {
+  // Key dates added before this feature existed have created_by = NULL. Making
+  // one private without claiming it would hide it from EVERYONE, its author
+  // included, with no way back — the guard 404s for all of them.
+  const [jesse, invite] = await member('kd_leg', 'Legacy KD');
+  const [sophie] = await member('kd_leg2', 'Legacy2 KD', invite);
+  const person = await jesse('POST', '/api/people', { name: 'Legacy Person' });
+
+  const created = await jesse('POST', '/api/gifts/events', {
+    person_id: person.body.id, title: 'Old anniversary', date: upcoming(6),
+    is_recurring: true, event_type: 'anniversary',
+  });
+  const id = created.body.id;
+  // Simulate the pre-migration row. The API deliberately refuses to unset an
+  // owner, so this has to go around it.
+  assert.equal(await clearOwner('special_events', id), 1, 'owner cleared');
+
+  const priv = await jesse('PUT', `/api/gifts/events/${id}`, { shared_scope: 'private' });
+  assert.equal(priv.status, 200);
+
+  const mine = (await jesse('GET', '/api/gifts/events')).body.find(e => e.id === id);
+  assert.ok(mine, 'the person who privatised it can still see it');
+  assert.ok(!(await sophie('GET', '/api/gifts/events')).body.some(e => e.id === id), 'the housemate cannot');
+
+  // And it can be shared again — i.e. it isn't a one-way trip.
+  assert.equal((await jesse('PUT', `/api/gifts/events/${id}`, { shared_scope: 'household' })).status, 200);
+  assert.ok((await sophie('GET', '/api/gifts/events')).body.some(e => e.id === id), 'recoverable');
+});
+
+test('key dates: a housemate cannot privatise someone else\'s date', async () => {
+  const [jesse, invite] = await member('kd_gd', 'Guard KD');
+  const [sophie] = await member('kd_gd2', 'Guard2 KD', invite);
+  const person = await jesse('POST', '/api/people', { name: 'Guard Person' });
+
+  const created = await jesse('POST', '/api/gifts/events', {
+    person_id: person.body.id, title: 'Shared date', date: upcoming(4),
+    is_recurring: true, event_type: 'birthday',
+  });
+  const id = created.body.id;
+
+  // Sophie can edit the content of a shared date...
+  assert.equal((await sophie('PUT', `/api/gifts/events/${id}`, { title: 'Renamed' })).status, 200);
+  // ...but cannot hide it from its owner.
+  await sophie('PUT', `/api/gifts/events/${id}`, { shared_scope: 'private' });
+  const stillShared = (await jesse('GET', '/api/gifts/events')).body.find(e => e.id === id);
+  assert.ok(stillShared, 'the owner still sees it');
+  assert.notEqual(stillShared.shared_scope, 'private', 'scope unchanged by a non-owner');
+  assert.equal(stillShared.title, 'Renamed', 'the content edit still applied');
+
+  // Junk scopes are normalised rather than stored verbatim.
+  await jesse('PUT', `/api/gifts/events/${id}`, { shared_scope: 'nonsense' });
+  const normalised = (await jesse('GET', '/api/gifts/events')).body.find(e => e.id === id);
+  assert.equal(normalised.shared_scope, 'household');
+});
+
+test('going private retracts the feed post that announced it', async () => {
+  const [jesse, invite] = await member('rt_ret', 'Retract RT');
+  const [sophie] = await member('rt_ret2', 'Retract2 RT', invite);
+  const person = await jesse('POST', '/api/people', { name: 'Retract Person' });
+
+  // A shared milestone posts to the feed…
+  const ms = await jesse('POST', '/api/milestones', {
+    person_id: person.body.id, title: 'Announced moment', milestone_date: '2026-07-20',
+  });
+  assert.ok((await sophie('GET', '/api/activity')).body.some(r => (r.title || '').includes('Announced moment')),
+    'the household sees the announcement');
+
+  // …and making it private has to take the announcement with it, or the record
+  // hides while the post about it stays in everyone's feed.
+  assert.equal((await jesse('PUT', `/api/milestones/${ms.body.id}`, { shared_scope: 'private' })).status, 200);
+  assert.ok(!(await sophie('GET', '/api/activity')).body.some(r => (r.title || '').includes('Announced moment')),
+    'the feed post is retracted');
+  assert.ok(!(await sophie('GET', '/api/milestones')).body.some(m => m.id === ms.body.id), 'and the record is hidden');
+
+  // Same for a routine pulled back from shared.
+  const routine = await jesse('POST', '/api/routines', { name: 'Retract routine', routine_type: 'baby_sleep' });
+  await jesse('PUT', `/api/routines/${routine.body.id}/share`, { shared_scope: 'household' });
+  assert.ok((await sophie('GET', '/api/activity')).body.some(r => (r.title || '').includes('Retract routine')));
+  await jesse('PUT', `/api/routines/${routine.body.id}/share`, { shared_scope: 'private' });
+  assert.ok(!(await sophie('GET', '/api/activity')).body.some(r => (r.title || '').includes('Retract routine')),
+    'un-sharing retracts the routine post too');
 });
 
 test('feed rows carry a per-type detail', async () => {
