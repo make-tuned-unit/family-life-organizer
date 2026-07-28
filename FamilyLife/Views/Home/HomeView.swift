@@ -28,8 +28,10 @@ struct HomeView: View {
     /// wrapper below so `.sheet(item:)` can drive it.
     @State private var selectedFeedRoutine: FeedRoutineTarget?
     @State private var selectedFeedDecision: DecisionResponse?
-    /// Milestones and key dates both live on the People hub — there's no tab for
-    /// it, so the feed opens it as a sheet rather than dead-ending.
+    /// Milestones and key dates live on a person's card. The feed opens that
+    /// person directly; `showingPeople` is the fallback when the row doesn't
+    /// name one (a key date with no person attached).
+    @State private var selectedFeedPerson: PersonResponse?
     @State private var showingPeople = false
     /// Tasks mid-checkoff in Up Next — held for the filled-dot + strikethrough
     /// beat before they poof away.
@@ -158,6 +160,19 @@ struct HomeView: View {
                 }
             }
         }
+        .sheet(item: $selectedFeedPerson) { person in
+            NavigationStack {
+                PersonDetailView(person: person) {
+                    await viewModel.loadAll(api: api)
+                }
+                .toolbar {
+                    ToolbarItem(placement: .topBarLeading) {
+                        Button("Done") { selectedFeedPerson = nil }
+                            .foregroundStyle(WarmPalette.ink2)
+                    }
+                }
+            }
+        }
         .sheet(isPresented: $showingPeople) {
             NavigationStack {
                 PeopleView()
@@ -274,6 +289,18 @@ struct HomeView: View {
                 selectedFeedEvent = appt
             }
         } catch {}
+    }
+
+    /// Milestone and key-date rows carry the person they belong to. Open that
+    /// person's card; if the row names no one (or they've since been removed),
+    /// fall back to the People hub rather than doing nothing.
+    private func openFeedPerson(id: Int) async {
+        guard let people = try? await api.fetchPeople(),
+              let person = people.first(where: { $0.id == id }) else {
+            showingPeople = true
+            return
+        }
+        selectedFeedPerson = person
     }
 
     // The feed row carries only a summary, so fetch the real decision to open it.
@@ -769,9 +796,9 @@ struct HomeView: View {
                     // key dates live under People, and decisions have their own
                     // tab — send each row to where the thing actually lives.
                     onRoutineTap: { routineId in selectedFeedRoutine = FeedRoutineTarget(id: routineId) },
-                    onMilestoneTap: { _ in showingPeople = true },
+                    onMilestoneTap: { personId in Task { await openFeedPerson(id: personId) } },
                     onDecisionTap: { decisionId in Task { await openFeedDecision(id: decisionId) } },
-                    onKeyDateTap: { _ in showingPeople = true }
+                    onKeyDateTap: { personId in Task { await openFeedPerson(id: personId) } }
                 )
                 .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
                 .padding(.bottom, 10)

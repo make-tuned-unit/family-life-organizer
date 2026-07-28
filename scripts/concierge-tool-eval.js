@@ -34,6 +34,8 @@ const CASES = [
   { say: 'how much have we spent on groceries this month?', tool: 'budget', actions: ['get'] },
   { say: "what's in the pantry right now?", tool: 'pantry', actions: ['list'] },
   { say: 'log that Jude took his first steps today', tool: 'people', actions: ['log_milestone'] },
+  { say: 'log that Jude rolled over, but keep it private', tool: 'people', actions: ['log_milestone'] },
+  { say: 'add our anniversary on August 2nd, just for me', tool: 'special_events', actions: ['add'] },
   { say: 'log a nap for Jude from 1pm to 2:20pm', tool: 'routines', actions: ['log_sleep', 'list'] },
   { say: 'Jude slept from 7:30pm to 6:45am and woke twice', tool: 'routines', actions: ['log_sleep', 'list'] },
   { say: 'how did Jude sleep last night?', tool: 'routines', actions: ['get', 'list'] },

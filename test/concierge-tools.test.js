@@ -203,6 +203,46 @@ test('routines: the concierge cannot read a housemate\'s private routine', async
   assert.equal(shared.result.ok, true, JSON.stringify(shared.result));
 });
 
+test('concierge: private key dates and milestones stay private', async () => {
+  const person = await run("INSERT INTO gift_people (name, group_id) VALUES ('Kid Tool', ?)", [ctx.groupId]);
+  const personId = person.lastID;
+
+  // "Add our anniversary, privately."
+  const kd = await tools.run('special_events', ctx, {
+    action: 'add', title: 'Our anniversary', date: '2026-08-02',
+    event_type: 'anniversary', private: true,
+  });
+  assert.equal(kd.result.ok, true, JSON.stringify(kd.result));
+  const kdRow = await get("SELECT shared_scope, created_by FROM special_events WHERE title = 'Our anniversary'");
+  assert.equal(kdRow.shared_scope, 'private');
+  assert.equal(kdRow.created_by, ctx.userId, 'owned, or it would be unreachable to everyone');
+
+  // A housemate must not see it.
+  const otherCtx = { ...ctx, userId: quinnId, userName: 'Quinn Tool' };
+  const theirs = await tools.run('special_events', otherCtx, { action: 'list' });
+  assert.ok(!theirs.result.some(e => e.title === 'Our anniversary'), 'invisible to the housemate');
+  assert.ok((await tools.run('special_events', ctx, { action: 'list' }))
+    .result.some(e => e.title === 'Our anniversary'), 'but visible to its author');
+
+  // A private milestone is celebrated nowhere.
+  const before = (await get('SELECT COUNT(*) AS n FROM feed_posts')).n;
+  const ms = await tools.run('people', ctx, {
+    action: 'log_milestone', person_id: personId, title: 'A quiet moment',
+    milestone_date: '2026-07-20', private: true,
+  });
+  assert.equal(ms.result.ok, true, JSON.stringify(ms.result));
+  assert.equal((await get('SELECT COUNT(*) AS n FROM feed_posts')).n, before,
+    'no feed post for a private milestone');
+  assert.match(ms.result.summary, /private/i, 'the confirmation says so');
+
+  // …while a normal one still is.
+  await tools.run('people', ctx, {
+    action: 'log_milestone', person_id: personId, title: 'A loud moment', milestone_date: '2026-07-21',
+  });
+  assert.equal((await get('SELECT COUNT(*) AS n FROM feed_posts')).n, before + 1,
+    'a shared milestone still posts');
+});
+
 test('cross-household: tools refuse to touch another household\'s rows', async () => {
   // Second household with its own task, receipt, and decision.
   const u3 = await run("INSERT INTO users (username, name, password_hash) VALUES ('rex_t', 'Rex Other', 'x')");

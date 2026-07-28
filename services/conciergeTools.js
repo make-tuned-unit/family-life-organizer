@@ -1313,7 +1313,7 @@ const TOOLS = [
   },
   {
     name: 'log_milestone',
-    description: "Log a milestone for a family member — e.g. \"Rowan lost his first tooth today\". The household gets a feed post to cheer them on. Use list_people for the person id; date defaults to today.",
+    description: "Log a milestone for a family member — e.g. \"Rowan lost his first tooth today\". The household gets a feed post to cheer them on, unless private=true, which keeps it to this user alone with no post and no notification. Use list_people for the person id; date defaults to today.",
     write: true,
     input_schema: {
       type: 'object',
@@ -1323,6 +1323,7 @@ const TOOLS = [
         description: { type: 'string', description: 'A little detail (optional)' },
         milestone_date: { type: 'string', description: 'YYYY-MM-DD (optional, defaults to today)' },
         category: { type: 'string', enum: ['first', 'school', 'sports', 'growth', 'moment'] },
+        private: { type: 'boolean', description: 'Keep it to this user: no feed post, no notification (default false)' },
       },
       required: ['person_id', 'title'],
     },
@@ -1337,22 +1338,24 @@ const TOOLS = [
         description: input.description || null,
         milestone_date: date,
         category: input.category || 'moment',
+        shared_scope: input.private ? 'private' : 'household',
         created_by: ctx.userId,
         creator_name: ctx.userName,
         group_id: ctx.groupId,
       });
-      try {
+      // A private milestone is celebrated nowhere — matching the API route.
+      if (!input.private) try {
         await ctx.db.addFeedPost({
           group_id: ctx.groupId, author_id: ctx.userId, post_type: 'milestone',
           title: `${person.name}: ${input.title}`, body: input.description || null,
           reference_type: 'milestone', reference_id: result.id,
         });
       } catch (e) { /* celebration is best-effort */ }
-      if (ctx.push) {
+      if (!input.private && ctx.push) {
         ctx.push.pushToGroup(ctx.db, ctx.groupId, ctx.userId, 'A new milestone',
           `${person.name} — ${input.title}. Cheer them on!`, { type: 'milestone', ref_id: result.id });
       }
-      const summary = `Logged milestone "${input.title}" for ${person.name} (${date})`;
+      const summary = `Logged ${input.private ? 'private ' : ''}milestone "${input.title}" for ${person.name} (${date})`;
       return { result: { ok: true, summary }, action: { tool: 'log_milestone', summary } };
     },
   },
@@ -1919,7 +1922,7 @@ const TOOLS = [
   },
   {
     name: 'add_special_event',
-    description: 'Add a key date / special event. Optionally tie it to a person (use list_people for person_id).',
+    description: 'Add a key date / special event. Optionally tie it to a person (use list_people for person_id). Set private=true when the user says it is just for them ("don\'t tell", "keep this to myself", "private") — a private date and its reminders are invisible to the rest of the household.',
     write: true,
     input_schema: {
       type: 'object',
@@ -1929,6 +1932,7 @@ const TOOLS = [
         person_id: { type: 'integer', description: 'Optional person this date is about' },
         event_type: { type: 'string', description: 'e.g. "birthday", "anniversary", "custom"' },
         is_recurring: { type: 'boolean', description: 'Repeats every year (default true)' },
+        private: { type: 'boolean', description: 'Visible only to this user (default false)' },
         notes: { type: 'string' },
       },
       required: ['title', 'date'],
@@ -1940,8 +1944,11 @@ const TOOLS = [
         title: input.title, date: input.date, person_id: input.person_id || null,
         event_type: input.event_type || 'custom', is_recurring: input.is_recurring !== false,
         notes: input.notes || null, group_id: ctx.groupId,
+        // Ownership is what makes a private row reachable by its author.
+        created_by: ctx.userId,
+        shared_scope: input.private ? 'private' : 'household',
       });
-      const summary = `Added key date "${input.title}" (${input.date})`;
+      const summary = `Added ${input.private ? 'private ' : ''}key date "${input.title}" (${input.date})`;
       return { result: { ok: true, id: r.id, summary }, action: { tool: 'add_special_event', summary } };
     },
   },

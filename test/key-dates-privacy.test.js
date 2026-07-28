@@ -388,6 +388,34 @@ test('editing a clan-shared milestone keeps the clan share', async () => {
   assert.equal((await jesse('GET', '/api/milestones')).body.find(m => m.id === id).shared_scope, 'private');
 });
 
+test('milestone and key-date rows point at the person they belong to', async () => {
+  // target_id is "what tapping opens". Milestones and key dates live on a
+  // person's card, so both rows carry that person — not the milestone id, which
+  // would have no screen to land on.
+  const [jesse] = await member('psn_rt', 'Person RT');
+  const person = await jesse('POST', '/api/people', { name: 'Deep Person' });
+  const personId = person.body.id;
+
+  await jesse('POST', '/api/milestones', {
+    person_id: personId, title: 'Pointed moment', milestone_date: '2026-07-20',
+  });
+  await jesse('POST', '/api/gifts/events', {
+    person_id: personId, title: 'Pointed date', date: upcoming(5),
+    is_recurring: true, event_type: 'birthday',
+  });
+
+  const feed = (await jesse('GET', '/api/activity')).body;
+  const msRow = feed.find(r => r.feed_type === 'post' && r.status === 'milestone');
+  assert.ok(msRow, 'the milestone post is in the feed');
+  assert.equal(msRow.target_id, personId, 'and points at the person, not the milestone');
+
+  const kdRow = feed.find(r => r.feed_type === 'key_date' && r.title === 'Pointed date');
+  assert.equal(kdRow.target_id, personId, 'key dates point at their person too');
+
+  // Following it has to load.
+  assert.ok((await jesse('GET', '/api/people')).body.some(p => p.id === msRow.target_id));
+});
+
 test('feed rows carry a per-type detail', async () => {
   const [jesse] = await member('det_rt', 'Detail RT');
   const person = await jesse('POST', '/api/people', { name: 'Detail Person' });

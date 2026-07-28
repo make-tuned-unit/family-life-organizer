@@ -3445,7 +3445,14 @@ class FamilyDB {
                     AND group_id = fp.group_id
                     AND shared_scope = 'household')
             ELSE NULL END as detail,
-          fp.reference_id as target_id
+          -- target_id is "what tapping this row should OPEN", not simply the
+          -- referenced row: a milestone post opens the person it is about,
+          -- which is where milestones live. Scoped like the detail lookup so a
+          -- forged reference can't resolve someone else's person.
+          CASE WHEN fp.reference_type = 'milestone'
+            THEN (SELECT person_id FROM milestones
+                  WHERE id = fp.reference_id AND group_id = fp.group_id)
+            ELSE fp.reference_id END as target_id
         FROM feed_posts fp
         LEFT JOIN users u ON u.id = fp.author_id
         LEFT JOIN groups g ON g.id = fp.group_id
