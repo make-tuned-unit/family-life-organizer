@@ -19,6 +19,9 @@ struct CalendarView: View {
     @State private var showingAddAppointment = false
     @State private var selectedEvent: AppointmentResponse?
     @State private var displayMode: CalendarDisplayMode = .month
+    /// Which way the last period change went, so the grid slides in from the
+    /// side you swiped from rather than cross-fading in place.
+    @State private var movingForward = true
     @State private var showingCareCascade = false
     // showingIncomingCoverage removed — incoming handled in combined MyCoverageRequestsView
     @State private var showingMyRequests = false
@@ -40,6 +43,16 @@ struct CalendarView: View {
                 switch displayMode {
                 case .month:
                     monthGrid
+                        // Re-identified per month so SwiftUI treats each month as
+                        // a new view and can transition between them; without
+                        // this the cells mutate in place and nothing moves.
+                        .id(viewModel.monthYearString)
+                        .transition(.asymmetric(
+                            insertion: .move(edge: movingForward ? .trailing : .leading)
+                                .combined(with: .opacity),
+                            removal: .move(edge: movingForward ? .leading : .trailing)
+                                .combined(with: .opacity)
+                        ))
                     selectedDayEvents
                 case .week:
                     WeekView(
@@ -63,9 +76,13 @@ struct CalendarView: View {
                     let dx = value.translation.width
                     let dy = value.translation.height
                     guard abs(dx) > 60, abs(dx) > abs(dy) * 1.8 else { return }
+                    movingForward = dx < 0
                     shiftPeriod(forward: dx < 0)
                 }
         )
+        // A light tap on every period change — swipes have no button to press,
+        // so without it the only confirmation is noticing the grid redraw.
+        .sensoryFeedback(.impact(weight: .light), trigger: viewModel.displayedMonth)
         .flMinimizesTabBar()
         .background { AmbientBackground(style: .calendar) }
         .navigationBarTitleDisplayMode(.inline)
@@ -384,18 +401,30 @@ struct CalendarView: View {
                     .font(.flOverline)
                     .foregroundStyle(WarmPalette.ink3)
                     .tracking(0.4)
+                    // The label is the thing that actually names where you are,
+                    // so animate it too — a static header during a moving grid
+                    // reads as the screen not having changed.
+                    .contentTransition(.numericText())
+                    .id(viewModel.monthYearString)
+                    .transition(.opacity.combined(with: .move(edge: movingForward ? .trailing : .leading)))
                 Text("Calendar")
                     .font(.flScreenTitle)
                     .foregroundStyle(WarmPalette.ink1)
             }
             Spacer()
             HStack(spacing: 8) {
-                Button { viewModel.previousMonth() } label: {
+                Button {
+                    movingForward = false
+                    withAnimation(.snappy) { viewModel.previousMonth() }
+                } label: {
                     Image(systemName: "chevron.left")
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundStyle(WarmPalette.ink2)
                 }
-                Button { viewModel.nextMonth() } label: {
+                Button {
+                    movingForward = true
+                    withAnimation(.snappy) { viewModel.nextMonth() }
+                } label: {
                     Image(systemName: "chevron.right")
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundStyle(WarmPalette.ink2)
@@ -471,7 +500,19 @@ struct CalendarView: View {
 
     @ViewBuilder
     private var selectedDayEvents: some View {
-        if let selected = viewModel.selectedDate {
+        if viewModel.selectedDate == nil {
+            // Changing month clears the selection, so say what to do next rather
+            // than leaving a hole where the day panel was.
+            HStack(spacing: 7) {
+                Image(systemName: "hand.tap")
+                    .font(.system(size: 13))
+                Text("Pick a day to see what's on")
+                    .font(.flFootnote)
+            }
+            .foregroundStyle(WarmPalette.ink3)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 18)
+        } else if let selected = viewModel.selectedDate {
             let dayAppointments = viewModel.appointments(for: selected)
             let dayCoverage = viewModel.coverageBlocks(for: selected)
             let dayExternal = viewModel.externalEvents(for: selected)

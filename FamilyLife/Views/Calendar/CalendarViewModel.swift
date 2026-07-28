@@ -164,12 +164,18 @@ final class CalendarViewModel {
 
     // MARK: - Navigation
 
+    // Moving to another month clears the selection. Keeping it meant the grid
+    // could show September while the day panel underneath still read "July 28" —
+    // two different months on screen claiming to be the current one. Applies to
+    // the header chevrons as well as the swipe, since both land here.
     func previousMonth() {
         displayedMonth = calendar.date(byAdding: .month, value: -1, to: displayedMonth) ?? displayedMonth
+        selectedDate = nil
     }
 
     func nextMonth() {
         displayedMonth = calendar.date(byAdding: .month, value: 1, to: displayedMonth) ?? displayedMonth
+        selectedDate = nil
     }
 
     // MARK: - API
