@@ -434,6 +434,59 @@ test('routines: the start of a running sleep can be corrected', async () => {
   assert.equal((await parent('PUT', `/api/routines/${id}/sleep/start`, { time: 'bedtime' })).status, 400);
 });
 
+test('routines: a finished sleep can have its end time corrected', async () => {
+  const [parent] = await member('endfix_rt', 'EndFix RT');
+  const created = await parent('POST', '/api/routines', {
+    name: 'Jude endfix', routine_type: 'baby_sleep', subject_name: 'Jude',
+  });
+  const id = created.body.id;
+
+  // Nap started 13:00; "Awake" was tapped at 14:40, twenty minutes late.
+  await parent('POST', `/api/routines/${id}/sleep/start`,
+    { kind: 'nap', date: '2026-07-22', time: '13:00' });
+  const ended = await parent('PUT', `/api/routines/${id}/sleep/end`, { time: '14:40' });
+  assert.equal(ended.body.duration_minutes, 100);
+  const entryId = ended.body.id;
+
+  // Correct it to when he actually woke.
+  const fixed = await parent('PUT', `/api/routines/${id}/entries/${entryId}`, {
+    start_time: '13:00', end_time: '14:20', entry_date: '2026-07-22',
+  });
+  assert.equal(fixed.status, 200, JSON.stringify(fixed.body));
+
+  const entry = (await parent('GET', `/api/routines/${id}/entries`)).body.find(e => e.id === entryId);
+  const value = JSON.parse(entry.value);
+  assert.equal(value.sleep_end, '2026-07-22 14:20', 'the end moved');
+  assert.equal(value.duration_minutes, 80, 'and the duration was recomputed, not left stale');
+  assert.equal(entry.entry_date, '2026-07-22', 'still filed under the same day');
+
+  // Stats have to reflect the correction, not the original stamp.
+  const stats = await parent('GET', `/api/routines/${id}/sleep-stats?window_days=30`);
+  assert.equal(stats.body.totals.longest_stretch_minutes, 80);
+
+  // A night correction that crosses midnight still lands on the next day.
+  await parent('POST', `/api/routines/${id}/sleep/start`,
+    { kind: 'night_sleep', date: '2026-07-22', time: '19:30' });
+  const night = await parent('PUT', `/api/routines/${id}/sleep/end`, { time: '06:00' });
+  const nightFix = await parent('PUT', `/api/routines/${id}/entries/${night.body.id}`, {
+    start_time: '19:30', end_time: '06:45', entry_date: '2026-07-22', wake_count: 2,
+  });
+  assert.equal(nightFix.status, 200);
+  const nightRow = (await parent('GET', `/api/routines/${id}/entries`)).body.find(e => e.id === night.body.id);
+  const nightValue = JSON.parse(nightRow.value);
+  assert.equal(nightValue.sleep_end, '2026-07-23 06:45', 'overnight end rolls forward');
+  assert.equal(nightValue.duration_minutes, 675);
+  assert.equal(nightValue.wake_count, 2);
+
+  // Junk times are refused rather than stored, and an entry from another
+  // routine cannot be edited through this one.
+  assert.equal((await parent('PUT', `/api/routines/${id}/entries/${entryId}`,
+    { start_time: 'lunch', end_time: '2pm' })).status, 400);
+  const other = await parent('POST', '/api/routines', { name: 'Other', routine_type: 'baby_sleep' });
+  assert.equal((await parent('PUT', `/api/routines/${other.body.id}/entries/${entryId}`,
+    { start_time: '13:00', end_time: '13:30' })).status, 404, 'entry belongs to another routine');
+});
+
 test('routines: sleep stats average the window and earn their tips', async () => {
   const [parent] = await member('stat_rt', 'Stat RT');
   // ~10 months old, so the 4–12 month band (12–16h) applies.

@@ -4472,6 +4472,27 @@ class FamilyDB {
     });
   }
 
+  // Edit a logged entry. Scoped by routine_id as well as id so an entry can
+  // never be rewritten through another routine, and restricted to the fields a
+  // correction touches — no reassigning an entry to a different routine.
+  updateRoutineEntry(id, routineId, updates) {
+    return new Promise((resolve, reject) => {
+      const ALLOWED = new Set(['entry_date', 'entry_time', 'entry_type', 'value', 'notes']);
+      const sets = [], params = [];
+      for (const key of Object.keys(updates)) {
+        if (!ALLOWED.has(key)) continue;
+        let val = updates[key];
+        if (key === 'value' && val != null && typeof val !== 'string') val = JSON.stringify(val);
+        sets.push(`${key} = ?`);
+        params.push(val);
+      }
+      if (!sets.length) return resolve({ changed: 0 });
+      params.push(id, routineId);
+      this.db.run(`UPDATE routine_entries SET ${sets.join(', ')} WHERE id = ? AND routine_id = ?`,
+        params, function (err) { err ? reject(err) : resolve({ changed: this.changes }); });
+    });
+  }
+
   getRoutineEntryById(id) {
     return new Promise((resolve, reject) => {
       this.db.get('SELECT * FROM routine_entries WHERE id = ?', [id],

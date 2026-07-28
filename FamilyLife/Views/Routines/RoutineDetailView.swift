@@ -21,6 +21,9 @@ struct RoutineDetailView: View {
     @State private var isTogglingLiveSleep = false
     /// The running sleep whose start time is being corrected.
     @State private var editingSleepStart: SleepStartEdit?
+    /// A finished sleep being corrected — most often an end time stamped when
+    /// you got round to tapping Awake rather than when they actually woke.
+    @State private var editingSleep: LoggedSleep?
 
     private let accent = TabAccent.routines.color
 
@@ -99,6 +102,11 @@ struct RoutineDetailView: View {
         .sheet(item: $editingSleepStart) { edit in
             EditSleepStartSheet(current: edit.current, accent: accent) { time in
                 await applySleepStart(time)
+            }
+        }
+        .sheet(item: $editingSleep) { logged in
+            LogSleepSheet(kind: logged.kind, accent: accent, editing: logged) { payload in
+                await applySleepEdit(entryId: logged.id, payload: payload, entryDate: logged.entryDate)
             }
         }
         .sheet(item: $sleepToLog) { kind in
@@ -262,6 +270,24 @@ struct RoutineDetailView: View {
         return DateFormatter.shortTime.string(from: d)
     }
 
+    private func applySleepEdit(entryId: Int, payload: SleepPayload, entryDate: String) async {
+        do {
+            try await api.updateRoutineEntry(routineId: routineId, entryId: entryId, data: [
+                // Send the times and let the server recompute the span, so the
+                // stored duration can never disagree with what was picked.
+                "start_time": payload.time,
+                "end_time": payload.endTime,
+                "wake_count": payload.wakeCount as Any,
+                "notes": payload.notes,
+                // Keep the original filing date rather than the picker's.
+                "entry_date": entryDate,
+            ])
+            await load()
+        } catch {
+            errorMessage = "Couldn't save that change. Please try again."
+        }
+    }
+
     private func applySleepStart(_ time: String) async {
         do {
             try await api.setSleepStart(routineId: routineId, time: time)
@@ -362,7 +388,16 @@ struct RoutineDetailView: View {
                     .flCard()
             } else {
                 ForEach(entries) { entry in
-                    EntryRow(entry: entry) { Task { await deleteEntry(entry.id) } }
+                    EntryRow(
+                        entry: entry,
+                        // Only completed sleeps are editable: a running one is
+                        // corrected from the card above, and older entries have
+                        // no span to correct.
+                        onEdit: LoggedSleep(entry: entry).map { logged in
+                            { editingSleep = logged }
+                        },
+                        onDelete: { Task { await deleteEntry(entry.id) } }
+                    )
                 }
             }
         }
@@ -456,7 +491,47 @@ struct SleepPayload {
     let value: [String: Any]
     let date: String
     let time: String
+    /// The end of the span, for the edit path — the server recomputes the
+    /// duration from the two times so the stored value can't drift from them.
+    let endTime: String
+    let wakeCount: Int?
     let notes: String
+}
+
+/// An already-logged sleep, unpacked from its stored value so the sheet can open
+/// on the real numbers. Identifiable by entry id so `.sheet(item:)` can drive it.
+struct LoggedSleep: Identifiable {
+    let id: Int
+    let kind: SleepKind
+    let start: Date
+    let end: Date
+    let wakeCount: Int
+    let notes: String
+    /// The day the entry is filed under — preserved so a correction to the clock
+    /// times can't quietly move the sleep to a different date.
+    let entryDate: String
+
+    /// Rebuilds from a history row, or nil if the row predates sleep spans (an
+    /// old entry with no start/end has nothing to correct).
+    init?(entry: RoutineEntryResponse) {
+        guard entry.entry_type == "nap" || entry.entry_type == "night_sleep",
+              let raw = entry.value?.data(using: .utf8),
+              let obj = try? JSONSerialization.jsonObject(with: raw) as? [String: Any],
+              obj["in_progress"] as? Bool != true,
+              let startText = obj["sleep_start"] as? String,
+              let endText = obj["sleep_end"] as? String,
+              let start = DateFormatter.dateTimeMinute.date(from: startText),
+              let end = DateFormatter.dateTimeMinute.date(from: endText)
+        else { return nil }
+        self.id = entry.id
+        self.kind = entry.entry_type == "nap" ? .nap : .night
+        self.start = start
+        self.end = end
+        self.wakeCount = (obj["wake_count"] as? Int)
+            ?? (obj["wake_count"] as? NSNumber)?.intValue ?? 0
+        self.notes = entry.notes ?? ""
+        self.entryDate = entry.entry_date
+    }
 }
 
 /// Identifies the running sleep being corrected. `current` is its stored "HH:mm"
@@ -486,37 +561,38 @@ private struct EditSleepStartSheet: View {
 
     var body: some View {
         NavigationStack {
-            VStack(alignment: .leading, spacing: DesignTokens.Spacing.large) {
-                Text("When did they actually fall asleep?")
-                    .font(.flSubheadline)
-                    .foregroundStyle(WarmPalette.ink2)
+            ScrollView(showsIndicators: false) {
+                VStack(alignment: .leading, spacing: DesignTokens.Spacing.large) {
+                    Text("When did they actually fall asleep?")
+                        .font(.flSubheadline)
+                        .foregroundStyle(WarmPalette.ink2)
 
-                DatePicker("", selection: $time, displayedComponents: .hourAndMinute)
-                    .datePickerStyle(.wheel)
-                    .labelsHidden()
-                    .frame(maxWidth: .infinity)
-                    .tint(accent)
+                    DatePicker("", selection: $time, displayedComponents: .hourAndMinute)
+                        .datePickerStyle(.wheel)
+                        .labelsHidden()
+                        .frame(maxWidth: .infinity)
+                        .tint(accent)
 
-                Text("Only the time changes — the sleep stays on the day it was logged.")
-                    .font(.flFootnote)
-                    .foregroundStyle(WarmPalette.ink3)
+                    Text("Only the time changes — the sleep stays on the day it was logged.")
+                        .font(.flFootnote)
+                        .foregroundStyle(WarmPalette.ink3)
 
-                Button {
-                    Task {
-                        isSaving = true
-                        await onSave(DateFormatter.hourMinute.string(from: time))
-                        dismiss()
+                    Button {
+                        Task {
+                            isSaving = true
+                            await onSave(DateFormatter.hourMinute.string(from: time))
+                            dismiss()
+                        }
+                    } label: {
+                        Text("Save").frame(maxWidth: .infinity)
                     }
-                } label: {
-                    Text("Save").frame(maxWidth: .infinity)
+                    .buttonStyle(.flCTA)
+                    .disabled(isSaving)
                 }
-                .buttonStyle(.flCTA)
-                .disabled(isSaving)
-
-                Spacer()
+                .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
+                .padding(.top, 12)
+                .padding(.bottom, 24)
             }
-            .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
-            .padding(.top, 12)
             .background { AmbientBackground(style: .home) }
             .navigationTitle("Start time")
             .navigationBarTitleDisplayMode(.inline)
@@ -526,7 +602,10 @@ private struct EditSleepStartSheet: View {
                 }
             }
         }
-        .presentationDetents([.medium])
+        // .large as well as .medium: a wheel picker plus copy and a button does
+        // not fit half a screen on smaller phones, and overflow drew the content
+        // under the navigation bar instead of scrolling.
+        .presentationDetents([.medium, .large])
     }
 }
 
@@ -536,6 +615,8 @@ private struct EditSleepStartSheet: View {
 private struct LogSleepSheet: View {
     let kind: SleepKind
     let accent: Color
+    /// Set when correcting an already-logged sleep rather than adding one.
+    let editing: LoggedSleep?
     let onSave: (SleepPayload) async -> Void
 
     @Environment(\.dismiss) private var dismiss
@@ -546,17 +627,28 @@ private struct LogSleepSheet: View {
     @State private var notes = ""
     @State private var isSaving = false
 
-    init(kind: SleepKind, accent: Color, onSave: @escaping (SleepPayload) async -> Void) {
+    init(kind: SleepKind, accent: Color, editing: LoggedSleep? = nil,
+         onSave: @escaping (SleepPayload) async -> Void) {
         self.kind = kind
         self.accent = accent
+        self.editing = editing
         self.onSave = onSave
-        // Defaults that match how each is actually logged: a nap gets written up
-        // right after it ends, a night the morning after it started.
-        let now = Date()
-        _end = State(initialValue: now)
-        _start = State(initialValue: kind == .nap
-                       ? now.addingTimeInterval(-3600)
-                       : Calendar.current.date(byAdding: .hour, value: -12, to: now) ?? now)
+        if let editing {
+            // Correcting: open on what was actually recorded, so a wrong end time
+            // is a nudge rather than a re-entry.
+            _start = State(initialValue: editing.start)
+            _end = State(initialValue: editing.end)
+            _wakeCount = State(initialValue: editing.wakeCount)
+            _notes = State(initialValue: editing.notes)
+        } else {
+            // Defaults that match how each is actually logged: a nap gets written
+            // up right after it ends, a night the morning after it started.
+            let now = Date()
+            _end = State(initialValue: now)
+            _start = State(initialValue: kind == .nap
+                           ? now.addingTimeInterval(-3600)
+                           : Calendar.current.date(byAdding: .hour, value: -12, to: now) ?? now)
+        }
     }
 
     /// End before start means it ran past midnight — the normal case for a night
@@ -613,7 +705,7 @@ private struct LogSleepSheet: View {
                 .padding(.bottom, DesignTokens.Spacing.bottomBuffer)
             }
             .background { AmbientBackground(style: .home) }
-            .navigationTitle(kind.title)
+            .navigationTitle(editing == nil ? kind.title : "Edit sleep")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -664,6 +756,8 @@ private struct LogSleepSheet: View {
             // evening it began rather than splitting across two dates.
             date: DateFormatter.isoDate.string(from: start),
             time: DateFormatter.hourMinute.string(from: start),
+            endTime: DateFormatter.hourMinute.string(from: resolvedEnd),
+            wakeCount: kind == .night ? wakeCount : nil,
             notes: notes.trimmingCharacters(in: .whitespaces)
         ))
         dismiss()
@@ -871,6 +965,9 @@ enum SleepValue {
 
 private struct EntryRow: View {
     let entry: RoutineEntryResponse
+    /// Present when this row can be corrected; drives the tap target and the
+    /// pencil, so a row only advertises editing when it actually supports it.
+    var onEdit: (() -> Void)?
     let onDelete: () -> Void
 
     var body: some View {
@@ -900,6 +997,11 @@ private struct EntryRow: View {
                 }
             }
             Spacer()
+            if onEdit != nil {
+                Image(systemName: "pencil")
+                    .font(.system(size: 12))
+                    .foregroundStyle(WarmPalette.ink4)
+            }
             Button(action: onDelete) {
                 Image(systemName: "trash")
                     .font(.system(size: 13))
@@ -909,6 +1011,8 @@ private struct EntryRow: View {
         }
         .padding(12)
         .flCard()
+        .contentShape(Rectangle())
+        .onTapGesture { onEdit?() }
     }
 
     private var label: String {

@@ -5603,6 +5603,40 @@ app.post('/api/routines/:id/entries', requireAuth, async (req, res) => {
   finally { db.close(); }
 });
 
+// Correct an entry after the fact — most often a sleep whose end was stamped
+// when you got round to tapping "Awake" rather than when they actually woke.
+app.put('/api/routines/:id/entries/:entryId', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    if (!(await requireRoutineAccess(db, req.params.id, req, res))) return;
+    const existing = await db.getRoutineEntryById(req.params.entryId);
+    if (!existing || existing.routine_id !== parseInt(req.params.id)) {
+      return res.status(404).json({ error: 'Not found' });
+    }
+    const updates = {};
+    if (req.body.entry_date) updates.entry_date = normalizeDate(req.body.entry_date);
+    if (req.body.notes !== undefined) updates.notes = req.body.notes || null;
+
+    // A sleep is corrected by its times; the span is recomputed server-side so
+    // the stored duration can never disagree with the start and end shown.
+    if (req.body.start_time && req.body.end_time) {
+      const day = updates.entry_date || existing.entry_date;
+      const span = sleepStats.span(day, req.body.start_time, req.body.end_time);
+      if (!span) return res.status(400).json({ error: 'start_time and end_time must be HH:MM' });
+      const value = { sleep_start: span.start, sleep_end: span.end, duration_minutes: span.minutes };
+      if (req.body.wake_count != null) value.wake_count = Math.max(0, parseInt(req.body.wake_count) || 0);
+      updates.value = value;
+      updates.entry_time = span.startTime;
+    } else if (req.body.entry_time) {
+      updates.entry_time = req.body.entry_time;
+    }
+
+    const result = await db.updateRoutineEntry(req.params.entryId, req.params.id, updates);
+    res.json({ success: true, changed: result.changed });
+  } catch (err) { sendServerError(res, err); }
+  finally { db.close(); }
+});
+
 app.delete('/api/routines/:id/entries/:entryId', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {

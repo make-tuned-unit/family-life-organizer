@@ -650,6 +650,12 @@ final class APIService {
         try await post("/api/routines/\(id)/entries", body: data)
     }
 
+    /// Correct a logged sleep. The server recomputes the span from the times, so
+    /// the stored duration can never disagree with what's shown.
+    func updateRoutineEntry(routineId: Int, entryId: Int, data: [String: Any]) async throws {
+        let _: SuccessResponse = try await put("/api/routines/\(routineId)/entries/\(entryId)", body: data)
+    }
+
     func deleteRoutineEntry(routineId: Int, entryId: Int) async throws {
         let _: SuccessResponse = try await delete("/api/routines/\(routineId)/entries/\(entryId)")
     }
