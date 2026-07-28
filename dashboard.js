@@ -5637,6 +5637,31 @@ app.post('/api/routines/:id/sleep/start', requireAuth, async (req, res) => {
   finally { db.close(); }
 });
 
+// Correct the start time of the sleep that's currently running. Tapping "down
+// for the night" stamps now, which is only right if you tapped it at the time —
+// this is for the far more common case of remembering twenty minutes later.
+app.put('/api/routines/:id/sleep/start', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    if (!(await requireRoutineAccess(db, req.params.id, req, res))) return;
+    const open = await db.getOpenSleepEntry(req.params.id);
+    if (!open) return res.status(404).json({ error: 'No sleep is running' });
+    let stored = {};
+    try { stored = JSON.parse(open.value || '{}'); } catch {}
+    // Keep the day the sleep was filed under and move only the clock time, so a
+    // correction can't silently relocate the entry to another date.
+    const day = String(stored.sleep_start || '').slice(0, 10) || open.entry_date;
+    const span = sleepStats.span(day, req.body.time, req.body.time);
+    if (!span) return res.status(400).json({ error: 'time must be HH:MM' });
+    await db.setSleepEntryValue(open.id, req.params.id,
+      { sleep_start: span.start, in_progress: true }, req.body.notes || null);
+    await dbRun(db, 'UPDATE routine_entries SET entry_time = ? WHERE id = ? AND routine_id = ?',
+      [span.startTime, open.id, req.params.id]);
+    res.json({ success: true, id: open.id, started_at: span.start });
+  } catch (err) { sendServerError(res, err); }
+  finally { db.close(); }
+});
+
 app.put('/api/routines/:id/sleep/end', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
@@ -5651,7 +5676,7 @@ app.put('/api/routines/:id/sleep/end', requireAuth, async (req, res) => {
     if (!span) return res.status(400).json({ error: 'time must be HH:MM' });
     const value = { sleep_start: span.start, sleep_end: span.end, duration_minutes: span.minutes };
     if (req.body.wake_count != null) value.wake_count = Math.max(0, parseInt(req.body.wake_count) || 0);
-    await db.closeSleepEntry(open.id, req.params.id, value, req.body.notes || null);
+    await db.setSleepEntryValue(open.id, req.params.id, value, req.body.notes || null);
     res.json({ success: true, id: open.id, duration_minutes: span.minutes });
   } catch (err) { sendServerError(res, err); }
   finally { db.close(); }

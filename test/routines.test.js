@@ -403,6 +403,37 @@ test('routines: a live sleep starts open and closes with a duration', async () =
   assert.equal(night.body.duration_minutes, 675);
 });
 
+test('routines: the start of a running sleep can be corrected', async () => {
+  const [parent] = await member('adj_rt', 'Adjust RT');
+  const created = await parent('POST', '/api/routines', {
+    name: 'Jude adjust', routine_type: 'baby_sleep', subject_name: 'Jude',
+  });
+  const id = created.body.id;
+
+  // Tapped "down for the night" at 20:00, but he actually went down at 19:30.
+  await parent('POST', `/api/routines/${id}/sleep/start`,
+    { kind: 'night_sleep', date: '2026-07-22', time: '20:00' });
+
+  const fixed = await parent('PUT', `/api/routines/${id}/sleep/start`, { time: '19:30' });
+  assert.equal(fixed.status, 200, JSON.stringify(fixed.body));
+
+  const entry = (await parent('GET', `/api/routines/${id}/entries`)).body[0];
+  const value = JSON.parse(entry.value);
+  assert.equal(value.sleep_start, '2026-07-22 19:30', 'the start moved');
+  assert.equal(value.in_progress, true, 'and it is still running');
+  assert.equal(entry.entry_time, '19:30', 'the entry time moved with it');
+  assert.equal(entry.entry_date, '2026-07-22', 'but the day it is filed under did not');
+
+  // The correction has to feed through to the duration, which is the point.
+  const ended = await parent('PUT', `/api/routines/${id}/sleep/end`, { time: '06:45' });
+  assert.equal(ended.body.duration_minutes, 675, '7:30pm to 6:45am, not 8pm');
+
+  // Correcting with nothing running is a 404, and junk times are refused.
+  assert.equal((await parent('PUT', `/api/routines/${id}/sleep/start`, { time: '19:30' })).status, 404);
+  await parent('POST', `/api/routines/${id}/sleep/start`, { kind: 'nap', time: '13:00' });
+  assert.equal((await parent('PUT', `/api/routines/${id}/sleep/start`, { time: 'bedtime' })).status, 400);
+});
+
 test('routines: sleep stats average the window and earn their tips', async () => {
   const [parent] = await member('stat_rt', 'Stat RT');
   // ~10 months old, so the 4–12 month band (12–16h) applies.

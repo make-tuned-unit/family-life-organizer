@@ -957,6 +957,33 @@ const TOOLS = [
     },
   },
   {
+    name: 'set_sleep_start',
+    description: "Correct the start time of the sleep currently running — for 'he actually went down at 7:30' after the fact. Only changes the clock time; the sleep stays on the day it was filed under.",
+    write: true,
+    input_schema: {
+      type: 'object',
+      properties: {
+        routine_id: { type: 'number' },
+        time: { type: 'string', description: 'When they actually fell asleep, HH:MM (24h)' },
+      },
+      required: ['routine_id', 'time'],
+    },
+    async run(ctx, input) {
+      await assertRoutineAccess(ctx, input.routine_id);
+      const open = await ctx.db.getOpenSleepEntry(input.routine_id);
+      if (!open) throw new Error('No sleep is running on this routine.');
+      let stored = {};
+      try { stored = JSON.parse(open.value || '{}'); } catch {}
+      const day = String(stored.sleep_start || '').slice(0, 10) || open.entry_date;
+      const span = sleepStats.span(day, input.time, input.time);
+      if (!span) throw new Error('time must look like "19:30"');
+      await ctx.db.setSleepEntryValue(open.id, input.routine_id,
+        { sleep_start: span.start, in_progress: true });
+      const summary = `Moved the start of this sleep to ${span.startTime}`;
+      return { result: { ok: true, id: open.id, summary }, action: { tool: 'set_sleep_start', summary } };
+    },
+  },
+  {
     name: 'end_sleep',
     description: "End the sleep currently running on a routine — use when the user says someone 'is awake', 'woke up', or 'is up'. Fills in the end time and the duration.",
     write: true,
@@ -982,7 +1009,7 @@ const TOOLS = [
       if (!span) throw new Error('time must look like "06:45"');
       const value = { sleep_start: span.start, sleep_end: span.end, duration_minutes: span.minutes };
       if (input.wake_count != null) value.wake_count = Math.max(0, parseInt(input.wake_count) || 0);
-      await ctx.db.closeSleepEntry(open.id, input.routine_id, value, input.notes || null);
+      await ctx.db.setSleepEntryValue(open.id, input.routine_id, value, input.notes || null);
       const summary = `Ended the sleep at ${span.endTime} — ${sleepStats.fmtHm(span.minutes)} total`;
       return { result: { ok: true, id: open.id, duration_minutes: span.minutes, summary },
                action: { tool: 'end_sleep', summary } };
@@ -2647,7 +2674,8 @@ const GROUPS = {
     list: 'list_notes', add: 'add_note', update: 'update_note', delete: 'delete_note' } },
   routines: { desc: 'Routines: baby sleep / sleep-training logs, cycle tracking, activity streaks. Sleep can be logged after the fact (log_sleep) or live (start_sleep now, end_sleep on waking).', actions: {
     list: 'list_routines', get: 'get_routine', log_sleep: 'log_sleep', log_entry: 'log_routine_entry',
-    start_sleep: 'start_sleep', end_sleep: 'end_sleep', stats: 'get_sleep_stats' } },
+    start_sleep: 'start_sleep', end_sleep: 'end_sleep', set_start: 'set_sleep_start',
+    stats: 'get_sleep_stats' } },
   people: { desc: 'Household people (adults, kids) and their milestones.', actions: {
     list: 'list_people', add: 'add_person', update: 'update_person', delete: 'delete_person',
     list_milestones: 'list_milestones', log_milestone: 'log_milestone',

@@ -4458,9 +4458,10 @@ class FamilyDB {
     });
   }
 
-  // Close an open sleep by rewriting its value with the end and duration. Scoped
-  // by routine_id as well as id so an entry can't be closed from another routine.
-  closeSleepEntry(id, routineId, value, notes = null) {
+  // Rewrite a sleep entry's stored value — closing it with an end and duration,
+  // or correcting the start of one still running. Scoped by routine_id as well
+  // as id so an entry can never be rewritten from another routine.
+  setSleepEntryValue(id, routineId, value, notes = null) {
     return new Promise((resolve, reject) => {
       // COALESCE keeps any note written when the sleep started if none is given
       // on waking — ending a sleep should never erase what was already there.

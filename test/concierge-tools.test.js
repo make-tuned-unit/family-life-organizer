@@ -178,6 +178,42 @@ test('routines: concierge logs a nap and an overnight sleep', async () => {
   assert.ok(bad.result.ok !== true, 'unparseable times are refused');
 });
 
+test('routines: concierge runs a live sleep and can correct its start', async () => {
+  const created = await run(
+    "INSERT INTO routines (group_id, created_by, name, routine_type, shared_scope) VALUES (?, ?, 'Live tool', 'baby_sleep', 'private')",
+    [ctx.groupId, ctx.userId]);
+  const routineId = created.lastID;
+  const liveCtx = { ...ctx, nowTime: '20:00' };
+
+  const started = await tools.run('routines', liveCtx, {
+    action: 'start_sleep', routine_id: routineId, kind: 'night_sleep', date: '2026-07-22',
+  });
+  assert.equal(started.result.ok, true, JSON.stringify(started.result));
+
+  // Only one at a time.
+  const again = await tools.run('routines', liveCtx, {
+    action: 'start_sleep', routine_id: routineId, kind: 'nap',
+  });
+  assert.ok(again.result.ok !== true, 'a second concurrent sleep is refused');
+
+  // "He actually went down at 7:30."
+  const fixed = await tools.run('routines', liveCtx, {
+    action: 'set_start', routine_id: routineId, time: '19:30',
+  });
+  assert.equal(fixed.result.ok, true, JSON.stringify(fixed.result));
+
+  const ended = await tools.run('routines', { ...ctx, nowTime: '06:45' }, {
+    action: 'end_sleep', routine_id: routineId, wake_count: 1,
+  });
+  assert.equal(ended.result.duration_minutes, 675, 'the correction fed through to the duration');
+
+  const row = await get('SELECT * FROM routine_entries WHERE id = ?', [ended.result.id]);
+  const value = JSON.parse(row.value);
+  assert.equal(value.sleep_start, '2026-07-22 19:30');
+  assert.equal(value.sleep_end, '2026-07-23 06:45', 'overnight end lands the next day');
+  assert.equal(value.in_progress, undefined, 'no longer running');
+});
+
 test('routines: the concierge cannot read a housemate\'s private routine', async () => {
   // Quinn shares Pam's household but the routine is Quinn's and unshared.
   const priv = await run(

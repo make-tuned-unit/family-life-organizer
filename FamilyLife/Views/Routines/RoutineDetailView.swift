@@ -19,6 +19,8 @@ struct RoutineDetailView: View {
     @State private var sleepToLog: SleepKind?
     @State private var sleepStats: SleepStats?
     @State private var isTogglingLiveSleep = false
+    /// The running sleep whose start time is being corrected.
+    @State private var editingSleepStart: SleepStartEdit?
 
     private let accent = TabAccent.routines.color
 
@@ -93,6 +95,11 @@ struct RoutineDetailView: View {
         .confirmationDialog("Delete this routine and all its entries?", isPresented: $showingDeleteConfirm, titleVisibility: .visible) {
             Button("Delete", role: .destructive) { Task { await deleteRoutine() } }
             Button("Cancel", role: .cancel) {}
+        }
+        .sheet(item: $editingSleepStart) { edit in
+            EditSleepStartSheet(current: edit.current, accent: accent) { time in
+                await applySleepStart(time)
+            }
         }
         .sheet(item: $sleepToLog) { kind in
             LogSleepSheet(kind: kind, accent: accent) { payload in
@@ -189,9 +196,20 @@ struct RoutineDetailView: View {
                     Text(open.entry_type == "nap" ? "Napping now" : "Asleep for the night")
                         .font(.flSubheadline.weight(.semibold))
                         .foregroundStyle(WarmPalette.ink1)
-                    Text(started.isEmpty ? "In progress" : "Since \(started)")
+                    // Tappable: the stamped time is only right if you tapped the
+                    // button at the moment it happened, which is rarely the case.
+                    Button {
+                        editingSleepStart = SleepStartEdit(current: started)
+                    } label: {
+                        HStack(spacing: 4) {
+                            Text(started.isEmpty ? "In progress" : "Since \(displayTime(started))")
+                            Image(systemName: "pencil")
+                                .font(.system(size: 10, weight: .semibold))
+                        }
                         .font(.flFootnote)
-                        .foregroundStyle(WarmPalette.ink3)
+                        .foregroundStyle(accent)
+                    }
+                    .buttonStyle(.plain)
                 }
                 Spacer()
                 Button("Awake") { Task { await endLiveSleep() } }
@@ -235,6 +253,21 @@ struct RoutineDetailView: View {
             await load()
         } catch {
             errorMessage = "Couldn't start that sleep. Please try again."
+        }
+    }
+
+    /// "19:30" -> "7:30pm" for display; falls back to the raw value.
+    private func displayTime(_ hhmm: String) -> String {
+        guard let d = DateFormatter.hourMinute.date(from: hhmm) else { return hhmm }
+        return DateFormatter.shortTime.string(from: d)
+    }
+
+    private func applySleepStart(_ time: String) async {
+        do {
+            try await api.setSleepStart(routineId: routineId, time: time)
+            await load()
+        } catch {
+            errorMessage = "Couldn't change the start time. Please try again."
         }
     }
 
@@ -424,6 +457,77 @@ struct SleepPayload {
     let date: String
     let time: String
     let notes: String
+}
+
+/// Identifies the running sleep being corrected. `current` is its stored "HH:mm"
+/// so the picker opens on the time already recorded, not on now.
+struct SleepStartEdit: Identifiable {
+    let current: String
+    var id: String { current }
+}
+
+/// One picker: when they actually fell asleep. Deliberately not the full log
+/// sheet — the sleep is still running, so there is no end time to ask for.
+private struct EditSleepStartSheet: View {
+    let current: String
+    let accent: Color
+    let onSave: (String) async -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var time: Date
+    @State private var isSaving = false
+
+    init(current: String, accent: Color, onSave: @escaping (String) async -> Void) {
+        self.current = current
+        self.accent = accent
+        self.onSave = onSave
+        _time = State(initialValue: DateFormatter.hourMinute.date(from: current) ?? Date())
+    }
+
+    var body: some View {
+        NavigationStack {
+            VStack(alignment: .leading, spacing: DesignTokens.Spacing.large) {
+                Text("When did they actually fall asleep?")
+                    .font(.flSubheadline)
+                    .foregroundStyle(WarmPalette.ink2)
+
+                DatePicker("", selection: $time, displayedComponents: .hourAndMinute)
+                    .datePickerStyle(.wheel)
+                    .labelsHidden()
+                    .frame(maxWidth: .infinity)
+                    .tint(accent)
+
+                Text("Only the time changes — the sleep stays on the day it was logged.")
+                    .font(.flFootnote)
+                    .foregroundStyle(WarmPalette.ink3)
+
+                Button {
+                    Task {
+                        isSaving = true
+                        await onSave(DateFormatter.hourMinute.string(from: time))
+                        dismiss()
+                    }
+                } label: {
+                    Text("Save").frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.flCTA)
+                .disabled(isSaving)
+
+                Spacer()
+            }
+            .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
+            .padding(.top, 12)
+            .background { AmbientBackground(style: .home) }
+            .navigationTitle("Start time")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+            }
+        }
+        .presentationDetents([.medium])
+    }
 }
 
 /// Start, end, and a running duration. Every field is editable because sleep is

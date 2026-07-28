@@ -668,6 +668,12 @@ final class APIService {
         try await post("/api/routines/\(routineId)/sleep/start", body: ["kind": kind])
     }
 
+    /// Correct when the running sleep actually started. Tapping "down for the
+    /// night" stamps now, which is rarely the moment it happened.
+    func setSleepStart(routineId: Int, time: String) async throws {
+        let _: SuccessResponse = try await put("/api/routines/\(routineId)/sleep/start", body: ["time": time])
+    }
+
     func endSleep(routineId: Int, wakeCount: Int?) async throws {
         var body: [String: Any] = [:]
         if let wakeCount { body["wake_count"] = wakeCount }

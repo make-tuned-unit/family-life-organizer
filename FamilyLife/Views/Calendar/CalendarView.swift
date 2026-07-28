@@ -53,6 +53,19 @@ struct CalendarView: View {
             }
             .padding(.bottom, DesignTokens.Spacing.bottomBuffer)
         }
+        // Swipe sideways to move through time. simultaneousGesture (not gesture)
+        // so it coexists with the ScrollView's vertical pan, and the horizontal
+        // component must clearly dominate before it counts — otherwise a slightly
+        // angled scroll would skip a month under your thumb.
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 24)
+                .onEnded { value in
+                    let dx = value.translation.width
+                    let dy = value.translation.height
+                    guard abs(dx) > 60, abs(dx) > abs(dy) * 1.8 else { return }
+                    shiftPeriod(forward: dx < 0)
+                }
+        )
         .flMinimizesTabBar()
         .background { AmbientBackground(style: .calendar) }
         .navigationBarTitleDisplayMode(.inline)
@@ -597,6 +610,46 @@ struct CalendarView: View {
                 }
                 .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
             }
+        }
+    }
+
+    /// Move one period in the direction of the swipe, in whatever unit the
+    /// current mode actually shows — a month view moves by months, a week view
+    /// by weeks, a day view by days. Swiping left goes forward, matching the
+    /// direction the content would travel.
+    private func shiftPeriod(forward: Bool) {
+        let step = forward ? 1 : -1
+        let cal = Calendar.current
+        withAnimation(.snappy) {
+            switch displayMode {
+            case .month:
+                forward ? viewModel.nextMonth() : viewModel.previousMonth()
+            case .week:
+                let base = viewModel.selectedDate ?? Date()
+                if let moved = cal.date(byAdding: .weekOfYear, value: step, to: base) {
+                    viewModel.selectedDate = cal.startOfDay(for: moved)
+                    // Keep the loaded month in step, or a swipe past a month
+                    // boundary shows a week with no events in it.
+                    syncDisplayedMonth(to: moved)
+                }
+            case .day:
+                let base = viewModel.selectedDate ?? Date()
+                if let moved = cal.date(byAdding: .day, value: step, to: base) {
+                    viewModel.selectedDate = cal.startOfDay(for: moved)
+                    syncDisplayedMonth(to: moved)
+                }
+            }
+        }
+    }
+
+    /// The month's events are fetched per displayed month, so week/day movement
+    /// that crosses a boundary has to bring displayedMonth along with it.
+    private func syncDisplayedMonth(to date: Date) {
+        let cal = Calendar.current
+        let shown = cal.dateComponents([.year, .month], from: viewModel.displayedMonth)
+        let target = cal.dateComponents([.year, .month], from: date)
+        if shown.year != target.year || shown.month != target.month {
+            viewModel.displayedMonth = date
         }
     }
 
