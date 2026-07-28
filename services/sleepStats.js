@@ -11,7 +11,7 @@
 // consensus range below that age — so `recommended` is null for newborns and the
 // UI says so rather than inventing a number.
 
-const { ageInDays } = require('./sleepTraining');
+const { ageInDays, wakeWindowForBirthdate } = require('./sleepTraining');
 
 // AASM child sleep-duration consensus (AAP-endorsed), hours per 24h INCLUDING
 // naps. Bands are [minDays, maxDays] inclusive.
@@ -356,4 +356,48 @@ function span(date, startTime, endTime) {
   };
 }
 
-module.exports = { compute, span, DURATION_BANDS, NAP_BANDS, fmtHm, fmtClock };
+// When the next sleep is likely due, based on when they last woke and the
+// typical wake window for their age. Returns null unless there is both a
+// birthdate to reason from and a finished sleep to measure from — a guess with
+// nothing behind it is worse than no guess.
+//
+// `prepare_at` is deliberately the START of the window minus a short lead: the
+// useful nudge is "start winding down", not "they are already overtired".
+function nextSleepWindow(entries, { birthdate = null, leadMinutes = 15 } = {}) {
+  const window = wakeWindowForBirthdate(birthdate);
+  if (!window) return null;
+
+  // The most recent sleep that has actually ended.
+  let latest = null;
+  for (const e of entries || []) {
+    if (e.entry_type !== 'nap' && e.entry_type !== 'night_sleep') continue;
+    const v = parseValue(e) || {};
+    if (v.in_progress || !v.sleep_end) continue;
+    const endedAt = new Date(`${String(v.sleep_end).replace(' ', 'T')}:00`);
+    if (isNaN(endedAt)) continue;
+    if (!latest || endedAt > latest.endedAt) latest = { endedAt, type: e.entry_type };
+  }
+  if (!latest) return null;
+
+  const at = (mins) => new Date(latest.endedAt.getTime() + mins * 60000);
+  const dueFrom = at(window.min_minutes);
+  const prepare = at(Math.max(0, window.min_minutes - leadMinutes));
+  const stamp = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+
+  return {
+    last_wake_at: stamp(latest.endedAt),
+    last_sleep_type: latest.type,
+    wake_window_label: window.label,
+    wake_window_min_minutes: window.min_minutes,
+    wake_window_max_minutes: window.max_minutes,
+    due_from: stamp(dueFrom),
+    due_by: stamp(at(window.max_minutes)),
+    prepare_at: stamp(prepare),
+    lead_minutes: leadMinutes,
+    // Said plainly wherever this surfaces: this is a rule of thumb, not the
+    // AASM/AAP consensus the duration ranges come from.
+    basis: 'Typical wake windows used in pediatric sleep guidance — a rule of thumb, not a consensus standard.',
+  };
+}
+
+module.exports = { compute, span, nextSleepWindow, DURATION_BANDS, NAP_BANDS, fmtHm, fmtClock };

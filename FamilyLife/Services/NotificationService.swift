@@ -128,6 +128,38 @@ final class NotificationService {
         UNUserNotificationCenter.current().add(request)
     }
 
+    /// "Time to start winding down" ahead of the next likely nap, worked back
+    /// from when they last woke. Scheduled per routine with a stable id, so
+    /// re-scheduling after each wake replaces the previous one rather than
+    /// stacking up a queue of stale nudges.
+    func scheduleNapPrep(routineId: Int, childName: String?, at date: Date, windowLabel: String?) {
+        cancelNapPrep(routineId: routineId)
+        guard date > Date() else { return }
+
+        let who = (childName?.isEmpty == false) ? childName! : "your little one"
+        let content = UNMutableNotificationContent()
+        content.title = "Nap coming up for \(who)"
+        content.body = windowLabel.map { "Awake \($0) is typical at this age — a good time to start winding down." }
+            ?? "A good time to start winding down."
+        content.sound = .default
+        content.categoryIdentifier = "ROUTINE_NAP_PREP"
+        content.userInfo = ["type": "routine", "ref_id": routineId]
+
+        let components = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute], from: date)
+        let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
+        UNUserNotificationCenter.current().add(
+            UNNotificationRequest(identifier: napPrepId(routineId), content: content, trigger: trigger))
+    }
+
+    /// Drop the pending nudge — when a sleep starts (they're already down, so the
+    /// reminder is moot) or when the routine is no longer being followed.
+    func cancelNapPrep(routineId: Int) {
+        UNUserNotificationCenter.current()
+            .removePendingNotificationRequests(withIdentifiers: [napPrepId(routineId)])
+    }
+
+    private func napPrepId(_ routineId: Int) -> String { "routine-nap-prep-\(routineId)" }
+
     /// Cancel the pending "Did you go?" nudge once the user has confirmed (or
     /// skipped) that date directly, so it can't fire after they've answered.
     func cancelActivityConfirmation(routineId: Int, date: String) {

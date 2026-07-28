@@ -274,4 +274,39 @@ function guidanceForBirthdate(birthdate) {
   };
 }
 
-module.exports = { template, guidanceForBirthdate, ageInDays, PHASES, METHODS, SAFE_SLEEP, SOURCES };
+// Typical awake stretches between sleeps, by age, in minutes.
+//
+// SOURCING NOTE, deliberately different from DURATION_BANDS in sleepStats.js:
+// those come from the AASM/AAP consensus statement. Wake windows have no such
+// consensus — they are widely used in pediatric sleep practice and parent
+// guidance (see the NHS and sleep-training sources above), but they are a rule
+// of thumb, not a standard. They are presented as "typical", never as a target,
+// and the app says so wherever it uses them.
+const WAKE_WINDOWS = [
+  { minDays: 0, maxDays: 30, min: 45, max: 60, label: 'about 45–60 minutes' },
+  { minDays: 31, maxDays: 60, min: 60, max: 90, label: 'about 1–1.5 hours' },
+  { minDays: 61, maxDays: 105, min: 75, max: 105, label: 'about 1.5–2 hours' },
+  { minDays: 106, maxDays: 180, min: 105, max: 150, label: 'about 2–2.5 hours' },
+  { minDays: 181, maxDays: 273, min: 150, max: 180, label: 'about 2.5–3 hours' },
+  { minDays: 274, maxDays: 365, min: 180, max: 240, label: 'about 3–4 hours' },
+  { minDays: 366, maxDays: 547, min: 240, max: 300, label: 'about 4–5 hours' },
+  { minDays: 548, maxDays: 1095, min: 300, max: 360, label: 'about 5–6 hours' },
+];
+
+/// The typical awake stretch for a child of this age, or null when there's no
+/// birthdate to reason from — the caller must not invent one.
+function wakeWindowForBirthdate(birthdate) {
+  if (!birthdate) return null;
+  const days = ageInDays(birthdate);
+  if (days == null || days < 0) return null;
+  const band = WAKE_WINDOWS.find(w => days >= w.minDays && days <= w.maxDays);
+  // Past the last band a child is on one nap or none; a wake-window nudge stops
+  // being useful, so return nothing rather than extrapolating.
+  if (!band) return null;
+  return { min_minutes: band.min, max_minutes: band.max, label: band.label };
+}
+
+module.exports = {
+  template, guidanceForBirthdate, ageInDays, wakeWindowForBirthdate,
+  PHASES, METHODS, SAFE_SLEEP, SOURCES, WAKE_WINDOWS,
+};

@@ -60,6 +60,7 @@ struct RoutineDetailView: View {
 
                         if detail.type == .babySleep || detail.type == .sleepTraining {
                             liveSleepCard(detail)
+                            nextSleepCard(detail)
                         }
 
                         quickLog(for: detail.type)
@@ -172,6 +173,72 @@ struct RoutineDetailView: View {
                 ? "Couldn't share this routine. Please try again."
                 : "Couldn't make this routine private. Please try again."
         }
+    }
+
+    /// Keep the "start winding down" nudge in step with reality: scheduled from
+    /// the last wake, and dropped while a sleep is actually running — they're
+    /// already down, so a reminder to put them down is noise.
+    private func syncNapPrepNotification(_ detail: RoutineDetailResponse) async {
+        guard await NotificationService.shared.isAuthorized() else { return }
+        guard openSleep(detail) == nil, let next = detail.next_sleep, let at = next.prepareDate else {
+            NotificationService.shared.cancelNapPrep(routineId: routineId)
+            return
+        }
+        NotificationService.shared.scheduleNapPrep(
+            routineId: routineId,
+            childName: detail.subject_name,
+            at: at,
+            windowLabel: next.wake_window_label
+        )
+    }
+
+    // MARK: - Next sleep
+
+    /// Shown only when there's something real to say — a birthdate to reason
+    /// from and a finished sleep to measure from — and never while one is
+    /// running.
+    @ViewBuilder
+    private func nextSleepCard(_ detail: RoutineDetailResponse) -> some View {
+        if openSleep(detail) == nil, let next = detail.next_sleep,
+           let dueFrom = next.dueFromDate, let prepare = next.prepareDate {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 7) {
+                    Image(systemName: "hourglass")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(accent)
+                    Text("Next sleep")
+                        .font(.flHeadline)
+                        .foregroundStyle(WarmPalette.ink1)
+                    Spacer()
+                    if prepare > Date() {
+                        Text("in \(relativeMinutes(to: prepare))")
+                            .font(.flFootnote)
+                            .foregroundStyle(WarmPalette.ink3)
+                    }
+                }
+                Text("Likely due around \(DateFormatter.shortTime.string(from: dueFrom))")
+                    .font(.flSubheadline)
+                    .foregroundStyle(WarmPalette.ink2)
+                if let label = next.wake_window_label {
+                    Text("Awake \(label) is typical at this age. We'll nudge you \(next.lead_minutes ?? 15) minutes before.")
+                        .font(.flFootnote)
+                        .foregroundStyle(WarmPalette.ink3)
+                }
+                if let basis = next.basis {
+                    Text(basis)
+                        .font(.flCaption2)
+                        .foregroundStyle(WarmPalette.ink4)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(12)
+            .flCard(tint: accent.opacity(0.06))
+        }
+    }
+
+    private func relativeMinutes(to date: Date) -> String {
+        let mins = max(0, Int(date.timeIntervalSinceNow / 60))
+        return SleepValue.durationText(minutes: mins)
     }
 
     // MARK: - Live sleep
@@ -414,6 +481,7 @@ struct RoutineDetailView: View {
             errorMessage = nil
             if d.type == .babySleep || d.type == .sleepTraining {
                 sleepStats = try? await api.fetchSleepStats(routineId: routineId)
+                await syncNapPrepNotification(d)
             }
             if d.type.isActivity {
                 let occ = try? await api.fetchRoutineOccurrences(id: routineId)

@@ -104,9 +104,27 @@ struct RoutineDetailResponse: Codable, Identifiable {
     let guidance: SleepGuidance?
     let cycle: CyclePrediction?
     let achievements: RoutineAchievements?
+    let next_sleep: NextSleepWindow?
 
     var type: RoutineType { RoutineType(rawValue: routine_type) ?? .custom }
     var isSharedWithHousehold: Bool { shared_scope == "household" }
+}
+
+/// When the next sleep is likely due, from the last wake plus the typical wake
+/// window for the child's age. Absent when there's no birthdate to reason from
+/// or no finished sleep to measure from.
+struct NextSleepWindow: Codable {
+    let last_wake_at: String?
+    let last_sleep_type: String?
+    let wake_window_label: String?
+    let due_from: String?
+    let due_by: String?
+    let prepare_at: String?
+    let lead_minutes: Int?
+    let basis: String?
+
+    var prepareDate: Date? { prepare_at.flatMap { DateFormatter.dateTimeMinute.date(from: $0) } }
+    var dueFromDate: Date? { due_from.flatMap { DateFormatter.dateTimeMinute.date(from: $0) } }
 }
 
 // MARK: - Sleep statistics

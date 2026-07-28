@@ -5489,7 +5489,12 @@ app.get('/api/routines/:id', requireAuth, async (req, res) => {
     const routine = await db.getRoutineById(req.params.id);
     const entries = await db.getRoutineEntries(req.params.id, {});
     // Attach type-specific derived data the client renders.
-    let guidance = null, cycle = null, achievements = null;
+    let guidance = null, cycle = null, achievements = null, nextSleep = null;
+    if (routine.routine_type === 'baby_sleep' || routine.routine_type === 'sleep_training') {
+      // When the next nap is likely due, so the client can nudge before they're
+      // overtired rather than after.
+      nextSleep = sleepStats.nextSleepWindow(entries, { birthdate: routine.subject_birthdate });
+    }
     if (routine.routine_type === 'sleep_training' && routine.subject_birthdate) {
       guidance = sleepTraining.guidanceForBirthdate(routine.subject_birthdate);
     } else if (routine.routine_type === 'period') {
@@ -5497,7 +5502,7 @@ app.get('/api/routines/:id', requireAuth, async (req, res) => {
     } else if (routine.routine_type === 'activity') {
       achievements = routineAchievements.compute(entries, {});
     }
-    res.json({ ...routine, entries, guidance, cycle, achievements });
+    res.json({ ...routine, entries, guidance, cycle, achievements, next_sleep: nextSleep });
   } catch (err) { sendServerError(res, err); }
   finally { db.close(); }
 });

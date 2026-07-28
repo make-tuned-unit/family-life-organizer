@@ -487,6 +487,72 @@ test('routines: a finished sleep can have its end time corrected', async () => {
     { start_time: '13:00', end_time: '13:30' })).status, 404, 'entry belongs to another routine');
 });
 
+test('routines: the next-nap window is worked back from the last wake', async () => {
+  const [parent] = await member('wake_rt', 'Wake RT');
+  // ~10 months old on the test dates → the 3–4 hour wake-window band.
+  const created = await parent('POST', '/api/routines', {
+    name: 'Jude windows', routine_type: 'baby_sleep', subject_name: 'Jude',
+    subject_birthdate: '2025-09-20',
+  });
+  const id = created.body.id;
+
+  // Nothing logged yet: no wake to measure from, so no guess.
+  assert.equal((await parent('GET', `/api/routines/${id}`)).body.next_sleep, null,
+    'no finished sleep means no prediction');
+
+  await parent('POST', `/api/routines/${id}/entries`, {
+    entry_date: '2026-07-28', entry_type: 'nap', entry_time: '13:00',
+    value: { sleep_start: '2026-07-28 13:00', sleep_end: '2026-07-28 14:20', duration_minutes: 80 },
+  });
+
+  const next = (await parent('GET', `/api/routines/${id}`)).body.next_sleep;
+  assert.ok(next, 'a finished sleep gives us something to work from');
+  assert.equal(next.last_wake_at, '2026-07-28 14:20');
+  assert.equal(next.wake_window_min_minutes, 180, '3 hours at this age');
+  assert.equal(next.due_from, '2026-07-28 17:20', 'wake + 3h');
+  assert.equal(next.due_by, '2026-07-28 18:20', 'wake + 4h');
+  assert.equal(next.prepare_at, '2026-07-28 17:05', 'nudge lands 15 min before, not after');
+  assert.match(next.basis, /rule of thumb/i, 'the basis is stated, not implied');
+
+  // A later wake moves the window with it.
+  await parent('POST', `/api/routines/${id}/entries`, {
+    entry_date: '2026-07-28', entry_type: 'nap', entry_time: '17:30',
+    value: { sleep_start: '2026-07-28 17:30', sleep_end: '2026-07-28 18:10', duration_minutes: 40 },
+  });
+  const moved = (await parent('GET', `/api/routines/${id}`)).body.next_sleep;
+  assert.equal(moved.last_wake_at, '2026-07-28 18:10', 'measured from the most recent wake');
+  assert.equal(moved.due_from, '2026-07-28 21:10');
+
+  // A sleep in progress has no end, so it cannot move the window.
+  await parent('POST', `/api/routines/${id}/sleep/start`, { kind: 'nap', date: '2026-07-29', time: '09:00' });
+  const running = (await parent('GET', `/api/routines/${id}`)).body.next_sleep;
+  assert.equal(running.last_wake_at, '2026-07-28 18:10', 'a running sleep is ignored until it ends');
+});
+
+test('routines: no birthdate means no next-nap guess', async () => {
+  const [parent] = await member('nowin_rt', 'NoWindow RT');
+  const created = await parent('POST', '/api/routines', {
+    name: 'No birthdate', routine_type: 'baby_sleep',
+  });
+  await parent('POST', `/api/routines/${created.body.id}/entries`, {
+    entry_date: '2026-07-28', entry_type: 'nap', entry_time: '13:00',
+    value: { sleep_start: '2026-07-28 13:00', sleep_end: '2026-07-28 14:20', duration_minutes: 80 },
+  });
+  assert.equal((await parent('GET', `/api/routines/${created.body.id}`)).body.next_sleep, null,
+    'without an age there is no wake window to apply');
+
+  // And past the last band (a 5-year-old) there is no nap to predict.
+  const older = await parent('POST', '/api/routines', {
+    name: 'Older kid', routine_type: 'baby_sleep', subject_birthdate: '2021-01-01',
+  });
+  await parent('POST', `/api/routines/${older.body.id}/entries`, {
+    entry_date: '2026-07-28', entry_type: 'night_sleep', entry_time: '19:30',
+    value: { sleep_start: '2026-07-28 19:30', sleep_end: '2026-07-29 06:30', duration_minutes: 660 },
+  });
+  assert.equal((await parent('GET', `/api/routines/${older.body.id}`)).body.next_sleep, null,
+    'past the nap years we extrapolate nothing');
+});
+
 test('routines: sleep stats average the window and earn their tips', async () => {
   const [parent] = await member('stat_rt', 'Stat RT');
   // ~10 months old, so the 4–12 month band (12–16h) applies.
