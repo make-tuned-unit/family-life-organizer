@@ -618,6 +618,10 @@ struct CalendarView: View {
     /// by weeks, a day view by days. Swiping left goes forward, matching the
     /// direction the content would travel.
     private func shiftPeriod(forward: Bool) {
+        // Day view already has a horizontal date strip, and it scrolls. A
+        // screen-wide swipe would drag the strip AND jump the day at the same
+        // time, so day navigation stays with the control that owns it.
+        guard displayMode != .day else { return }
         let step = forward ? 1 : -1
         let cal = Calendar.current
         withAnimation(.snappy) {
@@ -633,11 +637,7 @@ struct CalendarView: View {
                     syncDisplayedMonth(to: moved)
                 }
             case .day:
-                let base = viewModel.selectedDate ?? Date()
-                if let moved = cal.date(byAdding: .day, value: step, to: base) {
-                    viewModel.selectedDate = cal.startOfDay(for: moved)
-                    syncDisplayedMonth(to: moved)
-                }
+                break   // guarded above — the date strip navigates days
             }
         }
     }

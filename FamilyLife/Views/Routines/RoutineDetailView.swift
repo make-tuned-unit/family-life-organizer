@@ -106,7 +106,7 @@ struct RoutineDetailView: View {
         }
         .sheet(item: $editingSleep) { logged in
             LogSleepSheet(kind: logged.kind, accent: accent, editing: logged) { payload in
-                await applySleepEdit(entryId: logged.id, payload: payload, entryDate: logged.entryDate)
+                await applySleepEdit(entryId: logged.id, payload: payload)
             }
         }
         .sheet(item: $sleepToLog) { kind in
@@ -270,7 +270,7 @@ struct RoutineDetailView: View {
         return DateFormatter.shortTime.string(from: d)
     }
 
-    private func applySleepEdit(entryId: Int, payload: SleepPayload, entryDate: String) async {
+    private func applySleepEdit(entryId: Int, payload: SleepPayload) async {
         do {
             try await api.updateRoutineEntry(routineId: routineId, entryId: entryId, data: [
                 // Send the times and let the server recompute the span, so the
@@ -279,8 +279,10 @@ struct RoutineDetailView: View {
                 "end_time": payload.endTime,
                 "wake_count": payload.wakeCount as Any,
                 "notes": payload.notes,
-                // Keep the original filing date rather than the picker's.
-                "entry_date": entryDate,
+                // The full editor's start picker includes a date, so honour it —
+                // logging a sleep on the wrong day is a thing to be able to fix.
+                // (The quick start-time correction stays time-only by design.)
+                "entry_date": payload.date,
             ])
             await load()
         } catch {
@@ -507,9 +509,6 @@ struct LoggedSleep: Identifiable {
     let end: Date
     let wakeCount: Int
     let notes: String
-    /// The day the entry is filed under — preserved so a correction to the clock
-    /// times can't quietly move the sleep to a different date.
-    let entryDate: String
 
     /// Rebuilds from a history row, or nil if the row predates sleep spans (an
     /// old entry with no start/end has nothing to correct).
@@ -530,7 +529,6 @@ struct LoggedSleep: Identifiable {
         self.wakeCount = (obj["wake_count"] as? Int)
             ?? (obj["wake_count"] as? NSNumber)?.intValue ?? 0
         self.notes = entry.notes ?? ""
-        self.entryDate = entry.entry_date
     }
 }
 
