@@ -151,14 +151,29 @@ function compute(entries, { birthdate = null, today = null, windowDays = 7 } = {
   const durationBand = days_old != null ? bandFor(DURATION_BANDS, days_old) : null;
   const napBand = days_old != null ? bandFor(NAP_BANDS, days_old) : null;
 
+  // Night and nap figures average over the days that actually HAVE one. Dividing
+  // by every logged day instead meant a day with only a nap contributed a
+  // zero-length night, so two 11-hour nights and one nap-only day reported the
+  // nights as 7h20m — a number that is neither the night average nor anything
+  // else. Daily totals and naps-per-day stay over all logged days, where a zero
+  // is a real observation rather than a missing one.
+  const nightDays = days.filter(d => d.night_minutes > 0);
+  const napDays = days.filter(d => d.nap_count > 0);
+  const avgOf = (rows, pick, decimals = 0) => {
+    const m = mean(rows.map(pick));
+    if (m == null) return null;
+    const f = 10 ** decimals;
+    return Math.round(m * f) / f;
+  };
+
   const totals = {
     nights_logged: nightsInWindow.length,
     days_logged: days.length,
     avg_daily_minutes: avgDaily == null ? null : Math.round(avgDaily),
-    avg_night_minutes: mean(days.map(d => d.night_minutes)) == null ? null : Math.round(mean(days.map(d => d.night_minutes))),
-    avg_nap_minutes: mean(days.map(d => d.nap_minutes)) == null ? null : Math.round(mean(days.map(d => d.nap_minutes))),
-    avg_naps_per_day: mean(days.map(d => d.nap_count)) == null ? null : Math.round(mean(days.map(d => d.nap_count)) * 10) / 10,
-    avg_wakings: mean(days.map(d => d.wake_count)) == null ? null : Math.round(mean(days.map(d => d.wake_count)) * 10) / 10,
+    avg_night_minutes: avgOf(nightDays, d => d.night_minutes),
+    avg_nap_minutes: avgOf(napDays, d => d.nap_minutes),
+    avg_naps_per_day: avgOf(days, d => d.nap_count, 1),
+    avg_wakings: avgOf(nightDays, d => d.wake_count, 1),
     // Scoped to the window like every other figure here — an all-time maximum
     // sitting under a "last 7 days" heading would be quietly wrong.
     longest_stretch_minutes: (() => {

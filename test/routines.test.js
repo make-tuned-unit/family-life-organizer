@@ -531,6 +531,38 @@ test('routines: sleep stats average the window and earn their tips', async () =>
   assert.ok(stats.tips.every(t => t.title && t.detail), 'every tip says something concrete');
 });
 
+test('routines: the night average ignores days with no night logged', async () => {
+  // A day with only a nap used to contribute a zero-length night, so two 11h
+  // nights plus one nap-only day reported the nights as 7h20m.
+  const [parent] = await member('avg_rt', 'Average RT');
+  const created = await parent('POST', '/api/routines', {
+    name: 'Jude averages', routine_type: 'baby_sleep', subject_birthdate: '2025-09-20',
+  });
+  const id = created.body.id;
+
+  for (const day of ['2026-07-20', '2026-07-21']) {
+    await parent('POST', `/api/routines/${id}/entries`, {
+      entry_date: day, entry_type: 'night_sleep', entry_time: '19:30',
+      value: { sleep_start: `${day} 19:30`, sleep_end: nextDay(day, '06:30'), duration_minutes: 660, wake_count: 1 },
+    });
+  }
+  // A third day where only a nap was logged — no night at all.
+  await parent('POST', `/api/routines/${id}/entries`, {
+    entry_date: '2026-07-22', entry_type: 'nap', entry_time: '13:00',
+    value: { sleep_start: '2026-07-22 13:00', sleep_end: '2026-07-22 14:30', duration_minutes: 90 },
+  });
+
+  const t = (await parent('GET', `/api/routines/${id}/sleep-stats?window_days=30`)).body.totals;
+  assert.equal(t.avg_night_minutes, 660, 'both nights were 11h, so the night average is 11h');
+  assert.equal(t.avg_wakings, 1, 'wakings average over nights, not over every day');
+  assert.equal(t.avg_nap_minutes, 90, 'nap length averages over days that had a nap');
+  assert.equal(t.days_logged, 3, 'all three days still count as logged');
+  assert.equal(t.nights_logged, 2, 'but only two of them had a night');
+  // Daily total is deliberately still over every logged day — a day with less
+  // sleep is a real observation, not a missing one.
+  assert.equal(t.avg_daily_minutes, 470);
+});
+
 test('routines: sleep stats flag a short sleeper and a roaming bedtime', async () => {
   const [parent] = await member('shrt_rt', 'Short RT');
   const created = await parent('POST', '/api/routines', {
