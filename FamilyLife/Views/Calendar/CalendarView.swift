@@ -43,16 +43,6 @@ struct CalendarView: View {
                 switch displayMode {
                 case .month:
                     monthGrid
-                        // Re-identified per month so SwiftUI treats each month as
-                        // a new view and can transition between them; without
-                        // this the cells mutate in place and nothing moves.
-                        .id(viewModel.monthYearString)
-                        .transition(.asymmetric(
-                            insertion: .move(edge: movingForward ? .trailing : .leading)
-                                .combined(with: .opacity),
-                            removal: .move(edge: movingForward ? .leading : .trailing)
-                                .combined(with: .opacity)
-                        ))
                     selectedDayEvents
                 case .week:
                     WeekView(
@@ -463,7 +453,10 @@ struct CalendarView: View {
         VStack(spacing: 0) {
             // Day headers
             LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 7), spacing: 0) {
-                ForEach(weekdays, id: \.self) { day in
+                // Indexed, NOT id: \.self — "S" and "T" each appear twice, and
+                // duplicate ids make SwiftUI collapse them, dropping Thursday
+                // and Saturday from the header entirely.
+                ForEach(Array(weekdays.enumerated()), id: \.offset) { _, day in
                     Text(day)
                         .font(.flOverline)
                         .foregroundStyle(WarmPalette.ink3)
@@ -474,7 +467,9 @@ struct CalendarView: View {
             }
             .padding(.bottom, 8)
 
-            // Calendar cells
+            // Calendar cells — the only part that moves between months. The
+            // weekday header above is fixed furniture: S M T W T F S is the same
+            // in every month, so sliding it just made the whole card wobble.
             LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 7), spacing: 4) {
                 ForEach(viewModel.calendarDays, id: \.id) { day in
                     CalendarDayCell(
@@ -488,6 +483,11 @@ struct CalendarView: View {
                     }
                 }
             }
+            .id(viewModel.monthYearString)
+            .transition(.asymmetric(
+                insertion: .move(edge: movingForward ? .trailing : .leading).combined(with: .opacity),
+                removal: .move(edge: movingForward ? .leading : .trailing).combined(with: .opacity)
+            ))
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 16)
