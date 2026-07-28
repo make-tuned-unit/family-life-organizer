@@ -105,6 +105,11 @@ struct RoutineDetailResponse: Codable, Identifiable {
     let cycle: CyclePrediction?
     let achievements: RoutineAchievements?
     let next_sleep: NextSleepWindow?
+    let bedtime_prep: BedtimePrep?
+    /// What the age guidance was computed from — "routine" when the routine
+    /// carries a birthdate, "people" when it came from the child's People card.
+    let birthdate_source: String?
+    let resolved_birthdate: String?
 
     var type: RoutineType { RoutineType(rawValue: routine_type) ?? .custom }
     var isSharedWithHousehold: Bool { shared_scope == "household" }
@@ -125,6 +130,24 @@ struct NextSleepWindow: Codable {
 
     var prepareDate: Date? { prepare_at.flatMap { DateFormatter.dateTimeMinute.date(from: $0) } }
     var dueFromDate: Date? { due_from.flatMap { DateFormatter.dateTimeMinute.date(from: $0) } }
+}
+
+/// When to start the bedtime routine, from the bedtime actually kept. Nil until
+/// there are a few nights logged — one early night shouldn't set the reminder.
+struct BedtimePrep: Codable {
+    let start_time: String?     // "HH:mm"
+    let bedtime: String?        // the observed average, already formatted
+    let lead_minutes: Int?
+    let based_on_nights: Int?
+    let spread_minutes: Int?
+    let basis: String?
+
+    /// Hour and minute for a repeating daily trigger.
+    var startComponents: (hour: Int, minute: Int)? {
+        guard let parts = start_time?.split(separator: ":"), parts.count == 2,
+              let h = Int(parts[0]), let m = Int(parts[1]) else { return nil }
+        return (h, m)
+    }
 }
 
 // MARK: - Sleep statistics

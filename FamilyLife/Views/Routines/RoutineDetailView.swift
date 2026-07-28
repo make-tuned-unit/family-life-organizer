@@ -61,6 +61,7 @@ struct RoutineDetailView: View {
                         if detail.type == .babySleep || detail.type == .sleepTraining {
                             liveSleepCard(detail)
                             nextSleepCard(detail)
+                            bedtimeCard(detail)
                         }
 
                         quickLog(for: detail.type)
@@ -180,16 +181,31 @@ struct RoutineDetailView: View {
     /// already down, so a reminder to put them down is noise.
     private func syncNapPrepNotification(_ detail: RoutineDetailResponse) async {
         guard await NotificationService.shared.isAuthorized() else { return }
-        guard openSleep(detail) == nil, let next = detail.next_sleep, let at = next.prepareDate else {
+
+        if openSleep(detail) == nil, let next = detail.next_sleep, let at = next.prepareDate {
+            NotificationService.shared.scheduleNapPrep(
+                routineId: routineId,
+                childName: detail.subject_name,
+                at: at,
+                windowLabel: next.wake_window_label
+            )
+        } else {
             NotificationService.shared.cancelNapPrep(routineId: routineId)
-            return
         }
-        NotificationService.shared.scheduleNapPrep(
-            routineId: routineId,
-            childName: detail.subject_name,
-            at: at,
-            windowLabel: next.wake_window_label
-        )
+
+        // Bedtime is a standing nightly reminder rather than an event-driven one,
+        // so it is set (and re-set as the observed bedtime shifts) regardless of
+        // whether a sleep is running right now.
+        if let prep = detail.bedtime_prep, let at = prep.startComponents {
+            NotificationService.shared.scheduleBedtimePrep(
+                routineId: routineId,
+                childName: detail.subject_name,
+                hour: at.hour, minute: at.minute,
+                leadMinutes: prep.lead_minutes ?? 30
+            )
+        } else {
+            NotificationService.shared.cancelBedtimePrep(routineId: routineId)
+        }
     }
 
     // MARK: - Next sleep
@@ -233,6 +249,40 @@ struct RoutineDetailView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(12)
             .flCard(tint: accent.opacity(0.06))
+        }
+    }
+
+    /// The standing bedtime reminder, shown whether or not a nap is due.
+    @ViewBuilder
+    private func bedtimeCard(_ detail: RoutineDetailResponse) -> some View {
+        if let prep = detail.bedtime_prep, let startTime = prep.start_time {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 7) {
+                    Image(systemName: "moon.stars")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(accent)
+                    Text("Bedtime routine")
+                        .font(.flHeadline)
+                        .foregroundStyle(WarmPalette.ink1)
+                    Spacer()
+                    if let nights = prep.based_on_nights {
+                        Text("\(nights) night\(nights == 1 ? "" : "s")")
+                            .font(.flFootnote)
+                            .foregroundStyle(WarmPalette.ink3)
+                    }
+                }
+                Text("Start around \(displayTime(startTime))\(prep.bedtime.map { " for a \($0) bedtime" } ?? "")")
+                    .font(.flSubheadline)
+                    .foregroundStyle(WarmPalette.ink2)
+                if let basis = prep.basis {
+                    Text(basis)
+                        .font(.flCaption2)
+                        .foregroundStyle(WarmPalette.ink4)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(12)
+            .flCard()
         }
     }
 

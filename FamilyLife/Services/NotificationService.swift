@@ -151,6 +151,36 @@ final class NotificationService {
             UNNotificationRequest(identifier: napPrepId(routineId), content: content, trigger: trigger))
     }
 
+    /// "Time to start the bedtime routine", repeating daily at the time worked
+    /// back from the bedtime they actually keep. Repeating rather than one-shot
+    /// because bedtime is the same time every night — that consistency is the
+    /// whole point of the reminder.
+    func scheduleBedtimePrep(routineId: Int, childName: String?, hour: Int, minute: Int, leadMinutes: Int) {
+        cancelBedtimePrep(routineId: routineId)
+
+        let who = (childName?.isEmpty == false) ? childName! : "your little one"
+        let content = UNMutableNotificationContent()
+        content.title = "Bedtime routine for \(who)"
+        content.body = "About \(leadMinutes) minutes to bedtime — a good moment to start winding down."
+        content.sound = .default
+        content.categoryIdentifier = "ROUTINE_BEDTIME_PREP"
+        content.userInfo = ["type": "routine", "ref_id": routineId]
+
+        var components = DateComponents()
+        components.hour = max(0, min(23, hour))
+        components.minute = max(0, min(59, minute))
+        let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: true)
+        UNUserNotificationCenter.current().add(
+            UNNotificationRequest(identifier: bedtimePrepId(routineId), content: content, trigger: trigger))
+    }
+
+    func cancelBedtimePrep(routineId: Int) {
+        UNUserNotificationCenter.current()
+            .removePendingNotificationRequests(withIdentifiers: [bedtimePrepId(routineId)])
+    }
+
+    private func bedtimePrepId(_ routineId: Int) -> String { "routine-bedtime-prep-\(routineId)" }
+
     /// Drop the pending nudge — when a sleep starts (they're already down, so the
     /// reminder is moot) or when the routine is no longer being followed.
     func cancelNapPrep(routineId: Int) {

@@ -5482,6 +5482,38 @@ app.post('/api/routines', requireAuth, async (req, res) => {
   finally { db.close(); }
 });
 
+// The child's birthdate, from the routine if it carries one, otherwise from the
+// person of that name in the same household — their People record, or failing
+// that a birthday key date tied to them. Age drives every piece of sleep
+// guidance, so a birthday already entered once shouldn't have to be typed again.
+//
+// Name matching is scoped to the household and refuses to guess: two people
+// whose names both match returns nothing rather than picking one.
+async function resolveSubjectBirthdate(db, routine) {
+  if (routine?.subject_birthdate) return routine.subject_birthdate;
+  const name = String(routine?.subject_name || '').trim();
+  if (!name || routine.group_id == null) return null;
+
+  const people = await new Promise((resolve) => db.db.all(
+    'SELECT id, name, birthday FROM gift_people WHERE group_id = ?', [routine.group_id],
+    (err, rows) => resolve(err ? [] : (rows || []))));
+
+  const wanted = name.toLowerCase();
+  const firstOf = (n) => String(n || '').trim().toLowerCase().split(/\s+/)[0];
+  let matches = people.filter(p => String(p.name || '').trim().toLowerCase() === wanted);
+  if (!matches.length) matches = people.filter(p => firstOf(p.name) === firstOf(name));
+  if (matches.length !== 1) return null;   // none, or ambiguous — don't guess
+  const person = matches[0];
+  if (person.birthday) return String(person.birthday).slice(0, 10);
+
+  // Fall back to a birthday key date filed against that person.
+  const row = await dbGet(db,
+    `SELECT date FROM special_events
+     WHERE person_id = ? AND group_id = ? AND event_type = 'birthday'
+     ORDER BY date LIMIT 1`, [person.id, routine.group_id]);
+  return row?.date ? String(row.date).slice(0, 10) : null;
+}
+
 app.get('/api/routines/:id', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
@@ -5489,20 +5521,31 @@ app.get('/api/routines/:id', requireAuth, async (req, res) => {
     const routine = await db.getRoutineById(req.params.id);
     const entries = await db.getRoutineEntries(req.params.id, {});
     // Attach type-specific derived data the client renders.
-    let guidance = null, cycle = null, achievements = null, nextSleep = null;
+    let guidance = null, cycle = null, achievements = null, nextSleep = null, bedtimePrep = null;
+    // Falls back to the People record, so a birthday entered once is enough.
+    const birthdate = await resolveSubjectBirthdate(db, routine);
     if (routine.routine_type === 'baby_sleep' || routine.routine_type === 'sleep_training') {
       // When the next nap is likely due, so the client can nudge before they're
       // overtired rather than after.
-      nextSleep = sleepStats.nextSleepWindow(entries, { birthdate: routine.subject_birthdate });
+      nextSleep = sleepStats.nextSleepWindow(entries, { birthdate });
+      bedtimePrep = sleepStats.bedtimePrep(
+        sleepStats.compute(entries, { birthdate, today: todayLocal() }));
     }
-    if (routine.routine_type === 'sleep_training' && routine.subject_birthdate) {
-      guidance = sleepTraining.guidanceForBirthdate(routine.subject_birthdate);
+    if (routine.routine_type === 'sleep_training' && birthdate) {
+      guidance = sleepTraining.guidanceForBirthdate(birthdate);
     } else if (routine.routine_type === 'period') {
       cycle = cycleTracking.predict(entries, routine.config);
     } else if (routine.routine_type === 'activity') {
       achievements = routineAchievements.compute(entries, {});
     }
-    res.json({ ...routine, entries, guidance, cycle, achievements, next_sleep: nextSleep });
+    res.json({
+      ...routine, entries, guidance, cycle, achievements,
+      next_sleep: nextSleep, bedtime_prep: bedtimePrep,
+      // What the age guidance was actually computed from, so the client can say
+      // "using Jude's birthday from People" rather than looking psychic.
+      resolved_birthdate: birthdate,
+      birthdate_source: routine.subject_birthdate ? 'routine' : (birthdate ? 'people' : null),
+    });
   } catch (err) { sendServerError(res, err); }
   finally { db.close(); }
 });
@@ -5729,7 +5772,8 @@ app.get('/api/routines/:id/sleep-stats', requireAuth, async (req, res) => {
     const routine = await db.getRoutineById(req.params.id);
     const entries = await db.getRoutineEntries(req.params.id, { limit: 400 });
     res.json(sleepStats.compute(entries, {
-      birthdate: routine?.subject_birthdate || null,
+      // Same resolution as the detail route: the age can come from People.
+      birthdate: await resolveSubjectBirthdate(db, routine),
       today: todayLocal(),
       windowDays: clampLimit(req.query.window_days, 7, 30),
     }));

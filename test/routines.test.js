@@ -529,6 +529,90 @@ test('routines: the next-nap window is worked back from the last wake', async ()
   assert.equal(running.last_wake_at, '2026-07-28 18:10', 'a running sleep is ignored until it ends');
 });
 
+test('routines: the age falls back to the child\'s People record', async () => {
+  const [parent] = await member('ppl_rt', 'People RT');
+  // Jude's birthday lives on his People card, not on the routine.
+  const person = await parent('POST', '/api/people', { name: 'Jude', birthday: '2025-09-20' });
+  assert.equal(person.status, 200, JSON.stringify(person.body));
+
+  const created = await parent('POST', '/api/routines', {
+    name: "Jude's sleep", routine_type: 'baby_sleep', subject_name: 'Jude',
+  });
+  const id = created.body.id;
+  await parent('POST', `/api/routines/${id}/entries`, {
+    entry_date: '2026-07-28', entry_type: 'nap', entry_time: '13:00',
+    value: { sleep_start: '2026-07-28 13:00', sleep_end: '2026-07-28 14:20', duration_minutes: 80 },
+  });
+
+  const detail = (await parent('GET', `/api/routines/${id}`)).body;
+  assert.equal(detail.resolved_birthdate, '2025-09-20', 'found via People');
+  assert.equal(detail.birthdate_source, 'people', 'and says where it came from');
+  assert.ok(detail.next_sleep, 'so the nap window can be worked out');
+  assert.equal(detail.next_sleep.wake_window_min_minutes, 180);
+
+  // Stats get the same resolution — the age band should not be blank.
+  const stats = await parent('GET', `/api/routines/${id}/sleep-stats`);
+  assert.equal(stats.body.guidance.age_label, '4–12 months');
+});
+
+test('routines: a birthday key date works, and ambiguous names do not', async () => {
+  const [parent] = await member('kdage_rt', 'KeyDate RT');
+  // No birthday on the card — only a birthday key date filed against them.
+  const person = await parent('POST', '/api/people', { name: 'Wren' });
+  await parent('POST', '/api/gifts/events', {
+    person_id: person.body.id, title: "Wren's birthday", date: '2025-09-20',
+    is_recurring: true, event_type: 'birthday',
+  });
+
+  const created = await parent('POST', '/api/routines', {
+    name: 'Wren sleep', routine_type: 'baby_sleep', subject_name: 'Wren',
+  });
+  await parent('POST', `/api/routines/${created.body.id}/entries`, {
+    entry_date: '2026-07-28', entry_type: 'nap', entry_time: '13:00',
+    value: { sleep_start: '2026-07-28 13:00', sleep_end: '2026-07-28 14:20', duration_minutes: 80 },
+  });
+  const detail = (await parent('GET', `/api/routines/${created.body.id}`)).body;
+  assert.equal(detail.resolved_birthdate, '2025-09-20', 'a birthday key date is enough');
+
+  // Two people called Wren: refuse to guess rather than pick one.
+  await parent('POST', '/api/people', { name: 'Wren Cousin', birthday: '2020-01-01' });
+  const second = await parent('POST', '/api/people', { name: 'Wren' });
+  assert.equal(second.status, 200);
+  const ambiguous = (await parent('GET', `/api/routines/${created.body.id}`)).body;
+  assert.equal(ambiguous.resolved_birthdate, null, 'two exact matches -> no guess');
+  assert.equal(ambiguous.next_sleep, null, 'and therefore no prediction');
+});
+
+test('routines: the bedtime reminder comes from the bedtime actually kept', async () => {
+  const [parent] = await member('bed_rt', 'Bedtime RT');
+  const created = await parent('POST', '/api/routines', {
+    name: 'Jude bedtime prep', routine_type: 'baby_sleep', subject_birthdate: '2025-09-20',
+  });
+  const id = created.body.id;
+
+  // Two nights is not enough to set a nightly reminder.
+  for (const day of ['2026-07-25', '2026-07-26']) {
+    await parent('POST', `/api/routines/${id}/entries`, {
+      entry_date: day, entry_type: 'night_sleep', entry_time: '19:30',
+      value: { sleep_start: `${day} 19:30`, sleep_end: nextDay(day, '06:30'), duration_minutes: 660 },
+    });
+  }
+  assert.equal((await parent('GET', `/api/routines/${id}`)).body.bedtime_prep, null,
+    'under three nights it says nothing');
+
+  await parent('POST', `/api/routines/${id}/entries`, {
+    entry_date: '2026-07-27', entry_type: 'night_sleep', entry_time: '19:30',
+    value: { sleep_start: '2026-07-27 19:30', sleep_end: nextDay('2026-07-27', '06:30'), duration_minutes: 660 },
+  });
+
+  const prep = (await parent('GET', `/api/routines/${id}`)).body.bedtime_prep;
+  assert.ok(prep, 'three nights is enough');
+  assert.equal(prep.bedtime, '7:30pm', 'the bedtime they actually keep');
+  assert.equal(prep.start_time, '19:00', 'reminder 30 minutes before it');
+  assert.equal(prep.based_on_nights, 3);
+  assert.match(prep.basis, /Mindell/, 'the evidence is cited, not implied');
+});
+
 test('routines: no birthdate means no next-nap guess', async () => {
   const [parent] = await member('nowin_rt', 'NoWindow RT');
   const created = await parent('POST', '/api/routines', {

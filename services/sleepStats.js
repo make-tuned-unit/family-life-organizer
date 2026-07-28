@@ -199,6 +199,10 @@ function compute(entries, { birthdate = null, today = null, windowDays = 7 } = {
     totals,
     bedtime: bedtimes ? {
       average: fmtClock(bedtimes.average),
+      // Raw minutes-of-day as well as the label: a bedtime reminder has to do
+      // arithmetic on this, and re-parsing "7:30pm" to get it back would be
+      // absurd.
+      average_minutes: Math.round(bedtimes.average),
       earliest: fmtClock(bedtimes.earliest),
       latest: fmtClock(bedtimes.latest),
       spread_minutes: Math.round(bedtimes.spread),
@@ -400,4 +404,28 @@ function nextSleepWindow(entries, { birthdate = null, leadMinutes = 15 } = {}) {
   };
 }
 
-module.exports = { compute, span, nextSleepWindow, DURATION_BANDS, NAP_BANDS, fmtHm, fmtClock };
+// When to start the bedtime routine, from the bedtime they actually keep. Needs
+// a few nights before it will say anything — one early night would otherwise
+// drag the reminder to a time that isn't their bedtime at all.
+//
+// This one IS grounded: the bedtime-routine dose-response study is the strongest
+// evidence in the whole feature, and it is about consistency, which is exactly
+// what a nightly reminder supports.
+function bedtimePrep(stats, { leadMinutes = 30, minNights = 3 } = {}) {
+  const avg = stats?.bedtime?.average_minutes;
+  const nights = stats?.totals?.nights_logged ?? 0;
+  if (avg == null || nights < minNights) return null;
+
+  const startAt = ((Math.round(avg) - leadMinutes) % 1440 + 1440) % 1440;
+  const pad = (v) => String(v).padStart(2, '0');
+  return {
+    start_time: `${pad(Math.floor(startAt / 60))}:${pad(startAt % 60)}`,
+    bedtime: stats.bedtime.average,
+    lead_minutes: leadMinutes,
+    based_on_nights: nights,
+    spread_minutes: stats.bedtime.spread_minutes ?? null,
+    basis: 'Based on the bedtime you actually keep. A consistent, same-order routine is the change with the most evidence behind it (Mindell et al. 2015, n=10,085).',
+  };
+}
+
+module.exports = { compute, span, nextSleepWindow, bedtimePrep, DURATION_BANDS, NAP_BANDS, fmtHm, fmtClock };
