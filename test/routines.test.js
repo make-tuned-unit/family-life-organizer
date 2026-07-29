@@ -583,6 +583,35 @@ test('routines: a birthday key date works, and ambiguous names do not', async ()
   assert.equal(ambiguous.next_sleep, null, 'and therefore no prediction');
 });
 
+test('routines: a private birthday key date does not leak through the age lookup', async () => {
+  const [jesse, invite] = await member('leakage_a', 'Leak Age A');
+  const [sophie] = await member('leakage_b', 'Leak Age B', invite);
+
+  // Sophie records the birthday privately; the person card carries no birthday.
+  const person = await jesse('POST', '/api/people', { name: 'Quiet Kid' });
+  await sophie('POST', '/api/gifts/events', {
+    person_id: person.body.id, title: 'Quiet Kid birthday', date: '2025-09-20',
+    is_recurring: true, event_type: 'birthday', shared_scope: 'private',
+  });
+
+  // Jesse's routine must not resolve an age through a key date he cannot see.
+  const routine = await jesse('POST', '/api/routines', {
+    name: 'Quiet sleep', routine_type: 'baby_sleep', subject_name: 'Quiet Kid',
+  });
+  await jesse('POST', `/api/routines/${routine.body.id}/entries`, {
+    entry_date: '2026-07-28', entry_type: 'nap', entry_time: '13:00',
+    value: { sleep_start: '2026-07-28 13:00', sleep_end: '2026-07-28 14:20', duration_minutes: 80 },
+  });
+  const forJesse = (await jesse('GET', `/api/routines/${routine.body.id}`)).body;
+  assert.equal(forJesse.resolved_birthdate, null, 'a private key date is not a source for someone else');
+  assert.equal(forJesse.next_sleep, null, 'and no age means no prediction');
+
+  // Sophie owns it, so for her it resolves — the date is hers to use.
+  await jesse('PUT', `/api/routines/${routine.body.id}/share`, { shared_scope: 'household' });
+  const forSophie = (await sophie('GET', `/api/routines/${routine.body.id}`)).body;
+  assert.equal(forSophie.resolved_birthdate, '2025-09-20', 'the owner can still use her own key date');
+});
+
 test('routines: the bedtime reminder comes from the bedtime actually kept', async () => {
   const [parent] = await member('bed_rt', 'Bedtime RT');
   const created = await parent('POST', '/api/routines', {

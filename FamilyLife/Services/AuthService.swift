@@ -285,6 +285,11 @@ final class AuthService {
         // inherit (or re-fire against) the previous account's history.
         UserDefaults.standard.removeObject(forKey: "notified_dm_ids")
         UserDefaults.standard.removeObject(forKey: "notified_feed_keys")
+        // Scheduled local notifications outlive the session. Most are one-shot
+        // and expire quietly, but the bedtime nudge repeats nightly — without
+        // this it would keep naming the previous family's child on whatever
+        // account signs in next.
+        NotificationService.shared.removeAllPending()
         if let username {
             // Revoke the device + push tokens server-side (best effort), then
             // scrub local credentials.

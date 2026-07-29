@@ -78,7 +78,10 @@ async function resolveSubjectBirthdate(ctx, routine) {
   const row = await dbGet(ctx,
     `SELECT date FROM special_events
      WHERE person_id = ? AND group_id = ? AND event_type = 'birthday'
-     ORDER BY date LIMIT 1`, [matches[0].id, ctx.groupId]);
+       -- A private key date is its owner's alone; resolving an age through one
+       -- would hand its date to the rest of the household.
+       AND (COALESCE(shared_scope, 'household') != 'private' OR created_by = ?)
+     ORDER BY date LIMIT 1`, [matches[0].id, ctx.groupId, ctx.userId]);
   return row?.date ? String(row.date).slice(0, 10) : null;
 }
 

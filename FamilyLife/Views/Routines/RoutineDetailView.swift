@@ -584,6 +584,10 @@ struct RoutineDetailView: View {
     private func deleteRoutine() async {
         do {
             try await api.deleteRoutine(id: routineId)
+            // The bedtime nudge REPEATS nightly, so leaving it behind would keep
+            // reminding you about a routine that no longer exists — forever.
+            NotificationService.shared.cancelNapPrep(routineId: routineId)
+            NotificationService.shared.cancelBedtimePrep(routineId: routineId)
             dismiss()
         } catch {
             errorMessage = "Couldn't delete this routine."

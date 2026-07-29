@@ -5489,7 +5489,7 @@ app.post('/api/routines', requireAuth, async (req, res) => {
 //
 // Name matching is scoped to the household and refuses to guess: two people
 // whose names both match returns nothing rather than picking one.
-async function resolveSubjectBirthdate(db, routine) {
+async function resolveSubjectBirthdate(db, routine, callerId) {
   if (routine?.subject_birthdate) return routine.subject_birthdate;
   const name = String(routine?.subject_name || '').trim();
   if (!name || routine.group_id == null) return null;
@@ -5510,7 +5510,10 @@ async function resolveSubjectBirthdate(db, routine) {
   const row = await dbGet(db,
     `SELECT date FROM special_events
      WHERE person_id = ? AND group_id = ? AND event_type = 'birthday'
-     ORDER BY date LIMIT 1`, [person.id, routine.group_id]);
+       -- A private key date is its owner's alone; resolving an age through one
+       -- would hand its date to the rest of the household.
+       AND (COALESCE(shared_scope, 'household') != 'private' OR created_by = ?)
+     ORDER BY date LIMIT 1`, [person.id, routine.group_id, callerId]);
   return row?.date ? String(row.date).slice(0, 10) : null;
 }
 
@@ -5523,7 +5526,7 @@ app.get('/api/routines/:id', requireAuth, async (req, res) => {
     // Attach type-specific derived data the client renders.
     let guidance = null, cycle = null, achievements = null, nextSleep = null, bedtimePrep = null;
     // Falls back to the People record, so a birthday entered once is enough.
-    const birthdate = await resolveSubjectBirthdate(db, routine);
+    const birthdate = await resolveSubjectBirthdate(db, routine, req.session.user?.id);
     if (routine.routine_type === 'baby_sleep' || routine.routine_type === 'sleep_training') {
       // When the next nap is likely due, so the client can nudge before they're
       // overtired rather than after.
@@ -5773,7 +5776,7 @@ app.get('/api/routines/:id/sleep-stats', requireAuth, async (req, res) => {
     const entries = await db.getRoutineEntries(req.params.id, { limit: 400 });
     res.json(sleepStats.compute(entries, {
       // Same resolution as the detail route: the age can come from People.
-      birthdate: await resolveSubjectBirthdate(db, routine),
+      birthdate: await resolveSubjectBirthdate(db, routine, req.session.user?.id),
       today: todayLocal(),
       windowDays: clampLimit(req.query.window_days, 7, 30),
     }));
