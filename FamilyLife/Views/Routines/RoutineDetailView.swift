@@ -215,7 +215,9 @@ struct RoutineDetailView: View {
     /// running.
     @ViewBuilder
     private func nextSleepCard(_ detail: RoutineDetailResponse) -> some View {
-        if openSleep(detail) == nil, let next = detail.next_sleep,
+        // Hidden once the window has passed: a prediction from this morning
+        // shown at 8pm reads as "a nap is coming at 11am", which is just wrong.
+        if openSleep(detail) == nil, let next = detail.next_sleep, !next.isStale,
            let dueFrom = next.dueFromDate, let prepare = next.prepareDate {
             VStack(alignment: .leading, spacing: 6) {
                 HStack(spacing: 7) {
@@ -232,9 +234,11 @@ struct RoutineDetailView: View {
                             .foregroundStyle(WarmPalette.ink3)
                     }
                 }
-                Text("Likely due around \(DateFormatter.shortTime.string(from: dueFrom))")
+                Text(next.isDueNow
+                     ? "Due now — the window opened at \(DateFormatter.shortTime.string(from: dueFrom))"
+                     : "Likely due around \(DateFormatter.shortTime.string(from: dueFrom))")
                     .font(.flSubheadline)
-                    .foregroundStyle(WarmPalette.ink2)
+                    .foregroundStyle(next.isDueNow ? WarmPalette.ink1 : WarmPalette.ink2)
                 if let label = next.wake_window_label {
                     Text("Awake \(label) is typical at this age. We'll nudge you \(next.lead_minutes ?? 15) minutes before.")
                         .font(.flFootnote)

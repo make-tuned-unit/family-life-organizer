@@ -130,6 +130,17 @@ struct NextSleepWindow: Codable {
 
     var prepareDate: Date? { prepare_at.flatMap { DateFormatter.dateTimeMinute.date(from: $0) } }
     var dueFromDate: Date? { due_from.flatMap { DateFormatter.dateTimeMinute.date(from: $0) } }
+    var dueByDate: Date? { due_by.flatMap { DateFormatter.dateTimeMinute.date(from: $0) } }
+
+    /// The prediction has outlived its window — the nap either happened and
+    /// wasn't logged, or the day moved on. Showing it after this point states a
+    /// time in the past as though it were still coming.
+    var isStale: Bool { dueByDate.map { $0 < Date() } ?? false }
+    /// Inside the window: not "coming up" any more, but "now".
+    var isDueNow: Bool {
+        guard let from = dueFromDate, !isStale else { return false }
+        return from <= Date()
+    }
 }
 
 /// When to start the bedtime routine, from the bedtime actually kept. Nil until

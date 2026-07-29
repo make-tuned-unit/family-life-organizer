@@ -5525,9 +5525,14 @@ app.get('/api/routines/:id', requireAuth, async (req, res) => {
     const entries = await db.getRoutineEntries(req.params.id, {});
     // Attach type-specific derived data the client renders.
     let guidance = null, cycle = null, achievements = null, nextSleep = null, bedtimePrep = null;
-    // Falls back to the People record, so a birthday entered once is enough.
-    const birthdate = await resolveSubjectBirthdate(db, routine, req.session.user?.id);
-    if (routine.routine_type === 'baby_sleep' || routine.routine_type === 'sleep_training') {
+    // Only the sleep types reason from an age, so only they pay for the lookup —
+    // and a cycle routine whose subject is "Me" can't accidentally resolve some
+    // household member's birthday into its response.
+    const needsAge = ['baby_sleep', 'sleep_training'].includes(routine.routine_type);
+    const birthdate = needsAge
+      ? await resolveSubjectBirthdate(db, routine, req.session.user?.id)
+      : null;
+    if (needsAge) {
       // When the next nap is likely due, so the client can nudge before they're
       // overtired rather than after.
       nextSleep = sleepStats.nextSleepWindow(entries, { birthdate });
