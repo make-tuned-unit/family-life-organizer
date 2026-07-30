@@ -228,8 +228,11 @@ struct RoutineDetailView: View {
                         .font(.flHeadline)
                         .foregroundStyle(WarmPalette.ink1)
                     Spacer()
-                    if prepare > Date() {
-                        Text("in \(relativeMinutes(to: prepare))")
+                    // The countdown must run to the sleep time named below it —
+                    // counting to the wind-down nudge instead read as the two
+                    // disagreeing by the lead time.
+                    if dueFrom > Date() {
+                        Text("in \(relativeMinutes(to: dueFrom))")
                             .font(.flFootnote)
                             .foregroundStyle(WarmPalette.ink3)
                     }
@@ -240,7 +243,9 @@ struct RoutineDetailView: View {
                     .font(.flSubheadline)
                     .foregroundStyle(next.isDueNow ? WarmPalette.ink1 : WarmPalette.ink2)
                 if let label = next.wake_window_label {
-                    Text("Awake \(label) is typical at this age. We'll nudge you \(next.lead_minutes ?? 15) minutes before.")
+                    // Name the wind-down time outright, so the nudge and the
+                    // sleep time are two clearly different clock times.
+                    Text("Awake \(label) is typical at this age. \(windDownLine(prepare: prepare, leadMinutes: next.lead_minutes ?? 15))")
                         .font(.flFootnote)
                         .foregroundStyle(WarmPalette.ink3)
                 }
@@ -288,6 +293,15 @@ struct RoutineDetailView: View {
             .padding(12)
             .flCard()
         }
+    }
+
+    /// The wind-down half of the next-sleep card: the nudge is a separate,
+    /// earlier moment than the sleep itself, so it gets its own clock time
+    /// rather than a relative "15 minutes before".
+    private func windDownLine(prepare: Date, leadMinutes: Int) -> String {
+        prepare > Date()
+            ? "We'll nudge you at \(DateFormatter.shortTime.string(from: prepare)) — \(leadMinutes) min before — to start winding down."
+            : "Good time to start winding down."
     }
 
     private func relativeMinutes(to date: Date) -> String {
