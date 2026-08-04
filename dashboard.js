@@ -677,6 +677,15 @@ app.post('/api/auth/register', registerLimiter, async (req, res) => {
     if (!username || !password || !name) {
       return res.status(400).json({ error: 'Username, password, and name are required' });
     }
+    // Email is optional at signup. It seeds the onboarding drip and can later
+    // be verified via the account-email flow to become the 2FA destination.
+    let signupEmail = null;
+    if (req.body.email != null && String(req.body.email).trim() !== '') {
+      signupEmail = String(req.body.email).trim().toLowerCase();
+      if (signupEmail.length > 254 || !EMAIL_RE.test(signupEmail)) {
+        return res.status(400).json({ error: 'Please enter a valid email address' });
+      }
+    }
     if (typeof password !== 'string' || password.length < 8) {
       return res.status(400).json({ error: 'Password must be at least 8 characters' });
     }
@@ -696,7 +705,7 @@ app.post('/api/auth/register', registerLimiter, async (req, res) => {
 
     // Hash password and create user
     const password_hash = await bcrypt.hash(password, 12);
-    const user = await db.createUser({ username, password_hash, name });
+    const user = await db.createUser({ username, password_hash, name, email: signupEmail });
 
     // If invite code provided, join that household
     let household = null;

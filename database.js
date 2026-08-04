@@ -4339,13 +4339,15 @@ class FamilyDB {
 
   // === Onboarding email drip ===
 
-  // Users eligible for the onboarding sequence: a verified address (proven via
-  // the email-code flow — never send to an unproven typo) that hasn't opted out.
+  // Users eligible for the onboarding sequence: any address on file that
+  // hasn't opted out. Signup collects email without verification, so the drip
+  // accepts unverified addresses — the one-click unsubscribe in every message
+  // covers the mistyped-address case. (2FA codes still require verification.)
   getOnboardingEmailCandidates() {
     return new Promise((resolve, reject) => {
       this.db.all(
         `SELECT id, username, name, email, created_at FROM users
-         WHERE email IS NOT NULL AND email_verified = 1 AND COALESCE(email_opt_out, 0) = 0`,
+         WHERE email IS NOT NULL AND email != '' AND COALESCE(email_opt_out, 0) = 0`,
         [],
         (err, rows) => err ? reject(err) : resolve(rows || [])
       );

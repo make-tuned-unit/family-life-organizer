@@ -6,6 +6,7 @@ struct SignUpView: View {
     @State private var name = ""
     @State private var username = ""
     @State private var password = ""
+    @State private var email = ""
     @State private var inviteCode = ""
     @State private var householdName = ""
     @State private var hasInviteCode = false
@@ -40,6 +41,11 @@ struct SignUpView: View {
                             .autocorrectionDisabled()
                         formField(icon: "lock.fill", placeholder: "Password", text: $password, isSecure: true)
                             .textContentType(.newPassword)
+                        formField(icon: "envelope.fill", placeholder: "Email (optional)", text: $email)
+                            .textContentType(.emailAddress)
+                            .keyboardType(.emailAddress)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
 
                         // Invite code toggle
                         Button {
@@ -134,6 +140,11 @@ struct SignUpView: View {
     }
 
     private func signUp() {
+        let trimmedEmail = email.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmedEmail.isEmpty, !trimmedEmail.contains("@") || !trimmedEmail.contains(".") {
+            errorMessage = "That email doesn't look right"
+            return
+        }
         isLoading = true
         errorMessage = nil
         Task {
@@ -142,11 +153,14 @@ struct SignUpView: View {
                     username: username,
                     password: password,
                     name: name,
+                    email: trimmedEmail.isEmpty ? nil : trimmedEmail,
                     inviteCode: hasInviteCode ? inviteCode : nil,
                     householdName: !hasInviteCode && !householdName.isEmpty ? householdName : nil
                 )
                 dismiss()
             } catch APIError.serverMessage(409, let message) {
+                errorMessage = message
+            } catch APIError.serverMessage(400, let message) {
                 errorMessage = message
             } catch APIError.serverError(409) {
                 errorMessage = "Username already taken"

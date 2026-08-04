@@ -106,15 +106,36 @@ test('stages unlock in order as prior sends age', async () => {
   } finally { db.close(); }
 });
 
-test('unverified emails and opted-out users are excluded', async () => {
-  // Unverified: has an email but never proved it.
-  await post('/api/auth/register', { username: 'onbbob', password: 'hunter22!', name: 'Bob Test' });
+test('registration accepts an optional email and seeds the drip', async () => {
+  const r = await post('/api/auth/register', { username: 'onbbob', password: 'hunter22!', name: 'Bob Test', email: '  Bob@Example.COM ' });
+  assert.equal(r.status, 200, 'register with email succeeds');
+
+  const bad = await post('/api/auth/register', { username: 'onbbadmail', password: 'hunter22!', name: 'Bad Mail', email: 'not-an-email' });
+  assert.equal(bad.status, 400, 'invalid email is rejected');
+
   const db = new FamilyDB();
   try {
-    await run(db, `UPDATE users SET email = 'bob@example.com', email_verified = 0 WHERE username = 'onbbob'`);
+    const row = await get(db, `SELECT email, email_verified FROM users WHERE username = 'onbbob'`);
+    assert.equal(row.email, 'bob@example.com', 'email stored trimmed + lowercased');
+    assert.equal(row.email_verified, 0, 'signup email starts unverified (2FA still needs the code flow)');
+
+    // Unverified addresses from signup ARE eligible for the drip.
     const { sent, send } = fakeSender();
     await onboarding.runOnboardingEmailSweep(db, { send });
-    assert.ok(!sent.some(m => m.to === 'bob@example.com'), 'unverified address never emailed');
+    assert.ok(sent.some(m => m.to === 'bob@example.com'), 'signup email receives the welcome');
+  } finally { db.close(); }
+});
+
+test('users with no email on file are excluded', async () => {
+  await post('/api/auth/register', { username: 'onbnomail', password: 'hunter22!', name: 'No Mail' });
+  const db = new FamilyDB();
+  try {
+    const { sent, send } = fakeSender();
+    await onboarding.runOnboardingEmailSweep(db, { send });
+    assert.ok(sent.every(m => typeof m.to === 'string' && m.to.includes('@')), 'no empty recipients');
+    const row = await get(db, `SELECT COUNT(*) AS n FROM onboarding_emails oe
+      JOIN users u ON u.id = oe.user_id WHERE u.username = 'onbnomail'`);
+    assert.equal(row.n, 0, 'no drip rows for a user without an email');
   } finally { db.close(); }
 });
 
