@@ -1,11 +1,16 @@
 import SwiftUI
 
-/// First-run welcome tour: six swipeable pages introducing the app's shape,
+/// First-run welcome tour: five swipeable pages introducing the app's shape,
 /// with a deliberate spotlight on the AI Concierge — shown even when the
 /// concierge toggle is off, so every household knows what it can do.
 ///
 /// Presented from ContentView the first time an authenticated session appears
 /// (`hasSeenOnboardingTour`), and replayable from Settings → About.
+///
+/// Design notes: lives on the warm cream `.home` ambient (NOT `.login`, which
+/// is the app's one dark backdrop and swallows ink text). Titles/body are
+/// ink1/ink2 on cream for WCAG AA contrast; accents mark icons and eyebrows
+/// only. Five pages max, benefit-led copy, skip always available.
 struct OnboardingTourView: View {
     @Environment(\.dismiss) private var dismiss
     @AppStorage("hasSeenOnboardingTour") private var hasSeenOnboardingTour = false
@@ -13,22 +18,30 @@ struct OnboardingTourView: View {
     @AppStorage("household_invite_code") private var householdInviteCode = ""
 
     @State private var page = 0
-    private let pageCount = 6
+    private let pageCount = 5
+
+    init() {
+        #if DEBUG
+        // Screenshot harness: jump straight to a tour page (0-4).
+        if let v = ProcessInfo.processInfo.environment["UITEST_TOUR_PAGE"], let n = Int(v) {
+            _page = State(initialValue: min(max(n, 0), 4))
+        }
+        #endif
+    }
 
     var body: some View {
         ZStack {
-            AmbientBackground(style: .login)
+            AmbientBackground(style: .home)
 
             VStack(spacing: 0) {
                 topBar
 
                 TabView(selection: $page) {
                     welcomePage.tag(0)
-                    calendarPage.tag(1)
-                    listsPage.tag(2)
-                    householdPage.tag(3)
-                    conciergePage.tag(4)
-                    readyPage.tag(5)
+                    weekPage.tag(1)
+                    peoplePage.tag(2)
+                    conciergePage.tag(3)
+                    readyPage.tag(4)
                 }
                 .tabViewStyle(.page(indexDisplayMode: .never))
                 .animation(.easeInOut(duration: 0.25), value: page)
@@ -66,7 +79,7 @@ struct OnboardingTourView: View {
             if page < pageCount - 1 {
                 Button("Skip") { finish() }
                     .font(.flSubheadline.weight(.medium))
-                    .foregroundStyle(WarmPalette.ink3)
+                    .foregroundStyle(WarmPalette.ink2)
             }
         }
         .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
@@ -78,7 +91,7 @@ struct OnboardingTourView: View {
         HStack(spacing: 8) {
             ForEach(0..<pageCount, id: \.self) { i in
                 Capsule()
-                    .fill(i == page ? WarmPalette.ink1 : WarmPalette.ink4.opacity(0.5))
+                    .fill(i == page ? WarmPalette.ink1 : WarmPalette.ink4)
                     .frame(width: i == page ? 22 : 7, height: 7)
                     .animation(.spring(duration: 0.3), value: page)
             }
@@ -91,63 +104,48 @@ struct OnboardingTourView: View {
     private var welcomePage: some View {
         tourPage(
             icon: "house.fill",
-            accent: TabAccent.home.color,
+            accent: AccentTheme.sage.color,
             eyebrow: "Welcome to Kinrows",
             title: "One calm place for the whole household.",
-            body: "The calendar, the lists, the meals, the trips, the little decisions — out of scattered group chats and into a home everyone can see."
+            body: "The calendar, the lists, the meals, the trips — out of scattered group chats and into a home everyone can see."
         ) {
             featureCard([
                 ("calendar", TabAccent.calendar.color, "A calendar the whole house keeps up"),
-                ("list.bullet.rectangle.fill", TabAccent.home.color, "Lists that update from the store aisle"),
+                ("list.bullet.rectangle.fill", AccentTheme.sage.color, "Lists that update from the store aisle"),
                 ("bubble.left.and.text.bubble.right.fill", AccentTheme.ocean.color, "A family chat that isn't buried"),
             ])
         }
     }
 
-    private var calendarPage: some View {
+    private var weekPage: some View {
         tourPage(
             icon: "calendar",
             accent: TabAccent.calendar.color,
-            eyebrow: "Calendar",
-            title: "The week, in everyone's pocket.",
-            body: "Add it once and the whole household sees it. Sync your existing Apple or Google calendars into one merged view, colored by person."
+            eyebrow: "Your week, sorted",
+            title: "Add it once. Everyone knows.",
+            body: "Events, groceries and dinner plans land in everyone's pocket the moment you add them — and your existing Apple or Google calendars merge right in."
         ) {
             featureCard([
-                ("person.2.fill", TabAccent.calendar.color, "Everyone's events, color-coded by person"),
-                ("arrow.triangle.2.circlepath", TabAccent.home.color, "Mirrors the calendars you already use"),
-                ("location.fill", AccentTheme.ocean.color, "\u{201C}Time to leave\u{201D} nudges for located events"),
+                ("person.2.fill", TabAccent.calendar.color, "One merged calendar, colored by person"),
+                ("cart.fill", AccentTheme.sage.color, "Grocery lists that check off in real time"),
+                ("fork.knife", AccentTheme.terracotta.color, "Dinner ideas from what's in your pantry"),
+                ("creditcard.fill", AccentTheme.terracotta.color, "Budget, trips and more as you need them"),
             ])
         }
     }
 
-    private var listsPage: some View {
-        tourPage(
-            icon: "list.bullet.rectangle.fill",
-            accent: TabAccent.home.color,
-            eyebrow: "Lists, meals & home",
-            title: "The running of the house, shared.",
-            body: "Groceries that check off in real time, a pantry that knows what's expiring, dinner ideas from what you already have, and notes for everything else."
-        ) {
-            featureCard([
-                ("cart.fill", TabAccent.home.color, "Shared grocery and to-do lists"),
-                ("cabinet.fill", AccentTheme.ocean.color, "Pantry with expiry tracking"),
-                ("fork.knife", AccentTheme.terracotta.color, "Cook suggests meals from your pantry"),
-            ])
-        }
-    }
-
-    private var householdPage: some View {
+    private var peoplePage: some View {
         tourPage(
             icon: "person.2.fill",
             accent: AccentTheme.terracotta.color,
             eyebrow: "Your people",
             title: "A family does better when it rows together.",
-            body: "Invite your partner with your household code. Add kids under People — no account needed. Connect grandparents through clans while daily life stays private to your household."
+            body: "Kinrows really begins when your people join — the calendar fills itself in and the mental load finally gets shared."
         ) {
             featureCard([
-                ("creditcard.fill", AccentTheme.terracotta.color, "Budget, receipts & recurring payments"),
-                ("airplane", AccentTheme.ocean.color, "Trips, itineraries & packing lists"),
-                ("flag.2.crossed.fill", AccentTheme.rose.color, "Friendly rivalries & family milestones"),
+                ("person.badge.plus", AccentTheme.terracotta.color, "Your partner joins with one invite code"),
+                ("figure.and.child.holdinghands", AccentTheme.sage.color, "Kids join People — no phone needed"),
+                ("house.and.flag.fill", AccentTheme.mauve.color, "Clans link grandparents & cousins, privately"),
             ])
         }
     }
@@ -177,22 +175,24 @@ struct OnboardingTourView: View {
                     Button {
                         aiConciergeEnabled = true
                     } label: {
+                        // Dark ink on saffron clears WCAG AA (~7:1); cream text on
+                        // saffron would not (~2:1).
                         Label("Turn it on now", systemImage: "sparkles")
                             .font(.flSubheadline.weight(.semibold))
-                            .foregroundStyle(AccentTheme.saffron.color)
+                            .foregroundStyle(WarmPalette.ink1)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, DesignTokens.Spacing.inset)
                             .background(
-                                AccentTheme.saffron.color.opacity(DesignTokens.Opacity.interactiveTint),
+                                AccentTheme.saffron.color,
                                 in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.small)
                             )
                     }
                     .buttonStyle(.flCardPress)
                     .padding(.top, DesignTokens.Spacing.tinyLabel)
 
-                    Text("Off by default — nothing runs until you say so. The daily brief is free; you can change your mind any time under More → AI Concierge.")
+                    Text("Off by default — nothing runs until you say so. The daily brief is free; change your mind any time under More → AI Concierge.")
                         .font(.flCaption)
-                        .foregroundStyle(WarmPalette.ink3)
+                        .foregroundStyle(WarmPalette.ink2)
                 }
             }
             .padding(DesignTokens.Spacing.cardPadding)
@@ -203,10 +203,10 @@ struct OnboardingTourView: View {
     private var readyPage: some View {
         tourPage(
             icon: "figure.2.and.child.holdinghands",
-            accent: TabAccent.home.color,
+            accent: AccentTheme.sage.color,
             eyebrow: "You're ready",
             title: "Start with the week you're in.",
-            body: "Put tonight on the calendar, start a grocery list, say hello in the feed. Kinrows really begins when your people join you."
+            body: "Put tonight on the calendar, start a grocery list, say hello in the feed — small wins first."
         ) {
             if !householdInviteCode.isEmpty {
                 VStack(spacing: DesignTokens.Spacing.tinyLabel) {
@@ -214,18 +214,18 @@ struct OnboardingTourView: View {
                         .font(.flOverline)
                         .tracking(0.4)
                         .textCase(.uppercase)
-                        .foregroundStyle(WarmPalette.ink3)
+                        .foregroundStyle(WarmPalette.ink2)
                     // Monospaced invite codes are an allowed typography exemption.
                     Text(householdInviteCode)
                         .font(.system(.title2, design: .monospaced).weight(.bold))
                         .foregroundStyle(WarmPalette.ink1)
                     Text("Share it from More → Household")
                         .font(.flCaption)
-                        .foregroundStyle(WarmPalette.ink3)
+                        .foregroundStyle(WarmPalette.ink2)
                 }
                 .frame(maxWidth: .infinity)
                 .padding(DesignTokens.Spacing.cardPadding)
-                .flCard(tint: AccentTheme.saffron.color)
+                .flCard(tint: AccentTheme.sage.color)
             } else {
                 featureCard([
                     ("person.badge.plus", AccentTheme.terracotta.color, "Invite your partner from More → Household"),
@@ -237,6 +237,9 @@ struct OnboardingTourView: View {
 
     // MARK: - Building blocks
 
+    /// Shared page scaffold: icon badge, eyebrow, title, body, custom content —
+    /// vertically centered, scrolling only when it must (small screens / large
+    /// Dynamic Type).
     private func tourPage(
         icon: String,
         accent: Color,
@@ -245,40 +248,44 @@ struct OnboardingTourView: View {
         body: String,
         @ViewBuilder content: () -> some View
     ) -> some View {
-        ScrollView(showsIndicators: false) {
-            VStack(spacing: DesignTokens.Spacing.sectionGap) {
-                ZStack {
-                    Circle()
-                        .fill(accent.opacity(DesignTokens.Opacity.interactiveTint))
-                        .frame(width: 84, height: 84)
-                    Image(systemName: icon)
-                        .font(.system(size: 36, weight: .semibold))
-                        .foregroundStyle(accent)
-                }
-                .padding(.top, DesignTokens.Spacing.sectionGap)
+        // Materialize the builder up front — the GeometryReader closure is
+        // escaping and can't capture the non-escaping parameter.
+        let inner = content()
+        return GeometryReader { geo in
+            ScrollView(showsIndicators: false) {
+                VStack(spacing: DesignTokens.Spacing.sectionGap) {
+                    ZStack {
+                        Circle()
+                            .fill(accent.opacity(DesignTokens.Opacity.interactiveTint))
+                            .frame(width: 84, height: 84)
+                        Image(systemName: icon)
+                            .font(.system(size: 36, weight: .semibold))
+                            .foregroundStyle(accent)
+                    }
 
-                VStack(spacing: DesignTokens.Spacing.rowVertical) {
-                    Text(eyebrow)
-                        .font(.flOverline)
-                        .tracking(0.4)
-                        .textCase(.uppercase)
-                        .foregroundStyle(accent)
-                    Text(title)
-                        .font(.flTitle)
-                        .foregroundStyle(WarmPalette.ink1)
-                        .multilineTextAlignment(.center)
-                    Text(body)
-                        .font(.flBody)
-                        .foregroundStyle(WarmPalette.ink2)
-                        .multilineTextAlignment(.center)
-                        .lineSpacing(3)
-                }
+                    VStack(spacing: DesignTokens.Spacing.rowVertical) {
+                        Text(eyebrow)
+                            .font(.flOverline)
+                            .tracking(0.4)
+                            .textCase(.uppercase)
+                            .foregroundStyle(WarmPalette.ink2)
+                        Text(title)
+                            .font(.flTitle)
+                            .foregroundStyle(WarmPalette.ink1)
+                            .multilineTextAlignment(.center)
+                        Text(body)
+                            .font(.flBody)
+                            .foregroundStyle(WarmPalette.ink2)
+                            .multilineTextAlignment(.center)
+                            .lineSpacing(3)
+                    }
 
-                content()
+                    inner
+                }
+                .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
+                .padding(.vertical, DesignTokens.Spacing.sectionGap)
+                .frame(maxWidth: .infinity, minHeight: geo.size.height)
             }
-            .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
-            .padding(.bottom, DesignTokens.Spacing.sectionGap)
-            .frame(maxWidth: .infinity)
         }
     }
 
@@ -287,9 +294,10 @@ struct OnboardingTourView: View {
             ForEach(rows, id: \.text) { row in
                 HStack(spacing: DesignTokens.Spacing.chipPadding) {
                     Image(systemName: row.icon)
-                        .font(.system(size: 17, weight: .semibold))
+                        .font(.system(size: 15, weight: .semibold))
                         .foregroundStyle(row.tint)
-                        .frame(width: 30)
+                        .frame(width: 34, height: 34)
+                        .background(row.tint.opacity(DesignTokens.Opacity.badgeFill), in: Circle())
                     Text(row.text)
                         .font(.flSubheadline)
                         .foregroundStyle(WarmPalette.ink1)
