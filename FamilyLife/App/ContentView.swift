@@ -35,6 +35,7 @@ enum MainTab: Hashable, CaseIterable {
 
 struct ContentView: View {
     @Environment(AuthService.self) private var authService
+    @AppStorage("hasSeenOnboardingTour") private var hasSeenOnboardingTour = false
 
     var body: some View {
         content
@@ -53,6 +54,14 @@ struct ContentView: View {
             }
         } else if authService.isAuthenticated {
             MainTabView()
+                // First-run welcome tour; Settings → About can clear the flag
+                // to replay it. The derived binding marks it seen on dismissal.
+                .fullScreenCover(isPresented: Binding(
+                    get: { !hasSeenOnboardingTour },
+                    set: { hasSeenOnboardingTour = !$0 }
+                )) {
+                    OnboardingTourView()
+                }
         } else {
             LoginView()
         }

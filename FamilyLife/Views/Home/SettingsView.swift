@@ -30,6 +30,7 @@ struct SettingsView: View {
     // Off by default — household presence sharing is strictly opt-in.
     @AppStorage("sharePresenceEnabled") private var sharePresenceEnabled = false
     @AppStorage(AppleCalendarSyncMode.storageKey) private var calendarSyncMode: AppleCalendarSyncMode = .off
+    @AppStorage("hasSeenOnboardingTour") private var hasSeenOnboardingTour = false
 
     var body: some View {
         Form {
@@ -286,6 +287,13 @@ struct SettingsView: View {
             }
 
             Section("About") {
+                Button {
+                    // Clearing the flag re-presents the tour from ContentView.
+                    hasSeenOnboardingTour = false
+                } label: {
+                    Label("Replay the welcome tour", systemImage: "sparkles")
+                        .foregroundStyle(TabAccent.home.color)
+                }
                 HStack {
                     Text("Version")
                     Spacer()

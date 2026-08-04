@@ -113,6 +113,7 @@
 		AA000099 /* TravelHubView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000099 /* TravelHubView.swift */; };
 		AA0000A0 /* CookingModeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000A0 /* CookingModeView.swift */; };
 		AA0000A1 /* TabBarChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000A1 /* TabBarChrome.swift */; };
+		AA0000A2 /* OnboardingTourView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000A2 /* OnboardingTourView.swift */; };
 		AA000100 /* EventAttachment.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000100 /* EventAttachment.swift */; };
 		AA000101 /* EventAttachmentsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000101 /* EventAttachmentsView.swift */; };
 		AA000102 /* ConciergeHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000102 /* ConciergeHistoryView.swift */; };
@@ -239,6 +240,7 @@
 		BB000099 /* TravelHubView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TravelHubView.swift; sourceTree = "<group>"; };
 		BB0000A0 /* CookingModeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CookingModeView.swift; sourceTree = "<group>"; };
 		BB0000A1 /* TabBarChrome.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabBarChrome.swift; sourceTree = "<group>"; };
+		BB0000A2 /* OnboardingTourView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingTourView.swift; sourceTree = "<group>"; };
 		BB000100 /* EventAttachment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventAttachment.swift; sourceTree = "<group>"; };
 		BB000101 /* EventAttachmentsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventAttachmentsView.swift; sourceTree = "<group>"; };
 		BB000102 /* ConciergeHistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConciergeHistoryView.swift; sourceTree = "<group>"; };
@@ -369,6 +371,7 @@
 				GG000002 /* Lists */,
 				GG000003 /* Family */,
 				EE000023 /* Routines */,
+				EE000024 /* Onboarding */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -564,6 +567,14 @@
 				BB000218 /* SleepTrainingProgramView.swift */,
 			);
 			path = Routines;
+			sourceTree = "<group>";
+		};
+		EE000024 /* Onboarding */ = {
+			isa = PBXGroup;
+			children = (
+				BB0000A2 /* OnboardingTourView.swift */,
+			);
+			path = Onboarding;
 			sourceTree = "<group>";
 		};
 		GG000001 /* Care */ = {
@@ -766,6 +777,7 @@
 				AA000039 /* AmbientBackground.swift in Sources */,
 				AA00003B /* DesignTokens.swift in Sources */,
 				AA0000A1 /* TabBarChrome.swift in Sources */,
+				AA0000A2 /* OnboardingTourView.swift in Sources */,
 				AA00003C /* FLCardModifier.swift in Sources */,
 				AA000041 /* ButtonStyles.swift in Sources */,
 				AA000042 /* DateFormatters.swift in Sources */,
@@ -816,7 +828,7 @@
 				CODE_SIGN_ENTITLEMENTS = FamilyLife/FamilyLife.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 224;
+				CURRENT_PROJECT_VERSION = 226;
 				DEVELOPMENT_ASSET_PATHS = "";
 				DEVELOPMENT_TEAM = GANM22MFCH;
 				ENABLE_PREVIEWS = YES;
@@ -861,7 +873,7 @@
 				CODE_SIGN_ENTITLEMENTS = FamilyLife/FamilyLife.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 224;
+				CURRENT_PROJECT_VERSION = 226;
 				DEVELOPMENT_ASSET_PATHS = "";
 				DEVELOPMENT_TEAM = GANM22MFCH;
 				ENABLE_PREVIEWS = YES;
