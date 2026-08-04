@@ -453,6 +453,8 @@ CREATE TABLE IF NOT EXISTS users (
     last_location_at DATETIME,
     email_verified INTEGER DEFAULT 0,
     two_factor_enabled INTEGER DEFAULT 0,
+    email_opt_out INTEGER DEFAULT 0,     -- 1 = no product/onboarding email (2FA codes still send)
+    unsubscribe_token TEXT,              -- random token for one-click unsubscribe links
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -844,6 +846,18 @@ CREATE TABLE IF NOT EXISTS concierge_nudges (
 );
 
 CREATE INDEX IF NOT EXISTS idx_concierge_nudges_group ON concierge_nudges(group_id, sent_at);
+
+-- Onboarding email drip log: one row per (user, stage) actually handed to the
+-- send path. The UNIQUE constraint is the idempotence guard — the hourly sweep
+-- can re-run forever (and re-runs on every redeploy) without double-sending.
+CREATE TABLE IF NOT EXISTS onboarding_emails (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id),
+    email_key TEXT NOT NULL,             -- 'welcome' | 'household' | 'concierge' | 'rhythm' | 'checkin'
+    sent_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(user_id, email_key)
+);
+CREATE INDEX IF NOT EXISTS idx_onboarding_emails_user ON onboarding_emails(user_id);
 
 -- Polymorphic attachments: link a calendar appointment to any other entity
 -- (list | note | decision | receipt | trip | itinerary | ...). group_id mirrors

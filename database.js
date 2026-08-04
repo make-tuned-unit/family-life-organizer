@@ -193,6 +193,9 @@ class FamilyDB {
         // DEFAULT applies to existing rows too, so anything created before this
         // migration fails closed (a cycle tracker never silently stays visible).
         this.db.run(`ALTER TABLE routines ADD COLUMN shared_scope TEXT DEFAULT 'private'`, () => {});
+        // Onboarding email drip: opt-out flag + unsubscribe-link token
+        this.db.run('ALTER TABLE users ADD COLUMN email_opt_out INTEGER DEFAULT 0', () => {});
+        this.db.run('ALTER TABLE users ADD COLUMN unsubscribe_token TEXT', () => {});
         // Per-day HealthKit totals: one synced row per member per calendar day
         this.db.run('ALTER TABLE rivalry_entries ADD COLUMN activity_date TEXT', () => {});
         this.db.run(`CREATE UNIQUE INDEX IF NOT EXISTS idx_rivalry_entries_daily
@@ -4331,6 +4334,70 @@ class FamilyDB {
         [groupId, key, `-${hours} hours`],
         (err, row) => err ? reject(err) : resolve(!!row)
       );
+    });
+  }
+
+  // === Onboarding email drip ===
+
+  // Users eligible for the onboarding sequence: a verified address (proven via
+  // the email-code flow — never send to an unproven typo) that hasn't opted out.
+  getOnboardingEmailCandidates() {
+    return new Promise((resolve, reject) => {
+      this.db.all(
+        `SELECT id, username, name, email, created_at FROM users
+         WHERE email IS NOT NULL AND email_verified = 1 AND COALESCE(email_opt_out, 0) = 0`,
+        [],
+        (err, rows) => err ? reject(err) : resolve(rows || [])
+      );
+    });
+  }
+
+  getOnboardingEmailsSent(userId) {
+    return new Promise((resolve, reject) => {
+      this.db.all(
+        'SELECT email_key, sent_at FROM onboarding_emails WHERE user_id = ? ORDER BY sent_at',
+        [userId],
+        (err, rows) => err ? reject(err) : resolve(rows || [])
+      );
+    });
+  }
+
+  // Records a stage as sent. Resolves { recorded: false } if it was already
+  // logged (the UNIQUE constraint), so a racing double-sweep can't double-send.
+  recordOnboardingEmail(userId, key) {
+    return new Promise((resolve, reject) => {
+      this.db.run(
+        'INSERT OR IGNORE INTO onboarding_emails (user_id, email_key) VALUES (?, ?)',
+        [userId, key],
+        function(err) { err ? reject(err) : resolve({ recorded: this.changes > 0 }); }
+      );
+    });
+  }
+
+  // Returns the user's unsubscribe token, minting one on first use.
+  ensureUnsubscribeToken(userId) {
+    return new Promise((resolve, reject) => {
+      this.db.get('SELECT unsubscribe_token FROM users WHERE id = ?', [userId], (err, row) => {
+        if (err) return reject(err);
+        if (!row) return reject(new Error('User not found'));
+        if (row.unsubscribe_token) return resolve(row.unsubscribe_token);
+        const token = crypto.randomBytes(24).toString('hex');
+        this.db.run('UPDATE users SET unsubscribe_token = ? WHERE id = ? AND unsubscribe_token IS NULL',
+          [token, userId], (uErr) => {
+            if (uErr) return reject(uErr);
+            // Re-read in case a concurrent mint won the race.
+            this.db.get('SELECT unsubscribe_token FROM users WHERE id = ?', [userId],
+              (rErr, r2) => rErr ? reject(rErr) : resolve(r2.unsubscribe_token));
+          });
+      });
+    });
+  }
+
+  setEmailOptOutByToken(token) {
+    return new Promise((resolve, reject) => {
+      if (!token) return resolve({ changed: 0 });
+      this.db.run('UPDATE users SET email_opt_out = 1 WHERE unsubscribe_token = ?', [String(token)],
+        function(err) { err ? reject(err) : resolve({ changed: this.changes }); });
     });
   }
 

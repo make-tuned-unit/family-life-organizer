@@ -29,7 +29,7 @@ function isEmailEnabled() {
  * Low-level send. Resolves to { ok, id?, error? } — never throws, so callers
  * (e.g. the waitlist endpoint) can succeed even if email delivery hiccups.
  */
-async function sendEmail({ to, subject, html, text, from, replyTo }) {
+async function sendEmail({ to, subject, html, text, from, replyTo, headers }) {
   if (!isEmailEnabled()) {
     return { ok: false, error: 'RESEND_API_KEY not set' };
   }
@@ -47,6 +47,8 @@ async function sendEmail({ to, subject, html, text, from, replyTo }) {
         html,
         text,
         reply_to: replyTo || config.replyTo,
+        // Custom SMTP headers (e.g. List-Unsubscribe for one-click opt-out).
+        ...(headers ? { headers } : {}),
       }),
     });
     const data = await res.json().catch(() => ({}));
@@ -250,4 +252,6 @@ module.exports = {
   waitlistWelcomeEmail,
   waitlistNotifyEmail,
   emailConfig: config,
+  BRAND,
+  escapeHtml,
 };

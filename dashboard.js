@@ -18,6 +18,7 @@ const { runProactiveSweep } = require('./services/conciergeNudge');
 const { announceRivalryCompletion } = require('./services/rivalryAnnounce');
 const { createRateLimiter } = require('./services/rateLimit');
 const email = require('./services/email');
+const { runOnboardingEmailSweep } = require('./services/onboardingEmail');
 const crypto = require('crypto');
 
 const IS_PROD = process.env.NODE_ENV === 'production';
@@ -1102,6 +1103,46 @@ app.get('/api/waitlist/status', waitlistLimiter, async (req, res) => {
     if (!res.headersSent) res.status(500).json({ error: 'Something went wrong.' });
   } finally {
     db.close();
+  }
+});
+
+// ── Onboarding email unsubscribe (public, token-based) ───────────────────────
+// GET renders a tiny confirmation page (the footer link in every onboarding
+// email); POST is the RFC 8058 one-click endpoint mail clients hit for the
+// List-Unsubscribe header. Both are idempotent; unknown tokens still say
+// "done" so the endpoint can't be used to probe which tokens exist.
+const unsubscribeLimiter = createRateLimiter({ windowMs: 60000, max: 10, keyFn: clientIp });
+
+async function handleUnsubscribe(token) {
+  const db = new FamilyDB();
+  try {
+    await db.setEmailOptOutByToken(token);
+  } finally {
+    db.close();
+  }
+}
+
+app.get('/api/email/unsubscribe', unsubscribeLimiter, async (req, res) => {
+  try {
+    await handleUnsubscribe(req.query.token);
+    res.type('html').send(`<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1"><title>Unsubscribed — Kinrows</title>
+<style>body{margin:0;background:#fdf5e0;font-family:'Helvetica Neue',Arial,sans-serif;color:#2c2017;display:flex;min-height:100vh;align-items:center;justify-content:center}
+.card{background:#fffaf0;border-radius:20px;padding:44px 40px;max-width:420px;margin:16px;text-align:center;box-shadow:0 1px 0 #ece0c8}
+h1{font-family:Georgia,serif;font-size:28px;margin:0 0 12px}p{color:#5c4a3a;line-height:1.6;margin:0}</style></head>
+<body><div class="card"><h1>You're unsubscribed.</h1>
+<p>No more getting-started emails from Kinrows. Account and security emails (like sign-in codes) still reach you.</p></div></body></html>`);
+  } catch (err) {
+    sendServerError(res, err);
+  }
+});
+
+app.post('/api/email/unsubscribe', unsubscribeLimiter, async (req, res) => {
+  try {
+    await handleUnsubscribe(req.query.token || req.body?.token);
+    res.json({ success: true });
+  } catch (err) {
+    sendServerError(res, err);
   }
 });
 
@@ -6555,6 +6596,7 @@ initializeDatabase().then(() => {
     console.log('AI features:', process.env.ANTHROPIC_API_KEY ? 'ENABLED' : 'DISABLED (no ANTHROPIC_API_KEY)');
     startProactiveNudges();
     startNightlyBackups();
+    startOnboardingEmails();
   });
   // Graceful shutdown on platform-issued SIGTERM (deploys/restarts): stop
   // accepting connections, let in-flight requests finish, then exit. WAL keeps
@@ -6601,6 +6643,30 @@ function startNightlyBackups() {
   };
   runBackup(); // at boot, so every deploy day has a snapshot before any writes
   const handle = setInterval(runBackup, 24 * 60 * 60 * 1000);
+  handle.unref();
+}
+
+// Onboarding email drip: sweep hourly during civil hours (nobody wants a
+// "getting started" email at 3am). At most one stage per user per sweep;
+// dedupe/idempotence lives in the onboarding_emails log, so redeploys and
+// restarts are harmless.
+function startOnboardingEmails() {
+  const SWEEP_MS = 60 * 60 * 1000; // hourly
+  const runIfDaytime = async () => {
+    if (!email.isEmailEnabled()) return;
+    const hour = new Date().getHours(); // server TZ (America/Halifax)
+    if (hour < 9 || hour >= 20) return;
+    const db = new FamilyDB();
+    try {
+      const summary = await runOnboardingEmailSweep(db);
+      if (summary.sent || summary.errors) console.log('Onboarding emails:', JSON.stringify(summary));
+    } catch (err) {
+      console.error('Onboarding email sweep error:', err.message);
+    } finally {
+      db.close();
+    }
+  };
+  const handle = setInterval(runIfDaytime, SWEEP_MS);
   handle.unref();
 }
 
