@@ -155,7 +155,12 @@ final class NotificationService {
     /// back from the bedtime they actually keep. Repeating rather than one-shot
     /// because bedtime is the same time every night — that consistency is the
     /// whole point of the reminder.
-    func scheduleBedtimePrep(routineId: Int, childName: String?, hour: Int, minute: Int, leadMinutes: Int) {
+    ///
+    /// `skipToday` covers the night a sleep is already running: a repeating
+    /// trigger can't skip one occurrence, so we swap in a one-shot for tomorrow
+    /// instead. The nightly repeat is re-established on the next routine load
+    /// once no sleep is in progress.
+    func scheduleBedtimePrep(routineId: Int, childName: String?, hour: Int, minute: Int, leadMinutes: Int, skipToday: Bool = false) {
         cancelBedtimePrep(routineId: routineId)
 
         let who = (childName?.isEmpty == false) ? childName! : "your little one"
@@ -166,10 +171,21 @@ final class NotificationService {
         content.categoryIdentifier = "ROUTINE_BEDTIME_PREP"
         content.userInfo = ["type": "routine", "ref_id": routineId]
 
-        var components = DateComponents()
-        components.hour = max(0, min(23, hour))
-        components.minute = max(0, min(59, minute))
-        let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: true)
+        let h = max(0, min(23, hour))
+        let m = max(0, min(59, minute))
+        let trigger: UNCalendarNotificationTrigger
+        if skipToday {
+            let calendar = Calendar.current
+            guard let tomorrow = calendar.date(byAdding: .day, value: 1, to: calendar.startOfDay(for: Date())),
+                  let fire = calendar.date(bySettingHour: h, minute: m, second: 0, of: tomorrow) else { return }
+            let components = calendar.dateComponents([.year, .month, .day, .hour, .minute], from: fire)
+            trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
+        } else {
+            var components = DateComponents()
+            components.hour = h
+            components.minute = m
+            trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: true)
+        }
         UNUserNotificationCenter.current().add(
             UNNotificationRequest(identifier: bedtimePrepId(routineId), content: content, trigger: trigger))
     }

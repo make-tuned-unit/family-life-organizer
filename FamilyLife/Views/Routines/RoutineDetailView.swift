@@ -193,15 +193,17 @@ struct RoutineDetailView: View {
             NotificationService.shared.cancelNapPrep(routineId: routineId)
         }
 
-        // Bedtime is a standing nightly reminder rather than an event-driven one,
-        // so it is set (and re-set as the observed bedtime shifts) regardless of
-        // whether a sleep is running right now.
+        // Bedtime is a standing nightly reminder rather than an event-driven
+        // one — but if they're already down tonight, tonight's occurrence is
+        // noise ("start winding down" hours into a logged sleep), so it skips
+        // to tomorrow while a sleep is running.
         if let prep = detail.bedtime_prep, let at = prep.startComponents {
             NotificationService.shared.scheduleBedtimePrep(
                 routineId: routineId,
                 childName: detail.subject_name,
                 hour: at.hour, minute: at.minute,
-                leadMinutes: prep.lead_minutes ?? 30
+                leadMinutes: prep.lead_minutes ?? 30,
+                skipToday: openSleep(detail) != nil
             )
         } else {
             NotificationService.shared.cancelBedtimePrep(routineId: routineId)

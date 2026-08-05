@@ -144,8 +144,29 @@ function compute(entries, { birthdate = null, today = null, windowDays = 7 } = {
 
   const avgDaily = mean(days.map(d => d.total_minutes));
   const priorAvgDaily = mean(priorDays.map(d => d.total_minutes));
-  const bedtimes = clockStats(nightsInWindow.map(s => s.startMin).filter(v => v != null));
-  const wakeTimes = clockStats(nightsInWindow.map(s => s.endMin).filter(v => v != null));
+
+  // A night is usually SEVERAL night_sleep entries — the bedtime itself plus
+  // each overnight resettle. Averaging every start as if it were "a bedtime"
+  // dragged the average (and the wind-down reminder built on it) hours past the
+  // real bedtime. Reduce each night to two marks first: bedtime = the first
+  // start of the night, wake = the last end. "First/last" is judged on a
+  // noon-to-noon clock so a 00:30 resettle counts as later than a 19:15
+  // bedtime, not earlier.
+  const noonAnchored = (m) => (m < 720 ? m + 1440 : m);
+  const perNight = new Map();
+  for (const s of nightsInWindow) {
+    const night = perNight.get(s.date) || { startMin: null, endMin: null };
+    if (s.startMin != null && (night.startMin == null || noonAnchored(s.startMin) < noonAnchored(night.startMin))) {
+      night.startMin = s.startMin;
+    }
+    if (s.endMin != null && (night.endMin == null || noonAnchored(s.endMin) > noonAnchored(night.endMin))) {
+      night.endMin = s.endMin;
+    }
+    perNight.set(s.date, night);
+  }
+  const nightMarks = [...perNight.values()];
+  const bedtimes = clockStats(nightMarks.map(n => n.startMin).filter(v => v != null));
+  const wakeTimes = clockStats(nightMarks.map(n => n.endMin).filter(v => v != null));
 
   const days_old = birthdate ? ageInDays(birthdate) : null;
   const durationBand = days_old != null ? bandFor(DURATION_BANDS, days_old) : null;
