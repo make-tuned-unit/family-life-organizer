@@ -256,6 +256,12 @@ struct SettingsView: View {
                     set: { on in
                         calendarService.shareEnabled = on
                         if on {
+                            // Fresh setup defaults to sharing everything —
+                            // "the household sees my schedule" is the point,
+                            // and a partial pick reads as broken sync later.
+                            if calendarService.sharedCalendarIDs.isEmpty {
+                                calendarService.shareAllCalendars = true
+                            }
                             Task {
                                 if calendarService.access != .granted { _ = await calendarService.requestAccess() }
                                 await calendarService.syncToHousehold(api: api)
@@ -275,7 +281,9 @@ struct SettingsView: View {
                         HStack {
                             Text("Calendars to share")
                             Spacer()
-                            Text("\(calendarService.sharedCalendarIDs.count) selected")
+                            Text(calendarService.shareAllCalendars
+                                 ? "All"
+                                 : "\(calendarService.sharedCalendarIDs.count) selected")
                                 .foregroundStyle(WarmPalette.ink3)
                         }
                     }
@@ -283,7 +291,7 @@ struct SettingsView: View {
             } header: {
                 Text("Household calendar")
             } footer: {
-                Text("Share your selected device calendars (including synced Google calendars) so your household can see your schedule at a glance. Pick which calendars below.")
+                Text("Share your device calendars (including synced Google calendars) so your household can see your schedule at a glance. \"All\" includes calendars you add later; or pick specific ones below.")
             }
 
             Section("About") {
@@ -448,24 +456,45 @@ private struct CalendarSharePicker: View {
     var body: some View {
         List {
             Section {
-                ForEach(calendars) { cal in
-                    Button {
-                        toggle(cal.id)
-                    } label: {
-                        HStack(spacing: 12) {
-                            Circle().fill(cal.color).frame(width: 12, height: 12)
-                            Text(cal.title)
-                                .foregroundStyle(WarmPalette.ink1)
-                            Spacer()
-                            if calendarService.sharedCalendarIDs.contains(cal.id) {
-                                Image(systemName: "checkmark")
-                                    .foregroundStyle(AccentTheme.sage.color)
+                Toggle(isOn: Binding(
+                    get: { calendarService.shareAllCalendars },
+                    set: { on in
+                        calendarService.shareAllCalendars = on
+                        Task { await calendarService.syncToHousehold(api: api) }
+                    }
+                )) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("All calendars")
+                            .foregroundStyle(WarmPalette.ink1)
+                        Text("Including any you add later")
+                            .font(.flFootnote)
+                            .foregroundStyle(WarmPalette.ink3)
+                    }
+                }
+                .tint(AccentTheme.sage.color)
+            }
+
+            if !calendarService.shareAllCalendars {
+                Section {
+                    ForEach(calendars) { cal in
+                        Button {
+                            toggle(cal.id)
+                        } label: {
+                            HStack(spacing: 12) {
+                                Circle().fill(cal.color).frame(width: 12, height: 12)
+                                Text(cal.title)
+                                    .foregroundStyle(WarmPalette.ink1)
+                                Spacer()
+                                if calendarService.sharedCalendarIDs.contains(cal.id) {
+                                    Image(systemName: "checkmark")
+                                        .foregroundStyle(AccentTheme.sage.color)
+                                }
                             }
                         }
                     }
+                } footer: {
+                    Text("Tap to choose which calendars your household can see. Includes any Google or iCloud calendars synced to this iPhone. Calendars added to this iPhone later are NOT shared unless you return here — or switch on All calendars.")
                 }
-            } footer: {
-                Text("Tap to choose which calendars your household can see. Includes any Google or iCloud calendars synced to this iPhone.")
             }
         }
         .navigationTitle("Calendars to Share")

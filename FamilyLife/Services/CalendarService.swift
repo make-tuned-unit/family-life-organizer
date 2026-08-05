@@ -64,6 +64,7 @@ final class CalendarService {
 
     private static let shareEnabledKey = "calendarShareEnabled"
     private static let sharedIDsKey = "calendarSharedIDs"
+    private static let shareAllKey = "calendarShareAll"
 
     /// Master switch for uploading this device's calendar to the household.
     var shareEnabled: Bool {
@@ -73,6 +74,13 @@ final class CalendarService {
     /// Calendar identifiers the user has opted to share.
     var sharedCalendarIDs: Set<String> {
         didSet { UserDefaults.standard.set(Array(sharedCalendarIDs), forKey: Self.sharedIDsKey) }
+    }
+
+    /// Share every calendar on the device, including ones added AFTER setup.
+    /// The picked-ID set is a frozen snapshot — a work calendar added later was
+    /// silently never shared, which reads as "sync is broken" to the household.
+    var shareAllCalendars: Bool {
+        didSet { UserDefaults.standard.set(shareAllCalendars, forKey: Self.shareAllKey) }
     }
 
     private static let syncDateFormatter: DateFormatter = {
@@ -85,6 +93,7 @@ final class CalendarService {
     init() {
         shareEnabled = UserDefaults.standard.bool(forKey: Self.shareEnabledKey)
         sharedCalendarIDs = Set(UserDefaults.standard.stringArray(forKey: Self.sharedIDsKey) ?? [])
+        shareAllCalendars = UserDefaults.standard.bool(forKey: Self.shareAllKey)
         if let stored = UserDefaults.standard.dictionary(forKey: Self.mapKey) as? [String: String] {
             eventMap = stored
         }
@@ -306,7 +315,8 @@ final class CalendarService {
     /// Uploads the user's selected calendars to the household for a rolling window
     /// (1 month back → 3 months ahead). No-op unless sharing is on and granted.
     func syncToHousehold(api: APIService) async {
-        guard shareEnabled, access == .granted, !sharedCalendarIDs.isEmpty else { return }
+        guard shareEnabled, access == .granted,
+              shareAllCalendars || !sharedCalendarIDs.isEmpty else { return }
         let cal = Calendar.current
         let now = Date()
         let start = cal.date(byAdding: .month, value: -1, to: cal.startOfDay(for: now)) ?? now
@@ -320,15 +330,20 @@ final class CalendarService {
 
     /// Reads events from the shared calendars and builds the JSON payload off-main.
     private func collectEventsForSync(from start: Date, to end: Date) async -> [[String: Any]] {
-        guard !sharedCalendarIDs.isEmpty else { return [] }
+        guard shareAllCalendars || !sharedCalendarIDs.isEmpty else { return [] }
         let store = self.store
         let ids = sharedCalendarIDs
+        let shareAll = shareAllCalendars
         return await Task.detached {
             store.refreshSourcesIfNecessary()
             let fmt = DateFormatter()
             fmt.locale = Locale(identifier: "en_US_POSIX")
             fmt.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
-            let cals = store.calendars(for: .event).filter { ids.contains($0.calendarIdentifier) }
+            // "All" is resolved at sync time, so calendars added to the device
+            // later are picked up automatically.
+            let cals = shareAll
+                ? store.calendars(for: .event)
+                : store.calendars(for: .event).filter { ids.contains($0.calendarIdentifier) }
             guard !cals.isEmpty else { return [] }
             let predicate = store.predicateForEvents(withStart: start, end: end, calendars: cals)
             return store.events(matching: predicate).map { ev -> [String: Any] in
