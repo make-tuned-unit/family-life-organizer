@@ -297,10 +297,14 @@ final class CalendarService {
     struct DeviceCalendar: Identifiable {
         let id: String
         let title: String
+        let account: String   // EKSource name: "iCloud", "Exchange", "Gmail", …
         let color: Color
     }
 
-    /// All event calendars on the device — for the share picker.
+    /// All event calendars on the device — for the share picker. Carries the
+    /// account (EKSource) name because different accounts routinely hold
+    /// same-named calendars (two "Work"s) that are otherwise indistinguishable —
+    /// checking the wrong twin looks exactly like a broken sync.
     func availableCalendars() -> [DeviceCalendar] {
         guard access == .granted else { return [] }
         return store.calendars(for: .event)
@@ -308,6 +312,7 @@ final class CalendarService {
             .map { cal in
                 let cg = cal.cgColor
                 return DeviceCalendar(id: cal.calendarIdentifier, title: cal.title,
+                                      account: cal.source?.title ?? "On this iPhone",
                                       color: cg != nil ? Color(cgColor: cg!) : .gray)
             }
     }

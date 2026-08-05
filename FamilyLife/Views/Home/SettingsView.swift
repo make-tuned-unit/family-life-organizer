@@ -475,23 +475,31 @@ private struct CalendarSharePicker: View {
             }
 
             if !calendarService.shareAllCalendars {
-                Section {
-                    ForEach(calendars) { cal in
-                        Button {
-                            toggle(cal.id)
-                        } label: {
-                            HStack(spacing: 12) {
-                                Circle().fill(cal.color).frame(width: 12, height: 12)
-                                Text(cal.title)
-                                    .foregroundStyle(WarmPalette.ink1)
-                                Spacer()
-                                if calendarService.sharedCalendarIDs.contains(cal.id) {
-                                    Image(systemName: "checkmark")
-                                        .foregroundStyle(AccentTheme.sage.color)
+                // Grouped by account: two accounts routinely hold same-named
+                // calendars (two "Work"s), and a flat list makes checking the
+                // wrong twin look exactly like broken sync.
+                ForEach(accountGroups, id: \.account) { group in
+                    Section(group.account) {
+                        ForEach(group.calendars) { cal in
+                            Button {
+                                toggle(cal.id)
+                            } label: {
+                                HStack(spacing: 12) {
+                                    Circle().fill(cal.color).frame(width: 12, height: 12)
+                                    Text(cal.title)
+                                        .foregroundStyle(WarmPalette.ink1)
+                                    Spacer()
+                                    if calendarService.sharedCalendarIDs.contains(cal.id) {
+                                        Image(systemName: "checkmark")
+                                            .foregroundStyle(AccentTheme.sage.color)
+                                    }
                                 }
                             }
                         }
                     }
+                }
+                Section {
+                    EmptyView()
                 } footer: {
                     Text("Tap to choose which calendars your household can see. Includes any Google or iCloud calendars synced to this iPhone. Calendars added to this iPhone later are NOT shared unless you return here — or switch on All calendars.")
                 }
@@ -503,6 +511,12 @@ private struct CalendarSharePicker: View {
             if calendarService.access != .granted { _ = await calendarService.requestAccess() }
             calendars = calendarService.availableCalendars()
         }
+    }
+
+    private var accountGroups: [(account: String, calendars: [CalendarService.DeviceCalendar])] {
+        Dictionary(grouping: calendars, by: \.account)
+            .map { (account: $0.key, calendars: $0.value) }
+            .sorted { $0.account.localizedCaseInsensitiveCompare($1.account) == .orderedAscending }
     }
 
     private func toggle(_ id: String) {
