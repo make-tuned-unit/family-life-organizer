@@ -38,9 +38,15 @@
   </url>
   <url>
     <loc>https://kinrows.com/blog/</loc>
-    <lastmod>2026-06-24</lastmod>
+    <lastmod>2026-08-08</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://kinrows.com/blog/baby-sleep-training-guide.html</loc>
+    <lastmod>2026-08-08</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.6</priority>
   </url>
   <url>
     <loc>https://kinrows.com/blog/family-calendar-organization.html</loc>

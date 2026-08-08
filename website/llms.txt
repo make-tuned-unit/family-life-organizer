@@ -26,11 +26,12 @@ Kinrows keeps a household's shared life in one calm place and gets everyone "row
 - Signs you carry too much emotional labour: https://kinrows.com/blog/signs-too-much-emotional-labour.html
 - How couples divide emotional labour fairly: https://kinrows.com/blog/divide-emotional-labour-fairly.html
 - The invisible work of parenting: https://kinrows.com/blog/emotional-labour-parenting.html
+- Sleep training a baby, what the evidence says: https://kinrows.com/blog/baby-sleep-training-guide.html
 - Privacy Policy: https://kinrows.com/privacy.html
 - Terms of Use: https://kinrows.com/terms.html
 
 ## Structured data
-The homepage includes Organization, WebSite, and SoftwareApplication JSON-LD. Blog posts include BlogPosting + BreadcrumbList, and the emotional-labour articles add FAQPage (and HowTo where relevant). The compare page includes BreadcrumbList + FAQPage; the best-family-organizer-apps page includes ItemList + FAQPage + BreadcrumbList. Legal pages include BreadcrumbList.
+The homepage includes Organization, WebSite, and SoftwareApplication JSON-LD. Blog posts include BlogPosting + BreadcrumbList, and the emotional-labour and sleep-training articles add FAQPage (and HowTo where relevant). The compare page includes BreadcrumbList + FAQPage; the best-family-organizer-apps page includes ItemList + FAQPage + BreadcrumbList. Legal pages include BreadcrumbList.
 
 ## Full spec
 See https://kinrows.com/llms-full.txt for complete product details.
