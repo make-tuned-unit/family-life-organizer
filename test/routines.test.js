@@ -915,3 +915,113 @@ test('routines: cycle — one logged period is insufficient for predictions', as
   assert.ok(c.current_cycle_day >= 3 && c.current_cycle_day <= 5, `still shows the current cycle day (got ${c.current_cycle_day})`);
   assert.ok(!c.fertile_window, 'no fertile window from a single period');
 });
+
+// ---------------------------------------------------------------------------
+// Home-screen sleep bar + the deep analysis behind the concierge's answers.
+// ---------------------------------------------------------------------------
+
+test('routines: sleep-now reports awake-since and the next nap for Home', async () => {
+  const [parent] = await member('now_rt', 'Now RT');
+  const created = await parent('POST', '/api/routines', {
+    name: 'Jude sleep', routine_type: 'baby_sleep', subject_name: 'Jude',
+    subject_birthdate: '2025-09-20', // ~10 months → the 3–4 hour band
+  });
+  const id = created.body.id;
+
+  // Nothing logged: the routine is listed, but with nothing to count from.
+  const empty = await parent('GET', '/api/routines/sleep-now');
+  assert.equal(empty.status, 200);
+  assert.equal(empty.body.length, 1, 'the sleep routine is listed');
+  assert.equal(empty.body[0].state, 'awake');
+  assert.equal(empty.body[0].awake_since, null, 'nothing to count from yet');
+  assert.equal(empty.body[0].next_sleep, null);
+
+  await parent('POST', `/api/routines/${id}/entries`, {
+    entry_date: '2026-07-28', entry_type: 'nap', entry_time: '13:00',
+    value: { sleep_start: '2026-07-28 13:00', sleep_end: '2026-07-28 14:20', duration_minutes: 80 },
+  });
+
+  const awake = (await parent('GET', '/api/routines/sleep-now')).body[0];
+  assert.equal(awake.state, 'awake');
+  assert.equal(awake.awake_since, '2026-07-28 14:20', 'the bar counts from the last wake');
+  assert.equal(awake.next_sleep.due_from, '2026-07-28 17:20', 'and names when the next one is due');
+  assert.equal(awake.subject_name, 'Jude');
+
+  // With a sleep running the bar flips, and the stale next-nap guess is dropped.
+  await parent('POST', `/api/routines/${id}/sleep/start`, { kind: 'nap', date: '2026-07-29', time: '09:10' });
+  const asleep = (await parent('GET', '/api/routines/sleep-now')).body[0];
+  assert.equal(asleep.state, 'asleep');
+  assert.equal(asleep.asleep_since, '2026-07-29 09:10');
+  assert.equal(asleep.asleep_kind, 'nap');
+  assert.equal(asleep.next_sleep, null, 'no next-nap guess while one is running');
+});
+
+test('routines: sleep-now does not leak a housemate\'s private routine', async () => {
+  const [owner, invite] = await member('nowp_rt', 'Now Private RT');
+  const [partner] = await member('nowq_rt', 'Now Partner RT', invite);
+  const created = await owner('POST', '/api/routines', {
+    name: 'Private sleep', routine_type: 'baby_sleep', subject_name: 'Quiet',
+    subject_birthdate: '2025-09-20',
+  });
+  assert.equal(created.status, 200);
+
+  assert.equal((await partner('GET', '/api/routines/sleep-now')).body.length, 0,
+    'private by default — the housemate sees nothing');
+  assert.equal((await owner('GET', '/api/routines/sleep-now')).body.length, 1);
+
+  await owner('PUT', `/api/routines/${created.body.id}/share`, { shared: true });
+  assert.equal((await partner('GET', '/api/routines/sleep-now')).body.length, 1,
+    'sharing opts the housemate in');
+});
+
+test('routines: sleep-stats explains a 4am waking that comes every second night', async () => {
+  const [parent] = await member('why_rt', 'Why RT');
+  const created = await parent('POST', '/api/routines', {
+    name: 'Jude nights', routine_type: 'baby_sleep', subject_name: 'Jude',
+    subject_birthdate: '2025-10-02',
+  });
+  const id = created.body.id;
+
+  const entry = (date, type, startStamp, endStamp, minutes) =>
+    parent('POST', `/api/routines/${id}/entries`, {
+      entry_date: date, entry_type: type, entry_time: startStamp.slice(11),
+      value: { sleep_start: startStamp, sleep_end: endStamp, duration_minutes: minutes },
+    });
+
+  const day = (i) => new Date(Date.UTC(2026, 7, 5 + i)).toISOString().slice(0, 10);
+  const next = (d) => {
+    const x = new Date(`${d}T00:00:00Z`);
+    x.setUTCDate(x.getUTCDate() + 1);
+    return x.toISOString().slice(0, 10);
+  };
+  for (let i = 0; i < 14; i++) {
+    const d = day(i);
+    if (i % 2 === 1) {
+      // Broken night: down at 7:40, up at 4:00, back down at 4:25.
+      await entry(d, 'night_sleep', `${d} 19:40`, `${next(d)} 04:00`, 500);
+      await entry(d, 'night_sleep', `${next(d)} 04:25`, `${next(d)} 06:45`, 140);
+      await entry(d, 'nap', `${d} 14:30`, `${d} 16:00`, 90);   // the late nap
+    } else {
+      await entry(d, 'night_sleep', `${d} 19:15`, `${next(d)} 06:40`, 685);
+      await entry(d, 'nap', `${d} 13:45`, `${d} 15:00`, 75);
+    }
+    await entry(d, 'nap', `${d} 09:15`, `${d} 10:30`, 75);
+  }
+
+  const stats = (await parent('GET', `/api/routines/${id}/sleep-stats?window_days=14`)).body;
+  assert.ok(stats.wakings, 'the analysis rides along with the stats');
+  assert.equal(stats.wakings.cluster.typical_time, '4:00am');
+  assert.equal(stats.wakings.cluster.nights_affected, 7);
+  assert.equal(stats.wakings.rhythm.pattern, 'alternating');
+  assert.equal(stats.wakings.differences[0].key, 'last_nap_end',
+    'the late last nap is named as what differs');
+
+  const keys = stats.recommendations.items.map(i => i.key);
+  assert.ok(keys.includes('alternating_pattern'));
+  assert.ok(keys.includes('early_morning_waking'));
+  for (const item of stats.recommendations.items) {
+    assert.ok(item.source, 'every recommendation is attributed');
+    assert.ok(item.because, 'and states the observation behind it');
+  }
+  assert.match(stats.recommendations.note, /not medical advice/i);
+});

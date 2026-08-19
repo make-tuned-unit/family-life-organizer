@@ -5567,6 +5567,68 @@ async function resolveSubjectBirthdate(db, routine, callerId) {
   return row?.date ? String(row.date).slice(0, 10) : null;
 }
 
+// The live sleep picture for Home: for each sleep routine the caller can see,
+// whether they are asleep or awake right now, how long it has been, and when
+// the next sleep is likely due. Deliberately its own small endpoint rather than
+// "fetch every routine, then fetch every detail" — Home renders this above the
+// fold on every launch.
+//
+// MUST stay above `/api/routines/:id` — "sleep-now" would otherwise be read as
+// a routine id.
+app.get('/api/routines/sleep-now', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const userId = req.session.user?.id;
+    const groupId = await db.getUserHouseholdId(userId);
+    if (!groupId) return res.json([]);
+    const routines = (await db.getRoutines(groupId, userId))
+      .filter(r => r.active !== 0 && ['baby_sleep', 'sleep_training'].includes(r.routine_type))
+      // Home has room for a couple of these; more than that belongs in Routines.
+      .slice(0, 4);
+
+    const out = [];
+    for (const routine of routines) {
+      const entries = await db.getRoutineEntries(routine.id, { limit: 120 });
+      const birthdate = await resolveSubjectBirthdate(db, routine, userId);
+
+      // A sleep in progress wins: the useful line then is "asleep 40m", and the
+      // next-sleep prediction is meaningless until they wake.
+      const open = await db.getOpenSleepEntry(routine.id);
+      let openValue = null;
+      if (open) { try { openValue = JSON.parse(open.value || 'null'); } catch { openValue = null; } }
+      const asleepSince = openValue?.sleep_start || null;
+
+      const nextSleep = asleepSince ? null : sleepStats.nextSleepWindow(entries, { birthdate });
+      const stats = sleepStats.compute(entries, { birthdate, today: todayLocal() });
+
+      out.push({
+        routine_id: routine.id,
+        name: routine.name,
+        subject_name: routine.subject_name,
+        routine_type: routine.routine_type,
+        color: routine.color,
+        state: asleepSince ? 'asleep' : 'awake',
+        // Which kind of sleep is running, so the bar can say "napping" rather
+        // than the wrong one of the two at 8pm.
+        asleep_kind: asleepSince ? open.entry_type : null,
+        asleep_since: asleepSince,
+        // Null when there is no finished sleep to measure from — the client must
+        // then say nothing rather than count from an invented moment.
+        awake_since: nextSleep ? nextSleep.last_wake_at : null,
+        last_sleep_type: nextSleep ? nextSleep.last_sleep_type : null,
+        next_sleep: nextSleep,
+        bedtime_prep: sleepStats.bedtimePrep(stats),
+        last_night_minutes: stats.totals.last_night_minutes,
+        // Only surfaced when it is a real observation rather than a zero from
+        // an unlogged night.
+        avg_wakings: stats.totals.avg_wakings,
+      });
+    }
+    res.json(out);
+  } catch (err) { sendServerError(res, err); }
+  finally { db.close(); }
+});
+
 app.get('/api/routines/:id', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
@@ -5829,12 +5891,25 @@ app.get('/api/routines/:id/sleep-stats', requireAuth, async (req, res) => {
     if (!(await requireRoutineAccess(db, req.params.id, req, res))) return;
     const routine = await db.getRoutineById(req.params.id);
     const entries = await db.getRoutineEntries(req.params.id, { limit: 400 });
-    res.json(sleepStats.compute(entries, {
+    const birthdate = await resolveSubjectBirthdate(db, routine, req.session.user?.id);
+    const today = todayLocal();
+    const stats = sleepStats.compute(entries, {
       // Same resolution as the detail route: the age can come from People.
-      birthdate: await resolveSubjectBirthdate(db, routine, req.session.user?.id),
-      today: todayLocal(),
+      birthdate, today,
       windowDays: clampLimit(req.query.window_days, 7, 30),
-    }));
+    });
+    // The night-waking analysis reads back further than the averages do: an
+    // every-second-night rhythm needs a couple of weeks of nights before it can
+    // be told apart from a run of bad luck.
+    const analysis = sleepStats.analyzeWakings(entries, {
+      birthdate, today,
+      windowDays: clampLimit(req.query.analysis_days, 14, 30),
+    });
+    res.json({
+      ...stats,
+      wakings: analysis,
+      recommendations: sleepStats.recommend(stats, analysis, { birthdate }),
+    });
   } catch (err) { sendServerError(res, err); }
   finally { db.close(); }
 });

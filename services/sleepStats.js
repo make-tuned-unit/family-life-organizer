@@ -11,7 +11,7 @@
 // consensus range below that age — so `recommended` is null for newborns and the
 // UI says so rather than inventing a number.
 
-const { ageInDays, wakeWindowForBirthdate } = require('./sleepTraining');
+const { ageInDays, wakeWindowForBirthdate, guidanceForBirthdate } = require('./sleepTraining');
 
 // AASM child sleep-duration consensus (AAP-endorsed), hours per 24h INCLUDING
 // naps. Bands are [minDays, maxDays] inclusive.
@@ -352,6 +352,566 @@ function buildTips({ totals, days, bedtime, guidance, napBand, days_old, trend }
   return tips;
 }
 
+// ---------------------------------------------------------------------------
+// Night-waking analysis
+// ---------------------------------------------------------------------------
+//
+// `compute` above answers "how much sleep". This answers "what is going wrong,
+// and does it track anything we control" — the questions a parent standing in a
+// dark hallway at 4am actually has.
+//
+// The raw material is already in the log: a disturbed night is recorded as
+// SEVERAL night_sleep segments (bedtime, then each resettle), so the gap between
+// one segment's end and the next one's start IS a waking, with a clock time and
+// a length. Nothing new has to be logged for any of this to work.
+//
+// Two honesty rules carry over from buildTips:
+//   1. A pattern must clear a stated threshold before it is named.
+//   2. Everything reported carries the observed numbers behind it, so a parent
+//      (or the concierge) can see why it was said and disagree.
+
+// Wakings this close together are one unsettled stretch, not two events.
+const CLUSTER_RADIUS_MIN = 45;
+// Below this a "pattern" is just two coincidental nights.
+const MIN_CLUSTER_NIGHTS = 3;
+// A correlate has to move by this much before it is worth a parent's attention.
+const MEANINGFUL_DELTA_MIN = 20;
+
+// Night-time clock arithmetic runs on a noon-to-noon day: 4am is LATE in the
+// night that began at 7pm, not thirteen hours earlier the same morning.
+const noonAnchored = (m) => (m == null ? null : (m < 720 ? m + 1440 : m));
+
+const median = (xs) => {
+  if (!xs.length) return null;
+  const s = [...xs].sort((a, b) => a - b);
+  const mid = Math.floor(s.length / 2);
+  return s.length % 2 ? s[mid] : (s[mid - 1] + s[mid]) / 2;
+};
+
+// Calendar days between two YYYY-MM-DD dates, UTC-anchored so it can't wobble.
+function daysBetween(a, b) {
+  const at = Date.parse(`${a}T00:00:00Z`), bt = Date.parse(`${b}T00:00:00Z`);
+  if (Number.isNaN(at) || Number.isNaN(bt)) return null;
+  return Math.round((bt - at) / 86400000);
+}
+
+/**
+ * Reduce the entries to one record per night: its segments, the wakings between
+ * them, and the daytime that preceded it. `night.date` is the entry_date the
+ * night was filed under — the evening it started.
+ */
+function buildNights(entries, { today = null, windowDays = 14 } = {}) {
+  const sleeps = (entries || [])
+    .filter(e => e.entry_type === 'nap' || e.entry_type === 'night_sleep')
+    .map(e => {
+      const v = parseValue(e) || {};
+      return {
+        type: e.entry_type,
+        date: e.entry_date,
+        minutes: Number.isFinite(v.duration_minutes) ? v.duration_minutes : null,
+        startMin: minutesOfDay(v.sleep_start),
+        endMin: minutesOfDay(v.sleep_end),
+        endDay: dayOf(v.sleep_end),
+        wakeCount: Number.isFinite(v.wake_count) ? v.wake_count : null,
+        notes: e.notes || null,
+        inProgress: !!v.in_progress,
+      };
+    })
+    .filter(s => !s.inProgress && s.minutes != null && s.minutes > 0);
+
+  const nightDates = [...new Set(sleeps.filter(s => s.type === 'night_sleep').map(s => s.date))]
+    .sort().reverse()
+    .filter(d => !today || d <= today)
+    .slice(0, windowDays);
+
+  return nightDates.map(date => {
+    const segments = sleeps
+      .filter(s => s.type === 'night_sleep' && s.date === date && s.startMin != null && s.endMin != null)
+      .sort((a, b) => noonAnchored(a.startMin) - noonAnchored(b.startMin));
+
+    // Gaps between consecutive segments are the wakings. A segment logged with
+    // wake_count but no companion segment tells us a waking happened without
+    // saying when — kept separately so it can be counted but never plotted.
+    const wakings = [];
+    for (let i = 0; i < segments.length - 1; i++) {
+      const wokeAt = segments[i].endMin;
+      const backAt = segments[i + 1].startMin;
+      let awake = noonAnchored(backAt) - noonAnchored(wokeAt);
+      if (awake < 0) awake += 1440;
+      wakings.push({ at_minutes: wokeAt, at: fmtClock(wokeAt), awake_minutes: Math.round(awake) });
+    }
+    const countedWakings = segments.reduce((a, s) => a + (s.wakeCount || 0), 0);
+
+    // Naps belonging to this night's daytime: the ones logged on the same day,
+    // which is the day that ran INTO this bedtime.
+    const naps = sleeps.filter(s => s.type === 'nap' && s.date === date);
+    const lastNapEnd = naps.length
+      ? naps.reduce((latest, n) => (n.endMin != null && (latest == null || n.endMin > latest) ? n.endMin : latest), null)
+      : null;
+    const bedtime = segments.length ? segments[0].startMin : null;
+    const morningWake = segments.length ? segments[segments.length - 1].endMin : null;
+
+    return {
+      date,
+      bedtime_minutes: bedtime,
+      bedtime: bedtime == null ? null : fmtClock(bedtime),
+      morning_wake_minutes: morningWake,
+      morning_wake: morningWake == null ? null : fmtClock(morningWake),
+      night_minutes: segments.reduce((a, s) => a + s.minutes, 0),
+      nap_minutes: naps.reduce((a, s) => a + s.minutes, 0),
+      nap_count: naps.length,
+      last_nap_end_minutes: lastNapEnd,
+      last_nap_end: lastNapEnd == null ? null : fmtClock(lastNapEnd),
+      // The awake stretch between the last nap and lights-out — the lever most
+      // often behind both bedtime battles and 4am wake-ups.
+      pre_bed_window_minutes: (lastNapEnd != null && bedtime != null)
+        ? Math.max(0, noonAnchored(bedtime) - noonAnchored(lastNapEnd)) : null,
+      wakings,
+      // Timed gaps are the truth when we have them; a bare wake_count is the
+      // fallback for nights logged as one entry with a count on it.
+      waking_count: wakings.length || countedWakings,
+      timed: wakings.length > 0,
+    };
+  });
+}
+
+/**
+ * The tightest band of clock time that catches the most wakings. Sliding window
+ * over noon-anchored minutes, so a 23:50 waking and a 00:20 one land together.
+ */
+function findCluster(nights) {
+  const points = [];
+  for (const n of nights) {
+    for (const w of n.wakings) points.push({ date: n.date, anchored: noonAnchored(w.at_minutes), ...w });
+  }
+  if (points.length < MIN_CLUSTER_NIGHTS) return null;
+
+  points.sort((a, b) => a.anchored - b.anchored);
+  let best = null;
+  for (const centre of points) {
+    const inBand = points.filter(p => Math.abs(p.anchored - centre.anchored) <= CLUSTER_RADIUS_MIN);
+    const nightsHit = new Set(inBand.map(p => p.date));
+    // Rank by nights covered, not wakings — five wakings on one bad night is
+    // not a pattern, three wakings on three nights is.
+    if (!best || nightsHit.size > best.nightsHit.size ||
+        (nightsHit.size === best.nightsHit.size && inBand.length > best.inBand.length)) {
+      best = { inBand, nightsHit };
+    }
+  }
+  if (!best || best.nightsHit.size < MIN_CLUSTER_NIGHTS) return null;
+
+  const centreAnchored = median(best.inBand.map(p => p.anchored));
+  const lo = Math.min(...best.inBand.map(p => p.anchored));
+  const hi = Math.max(...best.inBand.map(p => p.anchored));
+  const unwrap = (m) => ((Math.round(m) % 1440) + 1440) % 1440;
+  return {
+    typical_time: fmtClock(unwrap(centreAnchored)),
+    typical_time_minutes: unwrap(centreAnchored),
+    earliest: fmtClock(unwrap(lo)),
+    latest: fmtClock(unwrap(hi)),
+    nights_affected: best.nightsHit.size,
+    nights_logged: nights.length,
+    waking_count: best.inBand.length,
+    median_awake_minutes: Math.round(median(best.inBand.map(p => p.awake_minutes)) || 0),
+    dates: [...best.nightsHit].sort(),
+  };
+}
+
+/**
+ * Does the cluster land on alternating nights? Runs over the consecutive
+ * calendar nights that were actually logged — a gap in logging breaks the
+ * chain rather than being guessed at, because "every second night" is a claim
+ * about consecutive nights and nothing else.
+ */
+function detectRhythm(nights, cluster) {
+  if (!cluster || nights.length < 5) return null;
+  const hit = new Set(cluster.dates);
+  const ordered = [...nights].map(n => n.date).sort();
+
+  let pairs = 0, alternating = 0, sameRun = 0;
+  for (let i = 0; i < ordered.length - 1; i++) {
+    if (daysBetween(ordered[i], ordered[i + 1]) !== 1) continue; // logging gap
+    pairs++;
+    if (hit.has(ordered[i]) !== hit.has(ordered[i + 1])) alternating++;
+    else sameRun++;
+  }
+  if (pairs < 4) return null;
+
+  const ratio = alternating / pairs;
+  if (ratio >= 0.75) {
+    return {
+      pattern: 'alternating',
+      label: 'roughly every second night',
+      consecutive_pairs: pairs,
+      alternating_pairs: alternating,
+      confidence: ratio >= 0.9 ? 'high' : 'moderate',
+      detail: `Of ${pairs} back-to-back night pairs, ${alternating} flipped between a disturbed night and a settled one.`,
+    };
+  }
+  if (ratio <= 0.25 && cluster.nights_affected >= Math.ceil(nights.length * 0.7)) {
+    return {
+      pattern: 'nightly',
+      label: 'most nights',
+      consecutive_pairs: pairs,
+      alternating_pairs: alternating,
+      confidence: 'high',
+      detail: `${cluster.nights_affected} of the last ${nights.length} logged nights had a waking in this window.`,
+    };
+  }
+  return {
+    pattern: 'irregular',
+    label: 'some nights, with no clear rhythm',
+    consecutive_pairs: pairs,
+    alternating_pairs: alternating,
+    confidence: 'low',
+    detail: `${cluster.nights_affected} of ${nights.length} nights, without a consistent on/off pattern.`,
+  };
+}
+
+/**
+ * What was different about the disturbed nights. Compares the median of each
+ * daytime factor on nights inside the cluster against nights outside it, and
+ * reports only the factors that moved by a meaningful margin.
+ *
+ * This is a correlation over a handful of nights, never a cause, and every
+ * consumer of this data is required to say so.
+ */
+function compareNights(nights, cluster) {
+  if (!cluster) return [];
+  const hit = new Set(cluster.dates);
+  const disturbed = nights.filter(n => hit.has(n.date));
+  const settled = nights.filter(n => !hit.has(n.date));
+  if (disturbed.length < 2 || settled.length < 2) return [];
+
+  // `label` heads a row of UI; `phrase` is the same factor in sentence form, so
+  // a recommendation can say "tracks when the last nap ends" rather than the
+  // ungrammatical "tracks last nap ended".
+  const FACTORS = [
+    { key: 'bedtime', label: 'Bedtime', phrase: 'bedtime', lever: 'bedtime',
+      pick: n => n.bedtime_minutes, clock: true, later: 'later', earlier: 'earlier' },
+    { key: 'nap_minutes', label: 'Daytime sleep', phrase: 'how much daytime sleep he gets',
+      lever: 'the amount of daytime sleep', pick: n => (n.nap_count ? n.nap_minutes : null),
+      later: 'more', earlier: 'less' },
+    { key: 'pre_bed_window_minutes', label: 'Awake stretch before bed',
+      phrase: 'the awake stretch before bed', lever: 'the awake stretch before bed',
+      pick: n => n.pre_bed_window_minutes, later: 'longer', earlier: 'shorter' },
+    { key: 'last_nap_end', label: 'Last nap ended', phrase: 'when the last nap ends',
+      lever: 'the time the last nap ends', pick: n => n.last_nap_end_minutes, clock: true,
+      later: 'later', earlier: 'earlier' },
+  ];
+
+  const out = [];
+  for (const f of FACTORS) {
+    const d = median(disturbed.map(f.pick).filter(v => v != null));
+    const s = median(settled.map(f.pick).filter(v => v != null));
+    if (d == null || s == null) continue;
+    const delta = Math.round(d - s);
+    if (Math.abs(delta) < MEANINGFUL_DELTA_MIN) continue;
+    out.push({
+      key: f.key,
+      label: f.label,
+      phrase: f.phrase,
+      lever: f.lever,
+      disturbed_value: f.clock ? fmtClock(d) : fmtHm(d),
+      settled_value: f.clock ? fmtClock(s) : fmtHm(s),
+      delta_minutes: delta,
+      direction: delta > 0 ? f.later : f.earlier,
+      summary: `${f.label} was ${fmtHm(Math.abs(delta))} ${delta > 0 ? f.later : f.earlier} on the disturbed nights (${f.clock ? fmtClock(d) : fmtHm(d)} vs ${f.clock ? fmtClock(s) : fmtHm(s)}).`,
+    });
+  }
+  // Biggest mover first — it is the one worth trying to change.
+  return out.sort((a, b) => Math.abs(b.delta_minutes) - Math.abs(a.delta_minutes));
+}
+
+/**
+ * The whole night-waking picture: per-night detail, the dominant waking window,
+ * whether it has a rhythm, and what differs on the nights it happens.
+ */
+function analyzeWakings(entries, { birthdate = null, today = null, windowDays = 14 } = {}) {
+  const nights = buildNights(entries, { today, windowDays });
+  const timedNights = nights.filter(n => n.timed);
+  const cluster = findCluster(nights);
+  const rhythm = detectRhythm(nights, cluster);
+
+  const totalWakings = nights.reduce((a, n) => a + n.waking_count, 0);
+  return {
+    window_days: windowDays,
+    nights_analyzed: nights.length,
+    nights_with_timed_wakings: timedNights.length,
+    total_wakings: totalWakings,
+    // Averaged over nights we can actually see inside, so a night logged as one
+    // block doesn't read as a flawless night.
+    avg_wakings_per_night: timedNights.length
+      ? Math.round((timedNights.reduce((a, n) => a + n.wakings.length, 0) / timedNights.length) * 10) / 10
+      : null,
+    cluster,
+    rhythm,
+    differences: compareNights(nights, cluster),
+    nights: nights.map(n => ({
+      date: n.date, bedtime: n.bedtime, morning_wake: n.morning_wake,
+      night_minutes: n.night_minutes, nap_minutes: n.nap_minutes, nap_count: n.nap_count,
+      last_nap_end: n.last_nap_end, pre_bed_window_minutes: n.pre_bed_window_minutes,
+      waking_count: n.waking_count,
+      wakings: n.wakings.map(w => ({ at: w.at, awake_minutes: w.awake_minutes })),
+    })),
+    // Said everywhere this surfaces. A handful of nights cannot establish cause,
+    // and a parent deserves to be told that before they change anything.
+    basis: 'Patterns observed in your own log over the last ' + windowDays + ' nights. Correlation across a handful of nights, not a cause — and not medical advice.',
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Recommendations — "what to try tonight"
+// ---------------------------------------------------------------------------
+//
+// buildTips describes what the data says. This proposes what to CHANGE, which
+// is a higher bar, so the rules are stricter:
+//
+//   1. A recommendation must be earned by a specific observation, and it states
+//      that observation in `because` — a parent can check our work.
+//   2. Every lever names the evidence behind it. Where the evidence is a rule of
+//      thumb rather than the AASM/AAP consensus, it says so in `strength`.
+//   3. They are ordered by how much the data supports them, and capped, because
+//      a list of twelve things to try is a list of nothing to try.
+//   4. Nothing here is medical advice, and a red-flag pattern routes to a
+//      pediatrician instead of to another lever.
+
+const EVIDENCE = {
+  routine: { source: 'Mindell et al. 2015 — bedtime routine dose-response (n=10,085)', strength: 'strong' },
+  extinction: { source: 'Gradisar et al. 2016, Pediatrics — RCT of graduated extinction & bedtime fading', strength: 'strong' },
+  review: { source: 'Mindell et al. 2006 — AASM review of behavioural sleep interventions', strength: 'strong' },
+  duration: { source: 'AASM child sleep-duration consensus (AAP-endorsed)', strength: 'strong' },
+  safe_sleep: { source: 'AAP 2022 Safe Sleep Policy Statement', strength: 'strong' },
+  wake_windows: { source: 'Typical wake windows in pediatric sleep guidance', strength: 'rule of thumb' },
+  practice: { source: 'Common pediatric sleep guidance (NHS)', strength: 'rule of thumb' },
+};
+
+const EARLY_MORNING_FROM = 4 * 60;   // 4:00am
+const EARLY_MORNING_TO = 6 * 60;     // 6:00am
+const SPLIT_NIGHT_AWAKE_MIN = 45;    // awake this long mid-night = a split night
+
+/**
+ * @param stats     the output of compute()
+ * @param analysis  the output of analyzeWakings()
+ * @param opts.birthdate  drives the age gate on formal training
+ * @param opts.maxItems   how many to return (default 4)
+ */
+function recommend(stats, analysis, { birthdate = null, maxItems = 4 } = {}) {
+  const out = [];
+  const days_old = birthdate ? ageInDays(birthdate) : null;
+  const cluster = analysis?.cluster || null;
+  const rhythm = analysis?.rhythm || null;
+  const diffs = analysis?.differences || [];
+  const byKey = (k) => diffs.find(d => d.key === k);
+  const totals = stats?.totals || {};
+  const guidance = stats?.guidance || null;
+
+  // Nothing to recommend from nothing. Say what would unlock it instead of
+  // inventing advice.
+  if (!analysis || analysis.nights_analyzed < 3) {
+    return {
+      items: [],
+      note: 'A few more logged nights — ideally with each resettle logged, not just the bedtime — and this turns into specific things to try.',
+    };
+  }
+
+  // -- Under 4 months: the answer is not a technique. ------------------------
+  if (days_old != null && days_old < 113) {
+    out.push({
+      key: 'too_young',
+      priority: 100,
+      title: 'Rhythm rather than training, at this age',
+      because: `${analysis.nights_analyzed} nights logged at ${Math.floor(days_old / 7)} weeks old.`,
+      what_to_try: [
+        'Keep night feeds quiet, dim, and boring; keep days bright and social.',
+        'Put down drowsy-but-awake when you can — practice, not a programme.',
+        'Follow tired cues rather than the clock.',
+      ],
+      ...EVIDENCE.practice,
+      note: 'Night waking is developmentally expected before ~4 months, and formal sleep training is not recommended yet.',
+    });
+  }
+
+  const inEarlyMorning = cluster &&
+    cluster.typical_time_minutes >= EARLY_MORNING_FROM &&
+    cluster.typical_time_minutes < EARLY_MORNING_TO;
+
+  // -- The early-morning waking, which is its own problem. -------------------
+  // By 4–6am sleep pressure is nearly spent, so the levers are different from
+  // the ones for a 1am waking: light, noise, and how the wake is handled matter
+  // far more, and going in quickly teaches the wake to stick.
+  if (inEarlyMorning && cluster.nights_affected >= MIN_CLUSTER_NIGHTS) {
+    const tooMuchDay = guidance?.recommended_max_minutes && totals.avg_daily_minutes != null &&
+      totals.avg_daily_minutes > guidance.recommended_max_minutes;
+    out.push({
+      key: 'early_morning_waking',
+      priority: 90,
+      title: `Treat the ${cluster.typical_time} waking as an early-morning waking, not a night waking`,
+      because: `Wakings cluster at ${cluster.typical_time} (${cluster.earliest}–${cluster.latest}) on ${cluster.nights_affected} of ${cluster.nights_logged} logged nights.`,
+      what_to_try: [
+        'Make the room properly dark and keep it dark until your chosen "morning" time — dawn light is the usual culprit at this hour.',
+        'Hold the same response you would use at midnight: by 4am there is little sleep pressure left, so a quick start to the day teaches the waking to repeat.',
+        'Keep the get-up time fixed even after a bad night, so the body clock has something stable to lock onto.',
+        tooMuchDay
+          ? 'Daytime sleep is above the age range — trimming the last nap slightly may push the morning later.'
+          : 'White noise through the early hours covers the household and street noise that lands right at this time.',
+      ],
+      ...EVIDENCE.practice,
+    });
+  }
+
+  // -- The alternating rhythm: the thing the parent actually noticed. --------
+  if (rhythm?.pattern === 'alternating') {
+    const driver = diffs[0];
+    out.push({
+      key: 'alternating_pattern',
+      priority: 95,
+      title: driver
+        ? `The every-second-night pattern tracks ${driver.phrase}`
+        : 'The every-second-night pattern looks like a swing, not a habit',
+      because: driver
+        ? `${rhythm.detail} ${driver.summary}`
+        : rhythm.detail,
+      what_to_try: driver
+        ? [
+            `Hold ${driver.lever} steady for a week — match the settled nights (${driver.settled_value}), not the average.`,
+            'Change one thing only, and give it 5–7 nights before judging it. Two changes at once tell you nothing.',
+            'Keep logging each resettle so the next week can be compared against this one.',
+          ]
+        : [
+            'Log the day before each night — nap timing especially — so the swing has something to be matched against.',
+            'Hold bedtime and the wind-down identical for a week; an alternating pattern often flattens once the day stops alternating.',
+          ],
+      ...EVIDENCE.routine,
+      note: 'An alternating rhythm usually means something in the day alternates too — a nap that happens on nursery days but not at home is the classic one.',
+    });
+  }
+
+  // -- Split night: awake for a long stretch in the middle. ------------------
+  if (cluster && cluster.median_awake_minutes >= SPLIT_NIGHT_AWAKE_MIN && !inEarlyMorning) {
+    out.push({
+      key: 'split_night',
+      priority: 80,
+      title: `Awake about ${fmtHm(cluster.median_awake_minutes)} in the middle of the night`,
+      because: `The ${cluster.typical_time} waking lasts a median of ${fmtHm(cluster.median_awake_minutes)} before sleep returns.`,
+      what_to_try: [
+        'A long, wide-awake, content stretch usually means there is more sleep in the 24 hours than is needed — trim daytime sleep or push bedtime 15–20 minutes later rather than earlier.',
+        'Keep the stretch boring and dark; stimulation at this point extends it.',
+      ],
+      ...EVIDENCE.practice,
+    });
+  }
+
+  // -- Bedtime consistency: the strongest evidence in the whole feature. -----
+  const spread = stats?.bedtime?.spread_minutes;
+  if (spread != null && spread >= 45) {
+    out.push({
+      key: 'steady_bedtime',
+      priority: 88,
+      title: `Pin the bedtime — it currently moves by about ${spread} minutes`,
+      because: `Bedtimes ranged ${stats.bedtime.earliest} to ${stats.bedtime.latest} across ${totals.nights_logged} nights.`,
+      what_to_try: [
+        `Pick one time near ${stats.bedtime.average} and hold it within 15 minutes every night, weekends included.`,
+        'Keep the wind-down short and in the same order every night — the order matters as much as the length.',
+      ],
+      ...EVIDENCE.routine,
+      note: 'This is the single best-evidenced change available, and its benefit scales with how many nights you manage it.',
+    });
+  }
+
+  // -- Pre-bed wake window, when the log shows it is off the typical band. ---
+  const window = wakeWindowForBirthdate(birthdate);
+  const preBed = byKey('pre_bed_window_minutes');
+  if (window && preBed) {
+    const disturbedLonger = preBed.delta_minutes > 0;
+    out.push({
+      key: 'pre_bed_window',
+      priority: 70,
+      title: disturbedLonger
+        ? 'The awake stretch before bed runs longer on the disturbed nights'
+        : 'The awake stretch before bed runs shorter on the disturbed nights',
+      because: preBed.summary,
+      what_to_try: disturbedLonger
+        ? [
+            `Aim for ${window.label} awake before bed — an overtired bedtime tends to fragment the second half of the night.`,
+            'If the last nap ends late, cap it rather than letting bedtime drift.',
+          ]
+        : [
+            `Aim for ${window.label} awake before bed — too little awake time makes the first stretch short and the middle of the night busy.`,
+            'Stretching the final wake window by 15 minutes at a time is the usual way to do this.',
+          ],
+      ...EVIDENCE.wake_windows,
+    });
+  }
+
+  // -- Total sleep against the consensus range. ------------------------------
+  if (guidance?.recommended_min_minutes && totals.avg_daily_minutes != null &&
+      totals.avg_daily_minutes < guidance.recommended_min_minutes) {
+    out.push({
+      key: 'below_range',
+      priority: 75,
+      title: `Total sleep is under the ${guidance.recommended_label}`,
+      because: `Averaging ${fmtHm(totals.avg_daily_minutes)} a day over ${totals.days_logged} logged days.`,
+      what_to_try: [
+        'Move bedtime 15 minutes earlier every few nights until the total lands in range — an earlier bedtime is usually the first lever, not a later one.',
+        'Protect the naps that are still happening; lost daytime sleep rarely improves the night.',
+      ],
+      ...EVIDENCE.duration,
+    });
+  }
+
+  // -- A named method, once they are old enough for one. ---------------------
+  // Only offered when the log shows a persistent problem, so it can't read as
+  // "your baby sleeps fine, here's a training programme anyway".
+  if (days_old != null && days_old >= 113 && cluster && cluster.nights_affected >= 3) {
+    const phase = guidanceForBirthdate(birthdate)?.current_phase;
+    const method = phase?.method;
+    if (method) {
+      out.push({
+        key: 'method',
+        priority: 60,
+        title: `If it persists, ${method.name.toLowerCase()} is the fit for this age`,
+        because: `A waking around ${cluster.typical_time} on ${cluster.nights_affected} of ${cluster.nights_logged} nights, at ${phase.age_label}.`,
+        what_to_try: [
+          method.summary,
+          'Pick ONE method and hold it consistently for 1–2 weeks — inconsistency is what prolongs the crying.',
+          'Talk to your pediatrician first, and stop if your child is unwell.',
+        ],
+        ...EVIDENCE.extinction,
+        method_key: method.key,
+        note: 'Behavioural methods have the strongest evidence base here, including 5-year follow-up showing no long-term harm (Price et al. 2012).',
+      });
+    }
+  }
+
+  // -- Worth a doctor, not another lever. -----------------------------------
+  // Deliberately not framed as alarming: it names the observation and points at
+  // the person qualified to interpret it.
+  if (totals.avg_wakings != null && totals.avg_wakings >= 5 && days_old != null && days_old >= 183) {
+    out.push({
+      key: 'check_in',
+      priority: 99,
+      title: 'Worth mentioning at the next check-up',
+      because: `About ${totals.avg_wakings} wakings a night at this age.`,
+      what_to_try: [
+        'Frequent waking that does not respond to routine changes is worth a conversation — reflux, allergy, apnoea, and iron levels are the usual things a doctor will want to rule out.',
+        'Bring this log with you; the nightly pattern is more useful to them than a summary.',
+      ],
+      ...EVIDENCE.safe_sleep,
+    });
+  }
+
+  const items = out.sort((a, b) => b.priority - a.priority).slice(0, maxItems)
+    .map(({ priority, ...rest }) => rest);
+
+  return {
+    items,
+    note: items.length
+      ? 'Earned from your own log and the sources named on each item. Educational guidance, not medical advice — change one thing at a time and give it 5–7 nights.'
+      : 'Nothing in the log stands out as worth changing right now.',
+  };
+}
+
 // Builds a sleep span from a date + two HH:MM times. An end at or before the
 // start means it ran past midnight, so the end lands on the next day — the
 // normal case for a night sleep. Shared by the API routes and the concierge so
@@ -449,4 +1009,7 @@ function bedtimePrep(stats, { leadMinutes = 30, minNights = 3 } = {}) {
   };
 }
 
-module.exports = { compute, span, nextSleepWindow, bedtimePrep, DURATION_BANDS, NAP_BANDS, fmtHm, fmtClock };
+module.exports = {
+  compute, span, nextSleepWindow, bedtimePrep, analyzeWakings, recommend,
+  DURATION_BANDS, NAP_BANDS, fmtHm, fmtClock,
+};
