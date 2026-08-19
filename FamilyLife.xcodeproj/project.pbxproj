@@ -131,6 +131,8 @@
 		AA000216 /* RoutineDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000216 /* RoutineDetailView.swift */; };
 		AA000217 /* RoutinesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000217 /* RoutinesView.swift */; };
 		AA000218 /* SleepTrainingProgramView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000218 /* SleepTrainingProgramView.swift */; };
+		AA000219 /* SleepInsightCards.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000219 /* SleepInsightCards.swift */; };
+		AA00021A /* SleepBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00021A /* SleepBar.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -258,6 +260,8 @@
 		BB000216 /* RoutineDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoutineDetailView.swift; sourceTree = "<group>"; };
 		BB000217 /* RoutinesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoutinesView.swift; sourceTree = "<group>"; };
 		BB000218 /* SleepTrainingProgramView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SleepTrainingProgramView.swift; sourceTree = "<group>"; };
+		BB000219 /* SleepInsightCards.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SleepInsightCards.swift; sourceTree = "<group>"; };
+		BB00021A /* SleepBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SleepBar.swift; sourceTree = "<group>"; };
 		CC000001 /* FamilyLife.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = FamilyLife.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -389,6 +393,7 @@
 			isa = PBXGroup;
 			children = (
 				BB00000B /* HomeView.swift */,
+				BB00021A /* SleepBar.swift */,
 				BB00000C /* HomeViewModel.swift */,
 				BB00001A /* SettingsView.swift */,
 				BB00001B /* AddTaskView.swift */,
@@ -565,6 +570,7 @@
 				BB000216 /* RoutineDetailView.swift */,
 				BB000217 /* RoutinesView.swift */,
 				BB000218 /* SleepTrainingProgramView.swift */,
+				BB000219 /* SleepInsightCards.swift */,
 			);
 			path = Routines;
 			sourceTree = "<group>";
@@ -757,6 +763,8 @@
 				AA000216 /* RoutineDetailView.swift in Sources */,
 				AA000217 /* RoutinesView.swift in Sources */,
 				AA000218 /* SleepTrainingProgramView.swift in Sources */,
+				AA000219 /* SleepInsightCards.swift in Sources */,
+				AA00021A /* SleepBar.swift in Sources */,
 				AA000028 /* StartRivalryView.swift in Sources */,
 				AA000029 /* RivalryDetailView.swift in Sources */,
 				AA00002A /* LogProgressView.swift in Sources */,

@@ -59,6 +59,7 @@ struct HomeView: View {
             VStack(spacing: 0) {
                 greetingSection
                 presenceRow
+                sleepBarSection
                 statsGrid
                 heroFocusCard
                 onThisDaySection
@@ -437,6 +438,26 @@ struct HomeView: View {
                     }
                 }
                 Spacer()
+            }
+            .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
+            .padding(.bottom, 16)
+        }
+    }
+
+    // MARK: - Sleep Bar
+
+    /// Whether the next nap is due, and how long he's been awake — the two
+    /// numbers that otherwise mean opening Routines mid-morning. Absent unless
+    /// the household actually keeps a sleep routine.
+    @ViewBuilder
+    private var sleepBarSection: some View {
+        if !viewModel.sleepNow.isEmpty {
+            VStack(spacing: 8) {
+                ForEach(viewModel.sleepNow) { summary in
+                    SleepBar(summary: summary) {
+                        selectedFeedRoutine = FeedRoutineTarget(id: summary.routine_id)
+                    }
+                }
             }
             .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
             .padding(.bottom, 16)

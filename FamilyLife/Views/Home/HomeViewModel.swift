@@ -25,6 +25,9 @@ final class HomeViewModel {
     var groceries: [GroceryResponse] = []
     var activityFeed: [PreparedFeedItem] = []
     var activeTrips: [TripResponse] = []
+    /// Live sleep status for the Home sleep bar. Usually one row; empty for
+    /// households with no sleep routine, which is the common case.
+    var sleepNow: [SleepNowSummary] = []
     var isLoading = false
     var error: String?
     var visibleFeedCount = 15
@@ -53,8 +56,9 @@ final class HomeViewModel {
         async let aMonth = Self.safeFetch { try await api.fetchAppointments(dateFrom: Self.todayString(), dateTo: Self.dateString(daysFromNow: 30)) }
         async let f = Self.safeFetch { try await api.fetchActivity() }
         async let tr = Self.safeFetch { try await api.fetchTrips(status: "active") }
+        async let sn = Self.safeFetch { try await api.fetchSleepNow() }
 
-        let (dashboard, tasks, appointments, weekAppts, monthAppts, feed, trips) = await (d, t, a, aWeek, aMonth, f, tr)
+        let (dashboard, tasks, appointments, weekAppts, monthAppts, feed, trips, sleep) = await (d, t, a, aWeek, aMonth, f, tr, sn)
 
         // Batch apply — single re-render
         if let data = dashboard.value {
@@ -95,6 +99,11 @@ final class HomeViewModel {
         else if let e = feed.error { firstError = firstError ?? e }
 
         if let trips = trips.value { activeTrips = trips }
+
+        // A missing sleep routine is not an error worth showing — the bar just
+        // doesn't appear. Only replace what we have on a successful fetch, so a
+        // dropped request doesn't blank a bar that was correct a moment ago.
+        if let sleep = sleep.value { sleepNow = sleep }
 
         error = firstError
         isLoading = false

@@ -690,6 +690,12 @@ final class APIService {
         try await get("/api/routines/\(routineId)/sleep-stats")
     }
 
+    /// The live sleep picture for every sleep routine the caller can see — one
+    /// call, because Home renders this above the fold on every launch.
+    func fetchSleepNow() async throws -> [SleepNowSummary] {
+        try await get("/api/routines/sleep-now")
+    }
+
     // MARK: - Rivalries
 
     func fetchRivalries(status: String? = nil) async throws -> [RivalryResponse] {

@@ -174,8 +174,174 @@ struct SleepStats: Codable {
     let trend: SleepTrend?
     let guidance: SleepStatsGuidance?
     let tips: [SleepTip]
+    /// When the night wakings happen and whether they follow a rhythm. Reads
+    /// back further than the averages do — a fortnight, since an every-second-
+    /// night pattern can't be told from bad luck in under two weeks.
+    let wakings: SleepWakingAnalysis?
+    /// What to change, earned by the data above.
+    let recommendations: SleepRecommendations?
 
     var hasData: Bool { (totals.days_logged ?? 0) > 0 }
+}
+
+// MARK: - Night-waking analysis
+
+/// The wakings pulled back out of the log: a disturbed night is recorded as
+/// several night_sleep entries, so the gap between them is a waking with a
+/// clock time attached. Nothing extra has to be logged for this to work.
+struct SleepWakingAnalysis: Codable {
+    let window_days: Int?
+    let nights_analyzed: Int?
+    let nights_with_timed_wakings: Int?
+    let total_wakings: Int?
+    let avg_wakings_per_night: Double?
+    let cluster: SleepWakingCluster?
+    let rhythm: SleepWakingRhythm?
+    let differences: [SleepNightDifference]
+    let nights: [SleepNightDetail]
+    let basis: String?
+
+    /// Nothing to show until there is a repeating waking to talk about.
+    var hasPattern: Bool { cluster != nil }
+}
+
+/// The time of night the wakings gather around.
+struct SleepWakingCluster: Codable {
+    let typical_time: String?
+    let typical_time_minutes: Int?
+    let earliest: String?
+    let latest: String?
+    let nights_affected: Int?
+    let nights_logged: Int?
+    let waking_count: Int?
+    let median_awake_minutes: Int?
+    let dates: [String]?
+
+    /// "7 of the last 14 nights" — the line that makes the pattern land.
+    var frequencyText: String? {
+        guard let hit = nights_affected, let total = nights_logged else { return nil }
+        return "\(hit) of the last \(total) nights"
+    }
+}
+
+/// Whether the cluster lands every second night, most nights, or without shape.
+struct SleepWakingRhythm: Codable {
+    let pattern: String?          // alternating | nightly | irregular
+    let label: String?
+    let consecutive_pairs: Int?
+    let alternating_pairs: Int?
+    let confidence: String?       // high | moderate | low
+    let detail: String?
+
+    var isAlternating: Bool { pattern == "alternating" }
+}
+
+/// One daytime factor that differs between the disturbed and settled nights.
+/// A correlation over a handful of nights — never presented as a cause.
+struct SleepNightDifference: Codable, Identifiable {
+    let key: String
+    let label: String
+    let phrase: String?
+    let lever: String?
+    let disturbed_value: String?
+    let settled_value: String?
+    let delta_minutes: Int?
+    let direction: String?
+    let summary: String?
+
+    var id: String { key }
+}
+
+struct SleepNightDetail: Codable, Identifiable {
+    let date: String
+    let bedtime: String?
+    let morning_wake: String?
+    let night_minutes: Int?
+    let nap_minutes: Int?
+    let nap_count: Int?
+    let last_nap_end: String?
+    let pre_bed_window_minutes: Int?
+    let waking_count: Int?
+    let wakings: [SleepWakingEvent]
+
+    var id: String { date }
+    var wasDisturbed: Bool { (waking_count ?? 0) > 0 }
+}
+
+struct SleepWakingEvent: Codable, Hashable {
+    let at: String?
+    let awake_minutes: Int?
+}
+
+// MARK: - Recommendations
+
+/// "What to try" — each item states the observation that earned it and names
+/// the research behind it, so a parent can check the reasoning before acting.
+struct SleepRecommendations: Codable {
+    let items: [SleepRecommendation]
+    let note: String?
+}
+
+struct SleepRecommendation: Codable, Identifiable {
+    let key: String
+    let title: String
+    /// The observed numbers this is reacting to.
+    let because: String?
+    let what_to_try: [String]
+    let source: String?
+    /// "strong" for the consensus/RCT-backed levers, "rule of thumb" otherwise.
+    let strength: String?
+    let note: String?
+    let method_key: String?
+
+    var id: String { key }
+    var isStrongEvidence: Bool { strength == "strong" }
+}
+
+// MARK: - Live sleep status (Home)
+
+/// GET /api/routines/sleep-now — one row per sleep routine the caller can see:
+/// asleep or awake right now, since when, and when the next sleep is due.
+/// Powers the Home sleep bar so checking the next nap doesn't mean a trip into
+/// Routines.
+struct SleepNowSummary: Codable, Identifiable {
+    let routine_id: Int
+    let name: String
+    let subject_name: String?
+    let routine_type: String?
+    let color: String?
+    let state: String            // asleep | awake
+    let asleep_kind: String?     // nap | night_sleep
+    let asleep_since: String?
+    let awake_since: String?
+    let last_sleep_type: String?
+    let next_sleep: NextSleepWindow?
+    let bedtime_prep: BedtimePrep?
+    let last_night_minutes: Int?
+    let avg_wakings: Double?
+
+    var id: Int { routine_id }
+    var isAsleep: Bool { state == "asleep" }
+    /// First name only — the bar is glanceable, not a report.
+    var displayName: String { subject_name ?? name }
+
+    var asleepSinceDate: Date? { asleep_since.flatMap { DateFormatter.dateTimeMinute.date(from: $0) } }
+    var awakeSinceDate: Date? { awake_since.flatMap { DateFormatter.dateTimeMinute.date(from: $0) } }
+
+    /// The moment the current state began, whichever state that is. Nil when
+    /// there's nothing logged to count from — the bar must then stay quiet
+    /// rather than count from an invented time.
+    var since: Date? { isAsleep ? asleepSinceDate : awakeSinceDate }
+
+    /// How far through the typical wake window they are, 0–1. Drives the bar's
+    /// fill. Nil while asleep or without a predicted window.
+    func wakeWindowProgress(now: Date = Date()) -> Double? {
+        guard !isAsleep, let from = awakeSinceDate,
+              let due = next_sleep?.dueFromDate else { return nil }
+        let total = due.timeIntervalSince(from)
+        guard total > 0 else { return nil }
+        return min(1, max(0, now.timeIntervalSince(from) / total))
+    }
 }
 
 struct SleepDay: Codable, Identifiable {

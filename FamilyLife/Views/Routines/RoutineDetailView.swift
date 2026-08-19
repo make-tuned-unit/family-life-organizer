@@ -68,6 +68,18 @@ struct RoutineDetailView: View {
 
                         if let stats = sleepStats {
                             SleepStatsCard(stats: stats, accent: accent)
+                            // The pattern and the levers only appear once the
+                            // log has earned them — both cards render nothing
+                            // when there is no repeating waking to explain.
+                            if let wakings = stats.wakings {
+                                SleepPatternCard(analysis: wakings, accent: accent)
+                            }
+                            if let recommendations = stats.recommendations {
+                                SleepRecommendationsCard(
+                                    recommendations: recommendations,
+                                    accent: accent,
+                                    conciergePrompt: conciergePrompt(for: detail, stats: stats))
+                            }
                         }
 
                         entriesSection(detail.entries)
@@ -304,6 +316,19 @@ struct RoutineDetailView: View {
         prepare > Date()
             ? "We'll nudge you at \(DateFormatter.shortTime.string(from: prepare)) — \(leadMinutes) min before — to start winding down."
             : "Good time to start winding down."
+    }
+
+    /// Seeds the concierge with the question this data raises, named subject and
+    /// all, so the chat opens on the specific night pattern rather than a blank
+    /// "how is he sleeping".
+    private func conciergePrompt(for detail: RoutineDetailResponse, stats: SleepStats) -> String {
+        let who = detail.subject_name ?? detail.name
+        if let time = stats.wakings?.cluster?.typical_time {
+            let rhythm = stats.wakings?.rhythm
+            let when = (rhythm?.confidence != "low" ? rhythm?.label : nil) ?? "on several nights"
+            return "\(who) is waking around \(time) \(when). Look at the sleep log and tell me why, and what we could try differently to get him through the night."
+        }
+        return "Look at \(who)'s sleep log and tell me what the data says, and what we could try differently."
     }
 
     private func relativeMinutes(to date: Date) -> String {
