@@ -9,6 +9,7 @@
  * push through the same code real pushes use.
  *
  *   node scripts/apns-check.js                    # config only, talks to nobody
+ *   node scripts/apns-check.js --probe            # ...ask Apple to vet the credentials
  *   node scripts/apns-check.js --token <hex>      # ...and send one test push
  *   node scripts/apns-check.js --user 1           # ...to every device of user 1
  *
@@ -61,6 +62,21 @@ async function tokensForUser(userId) {
     console.log(`${YELLOW}Note:${OFF} apns-topic is "${cfg.bundleId}", not the app's bundle ID (com.kinrows.app).`);
   }
 
+  // --probe answers "will these credentials work for this app?" without a
+  // device. Sending to a well-formed but nonexistent token separates the
+  // failure classes: APNs checks the provider token and the topic BEFORE it
+  // looks at the device token, so being rejected for the device token alone
+  // proves the key, the team, and the topic were all accepted. It is the only
+  // way to catch a topic-restricted key before a real push silently fails.
+  if (args.includes('--probe')) {
+    const res = await push.sendTest('0'.repeat(64), { title: 'probe', body: 'probe' });
+    const verdict = probeVerdict(res.reason);
+    console.log(`\nProbing APNs with a deliberately invalid device token…`);
+    console.log(`  APNs said: ${res.reason || res.status || 'ok'}`);
+    console.log(`  ${verdict.ok ? GREEN + '✓' : RED + '✗'} ${verdict.text}${OFF}\n`);
+    process.exit(verdict.ok ? 0 : 1);
+  }
+
   let tokens = [];
   const token = argOf('--token');
   const user = argOf('--user');
@@ -89,6 +105,27 @@ async function tokensForUser(userId) {
   }
   console.log('');
 })();
+
+/// What a probe's rejection tells us. Reaching the device-token check at all
+/// means everything checked before it passed.
+function probeVerdict(reason) {
+  switch (reason) {
+    case 'BadDeviceToken':
+    case 'BadEnvironmentKeyInToken':
+    case 'Unregistered':
+      return { ok: true, text: 'Credentials accepted — key, team and topic are all valid for this app. Only the fake token was refused, as expected.' };
+    case 'InvalidProviderToken':
+    case 'ExpiredProviderToken':
+      return { ok: false, text: 'Apple rejected the KEY. APNS_KEY_ID/APNS_TEAM_ID do not match this .p8, or it was revoked.' };
+    case 'TopicDisallowed':
+    case 'DeviceTokenNotForTopic':
+      return { ok: false, text: 'Apple rejected the TOPIC. Either Push is off for this App ID, or the key is restricted to other apps.' };
+    case 'not_configured':
+      return { ok: false, text: 'Not configured — set the three key variables first.' };
+    default:
+      return { ok: false, text: `Unexpected response. Treat as unverified.` };
+  }
+}
 
 /// APNs reasons are terse and the fix is rarely obvious from the word alone.
 function explain(reason) {
