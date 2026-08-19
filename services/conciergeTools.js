@@ -11,6 +11,7 @@
 
 const { announceRivalryCompletion } = require('./rivalryAnnounce');
 const sleepStats = require('./sleepStats');
+const sleepTraining = require('./sleepTraining');
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -1042,7 +1043,7 @@ const TOOLS = [
   },
   {
     name: 'get_sleep_stats',
-    description: "Sleep statistics and age-appropriate guidance for a baby-sleep or sleep-training routine — averages, bedtime consistency, night wakings, and tips grounded in the AASM/AAP research. Use for 'how is Jude sleeping', 'is he getting enough sleep', 'any tips'.",
+    description: "Sleep statistics and age-appropriate guidance for a baby-sleep or sleep-training routine — averages, bedtime consistency, night wakings, and tips grounded in the AASM/AAP research. Use for 'how is Jude sleeping', 'is he getting enough sleep', 'any tips'. For WHY a child wakes when they do, or what to change, use action \"analyze\" instead.",
     write: false,
     input_schema: {
       type: 'object',
@@ -1062,6 +1063,52 @@ const TOOLS = [
         today: ctx.today,
         windowDays: Math.min(30, Math.max(1, parseInt(input.window_days) || 7)),
       }) };
+    },
+  },
+  {
+    name: 'analyze_sleep',
+    description: "Deep analysis of a sleep log: WHEN the night wakings happen (clock times, not just a count), whether they follow a rhythm such as every second night, what is different about the day before a bad night, and what to try — each item tied to the research it comes from. Use for 'why is he waking at 4am', 'why is it every other night', 'what should we try differently', 'what does the data say'. Prefer this over the plain stats action for any why/what-should-we-do question.",
+    write: false,
+    input_schema: {
+      type: 'object',
+      properties: {
+        routine_id: { type: 'number' },
+        window_days: { type: 'number', description: 'Nights to analyse (default 14, max 30). A rhythm needs ~2 weeks to show.' },
+      },
+      required: ['routine_id'],
+    },
+    async run(ctx, input) {
+      await assertRoutineAccess(ctx, input.routine_id);
+      const routine = await ctx.db.getRoutineById(input.routine_id);
+      const entries = await ctx.db.getRoutineEntries(input.routine_id, { limit: 600 });
+      const birthdate = await resolveSubjectBirthdate(ctx, routine);
+      const windowDays = Math.min(30, Math.max(3, parseInt(input.window_days) || 14));
+      const stats = sleepStats.compute(entries, { birthdate, today: ctx.today });
+      const wakings = sleepStats.analyzeWakings(entries, { birthdate, today: ctx.today, windowDays });
+      const recommendations = sleepStats.recommend(stats, wakings, { birthdate });
+      // The age phase and its methods travel WITH the data. Without them the
+      // model reaches for half-remembered sleep advice; with them it can only
+      // recommend what this codebase can cite.
+      const phase = birthdate ? sleepTraining.guidanceForBirthdate(birthdate) : null;
+
+      return { result: {
+        subject: routine.subject_name || routine.name,
+        age: phase ? { days: phase.age_days, months: phase.age_months, ready_for_training: phase.ready_for_training } : null,
+        // No birthdate means no age-based guidance is possible — say so rather
+        // than letting the model guess an age from the child's name.
+        age_unknown_reason: birthdate ? null : 'No birthdate on the routine or the child\'s People card, so age-based guidance is unavailable. Ask the user for it.',
+        totals: stats.totals,
+        bedtime: stats.bedtime,
+        wake_time: stats.wake_time,
+        guidance: stats.guidance,
+        trend: stats.trend,
+        wakings,
+        recommendations,
+        current_phase: phase ? phase.current_phase : null,
+        safe_sleep: phase ? phase.safe_sleep : null,
+        sources: sleepTraining.SOURCES,
+        answer_guidance: 'Lead with the pattern in the data and the numbers behind it, then the one or two changes most worth trying. Name the source for each. Say plainly that this is their own log plus published guidance, not medical advice, and that a correlation over a handful of nights is not a cause. Recommend one change at a time, held for 5–7 nights.',
+      } };
     },
   },
   {
@@ -2698,10 +2745,10 @@ const GROUPS = {
     incoming: 'get_incoming_coverage', approve: 'approve_incoming_coverage' } },
   notes: { desc: 'Private/household notes (take/jot/write a note).', actions: {
     list: 'list_notes', add: 'add_note', update: 'update_note', delete: 'delete_note' } },
-  routines: { desc: 'Routines: baby sleep / sleep-training logs, cycle tracking, activity streaks. Sleep can be logged after the fact (log_sleep) or live (start_sleep now, end_sleep on waking).', actions: {
+  routines: { desc: 'Routines: baby sleep / sleep-training logs, cycle tracking, activity streaks. Sleep can be logged after the fact (log_sleep) or live (start_sleep now, end_sleep on waking). Action "analyze" explains night-waking patterns and what to try.', actions: {
     list: 'list_routines', get: 'get_routine', log_sleep: 'log_sleep', log_entry: 'log_routine_entry',
     start_sleep: 'start_sleep', end_sleep: 'end_sleep', set_start: 'set_sleep_start',
-    stats: 'get_sleep_stats' } },
+    stats: 'get_sleep_stats', analyze: 'analyze_sleep' } },
   people: { desc: 'Household people (adults, kids) and their milestones.', actions: {
     list: 'list_people', add: 'add_person', update: 'update_person', delete: 'delete_person',
     list_milestones: 'list_milestones', log_milestone: 'log_milestone',

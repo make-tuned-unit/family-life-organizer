@@ -315,3 +315,55 @@ test('send_message: resolves by first name, refuses strangers', async () => {
   const stranger = await tools.run('send_message', ctx, { to: 'Zorp', text: 'hi' });
   assert.equal(stranger.result.ok, false);
 });
+
+test('routines: the concierge analyses a 4am waking rather than just counting it', async () => {
+  const created = await run(
+    "INSERT INTO routines (group_id, created_by, name, routine_type, subject_name, subject_birthdate, shared_scope) VALUES (?, ?, 'Jude nights', 'baby_sleep', 'Jude', '2025-10-02', 'private')",
+    [ctx.groupId, ctx.userId]);
+  const routineId = created.lastID;
+
+  // A fortnight where every second night breaks at 4am, and on those days the
+  // last nap runs an hour late — logged the way the app logs it.
+  // Fourteen nights ending the day before ctx.today (2026-07-11).
+  const day = (i) => new Date(Date.UTC(2026, 5, 27 + i)).toISOString().slice(0, 10);
+  for (let i = 0; i < 14; i++) {
+    const d = day(i);
+    if (i % 2 === 1) {
+      await tools.run('routines', ctx, { action: 'log_sleep', routine_id: routineId,
+        kind: 'night_sleep', date: d, start_time: '19:40', end_time: '04:00' });
+      await tools.run('routines', ctx, { action: 'log_sleep', routine_id: routineId,
+        kind: 'night_sleep', date: d, start_time: '04:25', end_time: '06:45' });
+      await tools.run('routines', ctx, { action: 'log_sleep', routine_id: routineId,
+        kind: 'nap', date: d, start_time: '14:30', end_time: '16:00' });
+    } else {
+      await tools.run('routines', ctx, { action: 'log_sleep', routine_id: routineId,
+        kind: 'night_sleep', date: d, start_time: '19:15', end_time: '06:40' });
+      await tools.run('routines', ctx, { action: 'log_sleep', routine_id: routineId,
+        kind: 'nap', date: d, start_time: '13:45', end_time: '15:00' });
+    }
+    await tools.run('routines', ctx, { action: 'log_sleep', routine_id: routineId,
+      kind: 'nap', date: d, start_time: '09:15', end_time: '10:30' });
+  }
+
+  const out = await tools.run('routines', ctx, { action: 'analyze', routine_id: routineId });
+  const r = out.result;
+  assert.equal(r.subject, 'Jude');
+  assert.equal(r.wakings.cluster.typical_time, '4:00am', 'the clock time, not just a count');
+  assert.equal(r.wakings.rhythm.pattern, 'alternating');
+  assert.equal(r.wakings.differences[0].key, 'last_nap_end');
+  assert.ok(r.recommendations.items.length, 'something concrete to try');
+  // The research travels with the data so the model can only cite what we ship.
+  assert.ok(r.sources.length >= 5, 'the source list rides along');
+  assert.ok(r.current_phase.method.name, 'the age-appropriate method is named');
+  assert.match(r.answer_guidance, /not medical advice/i);
+});
+
+test('routines: analyse is refused on a housemate\'s private sleep log', async () => {
+  // Quinn's own baby-sleep routine, unshared: a sleep analysis is exactly the
+  // kind of personal detail the private scope exists to protect.
+  const created = await run(
+    "INSERT INTO routines (group_id, created_by, name, routine_type, shared_scope) VALUES (?, ?, 'Quinn baby', 'baby_sleep', 'private')",
+    [ctx.groupId, quinnId]);
+  const out = await tools.run('routines', ctx, { action: 'analyze', routine_id: created.lastID });
+  assert.ok(out.result.ok !== true && !out.result.wakings, 'analysing it is refused');
+});

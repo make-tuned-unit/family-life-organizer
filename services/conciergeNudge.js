@@ -4,12 +4,75 @@
 
 const push = require('../push');
 const { buildSnapshot } = require('./conciergeContext');
+const sleepStats = require('./sleepStats');
 
 const DAILY_CAP_HOURS = 20;   // at most one nudge per household per ~day
 const DEDUPE_HOURS = 72;      // don't repeat the same nudge within 3 days
 
 function plural(n, word) {
   return `${n} ${word}${n === 1 ? '' : 's'}`;
+}
+
+// How long a sleep insight stays quiet once sent. Longer than the generic
+// dedupe: the point of a sleep finding is to be acted on over a week, and
+// re-sending it every third day would train the family to swipe it away.
+const SLEEP_DEDUPE_HOURS = 24 * 7;
+// Below this there is not enough of a log to say anything worth a push.
+const SLEEP_MIN_NIGHTS = 5;
+
+/**
+ * The one sleep insight in this household worth interrupting for, or null.
+ *
+ * PRIVACY: a routine is private to its creator unless shared_scope is
+ * 'household' (see the routines table). A private routine's findings are pushed
+ * to that creator ALONE — never through pushToGroup — so the sweep can't
+ * broadcast one parent's private log to the whole house. `audience_user_id`
+ * carries that decision to the caller.
+ */
+async function sleepNudgeFor(db, groupId, { today = null } = {}) {
+  const members = await db.getGroupMembers(groupId);
+  const seen = new Set();
+  const routines = [];
+  for (const m of members) {
+    if (!m.user_id) continue;
+    for (const r of await db.getRoutines(groupId, m.user_id)) {
+      if (seen.has(r.id)) continue;
+      seen.add(r.id);
+      if (r.active === 0) continue;
+      if (!['baby_sleep', 'sleep_training'].includes(r.routine_type)) continue;
+      routines.push(r);
+    }
+  }
+
+  for (const routine of routines) {
+    const entries = await db.getRoutineEntries(routine.id, { limit: 600 });
+    const birthdate = routine.subject_birthdate || null;
+    const analysis = sleepStats.analyzeWakings(entries, { birthdate, today, windowDays: 14 });
+    if (analysis.nights_analyzed < SLEEP_MIN_NIGHTS) continue;
+
+    // Only a pattern with a rhythm behind it earns a push. A single rough night
+    // is not news to the person who was awake for it.
+    const cluster = analysis.cluster;
+    if (!cluster || !analysis.rhythm || analysis.rhythm.confidence === 'low') continue;
+
+    const stats = sleepStats.compute(entries, { birthdate, today });
+    const rec = sleepStats.recommend(stats, analysis, { birthdate }).items[0];
+    if (!rec) continue;
+
+    const who = routine.subject_name || routine.name;
+    const shared = routine.shared_scope === 'household';
+    return {
+      // Keyed on the FINDING, not the routine: the same insight stays quiet,
+      // and a genuinely new pattern gets through the dedupe immediately.
+      key: `sleep:${routine.id}:${rec.key}:${cluster.typical_time_minutes}`,
+      title: `${who}'s sleep — a pattern worth a look`,
+      body: `Waking around ${cluster.typical_time} on ${cluster.nights_affected} of the last ${cluster.nights_logged} nights, ${analysis.rhythm.label}. Tap to see what the data suggests trying.`,
+      audience_user_id: shared ? null : routine.created_by,
+      dedupe_hours: SLEEP_DEDUPE_HOURS,
+      routine_id: routine.id,
+    };
+  }
+  return null;
 }
 
 // Choose the single highest-priority nudge from a snapshot, or null if nothing
@@ -75,20 +138,41 @@ async function runProactiveSweep(db, { dailyCapHours = DAILY_CAP_HOURS, dedupeHo
     const member = members.find(m => m.user_id);
     if (!member) continue;
 
-    const snapshot = await buildSnapshot(db, member.user_id);
-    const nudge = pickNudge(snapshot);
+    // A sleep pattern outranks the generic candidates: it is rarer, it is
+    // deduped for a week, and it is the one thing here a parent cannot work out
+    // by looking at a list.
+    const sleep = await safeSleepNudge(db, groupId);
+    const nudge = sleep || pickNudge(await buildSnapshot(db, member.user_id));
     if (!nudge) continue;
     summary.considered++;
 
     if (await db.countRecentNudges(groupId, dailyCapHours)) continue;       // daily cap
-    if (await db.recentNudgeKey(groupId, nudge.key, dedupeHours)) continue; // dedupe
+    if (await db.recentNudgeKey(groupId, nudge.key, nudge.dedupe_hours || dedupeHours)) continue;
 
     // Record BEFORE pushing so the log is the guard against duplicate sends.
     await db.recordNudge(groupId, nudge.key);
-    await push.pushToGroup(db, groupId, null, nudge.title, nudge.body, { type: 'concierge', nudge: nudge.key });
+    const payload = { type: 'concierge', nudge: nudge.key };
+    if (nudge.routine_id) payload.routine_id = nudge.routine_id;
+    if (nudge.audience_user_id) {
+      // Private routine: its owner only. See the PRIVACY note on sleepNudgeFor.
+      await push.pushToUser(db, nudge.audience_user_id, nudge.title, nudge.body, payload);
+    } else {
+      await push.pushToGroup(db, groupId, null, nudge.title, nudge.body, payload);
+    }
     summary.sent++;
   }
   return summary;
 }
 
-module.exports = { pickNudge, runProactiveSweep };
+// A failure in the sleep analysis must not take the whole sweep down with it —
+// every other household still deserves its nudge.
+async function safeSleepNudge(db, groupId) {
+  try {
+    return await sleepNudgeFor(db, groupId);
+  } catch (err) {
+    console.error('[concierge] sleep nudge failed:', err.message);
+    return null;
+  }
+}
+
+module.exports = { pickNudge, sleepNudgeFor, runProactiveSweep };
