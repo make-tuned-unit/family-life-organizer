@@ -204,4 +204,59 @@ async function pushToGroup(db, groupId, excludeUserId, title, body, data = {}) {
   await pushToTokens(tokens, title, body, data);
 }
 
-module.exports = { isConfigured, pushToUser, pushToGroup, pushToTokens };
+// ---------------------------------------------------------------------------
+// Diagnostics
+// ---------------------------------------------------------------------------
+// Push fails silently by design — an unconfigured server simply doesn't notify.
+// That is right for production and useless when you are trying to work out why
+// nothing arrived, so these two expose the state without ever revealing the key.
+
+/// What this process actually believes about APNs. `keyParses` is the one that
+/// catches the common mistake: APNS_KEY_BASE64 holding something other than the
+/// base64 of a .p8 file's text.
+function describeConfig() {
+  let keyParses = false, keyError = null;
+  if (KEY_BASE64) {
+    try {
+      const pem = Buffer.from(KEY_BASE64, 'base64').toString('utf8');
+      if (!pem.includes('BEGIN PRIVATE KEY')) {
+        keyError = 'decoded value is not a PEM private key — base64 the .p8 file itself, contents and all';
+      } else {
+        crypto.createPrivateKey(pem);
+        keyParses = true;
+      }
+    } catch (err) {
+      keyError = err.message;
+    }
+  }
+  return {
+    configured: isConfigured(),
+    keyId: KEY_ID || null,
+    teamId: TEAM_ID || null,
+    bundleId: BUNDLE_ID,
+    primaryHost: PRIMARY_HOST,
+    alternateHost: ALTERNATE_HOST,
+    hasKey: !!KEY_BASE64,
+    keyParses,
+    keyError,
+  };
+}
+
+/// A single push whose verdict is RETURNED rather than logged and dropped —
+/// including which host answered, so an environment mismatch is visible instead
+/// of just looking like success. Same send path as real pushes, so a pass here
+/// means real pushes work.
+async function sendTest(deviceToken, { title = 'Kinrows', body = 'Test push' } = {}) {
+  if (!isConfigured()) return { ok: false, reason: 'not_configured' };
+  const payload = { aps: { alert: { title, body }, sound: 'default' } };
+
+  let res = await sendOnce(deviceToken, payload, PRIMARY_HOST);
+  if (res.ok) return { ...res, host: PRIMARY_HOST };
+  if (ENV_MISMATCH_REASONS.has(res.reason)) {
+    const alt = await sendOnce(deviceToken, payload, ALTERNATE_HOST);
+    return { ...alt, host: ALTERNATE_HOST, fellBackFrom: PRIMARY_HOST };
+  }
+  return { ...res, host: PRIMARY_HOST };
+}
+
+module.exports = { isConfigured, pushToUser, pushToGroup, pushToTokens, describeConfig, sendTest };
