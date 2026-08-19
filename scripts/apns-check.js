@@ -102,7 +102,8 @@ function explain(reason) {
     case 'InvalidProviderToken':
       return '— APNS_KEY_ID/APNS_TEAM_ID do not match the key, or the key was revoked. Check the key belongs to team Z58XSBM78S.';
     case 'TopicDisallowed':
-      return '— Push Notifications is not enabled on this App ID in the developer portal.';
+      return '— either Push is not enabled on this App ID, or the key is topic-restricted to other apps. '
+           + 'A key shared across a team must be scoped "Sandbox & Production", not limited to specific topics.';
     case 'Unregistered':
       return '— the app was uninstalled from this device; the server should drop this token.';
     case 'connect_error':
