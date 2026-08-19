@@ -4587,6 +4587,101 @@ class FamilyDB {
   close() {
     // No-op: using shared connection for WAL mode concurrency
   }
+
+  // Permagent analytics: store a pageview or custom event beacon
+  recordAnalyticsEvent(event) {
+    return new Promise((resolve, reject) => {
+      const {
+        kind,
+        path,
+        referrer,
+        name,
+        visitorHash,
+        properties,
+        isBot,
+        sessionId,
+        utmSource,
+        utmMedium,
+        utmCampaign,
+        country
+      } = event;
+
+      this.db.run(
+        `INSERT INTO permagent_analytics_events
+         (kind, path, referrer, name, visitor_hash, properties, is_bot, session_id, utm_source, utm_medium, utm_campaign, country)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          kind,
+          path,
+          referrer || null,
+          name || null,
+          visitorHash || null,
+          properties ? JSON.stringify(properties) : null,
+          isBot ? 1 : 0,
+          sessionId || null,
+          utmSource || null,
+          utmMedium || null,
+          utmCampaign || null,
+          country || null
+        ],
+        function(err) {
+          if (err) return reject(err);
+          resolve({ id: this.lastID });
+        }
+      );
+    });
+  }
+
+  // Permagent analytics: drain events for the Permagent daemon
+  // Returns events with id > since, ordered by id ASC, up to limit
+  drainAnalyticsEvents(since = 0, limit = 500) {
+    return new Promise((resolve, reject) => {
+      limit = Math.min(Math.max(1, limit), 1000); // cap between 1 and 1000
+      this.db.all(
+        `SELECT
+           id, kind, path, referrer, name, visitor_hash as visitorHash,
+           created_at as at, properties, is_bot as isBot, session_id as sessionId,
+           utm_source as utmSource, utm_medium as utmMedium,
+           utm_campaign as utmCampaign, country
+         FROM permagent_analytics_events
+         WHERE id > ?
+         ORDER BY id ASC
+         LIMIT ?`,
+        [since, limit],
+        (err, rows) => {
+          if (err) return reject(err);
+          // Parse properties JSON and convert timestamps to ISO-8601
+          const events = (rows || []).map(row => {
+            const event = {
+              id: row.id,
+              kind: row.kind,
+              path: row.path,
+              referrer: row.referrer,
+              name: row.name,
+              visitorHash: row.visitorHash,
+              at: row.at // already in ISO format from SQLite's DATETIME
+            };
+            // Optional fields: only include if present
+            if (row.properties !== null) {
+              try {
+                event.properties = JSON.parse(row.properties);
+              } catch {
+                event.properties = null;
+              }
+            }
+            if (row.isBot !== null) event.isBot = row.isBot;
+            if (row.sessionId !== null) event.sessionId = row.sessionId;
+            if (row.utmSource !== null) event.utmSource = row.utmSource;
+            if (row.utmMedium !== null) event.utmMedium = row.utmMedium;
+            if (row.utmCampaign !== null) event.utmCampaign = row.utmCampaign;
+            if (row.country !== null) event.country = row.country;
+            return event;
+          });
+          resolve(events);
+        }
+      );
+    });
+  }
 }
 
 FamilyDB.DB_DIR = DB_DIR;

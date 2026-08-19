@@ -931,3 +931,27 @@ CREATE TABLE IF NOT EXISTS routine_entries (
 );
 CREATE INDEX IF NOT EXISTS idx_routine_entries_routine ON routine_entries(routine_id);
 CREATE INDEX IF NOT EXISTS idx_routine_entries_date ON routine_entries(routine_id, entry_date);
+
+-- Permagent self-hosted analytics: events beacon same-origin to /api/permagent-analytics/collect,
+-- stored here, and drained outbound by a Permagent daemon on a timer.
+-- id is the drain cursor and MUST be monotonic (auto-increment). created_at is the EVENT time,
+-- not the server time, so charts show real user activity. properties is jsonb with a GIN index.
+CREATE TABLE IF NOT EXISTS permagent_analytics_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    kind TEXT NOT NULL,              -- 'pageview' or 'event'
+    path TEXT,                        -- request path without query string
+    referrer TEXT,                    -- HTTP referrer, clamped to 512 chars
+    name TEXT,                        -- event name, clamped to 128 chars
+    visitor_hash TEXT,                -- sha256(salt + user-agent + accept-language + date), first 32 hex chars
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, -- the EVENT time, not server time
+    properties TEXT,                  -- JSON object: flat scalars only, max 32 keys, 256 chars per value, 4 kb total
+    is_bot BOOLEAN NOT NULL DEFAULT 0, -- set server-side from User-Agent
+    session_id TEXT,                  -- first-party session id from sessionStorage
+    utm_source TEXT,                  -- from allowlist (utm_*, ref, gclid, fbclid)
+    utm_medium TEXT,
+    utm_campaign TEXT,
+    country TEXT                      -- two-letter code from edge header (CF-IPCountry, x-vercel-ip-country, etc)
+);
+CREATE INDEX IF NOT EXISTS idx_permagent_analytics_id ON permagent_analytics_events(id);
+CREATE INDEX IF NOT EXISTS idx_permagent_analytics_created ON permagent_analytics_events(created_at);
+CREATE INDEX IF NOT EXISTS idx_permagent_analytics_bot_date ON permagent_analytics_events(is_bot, created_at);

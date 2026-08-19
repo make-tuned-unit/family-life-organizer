@@ -254,6 +254,8 @@ const htmlEsc = (s) => String(s ?? '')
 // endpoints — is held to 1mb.
 const jsonSmall = bodyParser.json({ limit: '1mb' });
 const jsonLarge = bodyParser.json({ limit: '8mb' });
+// Text parser for analytics collect endpoint (sendBeacon sends text/plain)
+const textAny = bodyParser.text({ type: '*/*', limit: '1mb' });
 const LARGE_BODY_PATHS = [
   /^\/api\/users\/me\/avatar$/,
   /^\/api\/groups\/[^/]+\/avatar$/,
@@ -1470,6 +1472,59 @@ app.get('/login', (req, res) => {
       .login-card { padding: 32px 24px; }
     }
   </style>
+  <script>
+(function () {
+  var E = "/api/permagent-analytics/collect";
+  var S = null;
+  try {
+    S = sessionStorage.getItem("_pa_sid");
+    if (!S) {
+      S = Math.random().toString(36).slice(2) + Date.now().toString(36);
+      sessionStorage.setItem("_pa_sid", S);
+    }
+  } catch (e) { }
+  function send(kind, name, props, ref) {
+    var body = JSON.stringify({
+      k: kind,
+      p: location.pathname + location.search,
+      r: ref || null,
+      n: name || null,
+      d: props || null,
+      s: S
+    });
+    if (!(navigator.sendBeacon && navigator.sendBeacon(E, body))) {
+      fetch(E, { method: "POST", body: body, keepalive: true }).catch(function () {});
+    }
+  }
+  var lastPath = null;
+  var sentRef = false;
+  function pageview() {
+    if (location.pathname === lastPath) return;
+    lastPath = location.pathname;
+    var ref = sentRef ? null : (document.referrer || null);
+    sentRef = true;
+    send("pv", null, null, ref);
+  }
+  pageview();
+  ["pushState", "replaceState"].forEach(function (m) {
+    var orig = history[m];
+    history[m] = function () { orig.apply(this, arguments); pageview(); };
+  });
+  addEventListener("popstate", pageview);
+  window.permagent = window.permagent || {};
+  window.permagent.event = function (name, props) { send("ev", name, props, null); };
+  window.permagent.autocapture = function () {
+    addEventListener("click", function (e) {
+      var a = e.target && e.target.closest && e.target.closest("a[href]");
+      if (!a) return;
+      var url;
+      try { url = new URL(a.href, location.href); } catch (err) { return; }
+      if (url.host === location.host) return;
+      send("ev", "outbound_click", { host: url.host, href: url.href.slice(0, 256) }, null);
+    }, true);
+  };
+})();
+  </script>
 </head>
 <body>
   <div class="login-card">
@@ -1867,6 +1922,59 @@ function renderDashboard(user, summary, groceries, tasksByCategory, appointments
       }
     }
   </style>
+  <script>
+(function () {
+  var E = "/api/permagent-analytics/collect";
+  var S = null;
+  try {
+    S = sessionStorage.getItem("_pa_sid");
+    if (!S) {
+      S = Math.random().toString(36).slice(2) + Date.now().toString(36);
+      sessionStorage.setItem("_pa_sid", S);
+    }
+  } catch (e) { }
+  function send(kind, name, props, ref) {
+    var body = JSON.stringify({
+      k: kind,
+      p: location.pathname + location.search,
+      r: ref || null,
+      n: name || null,
+      d: props || null,
+      s: S
+    });
+    if (!(navigator.sendBeacon && navigator.sendBeacon(E, body))) {
+      fetch(E, { method: "POST", body: body, keepalive: true }).catch(function () {});
+    }
+  }
+  var lastPath = null;
+  var sentRef = false;
+  function pageview() {
+    if (location.pathname === lastPath) return;
+    lastPath = location.pathname;
+    var ref = sentRef ? null : (document.referrer || null);
+    sentRef = true;
+    send("pv", null, null, ref);
+  }
+  pageview();
+  ["pushState", "replaceState"].forEach(function (m) {
+    var orig = history[m];
+    history[m] = function () { orig.apply(this, arguments); pageview(); };
+  });
+  addEventListener("popstate", pageview);
+  window.permagent = window.permagent || {};
+  window.permagent.event = function (name, props) { send("ev", name, props, null); };
+  window.permagent.autocapture = function () {
+    addEventListener("click", function (e) {
+      var a = e.target && e.target.closest && e.target.closest("a[href]");
+      if (!a) return;
+      var url;
+      try { url = new URL(a.href, location.href); } catch (err) { return; }
+      if (url.host === location.host) return;
+      send("ev", "outbound_click", { host: url.host, href: url.href.slice(0, 256) }, null);
+    }, true);
+  };
+})();
+  </script>
 </head>
 <body>
   <header class="header">
@@ -6648,6 +6756,168 @@ async function initializeDatabase() {
     db.close();
   }
 }
+
+// ============================================================================
+// Permagent self-hosted analytics: POST /api/permagent-analytics/collect
+// ============================================================================
+// IMPORTANT: This route is EXEMPT from global rate limiting — a normal browsing
+// session can produce many pageviews and must never be throttled. It is also NOT
+// gated behind auth — analytics must work for unauthenticated visitors.
+// navigator.sendBeacon sends Content-Type: text/plain, so we accept text/* and
+// parse defensively. Malformed bodies return 204, never 500.
+app.post('/api/permagent-analytics/collect', textAny, (req, res) => {
+  // textAny parser gives us req.body as a string (or empty string if no body)
+  let body;
+  
+  // If body is already an object (shouldn't happen with textAny, but be defensive)
+  if (typeof req.body === 'object' && req.body !== null) {
+    body = req.body;
+  } else if (typeof req.body === 'string') {
+    try {
+      body = JSON.parse(req.body);
+    } catch {
+      return res.status(204).send(); // malformed beacon: silent drop
+    }
+  } else {
+    return res.status(204).send(); // no valid body
+  }
+
+  try {
+    // Body shape: { k: 'pv'|'ev', p: string, r: string|null, n: string|null, d: object|null, s: string|null }
+    const { k, p, r, n, d, s } = body;
+
+    if (!k || !p) return res.status(204).send(); // required fields missing
+
+    // Map kind: 'pv' -> 'pageview', 'ev' -> 'event'
+    const kind = k === 'pv' ? 'pageview' : k === 'ev' ? 'event' : null;
+    if (!kind) return res.status(204).send();
+
+    // Parse path+query, extract UTM and other allowed params, store path WITHOUT query
+    let path = p;
+    let utm = { source: null, medium: null, campaign: null };
+    try {
+      const url = new URL(p, 'http://localhost'); // parse relative paths
+      path = url.pathname;
+      // Allowlist: utm_*, ref, gclid, fbclid
+      if (url.searchParams.has('utm_source')) utm.source = url.searchParams.get('utm_source');
+      if (url.searchParams.has('utm_medium')) utm.medium = url.searchParams.get('utm_medium');
+      if (url.searchParams.has('utm_campaign')) utm.campaign = url.searchParams.get('utm_campaign');
+    } catch {
+      // If path parsing fails, store the string as-is
+    }
+
+    // Clamp string fields to their limits
+    const referrer = (r || '').slice(0, 512) || null;
+    const name = (n || '').slice(0, 128) || null;
+    const sessionId = (s || '').slice(0, 64) || null;
+
+    // Properties: flatten, drop nested objects/arrays, cap at 32 keys, 256 chars per value, 4 kb total
+    let properties = null;
+    if (d && typeof d === 'object' && !Array.isArray(d)) {
+      const flat = {};
+      const keys = Object.keys(d);
+      for (let i = 0; i < Math.min(keys.length, 32); i++) {
+        const key = keys[i];
+        const val = d[key];
+        // Keep only scalars: string, number, boolean
+        if (val === null || val === undefined) continue;
+        if (typeof val === 'object') continue; // skip nested objects and arrays
+        const str = String(val).slice(0, 256);
+        flat[key] = typeof val === 'string' ? str : val; // re-cast number/bool
+      }
+      // Truncate to 4kb if needed
+      const propStr = JSON.stringify(flat);
+      if (propStr.length > 4096) {
+        // Truncate by removing values, starting from the end
+        const truncated = {};
+        let totalSize = 0;
+        for (const [key, val] of Object.entries(flat)) {
+          const valStr = JSON.stringify(val);
+          if (totalSize + valStr.length + key.length + 4 > 4096) break;
+          truncated[key] = val;
+          totalSize += valStr.length + key.length + 4;
+        }
+        properties = truncated;
+      } else {
+        properties = flat;
+      }
+    }
+
+    // Compute visitor_hash server-side: sha256(salt + user-agent + accept-language + UTC date)
+    const SALT = process.env.PERMAGENT_ANALYTICS_SALT;
+    let visitorHash = null;
+    if (SALT) {
+      const ua = req.get('user-agent') || '';
+      const al = req.get('accept-language') || '';
+      const date = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+      const hash = crypto.createHash('sha256').update(SALT + ua + al + date).digest('hex');
+      visitorHash = hash.slice(0, 32); // first 32 hex chars
+    }
+
+    // Set is_bot server-side from User-Agent
+    const ua = (req.get('user-agent') || '').toLowerCase();
+    const isBot = !ua || /bot|crawler|spider|headless|curl|python-requests|facebookexternalhit/.test(ua);
+
+    // Resolve country from edge headers (Cloudflare, Vercel, Fly)
+    let country = null;
+    if (req.get('cf-ipcountry')) country = req.get('cf-ipcountry');
+    else if (req.get('x-vercel-ip-country')) country = req.get('x-vercel-ip-country');
+    // Note: Fly's x-forwarded-for region isn't exposed as easily; would need Fly-Client-IP parsing
+
+    // Store the event
+    const db = new FamilyDB();
+    db.recordAnalyticsEvent({
+      kind,
+      path: path.slice(0, 512), // clamp path too
+      referrer,
+      name,
+      visitorHash,
+      properties,
+      isBot,
+      sessionId,
+      utmSource: utm.source,
+      utmMedium: utm.medium,
+      utmCampaign: utm.campaign,
+      country
+    })
+      .then(() => res.status(202).send()) // Accepted, no body
+      .catch(() => res.status(202).send()) // Even on DB error, return 202 so browser doesn't retry
+      .finally(() => db.close());
+  } catch (err) {
+    // Defensive: any error in analytics parsing should not break the response
+    console.error('[analytics collect error]', err.message);
+    res.status(202).send();
+  }
+});
+
+// ============================================================================
+// Permagent self-hosted analytics: GET /api/permagent-analytics/drain
+// ============================================================================
+// Authenticated drain for the Permagent daemon. Auth via x-permagent-key header.
+// Query: ?since=<id>&limit=<n> (default limit 500, cap 1000).
+// Returns events with id > since, ordered by id ASC, as JSON.
+app.get('/api/permagent-analytics/drain', async (req, res) => {
+  const KEY = process.env.PERMAGENT_ANALYTICS_KEY;
+
+  // Fail closed: if the env var is not set or the header does not match, return 401
+  if (!KEY || req.get('x-permagent-key') !== KEY) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  try {
+    const since = Math.max(0, parseInt(req.query.since || '0', 10) || 0);
+    const limit = Math.max(1, Math.min(parseInt(req.query.limit || '500', 10) || 500, 1000));
+
+    const db = new FamilyDB();
+    const events = await db.drainAnalyticsEvents(since, limit);
+    db.close();
+
+    res.json({ events });
+  } catch (err) {
+    console.error('[analytics drain error]', err.message);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
 
 // 404 for unmatched API routes (avoids falling through to static/HTML).
 app.use('/api', (req, res) => res.status(404).json({ error: 'Not found' }));

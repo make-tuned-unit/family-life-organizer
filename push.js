@@ -126,7 +126,7 @@ function sendOnce(deviceToken, payload, host) {
   });
 }
 
-function sendPush(deviceToken, payload) {
+function sendPush(deviceToken, payload, db = null) {
   if (!isConfigured()) return Promise.resolve(false);
 
   return (async () => {
@@ -138,6 +138,22 @@ function sendPush(deviceToken, payload) {
     }
     if (!res.ok) {
       console.error(`APNs error ${res.status || ''} for ${deviceToken.substring(0, 8)}...: ${res.data || res.reason}`);
+      // 410 Unregistered is Apple telling us the app is gone from this device.
+      // Dropping it here is what stops a dead token being retried forever.
+      //
+      // Deliberately ONLY this reason. DeviceTokenNotForTopic and
+      // BadDeviceToken also mean "this token is useless to us", but both are
+      // what EVERY token returns if APNS_BUNDLE_ID is ever wrong — pruning on
+      // them would let one bad env var empty the table. Unregistered is
+      // per-device and cannot be mass-triggered by misconfiguration.
+      if (db && res.reason === 'Unregistered') {
+        try {
+          await db.removeDeviceToken(deviceToken);
+          console.log(`📱 Dropped unregistered token ${deviceToken.substring(0, 8)}…`);
+        } catch (err) {
+          console.error('Failed to drop unregistered token:', err.message);
+        }
+      }
     }
     return res.ok;
   })();
@@ -150,7 +166,7 @@ function sendPush(deviceToken, payload) {
  * @param {string} body
  * @param {object} [data] - custom data payload
  */
-async function pushToTokens(tokens, title, body, data = {}) {
+async function pushToTokens(tokens, title, body, data = {}, db = null) {
   if (!isConfigured() || !tokens || tokens.length === 0) return;
 
   const payload = {
@@ -163,7 +179,7 @@ async function pushToTokens(tokens, title, body, data = {}) {
   };
 
   const results = await Promise.allSettled(
-    tokens.map(token => sendPush(token, payload))
+    tokens.map(token => sendPush(token, payload, db))
   );
 
   const sent = results.filter(r => r.status === 'fulfilled' && r.value).length;
@@ -180,7 +196,7 @@ async function pushToTokens(tokens, title, body, data = {}) {
  */
 async function pushToUser(db, userId, title, body, data = {}) {
   const tokens = await db.getDeviceTokens(userId);
-  await pushToTokens(tokens, title, body, data);
+  await pushToTokens(tokens, title, body, data, db);
 }
 
 /**
@@ -201,7 +217,7 @@ async function pushToGroup(db, groupId, excludeUserId, title, body, data = {}) {
 
   const tokenRows = await db.getDeviceTokensForUsers(userIds);
   const tokens = tokenRows.map(r => r.token);
-  await pushToTokens(tokens, title, body, data);
+  await pushToTokens(tokens, title, body, data, db);
 }
 
 // ---------------------------------------------------------------------------
