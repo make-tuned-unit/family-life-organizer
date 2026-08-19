@@ -17,7 +17,6 @@ struct SettingsView: View {
     @State private var isDeletingAccount = false
     @State private var deleteError: String?
     @State private var notificationsEnabled = false
-    @State private var locationEnabled = false
     @State private var showingHousehold = false
     @State private var showingPhotoPicker = false
     @State private var selectedPhoto: PhotosPickerItem?
@@ -31,6 +30,17 @@ struct SettingsView: View {
     @AppStorage("sharePresenceEnabled") private var sharePresenceEnabled = false
     @AppStorage(AppleCalendarSyncMode.storageKey) private var calendarSyncMode: AppleCalendarSyncMode = .off
     @AppStorage("hasSeenOnboardingTour") private var hasSeenOnboardingTour = false
+
+    /// Never-asked and refused are different situations with different fixes,
+    /// so they must not both read "Disabled".
+    private var locationStatusLabel: String {
+        switch locationService.authorizationStatus {
+        case .authorizedAlways, .authorizedWhenInUse: "Enabled"
+        case .denied, .restricted: "Denied"
+        case .notDetermined: "Not set"
+        @unknown default: "Unknown"
+        }
+    }
 
     var body: some View {
         Form {
@@ -138,14 +148,49 @@ struct SettingsView: View {
                         .foregroundStyle(AccentTheme.ocean.color)
                     Text("Location Access")
                     Spacer()
-                    Text(locationEnabled ? "Enabled" : "Disabled")
+                    Text(locationStatusLabel)
                         .foregroundStyle(WarmPalette.ink3)
                 }
+
+                // Every unauthorized state needs a way out, or the row above is
+                // just a dead end reading "Disabled". iOS only shows the system
+                // prompt once, so a denial can be undone in Settings alone.
+                if locationService.authorizationStatus == .notDetermined {
+                    Button {
+                        locationService.requestPermission()
+                    } label: {
+                        Label("Enable Location Access", systemImage: "location")
+                            .foregroundStyle(TabAccent.home.color)
+                    }
+                } else if locationService.isDenied {
+                    Button {
+                        locationService.openLocationSettings()
+                    } label: {
+                        Label("Open Settings to allow location", systemImage: "arrow.up.forward.app")
+                            .foregroundStyle(TabAccent.home.color)
+                    }
+                }
+
                 Toggle(isOn: $sharePresenceEnabled) {
                     Label("Share my location with my household", systemImage: "person.2.wave.2")
                         .foregroundStyle(AccentTheme.ocean.color)
                 }
                 .tint(AccentTheme.sage.color)
+                // Turning the toggle on is a request for something that needs
+                // OS permission. Asking here means the switch does what it says
+                // rather than silently sharing nothing.
+                .onChange(of: sharePresenceEnabled) { _, isOn in
+                    guard isOn else { return }
+                    if locationService.authorizationStatus == .notDetermined {
+                        locationService.requestPermission()
+                    }
+                }
+
+                if sharePresenceEnabled && locationService.isDenied {
+                    Text("Location is denied in iOS Settings, so nothing is being shared.")
+                        .font(.flFootnote)
+                        .foregroundStyle(AccentTheme.terracotta.color)
+                }
             } header: {
                 Text("Location")
             } footer: {
@@ -410,7 +455,6 @@ struct SettingsView: View {
         .task {
             let settings = await UNUserNotificationCenter.current().notificationSettings()
             notificationsEnabled = settings.authorizationStatus == .authorized
-            locationEnabled = locationService.authorizationStatus == .authorizedWhenInUse || locationService.authorizationStatus == .authorizedAlways
         }
     }
 
