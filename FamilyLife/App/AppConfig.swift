@@ -32,7 +32,7 @@ enum AppConfig {
 
     // MARK: - App Metadata
 
-    static let bundleID = "com.mylauft.kinrows"
+    static let bundleID = "com.kinrows.app"
     static let appName = "Kinrows"
 
     static var appVersion: String {

@@ -74,10 +74,10 @@ wired up for real billing yet**. Before this can sell:
 
 - [ ] **Create the four subscription products in App Store Connect** — one subscription
   group ("Concierge"), exact product IDs and prices matching `Configuration.storekit`:
-  - `com.mylauft.kinrows.concierge.lite.monthly` — $4.99/mo
-  - `com.mylauft.kinrows.concierge.lite.yearly` — $49.99/yr
-  - `com.mylauft.kinrows.concierge.premium.monthly` — $9.99/mo
-  - `com.mylauft.kinrows.concierge.premium.yearly` — $99.99/yr
+  - `com.kinrows.app.concierge.lite.monthly` — $4.99/mo
+  - `com.kinrows.app.concierge.lite.yearly` — $49.99/yr
+  - `com.kinrows.app.concierge.premium.monthly` — $9.99/mo
+  - `com.kinrows.app.concierge.premium.yearly` — $99.99/yr
   - Tier levels: Premium above Lite (so upgrade/downgrade works); yearly = 2 months free.
 - [ ] Fill in App Store Connect subscription localizations, review screenshot, and the
   required paid-apps agreement / banking & tax forms.

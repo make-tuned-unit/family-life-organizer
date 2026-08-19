@@ -14,17 +14,27 @@ final class SubscriptionService {
     enum Period: String { case monthly, yearly }
 
     static let productIDs: [String] = [
+        "com.kinrows.app.concierge.lite.monthly",
+        "com.kinrows.app.concierge.lite.yearly",
+        "com.kinrows.app.concierge.premium.monthly",
+        "com.kinrows.app.concierge.premium.yearly",
+    ]
+    // Products sold under the previous bundle ID (com.mylauft.kinrows). They can
+    // no longer be BOUGHT — only the four above are offered — but a transaction
+    // from before the move still resolves as an entitlement, so nobody who paid
+    // loses access to what they paid for. The first is the pre-tier single
+    // product, which has always mapped to premium.
+    static let legacyProductIDs: [String] = [
+        "com.mylauft.kinrows.concierge.monthly",
         "com.mylauft.kinrows.concierge.lite.monthly",
         "com.mylauft.kinrows.concierge.lite.yearly",
         "com.mylauft.kinrows.concierge.premium.monthly",
         "com.mylauft.kinrows.concierge.premium.yearly",
     ]
-    // Legacy single-tier product still counts as an entitlement (maps to premium).
-    static let legacyProductID = "com.mylauft.kinrows.concierge.monthly"
-    private static let entitlementIDs = Set(productIDs + [legacyProductID])
+    private static let entitlementIDs = Set(productIDs + legacyProductIDs)
 
     static func productID(_ tier: Tier, _ period: Period) -> String {
-        "com.mylauft.kinrows.concierge.\(tier.rawValue).\(period.rawValue)"
+        "com.kinrows.app.concierge.\(tier.rawValue).\(period.rawValue)"
     }
 
     private(set) var isPremium = false           // entitled to ANY paid tier

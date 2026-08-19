@@ -32,7 +32,7 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
     /// Background task that keeps this device's shared calendar pushed to the
     /// household even when the user doesn't open the app (must match the id in
     /// Info.plist BGTaskSchedulerPermittedIdentifiers).
-    static let calSyncTaskID = "com.mylauft.kinrows.calsync"
+    static let calSyncTaskID = "com.kinrows.app.calsync"
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         UNUserNotificationCenter.current().delegate = self

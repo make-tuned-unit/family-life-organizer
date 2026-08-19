@@ -27,7 +27,7 @@
               "locale" : "en_US"
             }
           ],
-          "productID" : "com.mylauft.kinrows.concierge.premium.monthly",
+          "productID" : "com.kinrows.app.concierge.premium.monthly",
           "recurringSubscriptionPeriod" : "P1M",
           "referenceName" : "Concierge Premium Monthly",
           "subscriptionGroupID" : "20000001",
@@ -48,7 +48,7 @@
               "locale" : "en_US"
             }
           ],
-          "productID" : "com.mylauft.kinrows.concierge.premium.yearly",
+          "productID" : "com.kinrows.app.concierge.premium.yearly",
           "recurringSubscriptionPeriod" : "P1Y",
           "referenceName" : "Concierge Premium Yearly",
           "subscriptionGroupID" : "20000001",
@@ -69,7 +69,7 @@
               "locale" : "en_US"
             }
           ],
-          "productID" : "com.mylauft.kinrows.concierge.lite.monthly",
+          "productID" : "com.kinrows.app.concierge.lite.monthly",
           "recurringSubscriptionPeriod" : "P1M",
           "referenceName" : "Concierge Lite Monthly",
           "subscriptionGroupID" : "20000001",
@@ -90,7 +90,7 @@
               "locale" : "en_US"
             }
           ],
-          "productID" : "com.mylauft.kinrows.concierge.lite.yearly",
+          "productID" : "com.kinrows.app.concierge.lite.yearly",
           "recurringSubscriptionPeriod" : "P1Y",
           "referenceName" : "Concierge Lite Yearly",
           "subscriptionGroupID" : "20000001",

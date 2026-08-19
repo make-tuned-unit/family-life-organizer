@@ -29,7 +29,7 @@ scripts/                    # demo seeds + concierge-tool-eval.js (structural + 
 website/                    # kinrows.com static marketing site + llms.txt/llms-full.txt
 ```
 
-- Bundle ID: `com.mylauft.kinrows` · App name: **Kinrows**
+- Bundle ID: `com.kinrows.app` · App name: **Kinrows** · Team `Z58XSBM78S` (renamed from `com.mylauft.kinrows`/`GANM22MFCH` when the app moved to its own developer account)
 - API base: DEBUG → `http://localhost:3456` · RELEASE → hardcoded prod URL (see `AppConfig.swift`; the `server_url` UserDefaults override is DEBUG-only by design)
 - Deploy: **Railway** (prod URL in `AppConfig.swift`). Required env vars documented in `.env.example`
 

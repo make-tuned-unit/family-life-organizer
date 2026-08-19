@@ -395,7 +395,7 @@ final class AuthService {
 
     // MARK: - Keychain
 
-    private static let keychainService = "com.mylauft.kinrows"
+    private static let keychainService = "com.kinrows.app"
 
     // Device refresh token — the ONLY long-lived credential the app keeps.
     // Same device-only, after-first-unlock protection as the old password

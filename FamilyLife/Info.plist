@@ -9,7 +9,7 @@
 	</array>
 	<key>BGTaskSchedulerPermittedIdentifiers</key>
 	<array>
-		<string>com.mylauft.kinrows.calsync</string>
+		<string>com.kinrows.app.calsync</string>
 	</array>
 </dict>
 </plist>

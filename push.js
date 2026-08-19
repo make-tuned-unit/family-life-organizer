@@ -22,7 +22,7 @@ const ENV_MISMATCH_REASONS = new Set(['BadEnvironmentKeyInToken', 'BadDeviceToke
 // APNs auth key config (from environment variables)
 const KEY_ID = process.env.APNS_KEY_ID;
 const TEAM_ID = process.env.APNS_TEAM_ID;
-const BUNDLE_ID = process.env.APNS_BUNDLE_ID || 'com.mylauft.kinrows';
+const BUNDLE_ID = process.env.APNS_BUNDLE_ID || 'com.kinrows.app';
 const KEY_BASE64 = process.env.APNS_KEY_BASE64; // .p8 key contents, base64-encoded
 
 let _cachedToken = null;

@@ -139,7 +139,9 @@ code no longer uses them, but the exposed values are still in past commits.
 ### iOS
 - Keychain password now `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly`
   (not iCloud-synced / not in backups); keychain service + `AppConfig.bundleID`
-  corrected to `com.mylauft.kinrows`.
+  corrected to match the bundle ID, now `com.kinrows.app`. Note the keychain is
+  team-scoped: the move to team `Z58XSBM78S` makes items written under the old
+  team unreachable, so every install signs in again once.
 
 ### Tests & CI
 - `test/auth-isolation.test.js` — end-to-end auth + cross-household IDOR tests

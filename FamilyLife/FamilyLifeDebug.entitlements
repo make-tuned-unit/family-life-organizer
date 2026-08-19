@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Debug builds sign with a Development provisioning profile, whose
+	     aps-environment is "development". Carrying the production value here
+	     fails the entitlement match at signing time, and the sandbox APNs
+	     token a debug build mints is the one push.js already falls back to. -->
+	<key>aps-environment</key>
+	<string>development</string>
+	<key>com.apple.developer.healthkit</key>
+	<true/>
+</dict>
+</plist>

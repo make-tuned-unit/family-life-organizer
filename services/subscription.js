@@ -4,21 +4,30 @@
 
 const { verifyTransaction } = require('./appleVerify');
 
-const BUNDLE_ID = process.env.APNS_BUNDLE_ID || 'com.mylauft.kinrows';
+const BUNDLE_ID = process.env.APNS_BUNDLE_ID || 'com.kinrows.app';
 
 // Concierge product catalog. Two tiers (lite/premium) × two billing periods.
 // Tier drives the daily chat allowance (see dashboard TIER_DAILY_CAP); both tiers
 // get the free daily brief and the full feature set — they differ only by volume.
 // The legacy single-tier product maps to premium so existing subs don't regress.
 const PRODUCTS = {
+  'com.kinrows.app.concierge.lite.monthly':    { tier: 'lite',    period: 'monthly' },
+  'com.kinrows.app.concierge.lite.yearly':     { tier: 'lite',    period: 'yearly'  },
+  'com.kinrows.app.concierge.premium.monthly': { tier: 'premium', period: 'monthly' },
+  'com.kinrows.app.concierge.premium.yearly':  { tier: 'premium', period: 'yearly'  },
+  // Sold under the previous bundle ID (com.mylauft.kinrows). Nothing new can
+  // arrive on these, but a transaction from before the move must still resolve
+  // to its tier — Apple sends whatever product ID was actually purchased, and
+  // dropping these would silently downgrade a paying household. The last is the
+  // pre-tier single product, which has always mapped to premium.
   'com.mylauft.kinrows.concierge.lite.monthly':    { tier: 'lite',    period: 'monthly' },
   'com.mylauft.kinrows.concierge.lite.yearly':     { tier: 'lite',    period: 'yearly'  },
   'com.mylauft.kinrows.concierge.premium.monthly': { tier: 'premium', period: 'monthly' },
   'com.mylauft.kinrows.concierge.premium.yearly':  { tier: 'premium', period: 'yearly'  },
-  'com.mylauft.kinrows.concierge.monthly':         { tier: 'premium', period: 'monthly' }, // legacy
+  'com.mylauft.kinrows.concierge.monthly':         { tier: 'premium', period: 'monthly' },
 };
 // Product used for comped (non-billed) entitlements — grants the premium tier.
-const COMP_PRODUCT_ID = 'com.mylauft.kinrows.concierge.premium.monthly';
+const COMP_PRODUCT_ID = 'com.kinrows.app.concierge.premium.monthly';
 // Back-compat export for any caller still referencing a single product id.
 const PRODUCT_ID = process.env.CONCIERGE_PRODUCT_ID || COMP_PRODUCT_ID;
 
