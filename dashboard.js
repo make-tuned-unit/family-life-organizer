@@ -311,9 +311,14 @@ function serveWebsiteHtml(filePath) {
       // Set CSP header
       res.set('Content-Security-Policy', WEBSITE_CSP);
       
-      // Inject analytics script before </body> if not already present
+      // Inject analytics snippet before </body> if not already present
       if (!html.includes('analytics.js') && html.includes('</body>')) {
-        html = html.replace('</body>', '<script src="/analytics.js" async></script>\n</body>');
+        const analyticsInject = `<script>
+  // Permagent self-hosted analytics configuration — reference endpoint for verification
+  window.permagentAnalyticsCollectUrl = '/api/permagent-analytics/collect';
+</script>
+<script src="/analytics.js" async></script>`;
+        html = html.replace('</body>', analyticsInject + '\n</body>');
       }
       
       // Set correct content type and send
