@@ -203,3 +203,41 @@ test('recommendations: under 4 months, no training method is offered', () => {
   assert.ok(keys.includes('too_young'), 'the age gate fires');
   assert.ok(!keys.includes('method'), 'no formal method before ~4 months');
 });
+
+// ---------------------------------------------------------------------------
+// Next-nap window: Home counts awake from the last finished sleep, nap or
+// night. A fragile Date parse used to drop any stamp that wasn't exactly
+// "yyyy-MM-dd HH:mm", so a morning nap left the bar stuck on last night.
+// ---------------------------------------------------------------------------
+
+test('nextSleepWindow: a morning nap moves the wake, not last night', () => {
+  const birthdate = '2025-09-20'; // ~10 months → 3–4 hour band
+  const night = {
+    entry_type: 'night_sleep', entry_date: '2026-08-19',
+    value: JSON.stringify({
+      sleep_start: '2026-08-19 19:35', sleep_end: '2026-08-20 06:27', duration_minutes: 652,
+    }),
+  };
+  const nap = (end) => ({
+    entry_type: 'nap', entry_date: '2026-08-20',
+    value: JSON.stringify({
+      sleep_start: '2026-08-20 08:24', sleep_end: end, duration_minutes: 50,
+    }),
+  });
+
+  const fromNight = sleepStats.nextSleepWindow([night], { birthdate });
+  assert.equal(fromNight.last_wake_at, '2026-08-20 06:27');
+  assert.equal(fromNight.last_sleep_type, 'night_sleep');
+
+  const fromNap = sleepStats.nextSleepWindow([night, nap('2026-08-20 09:14')], { birthdate });
+  assert.equal(fromNap.last_wake_at, '2026-08-20 09:14', 'awake counts from the nap');
+  assert.equal(fromNap.last_sleep_type, 'nap');
+  assert.equal(fromNap.due_from, '2026-08-20 12:14');
+
+  // Shapes the old `new Date(stamp.replace(' ','T')+':00')` treated as invalid.
+  for (const end of ['2026-08-20 09:14:00', '2026-08-20T09:14:00', '2026-08-20 9:14 AM']) {
+    const w = sleepStats.nextSleepWindow([night, nap(end)], { birthdate });
+    assert.equal(w.last_wake_at, '2026-08-20 09:14', `parsed ${end}`);
+    assert.equal(w.last_sleep_type, 'nap');
+  }
+});

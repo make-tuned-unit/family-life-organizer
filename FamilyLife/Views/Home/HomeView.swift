@@ -198,7 +198,9 @@ struct HomeView: View {
                 }
             }
         }
-        .sheet(item: $selectedFeedRoutine) { target in
+        .sheet(item: $selectedFeedRoutine, onDismiss: {
+            Task { await viewModel.reloadSleepNow(api: api) }
+        }) { target in
             NavigationStack {
                 RoutineDetailView(routineId: target.id)
                     .toolbar {
@@ -272,6 +274,7 @@ struct HomeView: View {
         while !Task.isCancelled {
             try? await Task.sleep(for: .seconds(15))
             await viewModel.reloadTrips(api: api)
+            await viewModel.reloadSleepNow(api: api)
             presenceMembers = (try? await api.fetchHouseholdPresence()) ?? presenceMembers
         }
     }

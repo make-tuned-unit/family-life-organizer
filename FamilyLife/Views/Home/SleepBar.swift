@@ -89,7 +89,8 @@ struct SleepBar: View {
     }
 
     /// The line under the name: when the next sleep is due, or when this one
-    /// started. Never states a prediction that has already expired.
+    /// started. An overdue morning nap stays a nap until the evening wind-down
+    /// — swapping in tonight's bedtime at 11am is the wrong next action.
     private func detailText(now: Date) -> String {
         if summary.isAsleep {
             if let since = summary.asleepSinceDate {
@@ -97,26 +98,31 @@ struct SleepBar: View {
             }
             return "Sleeping now"
         }
-        if let next = summary.next_sleep, !next.isStale, let due = next.dueFromDate {
+        let bedtimeCopy: String? = {
+            guard let prep = summary.bedtime_prep, let bedtime = prep.bedtime else { return nil }
+            return "Bedtime routine around \(displayTime(prep.start_time)) for a \(bedtime) bedtime"
+        }()
+        if let next = summary.next_sleep, let due = next.dueFromDate {
             if due > now {
                 let mins = max(0, Int(due.timeIntervalSince(now) / 60))
                 let kind = next.last_sleep_type == "night_sleep" ? "First nap" : "Next nap"
                 return "\(kind) around \(DateFormatter.shortTime.string(from: due)) · in \(SleepValue.durationText(minutes: mins))"
             }
+            if summary.bedtime_prep?.hasStarted(now: now) == true, let bedtimeCopy {
+                return bedtimeCopy
+            }
             return "Nap window opened at \(DateFormatter.shortTime.string(from: due))"
         }
-        // No prediction: the bedtime routine is the next useful thing to say.
-        if let prep = summary.bedtime_prep, let bedtime = prep.bedtime {
-            return "Bedtime routine around \(displayTime(prep.start_time)) for a \(bedtime) bedtime"
-        }
-        return "Log a sleep to see when the next nap is due"
+        return bedtimeCopy ?? "Log a sleep to see when the next nap is due"
     }
 
-    /// Past the far end of the wake window — worth colouring, since the useful
-    /// signal at that point is "they are getting overtired".
+    /// Past the start of the wake window — worth colouring, since the useful
+    /// signal at that point is "they are getting overtired". Hands off to
+    /// bedtime once the evening routine has started, so 8pm doesn't stay red.
     private func isOverdue(now: Date) -> Bool {
-        guard !summary.isAsleep, let next = summary.next_sleep, !next.isStale,
+        guard !summary.isAsleep, let next = summary.next_sleep,
               let due = next.dueFromDate else { return false }
+        if summary.bedtime_prep?.hasStarted(now: now) == true { return false }
         return due <= now
     }
 

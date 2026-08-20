@@ -159,6 +159,15 @@ struct BedtimePrep: Codable {
               let h = Int(parts[0]), let m = Int(parts[1]) else { return nil }
         return (h, m)
     }
+
+    /// True once today's wind-down time has arrived — the point the Home bar
+    /// should talk about bedtime rather than an overdue morning nap.
+    func hasStarted(now: Date = Date()) -> Bool {
+        guard let (hour, minute) = startComponents,
+              let start = Calendar.current.date(bySettingHour: hour, minute: minute, second: 0, of: now)
+        else { return false }
+        return now >= start
+    }
 }
 
 // MARK: - Sleep statistics

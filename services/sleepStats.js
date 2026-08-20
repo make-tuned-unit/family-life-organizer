@@ -43,10 +43,39 @@ function parseValue(entry) {
   catch { return null; }
 }
 
-// "yyyy-MM-dd HH:mm" -> minutes since midnight, or null.
+// Sleep stamps are naive local clock times ("2026-08-20 09:14"), not instants.
+// Parse them as UTC-clock so server timezone cannot shift comparisons, and
+// accept the extra shapes the iOS formatter has actually emitted: seconds,
+// a T separator, and 12-hour AM/PM. `new Date(stamp.replace(' ','T')+':00')`
+// treated "09:14:00" and "09:14 AM" as invalid, so a morning nap was skipped
+// and Home kept counting awake from last night's wake.
+function parseSleepStamp(stamp) {
+  const s = String(stamp || '').trim();
+  const m = /^(\d{4})-(\d{2})-(\d{2})[ T](\d{1,2}):(\d{2})(?::(\d{2}))?(?:\s*([AaPp])\.?[Mm]\.?)?$/.exec(s);
+  if (!m) return null;
+  let h = parseInt(m[4], 10);
+  const min = parseInt(m[5], 10);
+  if (m[7]) {
+    const pm = m[7].toLowerCase() === 'p';
+    if (pm && h < 12) h += 12;
+    if (!pm && h === 12) h = 0;
+  }
+  if (h > 23 || min > 59) return null;
+  return Date.UTC(+m[1], +m[2] - 1, +m[3], h, min);
+}
+
+function formatSleepStamp(ms) {
+  const d = new Date(ms);
+  const pad = (v) => String(v).padStart(2, '0');
+  return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}`;
+}
+
+// "yyyy-MM-dd HH:mm" (and the sibling shapes above) -> minutes since midnight.
 function minutesOfDay(stamp) {
-  const m = /^\d{4}-\d{2}-\d{2} (\d{2}):(\d{2})$/.exec(String(stamp || ''));
-  return m ? parseInt(m[1]) * 60 + parseInt(m[2]) : null;
+  const ms = parseSleepStamp(stamp);
+  if (ms == null) return null;
+  const d = new Date(ms);
+  return d.getUTCHours() * 60 + d.getUTCMinutes();
 }
 
 const dayOf = (stamp) => String(stamp || '').slice(0, 10);
@@ -952,32 +981,31 @@ function nextSleepWindow(entries, { birthdate = null, leadMinutes = 15 } = {}) {
   const window = wakeWindowForBirthdate(birthdate);
   if (!window) return null;
 
-  // The most recent sleep that has actually ended.
+  // The most recent sleep that has actually ended — nap or night. Counting
+  // only from last night's wake made Home say "awake 4h" through a logged
+  // morning nap, then fall back to bedtime once that first-nap window closed.
   let latest = null;
   for (const e of entries || []) {
     if (e.entry_type !== 'nap' && e.entry_type !== 'night_sleep') continue;
     const v = parseValue(e) || {};
     if (v.in_progress || !v.sleep_end) continue;
-    const endedAt = new Date(`${String(v.sleep_end).replace(' ', 'T')}:00`);
-    if (isNaN(endedAt)) continue;
+    const endedAt = parseSleepStamp(v.sleep_end);
+    if (endedAt == null) continue;
     if (!latest || endedAt > latest.endedAt) latest = { endedAt, type: e.entry_type };
   }
   if (!latest) return null;
 
-  const at = (mins) => new Date(latest.endedAt.getTime() + mins * 60000);
-  const dueFrom = at(window.min_minutes);
-  const prepare = at(Math.max(0, window.min_minutes - leadMinutes));
-  const stamp = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  const at = (mins) => latest.endedAt + mins * 60000;
 
   return {
-    last_wake_at: stamp(latest.endedAt),
+    last_wake_at: formatSleepStamp(latest.endedAt),
     last_sleep_type: latest.type,
     wake_window_label: window.label,
     wake_window_min_minutes: window.min_minutes,
     wake_window_max_minutes: window.max_minutes,
-    due_from: stamp(dueFrom),
-    due_by: stamp(at(window.max_minutes)),
-    prepare_at: stamp(prepare),
+    due_from: formatSleepStamp(at(window.min_minutes)),
+    due_by: formatSleepStamp(at(window.max_minutes)),
+    prepare_at: formatSleepStamp(at(Math.max(0, window.min_minutes - leadMinutes))),
     lead_minutes: leadMinutes,
     // Said plainly wherever this surfaces: this is a rule of thumb, not the
     // AASM/AAP consensus the duration ranges come from.

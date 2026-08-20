@@ -12,6 +12,8 @@ extension DateFormatter {
     /// "yyyy-MM-dd" — API date strings, pantry expiry dates, server round-trips
     static let isoDate: DateFormatter = {
         let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.calendar = Calendar(identifier: .gregorian)
         f.dateFormat = "yyyy-MM-dd"
         return f
     }()
@@ -47,9 +49,12 @@ extension DateFormatter {
         return f
     }()
 
-    /// "HH:mm" — 24-hour time for appointment fields
+    /// "HH:mm" — 24-hour time for appointment fields and sleep clock times.
+    /// POSIX so a 12-hour device locale cannot rewrite this to "h:mm a".
     static let hourMinute: DateFormatter = {
         let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.calendar = Calendar(identifier: .gregorian)
         f.dateFormat = "HH:mm"
         return f
     }()
@@ -108,9 +113,13 @@ extension DateFormatter {
         return f
     }()
 
-    /// "yyyy-MM-dd HH:mm" — compact datetime (notifications)
+    /// "yyyy-MM-dd HH:mm" — compact datetime (sleep spans, notifications).
+    /// POSIX so a 12-hour locale cannot emit "9:14 AM" and make the server
+    /// skip the stamp when working out the next nap.
     static let dateTimeMinute: DateFormatter = {
         let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.calendar = Calendar(identifier: .gregorian)
         f.dateFormat = "yyyy-MM-dd HH:mm"
         return f
     }()

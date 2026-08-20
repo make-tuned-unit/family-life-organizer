@@ -229,10 +229,14 @@ struct RoutineDetailView: View {
     /// running.
     @ViewBuilder
     private func nextSleepCard(_ detail: RoutineDetailResponse) -> some View {
-        // Hidden once the window has passed: a prediction from this morning
-        // shown at 8pm reads as "a nap is coming at 11am", which is just wrong.
-        if openSleep(detail) == nil, let next = detail.next_sleep, !next.isStale,
+        // Hidden once the evening routine has started: a prediction from this
+        // morning shown at 8pm reads as "a nap is coming at 11am". Until then,
+        // an overdue window still belongs on this card — not swapped for bedtime.
+        let pastBedtimePrep = detail.bedtime_prep?.hasStarted() == true
+        if openSleep(detail) == nil, let next = detail.next_sleep,
+           !(next.isStale && pastBedtimePrep),
            let dueFrom = next.dueFromDate, let prepare = next.prepareDate {
+            let dueNow = dueFrom <= Date()
             VStack(alignment: .leading, spacing: 6) {
                 HStack(spacing: 7) {
                     Image(systemName: "hourglass")
@@ -251,11 +255,11 @@ struct RoutineDetailView: View {
                             .foregroundStyle(WarmPalette.ink3)
                     }
                 }
-                Text(next.isDueNow
+                Text(dueNow
                      ? "Due now — the window opened at \(DateFormatter.shortTime.string(from: dueFrom))"
                      : "Likely due around \(DateFormatter.shortTime.string(from: dueFrom))")
                     .font(.flSubheadline)
-                    .foregroundStyle(next.isDueNow ? WarmPalette.ink1 : WarmPalette.ink2)
+                    .foregroundStyle(dueNow ? WarmPalette.ink1 : WarmPalette.ink2)
                 if let label = next.wake_window_label {
                     // Name the wind-down time outright, so the nudge and the
                     // sleep time are two clearly different clock times.

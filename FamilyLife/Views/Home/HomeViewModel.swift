@@ -117,6 +117,16 @@ final class HomeViewModel {
         }
     }
 
+    /// Cheap refresh for the sleep bar — logging a nap in the routine sheet
+    /// must show up here without a full Home reload or a pull-to-refresh.
+    func reloadSleepNow(api: APIService) async {
+        do {
+            sleepNow = try await api.fetchSleepNow()
+        } catch {
+            guard !error.isCancellation else { return }
+        }
+    }
+
     /// Cancel an active trip straight from the Home presence chip. Optimistically
     /// drops it from the list; reloads to restore truth on failure.
     func cancelTrip(_ id: Int, api: APIService) async {

@@ -956,6 +956,31 @@ test('routines: sleep-now reports awake-since and the next nap for Home', async 
   assert.equal(asleep.next_sleep, null, 'no next-nap guess while one is running');
 });
 
+test('routines: sleep-now counts awake from the last nap, not last night', async () => {
+  const [parent] = await member('now_nap_rt', 'Now Nap RT');
+  const created = await parent('POST', '/api/routines', {
+    name: 'Jude sleep', routine_type: 'baby_sleep', subject_name: 'Jude',
+    subject_birthdate: '2025-09-20',
+  });
+  const id = created.body.id;
+
+  await parent('POST', `/api/routines/${id}/entries`, {
+    entry_date: '2026-08-19', entry_type: 'night_sleep', entry_time: '19:35',
+    value: { sleep_start: '2026-08-19 19:35', sleep_end: '2026-08-20 06:27', duration_minutes: 652 },
+  });
+  await parent('POST', `/api/routines/${id}/entries`, {
+    entry_date: '2026-08-20', entry_type: 'nap', entry_time: '08:24',
+    value: { sleep_start: '2026-08-20 08:24', sleep_end: '2026-08-20 09:14', duration_minutes: 50 },
+  });
+
+  const now = (await parent('GET', '/api/routines/sleep-now')).body[0];
+  assert.equal(now.state, 'awake');
+  assert.equal(now.awake_since, '2026-08-20 09:14', 'the bar follows the nap, not 6:27am');
+  assert.equal(now.last_sleep_type, 'nap');
+  assert.equal(now.next_sleep.last_sleep_type, 'nap');
+  assert.equal(now.next_sleep.due_from, '2026-08-20 12:14');
+});
+
 test('routines: sleep-now does not leak a housemate\'s private routine', async () => {
   const [owner, invite] = await member('nowp_rt', 'Now Private RT');
   const [partner] = await member('nowq_rt', 'Now Partner RT', invite);
