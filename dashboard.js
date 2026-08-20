@@ -281,6 +281,71 @@ app.use(session({
     maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
   },
 }));
+// CSP for the public marketing site. Allows script from same origin and inline,
+// and permits POST beacons to /api/permagent-analytics/collect.
+const WEBSITE_CSP = [
+  "default-src 'self'",
+  "script-src 'self' 'unsafe-inline'",  // allows both external files and inline
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+  "font-src https://fonts.gstatic.com",
+  "img-src 'self' data: https:",
+  "connect-src 'self'",  // POST to /api/permagent-analytics/collect
+  "object-src 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+  "frame-ancestors 'none'",
+].join('; ');
+
+// Middleware to inject analytics snippet into HTML responses from the website directory.
+// Intercepts express.static responses by wrapping res.write/res.end to buffer chunks,
+// inject the snippet, and send the modified content.
+app.use((req, res, next) => {
+  // Skip for non-HTML routes (API, login, app)
+  if (req.path.startsWith('/api') || req.path.startsWith('/login') || req.path.startsWith('/app')) {
+    return next();
+  }
+  
+  const originalWrite = res.write;
+  const originalEnd = res.end;
+  let chunks = [];
+  
+  // Buffer chunks instead of writing immediately
+  res.write = function(chunk, encoding) {
+    if (chunk) chunks.push({ chunk, encoding });
+    return this; // Enable chaining, don't write yet
+  };
+  
+  res.end = function(chunk, encoding) {
+    if (chunk) chunks.push({ chunk, encoding });
+    
+    // Reconstruct the full body from buffered chunks
+    let fullBody = '';
+    for (const { chunk: c, encoding: enc } of chunks) {
+      if (typeof c === 'string') {
+        fullBody += c;
+      } else if (Buffer.isBuffer(c)) {
+        fullBody += c.toString(enc || 'utf8');
+      }
+    }
+    
+    // Process HTML files: inject CSP header and analytics snippet
+    if (fullBody.includes('<!DOCTYPE') && req.path !== '/og-card.html') {
+      // Set CSP for website pages
+      res.set('Content-Security-Policy', WEBSITE_CSP);
+      
+      // Inject analytics script before </body> if not already present
+      if (!fullBody.includes('analytics.js') && fullBody.includes('</body>')) {
+        fullBody = fullBody.replace('</body>', '<script src="/analytics.js" async></script>\n</body>');
+      }
+    }
+    
+    // Send the modified content using original end method
+    return originalEnd.call(this, fullBody, encoding);
+  };
+  
+  next();
+});
+
 // Public marketing site (kinrows.com) — served at the root. Registered BEFORE
 // `public` so `/`, `/privacy.html`, `/terms.html`, and `/assets/*` resolve to the
 // Kinrows landing site. The iOS app + browser dashboard live under /api and /app.
