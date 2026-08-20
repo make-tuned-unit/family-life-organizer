@@ -7,6 +7,7 @@ const SQLiteStore = require('connect-sqlite3')(session);
 const bodyParser = require('body-parser');
 const bcrypt = require('bcryptjs');
 const path = require('path');
+const fs = require('fs');
 const FamilyDB = require('./database');
 const push = require('./push');
 const ai = require('./services/anthropic');
@@ -296,59 +297,52 @@ const WEBSITE_CSP = [
   "frame-ancestors 'none'",
 ].join('; ');
 
-// Middleware to inject analytics snippet into HTML responses from the website directory.
-// Intercepts express.static responses by wrapping res.write/res.end to buffer chunks,
-// inject the snippet, and send the modified content.
-app.use((req, res, next) => {
-  // Skip for non-HTML routes (API, login, app)
-  if (req.path.startsWith('/api') || req.path.startsWith('/login') || req.path.startsWith('/app')) {
-    return next();
-  }
-  
-  const originalWrite = res.write;
-  const originalEnd = res.end;
-  let chunks = [];
-  
-  // Buffer chunks instead of writing immediately
-  res.write = function(chunk, encoding) {
-    if (chunk) chunks.push({ chunk, encoding });
-    return this; // Enable chaining, don't write yet
-  };
-  
-  res.end = function(chunk, encoding) {
-    if (chunk) chunks.push({ chunk, encoding });
-    
-    // Reconstruct the full body from buffered chunks
-    let fullBody = '';
-    for (const { chunk: c, encoding: enc } of chunks) {
-      if (typeof c === 'string') {
-        fullBody += c;
-      } else if (Buffer.isBuffer(c)) {
-        fullBody += c.toString(enc || 'utf8');
+// Handler to inject analytics snippet into website HTML files.
+// express.static uses sendFile, not send/write/end, so we need explicit routes.
+function serveWebsiteHtml(filePath) {
+  return (req, res) => {
+    const fullPath = path.join(__dirname, 'website', filePath);
+    fs.readFile(fullPath, 'utf8', (err, html) => {
+      if (err) {
+        // File not found or read error
+        return res.status(404).send('Not found');
       }
-    }
-    
-    // Process HTML files: inject CSP header and analytics snippet
-    if (fullBody.includes('<!DOCTYPE') && req.path !== '/og-card.html') {
-      // Set CSP for website pages
+      
+      // Set CSP header
       res.set('Content-Security-Policy', WEBSITE_CSP);
       
       // Inject analytics script before </body> if not already present
-      if (!fullBody.includes('analytics.js') && fullBody.includes('</body>')) {
-        fullBody = fullBody.replace('</body>', '<script src="/analytics.js" async></script>\n</body>');
+      if (!html.includes('analytics.js') && html.includes('</body>')) {
+        html = html.replace('</body>', '<script src="/analytics.js" async></script>\n</body>');
       }
-    }
-    
-    // Send the modified content using original end method
-    return originalEnd.call(this, fullBody, encoding);
+      
+      // Set correct content type and send
+      res.set('Content-Type', 'text/html; charset=utf-8');
+      res.send(html);
+    });
   };
-  
-  next();
-});
+}
 
-// Public marketing site (kinrows.com) — served at the root. Registered BEFORE
-// `public` so `/`, `/privacy.html`, `/terms.html`, and `/assets/*` resolve to the
-// Kinrows landing site. The iOS app + browser dashboard live under /api and /app.
+// Explicit routes for website HTML files (must come BEFORE express.static)
+app.get('/', serveWebsiteHtml('index.html'));
+app.get('/about', serveWebsiteHtml('index.html')); // /about also serves index.html for SPA routing
+app.get('/privacy', serveWebsiteHtml('privacy.html'));
+app.get('/privacy.html', serveWebsiteHtml('privacy.html'));
+app.get('/terms', serveWebsiteHtml('terms.html'));
+app.get('/terms.html', serveWebsiteHtml('terms.html'));
+app.get('/compare', serveWebsiteHtml('compare.html'));
+app.get('/compare.html', serveWebsiteHtml('compare.html'));
+app.get('/best-chore-app-for-families', serveWebsiteHtml('best-chore-app-for-families.html'));
+app.get('/best-chore-app-for-families.html', serveWebsiteHtml('best-chore-app-for-families.html'));
+app.get('/best-family-calendar-app', serveWebsiteHtml('best-family-calendar-app.html'));
+app.get('/best-family-calendar-app.html', serveWebsiteHtml('best-family-calendar-app.html'));
+app.get('/best-family-organizer-apps', serveWebsiteHtml('best-family-organizer-apps.html'));
+app.get('/best-family-organizer-apps.html', serveWebsiteHtml('best-family-organizer-apps.html'));
+app.get('/best-shared-shopping-list-app', serveWebsiteHtml('best-shared-shopping-list-app.html'));
+app.get('/best-shared-shopping-list-app.html', serveWebsiteHtml('best-shared-shopping-list-app.html'));
+
+// Public static assets (CSS, JS, images, etc.) — serve after HTML routes
+// so /analytics.js and /assets/* are still available from express.static
 app.use(express.static(path.join(__dirname, 'website')));
 app.use(express.static(path.join(__dirname, 'public')));
 
