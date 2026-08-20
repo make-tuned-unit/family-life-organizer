@@ -311,14 +311,15 @@ function serveWebsiteHtml(filePath) {
       // Set CSP header
       res.set('Content-Security-Policy', WEBSITE_CSP);
       
-      // Inject analytics snippet before </body> if not already present
-      if (!html.includes('analytics.js') && html.includes('</body>')) {
-        const analyticsInject = `<script>
-  // Permagent self-hosted analytics configuration — reference endpoint for verification
-  window.permagentAnalyticsCollectUrl = '/api/permagent-analytics/collect';
-</script>
-<script src="/analytics.js" async></script>`;
-        html = html.replace('</body>', analyticsInject + '\n</body>');
+      // The collect path MUST appear in the HTML itself — Permagent's install
+      // verifier greps the document, not /analytics.js. Keep this as a safety
+      // net for any page that was not committed with the snippet.
+      if (!html.includes('/api/permagent-analytics/collect') && html.includes('</head>')) {
+        html = html.replace('</head>',
+          `<script>window.permagentCollectUrl='/api/permagent-analytics/collect';</script>\n` +
+          `<script src="/analytics.js" defer></script>\n</head>`);
+      } else if (!html.includes('analytics.js') && html.includes('</head>')) {
+        html = html.replace('</head>', `<script src="/analytics.js" defer></script>\n</head>`);
       }
       
       // Set correct content type and send
@@ -6973,10 +6974,10 @@ app.get('/api/permagent-analytics/drain', async (req, res) => {
     const limit = Math.max(1, Math.min(parseInt(req.query.limit || '500', 10) || 500, 1000));
 
     const db = new FamilyDB();
-    const events = await db.drainAnalyticsEvents(since, limit);
+    const payload = await db.drainAnalyticsEvents(since, limit);
     db.close();
 
-    res.json({ events });
+    res.json(payload);
   } catch (err) {
     console.error('[analytics drain error]', err.message);
     res.status(500).json({ error: 'Internal server error' });

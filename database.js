@@ -26,6 +26,23 @@ if (!fs.existsSync(DB_DIR)) {
   fs.mkdirSync(DB_DIR, { recursive: true });
 }
 
+// SQLite CURRENT_TIMESTAMP is "YYYY-MM-DD HH:MM:SS" (UTC, no offset). Permagent
+// stores `at` as-is; ISO-8601 with Z is what the drain spec asks for.
+function isoUtc(stamp) {
+  if (!stamp) return null;
+  const s = String(stamp);
+  const d = /^\d{4}-\d{2}-\d{2}T/.test(s)
+    ? new Date(s)
+    : new Date(s.includes('T') ? s : s.replace(' ', 'T') + 'Z');
+  return isNaN(d) ? s : d.toISOString();
+}
+
+function parseJsonObject(raw) {
+  if (raw == null || raw === '') return null;
+  if (typeof raw === 'object') return raw;
+  try { return JSON.parse(raw); } catch { return null; }
+}
+
 // Columns that must never be set from a client-supplied update body. Blocks
 // mass-assignment of ownership/isolation/identity fields in the dynamic update*
 // helpers (a future sensitive column is protected by default, not exposed).
@@ -4632,11 +4649,13 @@ class FamilyDB {
     });
   }
 
-  // Permagent analytics: drain events for the Permagent daemon
-  // Returns events with id > since, ordered by id ASC, up to limit
+  // Permagent analytics: drain events for the Permagent daemon.
+  // Envelope is spec v41: { events, latestId, firstAvailableId }.
+  // isBot MUST be a JSON boolean — SQLite stores 0/1, and Permagent's
+  // serde decoder rejects integer 0/1, which stalled every Kinrows drain.
   drainAnalyticsEvents(since = 0, limit = 500) {
     return new Promise((resolve, reject) => {
-      limit = Math.min(Math.max(1, limit), 1000); // cap between 1 and 1000
+      limit = Math.min(Math.max(1, limit), 1000);
       this.db.all(
         `SELECT
            id, kind, path, referrer, name, visitor_hash as visitorHash,
@@ -4650,34 +4669,33 @@ class FamilyDB {
         [since, limit],
         (err, rows) => {
           if (err) return reject(err);
-          // Parse properties JSON and convert timestamps to ISO-8601
-          const events = (rows || []).map(row => {
-            const event = {
-              id: row.id,
-              kind: row.kind,
-              path: row.path,
-              referrer: row.referrer,
-              name: row.name,
-              visitorHash: row.visitorHash,
-              at: row.at // already in ISO format from SQLite's DATETIME
-            };
-            // Optional fields: only include if present
-            if (row.properties !== null) {
-              try {
-                event.properties = JSON.parse(row.properties);
-              } catch {
-                event.properties = null;
-              }
+          this.db.get(
+            'SELECT MIN(id) AS firstAvailableId, MAX(id) AS latestId FROM permagent_analytics_events',
+            (boundErr, bounds) => {
+              if (boundErr) return reject(boundErr);
+              const events = (rows || []).map(row => ({
+                id: row.id,
+                kind: row.kind,
+                path: row.path,
+                referrer: row.referrer,
+                name: row.name,
+                visitorHash: row.visitorHash,
+                at: isoUtc(row.at),
+                properties: parseJsonObject(row.properties),
+                isBot: !!row.isBot,
+                sessionId: row.sessionId,
+                utmSource: row.utmSource,
+                utmMedium: row.utmMedium,
+                utmCampaign: row.utmCampaign,
+                country: row.country,
+              }));
+              resolve({
+                events,
+                latestId: bounds?.latestId ?? null,
+                firstAvailableId: bounds?.firstAvailableId ?? null,
+              });
             }
-            if (row.isBot !== null) event.isBot = row.isBot;
-            if (row.sessionId !== null) event.sessionId = row.sessionId;
-            if (row.utmSource !== null) event.utmSource = row.utmSource;
-            if (row.utmMedium !== null) event.utmMedium = row.utmMedium;
-            if (row.utmCampaign !== null) event.utmCampaign = row.utmCampaign;
-            if (row.country !== null) event.country = row.country;
-            return event;
-          });
-          resolve(events);
+          );
         }
       );
     });
