@@ -28,6 +28,9 @@ final class HomeViewModel {
     /// Live sleep status for the Home sleep bar. Usually one row; empty for
     /// households with no sleep routine, which is the common case.
     var sleepNow: [SleepNowSummary] = []
+    /// Today's chore slots per child, for the Home chore bar. Empty unless the
+    /// household keeps a chores routine.
+    var choresToday: [ChoresTodaySummary] = []
     var isLoading = false
     var error: String?
     var visibleFeedCount = 15
@@ -57,8 +60,9 @@ final class HomeViewModel {
         async let f = Self.safeFetch { try await api.fetchActivity() }
         async let tr = Self.safeFetch { try await api.fetchTrips(status: "active") }
         async let sn = Self.safeFetch { try await api.fetchSleepNow() }
+        async let ch = Self.safeFetch { try await api.fetchChoresToday() }
 
-        let (dashboard, tasks, appointments, weekAppts, monthAppts, feed, trips, sleep) = await (d, t, a, aWeek, aMonth, f, tr, sn)
+        let (dashboard, tasks, appointments, weekAppts, monthAppts, feed, trips, sleep, chores) = await (d, t, a, aWeek, aMonth, f, tr, sn, ch)
 
         // Batch apply — single re-render
         if let data = dashboard.value {
@@ -104,6 +108,7 @@ final class HomeViewModel {
         // doesn't appear. Only replace what we have on a successful fetch, so a
         // dropped request doesn't blank a bar that was correct a moment ago.
         if let sleep = sleep.value { sleepNow = sleep }
+        if let chores = chores.value { choresToday = chores }
 
         error = firstError
         isLoading = false
@@ -112,6 +117,27 @@ final class HomeViewModel {
     func reloadTrips(api: APIService) async {
         do {
             activeTrips = try await api.fetchTrips(status: "active")
+        } catch {
+            guard !error.isCancellation else { return }
+        }
+    }
+
+    /// Tick a chore slot from Home. Optimistic flip first so the dot responds
+    /// under the finger; the server's answer then settles the row.
+    func toggleChore(routineId: Int, choreId: String, slot: String, api: APIService) async {
+        guard let idx = choresToday.firstIndex(where: { $0.routine_id == routineId }) else { return }
+        do {
+            _ = try await api.toggleChore(routineId: routineId, choreId: choreId, slot: slot)
+            choresToday = try await api.fetchChoresToday()
+        } catch {
+            guard !error.isCancellation else { return }
+            self.error = "Couldn't update \(choresToday[idx].chores.first { $0.id == choreId }?.title ?? "that chore")."
+        }
+    }
+
+    func reloadChoresToday(api: APIService) async {
+        do {
+            choresToday = try await api.fetchChoresToday()
         } catch {
             guard !error.isCancellation else { return }
         }

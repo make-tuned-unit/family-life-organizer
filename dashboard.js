@@ -5746,11 +5746,17 @@ const sleepTraining = require('./services/sleepTraining');
 const sleepStats = require('./services/sleepStats');
 const cycleTracking = require('./services/cycleTracking');
 const routineAchievements = require('./services/routineAchievements');
+const chores = require('./services/chores');
 
 // The guided sleep-training program (age-banded phases). Static, read-only —
 // still behind auth so it isn't a public scrape target.
 app.get('/api/routines/templates/sleep-training', requireAuth, (req, res) => {
   res.json(sleepTraining.template());
+});
+
+// The chores program: age-banded chore ladder, reward guidance, and sources.
+app.get('/api/routines/templates/chores', requireAuth, (req, res) => {
+  res.json(chores.template());
 });
 
 // Authorization guard for routine rows. Routines are private to their creator
@@ -5822,7 +5828,7 @@ app.post('/api/routines', requireAuth, async (req, res) => {
     if (!groupId) return res.status(403).json({ error: 'Join a household first' });
     const name = String(req.body.name || '').trim();
     if (!name) return res.status(400).json({ error: 'name is required' });
-    const type = ['period', 'baby_sleep', 'sleep_training', 'activity', 'custom'].includes(req.body.routine_type)
+    const type = ['period', 'baby_sleep', 'sleep_training', 'activity', 'chores', 'custom'].includes(req.body.routine_type)
       ? req.body.routine_type : 'custom';
     const result = await db.createRoutine({
       group_id: groupId,
@@ -5877,6 +5883,46 @@ async function resolveSubjectBirthdate(db, routine, callerId) {
      ORDER BY date LIMIT 1`, [person.id, routine.group_id, callerId]);
   return row?.date ? String(row.date).slice(0, 10) : null;
 }
+
+// Today's chores for Home: each chores routine the caller can see, with the
+// slots still open today and this week's earnings — so ticking off "fed the
+// dog" is one tap from the front page. MUST stay above `/api/routines/:id`.
+app.get('/api/routines/chores-today', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const userId = req.session.user?.id;
+    const groupId = await db.getUserHouseholdId(userId);
+    if (!groupId) return res.json([]);
+    const routines = (await db.getRoutines(groupId, userId))
+      .filter(r => r.active !== 0 && r.routine_type === 'chores')
+      .slice(0, 4);
+    const out = [];
+    for (const routine of routines) {
+      const entries = await db.getRoutineEntries(routine.id, { limit: 1000 });
+      const birthdate = await resolveSubjectBirthdate(db, routine, userId);
+      const summary = chores.compute(entries, routine.config, { today: todayLocal(), birthdate });
+      const todayCol = summary.chores.map(c => {
+        const d = c.days.find(x => x.today);
+        return { id: c.id, title: c.title, icon: c.icon, applies: !!d?.applies, slots: d ? d.slots : [] };
+      }).filter(c => c.applies);
+      out.push({
+        routine_id: routine.id,
+        name: routine.name,
+        subject_name: routine.subject_name,
+        color: routine.color,
+        today: summary.today,
+        chores: todayCol,
+        open_slots: todayCol.reduce((n, c) => n + c.slots.filter(s => !s.done).length, 0),
+        total_slots: todayCol.reduce((n, c) => n + c.slots.length, 0),
+        streak_days: summary.streak_days,
+        week_total: summary.earnings.total,
+        currency: summary.earnings.currency,
+      });
+    }
+    res.json(out);
+  } catch (err) { sendServerError(res, err); }
+  finally { db.close(); }
+});
 
 // The live sleep picture for Home: for each sleep routine the caller can see,
 // whether they are asleep or awake right now, how long it has been, and when
@@ -5947,15 +5993,17 @@ app.get('/api/routines/:id', requireAuth, async (req, res) => {
     const routine = await db.getRoutineById(req.params.id);
     const entries = await db.getRoutineEntries(req.params.id, {});
     // Attach type-specific derived data the client renders.
-    let guidance = null, cycle = null, achievements = null, nextSleep = null, bedtimePrep = null;
+    let guidance = null, cycle = null, achievements = null, nextSleep = null, bedtimePrep = null, choreSummary = null;
     // Only the sleep types reason from an age, so only they pay for the lookup —
     // and a cycle routine whose subject is "Me" can't accidentally resolve some
     // household member's birthday into its response.
-    const needsAge = ['baby_sleep', 'sleep_training'].includes(routine.routine_type);
+    const needsAge = ['baby_sleep', 'sleep_training', 'chores'].includes(routine.routine_type);
     const birthdate = needsAge
       ? await resolveSubjectBirthdate(db, routine, req.session.user?.id)
       : null;
-    if (needsAge) {
+    if (routine.routine_type === 'chores') {
+      choreSummary = chores.compute(entries, routine.config, { today: todayLocal(), birthdate });
+    } else if (needsAge) {
       // When the next nap is likely due, so the client can nudge before they're
       // overtired rather than after.
       nextSleep = sleepStats.nextSleepWindow(entries, { birthdate });
@@ -5971,7 +6019,7 @@ app.get('/api/routines/:id', requireAuth, async (req, res) => {
     }
     res.json({
       ...routine, entries, guidance, cycle, achievements,
-      next_sleep: nextSleep, bedtime_prep: bedtimePrep,
+      next_sleep: nextSleep, bedtime_prep: bedtimePrep, chores: choreSummary,
       // What the age guidance was actually computed from, so the client can say
       // "using Jude's birthday from People" rather than looking psychic.
       resolved_birthdate: birthdate,
@@ -6048,6 +6096,101 @@ app.put('/api/routines/:id/share', requireAuth, async (req, res) => {
       push.pushToGroup(db, row.group_id, req.session.user?.id, 'A routine was shared',
         `${routine?.name || 'A routine'} is now shared with your household`);
     }
+  } catch (err) { sendServerError(res, err); }
+  finally { db.close(); }
+});
+
+// ---- Chores: idempotent slot toggles, bonuses, and payouts ----------------
+// Each is a thin write over routine_entries so history, sharing, and deletion
+// all keep working the way they do for every other routine kind.
+
+async function requireChoresRoutine(db, req, res) {
+  const row = await requireRoutineAccess(db, req.params.id, req, res);
+  if (!row) return null;
+  const routine = await db.getRoutineById(req.params.id);
+  if (routine.routine_type !== 'chores') { res.status(400).json({ error: 'Not a chores routine' }); return null; }
+  return routine;
+}
+
+async function choreDetail(db, routine, req) {
+  const entries = await db.getRoutineEntries(routine.id, { limit: 1000 });
+  const birthdate = await resolveSubjectBirthdate(db, routine, req.session.user?.id);
+  return chores.compute(entries, routine.config, { today: todayLocal(), birthdate });
+}
+
+// Toggle one chore slot on one day. Done -> not done deletes the entry; the
+// response is the recomputed week so the client never has to guess.
+app.post('/api/routines/:id/chores/toggle', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const routine = await requireChoresRoutine(db, req, res);
+    if (!routine) return;
+    const cfg = chores.parseConfig(routine.config);
+    const chore = cfg.chores.find(c => c.id === String(req.body.chore_id || ''));
+    if (!chore) return res.status(400).json({ error: 'Unknown chore' });
+    const slot = chore.slots.includes(req.body.slot) ? req.body.slot : chore.slots[0];
+    const date = req.body.date ? normalizeDate(req.body.date) : todayLocal();
+    if (date > todayLocal()) return res.status(400).json({ error: "Can't mark a chore done in the future" });
+    const existing = (await db.getRoutineEntries(routine.id, { from: date, to: date, limit: 200 }))
+      .find(e => e.entry_type === 'chore_done' && (() => { try { const v = JSON.parse(e.value || '{}'); return v.chore_id === chore.id && (v.slot || 'anytime') === slot; } catch { return false; } })());
+    const wantDone = req.body.done == null ? !existing : !!req.body.done;
+    if (wantDone && !existing) {
+      await db.addRoutineEntry(routine.id, {
+        entry_date: date, entry_type: 'chore_done', value: { chore_id: chore.id, slot, title: chore.title },
+        created_by: req.session.user?.id,
+      });
+    } else if (!wantDone && existing) {
+      await db.deleteRoutineEntry(existing.id, routine.id);
+    }
+    res.json({ success: true, done: wantDone, chores: await choreDetail(db, routine, req) });
+  } catch (err) { sendServerError(res, err); }
+  finally { db.close(); }
+});
+
+// Mark a behaviour bonus (e.g. "good bedtime") earned or not on a day.
+app.post('/api/routines/:id/chores/bonus', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const routine = await requireChoresRoutine(db, req, res);
+    if (!routine) return;
+    const cfg = chores.parseConfig(routine.config);
+    const bonus = cfg.bonuses.find(b => b.id === String(req.body.bonus_id || ''));
+    if (!bonus) return res.status(400).json({ error: 'Unknown bonus' });
+    const date = req.body.date ? normalizeDate(req.body.date) : todayLocal();
+    const existing = (await db.getRoutineEntries(routine.id, { from: date, to: date, limit: 200 }))
+      .find(e => e.entry_type === 'bonus_earned' && (() => { try { return JSON.parse(e.value || '{}').bonus_id === bonus.id; } catch { return false; } })());
+    const wantEarned = req.body.earned == null ? !existing : !!req.body.earned;
+    if (wantEarned && !existing) {
+      await db.addRoutineEntry(routine.id, {
+        entry_date: date, entry_type: 'bonus_earned', value: { bonus_id: bonus.id, title: bonus.title, amount: bonus.amount },
+        created_by: req.session.user?.id,
+      });
+    } else if (!wantEarned && existing) {
+      await db.deleteRoutineEntry(existing.id, routine.id);
+    }
+    res.json({ success: true, earned: wantEarned, chores: await choreDetail(db, routine, req) });
+  } catch (err) { sendServerError(res, err); }
+  finally { db.close(); }
+});
+
+// Record that a week's allowance was paid. Amount defaults to what the week
+// earned; week_start defaults to the current week.
+app.post('/api/routines/:id/chores/payout', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const routine = await requireChoresRoutine(db, req, res);
+    if (!routine) return;
+    const summary = await choreDetail(db, routine, req);
+    const weekStart = req.body.week_start ? chores.weekStartOf(normalizeDate(req.body.week_start), summary.week_start_day) : summary.week_start;
+    const owedWeek = summary.ledger.unpaid_weeks.find(w => w.week_start === weekStart);
+    const defaultAmount = weekStart === summary.week_start ? summary.earnings.total : (owedWeek ? owedWeek.amount : 0);
+    const amount = req.body.amount != null ? parseMoney(req.body.amount) : defaultAmount;
+    if (amount == null || amount < 0) return res.status(400).json({ error: 'Invalid amount' });
+    const r = await db.addRoutineEntry(routine.id, {
+      entry_date: todayLocal(), entry_type: 'payout', value: { amount, week_start: weekStart },
+      notes: req.body.notes || null, created_by: req.session.user?.id,
+    });
+    res.json({ success: true, id: r.id, chores: await choreDetail(db, routine, req) });
   } catch (err) { sendServerError(res, err); }
   finally { db.close(); }
 });

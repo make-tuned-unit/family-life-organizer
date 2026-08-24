@@ -714,6 +714,45 @@ final class APIService {
         try await get("/api/routines/templates/sleep-training")
     }
 
+    // MARK: Chores
+
+    func fetchChoresTemplate() async throws -> ChoresTemplate {
+        try await get("/api/routines/templates/chores")
+    }
+
+    /// Today's chore slots across the household's chores routines, for Home.
+    func fetchChoresToday() async throws -> [ChoresTodaySummary] {
+        try await get("/api/routines/chores-today")
+    }
+
+    /// Flip one chore slot on one day. `done: nil` toggles; the server answers
+    /// with the recomputed week so the grid never has to guess.
+    func toggleChore(routineId: Int, choreId: String, slot: String, date: String? = nil, done: Bool? = nil) async throws -> ChoreSummary {
+        var body: [String: Any] = ["chore_id": choreId, "slot": slot]
+        if let date { body["date"] = date }
+        if let done { body["done"] = done }
+        let r: ChoreMutationResponse = try await post("/api/routines/\(routineId)/chores/toggle", body: body)
+        return r.chores
+    }
+
+    func setChoreBonus(routineId: Int, bonusId: String, date: String? = nil, earned: Bool? = nil) async throws -> ChoreSummary {
+        var body: [String: Any] = ["bonus_id": bonusId]
+        if let date { body["date"] = date }
+        if let earned { body["earned"] = earned }
+        let r: ChoreMutationResponse = try await post("/api/routines/\(routineId)/chores/bonus", body: body)
+        return r.chores
+    }
+
+    /// Record a week's allowance as paid. Defaults to the current week and
+    /// what it earned; pass `weekStart` to settle an older unpaid week.
+    func recordChorePayout(routineId: Int, weekStart: String? = nil, amount: Double? = nil) async throws -> ChoreSummary {
+        var body: [String: Any] = [:]
+        if let weekStart { body["week_start"] = weekStart }
+        if let amount { body["amount"] = amount }
+        let r: ChoreMutationResponse = try await post("/api/routines/\(routineId)/chores/payout", body: body)
+        return r.chores
+    }
+
     func fetchRoutineOccurrences(id: Int) async throws -> RoutineOccurrences {
         try await get("/api/routines/\(id)/occurrences")
     }

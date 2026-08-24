@@ -27,6 +27,10 @@ struct PersonDetailView: View {
     @State private var showingAddGift = false
     @State private var showingEditPerson = false
     @State private var showingDeleteConfirm = false
+    /// The child's chores routine, when one exists — chores live in Routines
+    /// but a kid's card is where a parent looks for them.
+    @State private var choresRoutine: RoutineResponse?
+    @State private var showingNewChores = false
     @State private var editingMilestone: MilestoneResponse?
     @State private var editingKeyDate: SpecialEventResponse?
     /// Live copy of the person — refreshed after edits so the header updates in place.
@@ -38,6 +42,10 @@ struct PersonDetailView: View {
         ScrollView(showsIndicators: false) {
             VStack(spacing: 16) {
                 header
+
+                if display.isDependent {
+                    choresCard
+                }
 
                 Picker("Section", selection: $tab) {
                     ForEach(Tab.allCases) { Text($0.rawValue).tag($0) }
@@ -163,6 +171,71 @@ struct PersonDetailView: View {
             }
         }
         .padding(.top, 4)
+    }
+
+    // MARK: - Chores
+
+    /// One line: how the week is going, or an invitation to start. Tapping
+    /// opens the routine itself; the program and the money live there.
+    @ViewBuilder
+    private var choresCard: some View {
+        let accent = TabAccent.routines.color
+        if let routine = choresRoutine {
+            NavigationLink {
+                RoutineDetailView(routineId: routine.id)
+            } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: "checkmark.seal.fill")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(accent)
+                        .frame(width: 34, height: 34)
+                        .background(accent.opacity(0.12), in: Circle())
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Chores")
+                            .font(.flSubheadline.weight(.semibold))
+                            .foregroundStyle(WarmPalette.ink1)
+                        Text(routine.last_entry_date.map { "Last ticked \($0)" } ?? "Nothing ticked yet")
+                            .font(.flFootnote)
+                            .foregroundStyle(WarmPalette.ink3)
+                    }
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(WarmPalette.ink4)
+                }
+                .padding(DesignTokens.Spacing.cardPadding)
+                .flCard()
+            }
+            .buttonStyle(.flCardPress)
+        } else {
+            Button { showingNewChores = true } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: "checkmark.seal")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(accent)
+                        .frame(width: 34, height: 34)
+                        .background(accent.opacity(0.12), in: Circle())
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Start chores for \(display.name.split(separator: " ").first.map(String.init) ?? display.name)")
+                            .font(.flSubheadline.weight(.semibold))
+                            .foregroundStyle(WarmPalette.ink1)
+                        Text("Age-appropriate chores, allowance, and a program grounded in the research.")
+                            .font(.flFootnote)
+                            .foregroundStyle(WarmPalette.ink3)
+                    }
+                    Spacer()
+                    Image(systemName: "plus.circle.fill")
+                        .foregroundStyle(accent)
+                }
+                .padding(DesignTokens.Spacing.cardPadding)
+                .flCard(tint: accent.opacity(0.05))
+            }
+            .buttonStyle(.flCardPress)
+            .sheet(isPresented: $showingNewChores) {
+                NewRoutineView(onCreated: { Task { await load() } },
+                               initialType: .chores, initialSubject: display.name, initialBirthdate: display.birthday)
+            }
+        }
     }
 
     // MARK: - Milestones
@@ -490,6 +563,7 @@ struct PersonDetailView: View {
         async let events = api.fetchSpecialEvents()
         async let gifts = api.fetchGiftIdeas(personId: person.id)
         async let people = api.fetchPeople()
+        async let routines = api.fetchRoutines()
         milestones = (try? await ms) ?? []
         decisions = (try? await decs) ?? []
         keyDates = ((try? await events) ?? []).filter { $0.person_id == person.id }
@@ -497,6 +571,14 @@ struct PersonDetailView: View {
         if let refreshed = (try? await people)?.first(where: { $0.id == person.id }) {
             current = refreshed
         }
+        // Match on the child's name the way the server resolves birthdays:
+        // exact, then first name — and only when it's unambiguous.
+        let all = ((try? await routines) ?? []).filter { $0.type == .chores && $0.active != 0 }
+        let wanted = person.name.trimmingCharacters(in: .whitespaces).lowercased()
+        let first = wanted.split(separator: " ").first.map(String.init) ?? wanted
+        var matches = all.filter { ($0.subject_name ?? "").trimmingCharacters(in: .whitespaces).lowercased() == wanted }
+        if matches.isEmpty { matches = all.filter { ($0.subject_name ?? "").lowercased().split(separator: " ").first.map(String.init) == first } }
+        choresRoutine = matches.count == 1 ? matches[0] : nil
     }
 }
 

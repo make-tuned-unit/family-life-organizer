@@ -19,7 +19,7 @@ struct RoutinesView: View {
                 FLScreenHeader(
                     eyebrow: routines.isEmpty ? "Track what repeats" : "\(routines.count) active",
                     title: "Routines",
-                    subtitle: "Cycles, baby sleep, and the rhythms of family life.",
+                    subtitle: "Kids' chores, baby sleep, cycles, and the rhythms of family life.",
                     accent: accent
                 )
 
@@ -30,7 +30,7 @@ struct RoutinesView: View {
                     WarmEmptyState(
                         title: "No routines yet",
                         systemImage: "repeat",
-                        description: "Track a menstrual cycle, a baby's sleep, or start the guided sleep-training program — newborn to 4 years.",
+                        description: "Start a child's chores with an age-by-age program, track a baby's sleep or a menstrual cycle, or follow the guided sleep-training program.",
                         actionLabel: "New routine",
                         action: { showingNew = true }
                     )

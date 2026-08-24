@@ -24,6 +24,9 @@ struct RoutineDetailView: View {
     /// A finished sleep being corrected — most often an end time stamped when
     /// you got round to tapping Awake rather than when they actually woke.
     @State private var editingSleep: LoggedSleep?
+    /// The chores week, replaced wholesale by every toggle's response.
+    @State private var choreSummary: ChoreSummary?
+    @State private var showingManageChores = false
 
     private let accent = TabAccent.routines.color
 
@@ -64,7 +67,23 @@ struct RoutineDetailView: View {
                             bedtimeCard(detail)
                         }
 
-                        quickLog(for: detail.type)
+                        if detail.type.isChores, let summary = choreSummary {
+                            ChoreWeekCard(summary: summary, accent: accent,
+                                          onToggle: { choreId, slot, date in Task { await toggleChore(choreId, slot: slot, date: date) } },
+                                          onManage: { showingManageChores = true })
+                            ChoreEarningsCard(summary: summary, accent: accent,
+                                              onBonus: { bonusId in Task { await toggleBonus(bonusId) } },
+                                              onPayout: { weekStart in Task { await recordPayout(weekStart) } })
+                            if let guidance = summary.guidance {
+                                ChoreGuidanceCard(guidance: guidance, subject: detail.subject_name, accent: accent) { suggestion in
+                                    Task { await addSuggestedChore(suggestion, detail: detail) }
+                                }
+                            }
+                        }
+
+                        if !detail.type.isChores {
+                            quickLog(for: detail.type)
+                        }
 
                         if let stats = sleepStats {
                             SleepStatsCard(stats: stats, accent: accent)
@@ -121,6 +140,13 @@ struct RoutineDetailView: View {
         .sheet(item: $editingSleep) { logged in
             LogSleepSheet(kind: logged.kind, accent: accent, editing: logged) { payload in
                 await applySleepEdit(entryId: logged.id, payload: payload)
+            }
+        }
+        .sheet(isPresented: $showingManageChores) {
+            if let detail {
+                ManageChoresSheet(config: ChoreConfig.decode(detail.config), accent: accent) { cfg in
+                    await saveChoreConfig(cfg)
+                }
             }
         }
         .sheet(item: $sleepToLog) { kind in
@@ -502,6 +528,9 @@ struct RoutineDetailView: View {
                     logButton("Skipped", "xmark.circle", entryType: "session", value: ["status": "skipped"])
                 case .custom:
                     logButton("Done today", "checkmark", entryType: "note")
+                case .chores:
+                    // Chores tick in the week grid; there's nothing to stamp here.
+                    EmptyView()
                 }
             }
         }
@@ -577,6 +606,7 @@ struct RoutineDetailView: View {
         do {
             let d = try await api.fetchRoutine(id: routineId)
             detail = d
+            choreSummary = d.chores
             errorMessage = nil
             if d.type == .babySleep || d.type == .sleepTraining {
                 sleepStats = try? await api.fetchSleepStats(routineId: routineId)
@@ -597,6 +627,52 @@ struct RoutineDetailView: View {
             errorMessage = "Couldn't load this routine."
         }
         isLoading = false
+    }
+
+    // MARK: - Chores
+
+    private func toggleChore(_ choreId: String, slot: String, date: String) async {
+        do {
+            choreSummary = try await api.toggleChore(routineId: routineId, choreId: choreId, slot: slot, date: date)
+        } catch {
+            errorMessage = "Couldn't update that chore."
+        }
+    }
+
+    private func toggleBonus(_ bonusId: String) async {
+        do {
+            choreSummary = try await api.setChoreBonus(routineId: routineId, bonusId: bonusId)
+        } catch {
+            errorMessage = "Couldn't update that bonus."
+        }
+    }
+
+    private func recordPayout(_ weekStart: String?) async {
+        do {
+            choreSummary = try await api.recordChorePayout(routineId: routineId, weekStart: weekStart)
+        } catch {
+            errorMessage = "Couldn't record that payment."
+        }
+    }
+
+    /// Config edits go through the plain routine update; the server's next
+    /// detail fetch recomputes the week against the new chore list.
+    private func saveChoreConfig(_ cfg: ChoreConfig) async -> Bool {
+        do {
+            try await api.updateRoutine(id: routineId, data: ["config": cfg.jsonObject])
+            await load()
+            return true
+        } catch {
+            return false
+        }
+    }
+
+    private func addSuggestedChore(_ s: ChoreSuggestion, detail: RoutineDetailResponse) async {
+        var cfg = ChoreConfig.decode(detail.config)
+        guard !cfg.chores.contains(where: { $0.title.caseInsensitiveCompare(s.title) == .orderedSame }) else { return }
+        cfg.chores.append(.init(id: ManageChoresSheet.slug(s.title), title: s.title, icon: s.icon, slots: s.slots,
+                                days: nil, active: true, started_on: DateFormatter.isoDate.string(from: Date())))
+        if await saveChoreConfig(cfg) == false { errorMessage = "Couldn't add that chore." }
     }
 
     // Confirm (or mark skipped) attendance for a specific linked calendar date.

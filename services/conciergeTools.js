@@ -11,6 +11,7 @@
 
 const { announceRivalryCompletion } = require('./rivalryAnnounce');
 const sleepStats = require('./sleepStats');
+const choresEngine = require('./chores');
 const sleepTraining = require('./sleepTraining');
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -1158,6 +1159,107 @@ const TOOLS = [
           return { date: e.entry_date, time: e.entry_time, type: e.entry_type, notes: e.notes, ...(value || {}) };
         }),
       } };
+    },
+  },
+
+  // ---- Chores (a `chores` routine per child) ----
+  {
+    name: 'log_chore',
+    description: "Mark a child's chore done (or undo it) for a day — 'Jude fed the dog', 'he did his morning chore', 'undo tonight's dog feeding'. Needs the chores routine id (list_routines) and the chore id from get_chores; slot is morning | afternoon | evening | anytime.",
+    write: true,
+    input_schema: {
+      type: 'object',
+      properties: {
+        routine_id: { type: 'number' },
+        chore_id: { type: 'string', description: 'From get_chores; matching the chore title works too' },
+        slot: { type: 'string', description: 'morning | afternoon | evening | anytime — infer from the time of day if unsaid' },
+        date: { type: 'string', description: 'YYYY-MM-DD, defaults to today' },
+        done: { type: 'boolean', description: 'true to mark done (default), false to undo' },
+      },
+      required: ['routine_id', 'chore_id'],
+    },
+    async run(ctx, input) {
+      await assertRoutineAccess(ctx, input.routine_id);
+      const routine = await ctx.db.getRoutineById(input.routine_id);
+      if (routine.routine_type !== 'chores') throw new Error(`Routine #${input.routine_id} is not a chores routine`);
+      const cfg = choresEngine.parseConfig(routine.config);
+      const wanted = String(input.chore_id || '').toLowerCase();
+      const chore = cfg.chores.find(c => c.id.toLowerCase() === wanted)
+        || cfg.chores.find(c => c.title.toLowerCase() === wanted)
+        || cfg.chores.find(c => c.title.toLowerCase().includes(wanted));
+      if (!chore) throw new Error(`No chore "${input.chore_id}" on ${routine.name} — chores: ${cfg.chores.map(c => c.title).join(', ') || 'none'}`);
+      const slot = chore.slots.includes(input.slot) ? input.slot : chore.slots[0];
+      const date = input.date ? requireDate(input.date, 'date') : ctx.today;
+      if (date > ctx.today) throw new Error("Can't mark a chore done in the future");
+      const existing = (await ctx.db.getRoutineEntries(routine.id, { from: date, to: date, limit: 200 }))
+        .find(e => { if (e.entry_type !== 'chore_done') return false; try { const v = JSON.parse(e.value || '{}'); return v.chore_id === chore.id && (v.slot || 'anytime') === slot; } catch { return false; } });
+      const wantDone = input.done !== false;
+      if (wantDone && !existing) {
+        await ctx.db.addRoutineEntry(routine.id, { entry_date: date, entry_type: 'chore_done', value: { chore_id: chore.id, slot, title: chore.title }, created_by: ctx.userId });
+      } else if (!wantDone && existing) {
+        await ctx.db.deleteRoutineEntry(existing.id, routine.id);
+      }
+      const summary = `${wantDone ? 'Marked' : 'Unmarked'} ${chore.title} (${slot}) for ${routine.subject_name || routine.name} on ${date}`;
+      return { result: { ok: true, done: wantDone, summary }, action: { tool: 'log_chore', summary } };
+    },
+  },
+  {
+    name: 'get_chores',
+    description: "This week's chore picture for a child — each chore's id and which slots are done today, the streak, what's earned this week (allowance + bonuses), what's unpaid, and age-based guidance (when to add the next chore). Use for 'did Jude feed the dog', 'how are chores going', 'what does he get paid this week', 'is he ready for a second chore'.",
+    write: false,
+    input_schema: { type: 'object', properties: { routine_id: { type: 'number' } }, required: ['routine_id'] },
+    async run(ctx, input) {
+      await assertRoutineAccess(ctx, input.routine_id);
+      const routine = await ctx.db.getRoutineById(input.routine_id);
+      if (routine.routine_type !== 'chores') throw new Error(`Routine #${input.routine_id} is not a chores routine`);
+      const entries = await ctx.db.getRoutineEntries(routine.id, { limit: 1000 });
+      const birthdate = await resolveSubjectBirthdate(ctx, routine);
+      const s = choresEngine.compute(entries, routine.config, { today: ctx.today, birthdate });
+      return { result: {
+        child: routine.subject_name, week: `${s.week_start} → ${s.week_end}`,
+        chores: s.chores.map(c => ({ id: c.id, title: c.title, slots: c.slots,
+          today: (c.days.find(d => d.today)?.slots || []).map(x => `${x.slot}: ${x.done ? 'done' : 'open'}`),
+          done_this_week: c.done_count, expected_so_far: c.expected_count, lifetime: c.lifetime_count })),
+        completion_pct: s.completion_pct, streak_days: s.streak_days,
+        bonuses: s.bonuses.map(b => ({ id: b.id, title: b.title, amount: b.amount, earned_this_week: b.earned_this_week })),
+        earnings: s.earnings, owed_from_past_weeks: s.ledger.owed,
+        guidance: s.guidance ? { age: s.guidance.age_years, band: s.guidance.age_label, nudge: s.guidance.nudge.text, allowance: s.guidance.allowance_label } : null,
+      } };
+    },
+  },
+  {
+    name: 'log_chore_bonus',
+    description: "Mark a behaviour bonus earned (or not) for a day on a child's chores routine — 'Jude had a good bedtime tonight', 'no bedtime bonus today'.",
+    write: true,
+    input_schema: {
+      type: 'object',
+      properties: {
+        routine_id: { type: 'number' },
+        bonus_id: { type: 'string', description: 'From get_chores; the bonus title works too' },
+        date: { type: 'string', description: 'YYYY-MM-DD, defaults to today' },
+        earned: { type: 'boolean', description: 'true (default) or false to undo' },
+      },
+      required: ['routine_id', 'bonus_id'],
+    },
+    async run(ctx, input) {
+      await assertRoutineAccess(ctx, input.routine_id);
+      const routine = await ctx.db.getRoutineById(input.routine_id);
+      if (routine.routine_type !== 'chores') throw new Error(`Routine #${input.routine_id} is not a chores routine`);
+      const cfg = choresEngine.parseConfig(routine.config);
+      const wanted = String(input.bonus_id || '').toLowerCase();
+      const bonus = cfg.bonuses.find(b => b.id.toLowerCase() === wanted) || cfg.bonuses.find(b => b.title.toLowerCase().includes(wanted));
+      if (!bonus) throw new Error(`No bonus "${input.bonus_id}" on ${routine.name}`);
+      const date = input.date ? requireDate(input.date, 'date') : ctx.today;
+      const existing = (await ctx.db.getRoutineEntries(routine.id, { from: date, to: date, limit: 200 }))
+        .find(e => { if (e.entry_type !== 'bonus_earned') return false; try { return JSON.parse(e.value || '{}').bonus_id === bonus.id; } catch { return false; } });
+      const wantEarned = input.earned !== false;
+      if (wantEarned && !existing) {
+        await ctx.db.addRoutineEntry(routine.id, { entry_date: date, entry_type: 'bonus_earned', value: { bonus_id: bonus.id, title: bonus.title, amount: bonus.amount }, created_by: ctx.userId });
+      } else if (!wantEarned && existing) {
+        await ctx.db.deleteRoutineEntry(existing.id, routine.id);
+      }
+      const summary = `${wantEarned ? 'Earned' : 'Removed'} "${bonus.title}" bonus on ${date}`;
+      return { result: { ok: true, earned: wantEarned, summary }, action: { tool: 'log_chore_bonus', summary } };
     },
   },
 
@@ -2785,10 +2887,11 @@ const GROUPS = {
     incoming: 'get_incoming_coverage', approve: 'approve_incoming_coverage' } },
   notes: { desc: 'Private/household notes (take/jot/write a note).', actions: {
     list: 'list_notes', add: 'add_note', update: 'update_note', delete: 'delete_note' } },
-  routines: { desc: 'Routines: baby sleep / sleep-training logs, cycle tracking, activity streaks. Sleep can be logged after the fact (log_sleep) or live (start_sleep now, end_sleep on waking). Action "analyze" explains night-waking patterns and what to try.', actions: {
+  routines: { desc: 'Routines: baby sleep / sleep-training logs, cycle tracking, activity streaks, and kids\' chores. Sleep can be logged after the fact (log_sleep) or live (start_sleep now, end_sleep on waking). Action "analyze" explains night-waking patterns and what to try. Chores: "chores" reads a child\'s week (done today, streak, allowance earned, when to add the next chore); "log_chore" marks a chore done/undone; "chore_bonus" marks a behaviour bonus like a good bedtime.', actions: {
     list: 'list_routines', get: 'get_routine', log_sleep: 'log_sleep', log_entry: 'log_routine_entry',
     start_sleep: 'start_sleep', end_sleep: 'end_sleep', set_start: 'set_sleep_start',
-    stats: 'get_sleep_stats', analyze: 'analyze_sleep' } },
+    stats: 'get_sleep_stats', analyze: 'analyze_sleep',
+    chores: 'get_chores', log_chore: 'log_chore', chore_bonus: 'log_chore_bonus' } },
   people: { desc: 'Household people (adults, kids) and their milestones.', actions: {
     list: 'list_people', add: 'add_person', update: 'update_person', delete: 'delete_person',
     list_milestones: 'list_milestones', log_milestone: 'log_milestone',

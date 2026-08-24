@@ -10,6 +10,7 @@ enum RoutineType: String, Codable, CaseIterable, Identifiable {
     case babySleep = "baby_sleep"
     case sleepTraining = "sleep_training"
     case activity
+    case chores
     case custom
 
     var id: String { rawValue }
@@ -20,6 +21,7 @@ enum RoutineType: String, Codable, CaseIterable, Identifiable {
         case .babySleep:     "Baby sleep"
         case .sleepTraining: "Sleep training"
         case .activity:      "Activity"
+        case .chores:        "Chores"
         case .custom:        "Custom"
         }
     }
@@ -31,6 +33,7 @@ enum RoutineType: String, Codable, CaseIterable, Identifiable {
         case .babySleep:     "Log naps, night sleep, and wake-ups."
         case .sleepTraining: "A guided program from newborn to 4 years."
         case .activity:      "Practice like violin or swimming — earn milestones."
+        case .chores:        "A child's chores, allowance, and an age-by-age program."
         case .custom:        "Track any habit or routine, your way."
         }
     }
@@ -42,11 +45,13 @@ enum RoutineType: String, Codable, CaseIterable, Identifiable {
         case .babySleep:     "moon.zzz.fill"
         case .sleepTraining: "moon.stars.fill"
         case .activity:      "figure.run"
+        case .chores:        "checkmark.seal.fill"
         case .custom:        "repeat"
         }
     }
 
-    var needsBirthdate: Bool { self == .babySleep || self == .sleepTraining }
+    var needsBirthdate: Bool { self == .babySleep || self == .sleepTraining || self == .chores }
+    var isChores: Bool { self == .chores }
     var isActivity: Bool { self == .activity }
     var isCycle: Bool { self == .period }
 }
@@ -106,6 +111,8 @@ struct RoutineDetailResponse: Codable, Identifiable {
     let achievements: RoutineAchievements?
     let next_sleep: NextSleepWindow?
     let bedtime_prep: BedtimePrep?
+    /// The week engine's output for a `chores` routine — nil for every other kind.
+    let chores: ChoreSummary?
     /// What the age guidance was computed from — "routine" when the routine
     /// carries a birthdate, "people" when it came from the child's People card.
     let birthdate_source: String?
@@ -533,4 +540,237 @@ struct SleepGuidance: Codable {
     let ready_for_training: Bool
     let current_phase: SleepPhase
     let safe_sleep: [String]
+}
+
+// MARK: - Chores (per-child routine: week grid, earnings, age guidance)
+
+struct ChoreSlotState: Codable, Identifiable {
+    let slot: String            // morning | afternoon | evening | anytime
+    let done: Bool
+    let entry_id: Int?
+    var id: String { slot }
+
+    var label: String {
+        switch slot {
+        case "morning":   "Morning"
+        case "afternoon": "Afternoon"
+        case "evening":   "Evening"
+        default:          "Today"
+        }
+    }
+    var icon: String {
+        switch slot {
+        case "morning":   "sunrise.fill"
+        case "afternoon": "sun.max.fill"
+        case "evening":   "moon.fill"
+        default:          "checkmark"
+        }
+    }
+}
+
+struct ChoreDay: Codable, Identifiable {
+    let date: String
+    let applies: Bool
+    let past: Bool
+    let today: Bool
+    let slots: [ChoreSlotState]
+    var id: String { date }
+    var allDone: Bool { !slots.isEmpty && slots.allSatisfy(\.done) }
+    var anyDone: Bool { slots.contains { $0.done } }
+}
+
+struct ChoreState: Codable, Identifiable {
+    let id: String
+    let title: String
+    let icon: String
+    let slots: [String]
+    let days: [ChoreDay]
+    let done_count: Int
+    let expected_count: Int
+    let lifetime_count: Int
+    var today: ChoreDay? { days.first { $0.today } }
+}
+
+struct ChoreBonusState: Codable, Identifiable {
+    let id: String
+    let title: String
+    let amount: Double
+    let icon: String
+    let earned_dates: [ChoreBonusDate]
+    let earned_this_week: Bool
+}
+
+struct ChoreBonusDate: Codable { let date: String; let entry_id: Int? }
+
+struct ChoreEarnings: Codable {
+    let currency: String
+    let allowance: Double
+    let bonus: Double
+    let total: Double
+    let payday: Int
+    let paid: Bool
+    let paid_amount: Double
+    let payout_entry_id: Int?
+}
+
+struct ChoreUnpaidWeek: Codable, Identifiable {
+    let week_start: String
+    let week_end: String
+    let amount: Double
+    var id: String { week_start }
+}
+
+struct ChoreLedger: Codable {
+    let unpaid_weeks: [ChoreUnpaidWeek]
+    let owed: Double
+    let lifetime_paid: Double
+}
+
+struct ChoreNudge: Codable {
+    let kind: String            // start | soon | add | hold | steady
+    let text: String
+}
+
+struct ChoreSuggestion: Codable, Identifiable {
+    let title: String
+    let icon: String
+    let slots: [String]
+    let note: String?
+    var id: String { title }
+}
+
+struct ChoreGuidance: Codable {
+    let age_years: Int?
+    let band_key: String
+    let band_title: String
+    let age_label: String
+    let chore_count: String
+    let allowance_label: String
+    let next_band: String?
+    let suggested: [ChoreSuggestion]
+    let nudge: ChoreNudge
+}
+
+struct ChoreSummary: Codable {
+    let today: String
+    let week_start: String
+    let week_end: String
+    let week_start_day: Int
+    let chores: [ChoreState]
+    let completion_pct: Int?
+    let done_total: Int
+    let expected_total: Int
+    let streak_days: Int
+    let lifetime_done: Int
+    let bonuses: [ChoreBonusState]
+    let earnings: ChoreEarnings
+    let ledger: ChoreLedger
+    let guidance: ChoreGuidance?
+}
+
+/// POST /api/routines/:id/chores/{toggle,bonus,payout} — the recomputed week.
+struct ChoreMutationResponse: Codable {
+    let success: Bool
+    let chores: ChoreSummary
+}
+
+/// GET /api/routines/chores-today — one row per chores routine, for Home.
+struct ChoresTodaySummary: Codable, Identifiable {
+    let routine_id: Int
+    let name: String
+    let subject_name: String?
+    let color: String?
+    let today: String
+    let chores: [ChoresTodayChore]
+    let open_slots: Int
+    let total_slots: Int
+    let streak_days: Int
+    let week_total: Double
+    let currency: String
+    var id: Int { routine_id }
+    var displayName: String { subject_name ?? name }
+}
+
+struct ChoresTodayChore: Codable, Identifiable {
+    let id: String
+    let title: String
+    let icon: String
+    let slots: [ChoreSlotState]
+}
+
+// The static chores program (age bands + sources).
+
+struct ChoreBandAllowance: Codable {
+    let label: String
+    let note: String
+}
+
+struct ChoreBand: Codable, Identifiable {
+    let key: String
+    let title: String
+    let age_label: String
+    let min_years: Int?
+    let max_years: Int?
+    let chore_count: String
+    let description: String
+    let suggested: [ChoreSuggestion]
+    let steps: [String]
+    let tips: [String]
+    let allowance: ChoreBandAllowance
+    let next_band: String?
+    var id: String { key }
+}
+
+struct ChoresTemplate: Codable {
+    let id: String
+    let title: String
+    let subtitle: String
+    let disclaimer: String
+    let principles: [String]
+    let bands: [ChoreBand]
+    let sources: [SleepSource]
+}
+
+/// The editable shape of a chores routine's `config` JSON. Mirrors what
+/// `services/chores.js` `parseConfig` accepts.
+struct ChoreConfig: Codable {
+    struct Chore: Codable, Identifiable {
+        var id: String
+        var title: String
+        var icon: String
+        var slots: [String]
+        var days: [Int]?
+        var active: Bool?
+        var started_on: String?
+    }
+    struct Allowance: Codable {
+        var weekly_amount: Double
+        var currency: String?
+        var payday: Int?
+    }
+    struct Bonus: Codable, Identifiable {
+        var id: String
+        var title: String
+        var amount: Double
+        var icon: String?
+    }
+    var chores: [Chore]
+    var allowance: Allowance
+    var bonuses: [Bonus]
+    var week_start: Int?
+
+    static let empty = ChoreConfig(chores: [], allowance: Allowance(weekly_amount: 0, currency: "USD", payday: 0), bonuses: [], week_start: 1)
+
+    static func decode(_ json: String?) -> ChoreConfig {
+        guard let json, let data = json.data(using: .utf8),
+              let cfg = try? JSONDecoder().decode(ChoreConfig.self, from: data) else { return .empty }
+        return cfg
+    }
+
+    /// As the `[String: Any]` the API client sends.
+    var jsonObject: [String: Any] {
+        guard let data = try? JSONEncoder().encode(self),
+              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return [:] }
+        return obj
+    }
 }

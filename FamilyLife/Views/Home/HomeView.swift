@@ -59,6 +59,7 @@ struct HomeView: View {
                 greetingSection
                 presenceRow
                 sleepBarSection
+                choreBarSection
                 statsGrid
                 heroFocusCard
                 onThisDaySection
@@ -195,7 +196,10 @@ struct HomeView: View {
             }
         }
         .sheet(item: $selectedFeedRoutine, onDismiss: {
-            Task { await viewModel.reloadSleepNow(api: api) }
+            Task {
+                await viewModel.reloadSleepNow(api: api)
+                await viewModel.reloadChoresToday(api: api)
+            }
         }) { target in
             NavigationStack {
                 RoutineDetailView(routineId: target.id)
@@ -456,6 +460,27 @@ struct HomeView: View {
                     SleepBar(summary: summary) {
                         selectedFeedRoutine = FeedRoutineTarget(id: summary.routine_id)
                     }
+                }
+            }
+            .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
+            .padding(.bottom, 16)
+        }
+    }
+
+    // MARK: - Chore Bar
+
+    /// Today's chores, one row per child, tickable in place. Absent unless the
+    /// household keeps a chores routine.
+    @ViewBuilder
+    private var choreBarSection: some View {
+        if !viewModel.choresToday.isEmpty {
+            VStack(spacing: 8) {
+                ForEach(viewModel.choresToday) { summary in
+                    ChoreBar(summary: summary,
+                             onToggle: { choreId, slot in
+                                 Task { await viewModel.toggleChore(routineId: summary.routine_id, choreId: choreId, slot: slot, api: api) }
+                             },
+                             onTap: { selectedFeedRoutine = FeedRoutineTarget(id: summary.routine_id) })
                 }
             }
             .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
