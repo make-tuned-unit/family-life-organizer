@@ -32,17 +32,16 @@ struct MoreView: View {
                             moreRow(icon: "arrow.triangle.swap", title: "Coverage", subtitle: "Your requests and incoming help", color: TabAccent.care.color)
                         }
                         NavigationLink { RoutinesView() } label: {
-                            moreRow(icon: "repeat", title: "Routines", subtitle: "Cycles, baby sleep & sleep training", color: TabAccent.routines.color)
+                            moreRow(icon: "repeat", title: "Routines", subtitle: "Kids' chores, baby sleep, cycles & activities", color: TabAccent.routines.color)
                         }
                     }
 
                     // HOUSEHOLD
                     section("Household") {
-                        NavigationLink { CookView() } label: {
-                            moreRow(icon: "fork.knife", title: "Cook", subtitle: "Recipe ideas from what's in your pantry", color: AccentTheme.terracotta.color)
-                        }
+                        // Cook lives inside Pantry now — it's a question you ask
+                        // of what's in stock, not a separate place to go.
                         NavigationLink { PantryView() } label: {
-                            moreRow(icon: "cabinet.fill", title: "Pantry", subtitle: "What's in stock and what's expiring", color: TabAccent.pantry.color)
+                            moreRow(icon: "cabinet.fill", title: "Pantry & Cook", subtitle: "What's in stock, what's expiring, what to make", color: TabAccent.pantry.color)
                         }
                         NavigationLink { NotesView() } label: {
                             moreRow(icon: "note.text", title: "Notes", subtitle: "Private notes you can share & co-edit", color: AccentTheme.saffron.color)

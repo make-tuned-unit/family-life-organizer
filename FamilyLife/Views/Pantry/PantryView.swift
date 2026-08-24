@@ -15,6 +15,7 @@ struct PantryView: View {
         ScrollView(showsIndicators: false) {
             VStack(spacing: 0) {
                 headerSection
+                cookCTA
                 searchBar
                 locationChips
                 expiringSoonSection
@@ -68,6 +69,41 @@ struct PantryView: View {
             eyebrow: "\(viewModel.items.count) items \u{00B7} \(expiringCount) expiring",
             title: "Pantry"
         )
+    }
+
+    // MARK: - Cook
+
+    /// Cook is a question asked of the pantry, so it lives here rather than as
+    /// its own place in More: one tap from what's in stock to what to make.
+    private var cookCTA: some View {
+        NavigationLink {
+            CookView()
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "fork.knife")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(AccentTheme.terracotta.color)
+                    .frame(width: 34, height: 34)
+                    .background(AccentTheme.terracotta.color.opacity(0.12), in: Circle())
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("What can I make?")
+                        .font(.flSubheadline.weight(.semibold))
+                        .foregroundStyle(WarmPalette.ink1)
+                    Text(expiringCount > 0 ? "Recipe ideas — starting with the \(expiringCount) expiring soon" : "Recipe ideas from what's in stock")
+                        .font(.flFootnote)
+                        .foregroundStyle(WarmPalette.ink3)
+                }
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(WarmPalette.ink4)
+            }
+            .padding(DesignTokens.Spacing.cardPadding)
+            .flCard(tint: AccentTheme.terracotta.color.opacity(0.05))
+        }
+        .buttonStyle(.flCardPress)
+        .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
+        .padding(.bottom, 12)
     }
 
     // MARK: - Search
