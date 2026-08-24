@@ -210,6 +210,13 @@ class FamilyDB {
         // DEFAULT applies to existing rows too, so anything created before this
         // migration fails closed (a cycle tracker never silently stays visible).
         this.db.run(`ALTER TABLE routines ADD COLUMN shared_scope TEXT DEFAULT 'private'`, () => {});
+        // Self-heal: a chores routine created against a server that predates
+        // the `chores` type was stored as `custom` (the old allowlist
+        // fallback) with the chores config intact. Promote it so the child's
+        // chart, allowance and program appear the moment this build boots.
+        this.db.run(`UPDATE routines SET routine_type = 'chores'
+                     WHERE routine_type = 'custom' AND config IS NOT NULL AND json_valid(config)
+                       AND json_type(config, '$.chores') = 'array'`, () => {});
         // Onboarding email drip: opt-out flag + unsubscribe-link token
         this.db.run('ALTER TABLE users ADD COLUMN email_opt_out INTEGER DEFAULT 0', () => {});
         this.db.run('ALTER TABLE users ADD COLUMN unsubscribe_token TEXT', () => {});

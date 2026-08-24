@@ -274,6 +274,17 @@ test('chores tools: setup_chores → update_chores → log_chore → get_chores 
     r = await tools.run('routines', ctx, { action: 'chores', routine_id: routineId });
     assert.equal(r.result.earnings.paid, true);
 
+    // A routine saved as `custom` by an older server (config intact) is
+    // promoted to `chores` at boot, so nobody has to recreate it.
+    const legacy = await db.createRoutine({ group_id: groupId, created_by: userId, name: 'Chores', routine_type: 'custom',
+      subject_name: 'Rowan', config: JSON.stringify({ chores: [{ id: 'dog', title: 'Feed the dog', slots: ['morning', 'evening'] }], allowance: { weekly_amount: 2 } }),
+      shared_scope: 'household', start_date: iso });
+    const plain = await db.createRoutine({ group_id: groupId, created_by: userId, name: 'Stretching', routine_type: 'custom', config: JSON.stringify({ note: 'x' }), start_date: iso });
+    await db.initSchema();
+    await new Promise(res => setTimeout(res, 200));
+    assert.equal((await db.getRoutineById(legacy.id)).routine_type, 'chores');
+    assert.equal((await db.getRoutineById(plain.id)).routine_type, 'custom');
+
     // Re-running setup replaces the chore list but keeps the routine.
     r = await tools.run('routines', ctx, { action: 'setup_chores', child: 'Jude', chores: [{ title: 'Feed the dog', slots: ['morning'] }] });
     assert.equal(r.result.routine_id, routineId);
