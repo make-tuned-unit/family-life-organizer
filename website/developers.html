@@ -143,7 +143,7 @@
 
         <section id="endpoints">
           <h2><span class="h-num">2</span>Endpoints</h2>
-          <p>Base URL: <code>https://family-life-organizer-production.up.railway.app</code>. Every request needs <code>Authorization: Bearer &lt;your key&gt;</code>.</p>
+          <p>Base URL: <code>https://kinrows.com</code>. Every request needs <code>Authorization: Bearer &lt;your key&gt;</code>.</p>
           <div class="tbl-wrap"><table>
             <thead><tr><th>Method</th><th>Path</th><th>What it does</th></tr></thead>
             <tbody>
@@ -183,7 +183,7 @@
 <pre><code>{
   "mcpServers": {
     "kinrows": {
-      "url": "https://family-life-organizer-production.up.railway.app/v1/mcp",
+      "url": "https://kinrows.com/v1/mcp",
       "headers": { "Authorization": "Bearer kr_live_…" }
     }
   }
@@ -194,18 +194,18 @@
         <section id="rest">
           <h2><span class="h-num">5</span>Connect via REST</h2>
           <p>Any language, any model. Sanity-check the key:</p>
-<pre><code>curl https://family-life-organizer-production.up.railway.app/v1/me \
+<pre><code>curl https://kinrows.com/v1/me \
   -H "Authorization: Bearer $KINROWS_KEY"</code></pre>
           <p>Add a task and log an expense:</p>
-<pre><code>curl https://family-life-organizer-production.up.railway.app/v1/tools/tasks \
+<pre><code>curl https://kinrows.com/v1/tools/tasks \
   -H "Authorization: Bearer $KINROWS_KEY" -H "Content-Type: application/json" \
   -d '{"action":"add","title":"Book dentist","due_date":"2026-09-02"}'
 
-curl https://family-life-organizer-production.up.railway.app/v1/tools/budget \
+curl https://kinrows.com/v1/tools/budget \
   -H "Authorization: Bearer $KINROWS_KEY" -H "Content-Type: application/json" \
   -d '{"action":"log_expense","amount":42.10,"merchant":"Costco","category":"Groceries"}'</code></pre>
           <p>A minimal agent loop with the Anthropic SDK — fetch the catalog, let the model pick tools, execute them against <code>/v1/tools</code>, repeat:</p>
-<pre><code>const BASE = 'https://family-life-organizer-production.up.railway.app';
+<pre><code>const BASE = 'https://kinrows.com';
 const H = { Authorization: `Bearer ${process.env.KINROWS_KEY}`, 'Content-Type': 'application/json' };
 const { tools } = await (await fetch(`${BASE}/v1/tools`, { headers: H })).json();
 

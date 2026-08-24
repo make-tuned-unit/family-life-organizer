@@ -52,20 +52,20 @@ Tools are grouped by domain, each with an `action` enum — `calendar`, `tasks`,
 
 ```bash
 # Who am I?
-curl -s https://family-life-organizer-production.up.railway.app/v1/me -H "Authorization: Bearer $KINROWS_KEY"
+curl -s https://kinrows.com/v1/me -H "Authorization: Bearer $KINROWS_KEY"
 
 # Add a task
-curl -s https://family-life-organizer-production.up.railway.app/v1/tools/tasks \
+curl -s https://kinrows.com/v1/tools/tasks \
   -H "Authorization: Bearer $KINROWS_KEY" -H "Content-Type: application/json" \
   -d '{"action":"add","title":"Book dentist","due_date":"2026-09-02"}'
 
 # Log an expense
-curl -s https://family-life-organizer-production.up.railway.app/v1/tools/budget \
+curl -s https://kinrows.com/v1/tools/budget \
   -H "Authorization: Bearer $KINROWS_KEY" -H "Content-Type: application/json" \
   -d '{"action":"log_expense","amount":42.10,"merchant":"Costco","category":"Groceries"}'
 ```
 
-> Base URL is the prod API host from `FamilyLife/App/AppConfig.swift` (`http://localhost:3456` in dev). If the API is ever fronted by a kinrows.com hostname, update this doc and `website/developers.html` together.
+> `https://kinrows.com` resolves directly to the Railway service (verified 2026-08-24: `server: railway-hikari`, `/v1/me` → 401 JSON), so the marketing site and the API share one host. The iOS app still uses the raw Railway URL from `AppConfig.swift`; both hit the same deployment. Dev: `http://localhost:3456`.
 
 **Claude / Claude Code / Cursor (MCP):**
 
@@ -73,7 +73,7 @@ curl -s https://family-life-organizer-production.up.railway.app/v1/tools/budget 
 {
   "mcpServers": {
     "kinrows": {
-      "url": "https://family-life-organizer-production.up.railway.app/v1/mcp",
+      "url": "https://kinrows.com/v1/mcp",
       "headers": { "Authorization": "Bearer kr_live_…" }
     }
   }
@@ -85,8 +85,8 @@ curl -s https://family-life-organizer-production.up.railway.app/v1/tools/budget 
 ```js
 const KEY = process.env.KINROWS_KEY;
 const H = { Authorization: `Bearer ${KEY}`, 'Content-Type': 'application/json' };
-const { tools } = await (await fetch('https://family-life-organizer-production.up.railway.app/v1/tools', { headers: H })).json();
-const snapshot = await (await fetch('https://family-life-organizer-production.up.railway.app/v1/snapshot', { headers: H })).json();
+const { tools } = await (await fetch('https://kinrows.com/v1/tools', { headers: H })).json();
+const snapshot = await (await fetch('https://kinrows.com/v1/snapshot', { headers: H })).json();
 
 let messages = [{ role: 'user', content: `Household snapshot: ${JSON.stringify(snapshot)}\n\nMove the dentist task to Friday and add milk to Groceries.` }];
 for (;;) {
@@ -95,7 +95,7 @@ for (;;) {
   if (r.stop_reason !== 'tool_use') break;
   const results = [];
   for (const b of r.content.filter(c => c.type === 'tool_use')) {
-    const out = await (await fetch(`https://family-life-organizer-production.up.railway.app/v1/tools/${b.name}`, { method: 'POST', headers: H, body: JSON.stringify(b.input) })).json();
+    const out = await (await fetch(`https://kinrows.com/v1/tools/${b.name}`, { method: 'POST', headers: H, body: JSON.stringify(b.input) })).json();
     results.push({ type: 'tool_result', tool_use_id: b.id, content: JSON.stringify(out) });
   }
   messages.push({ role: 'user', content: results });
