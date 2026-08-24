@@ -135,7 +135,7 @@ extension DateFormatter {
 ///   3. SQLite datetime  "2026-07-01 12:34:56" (UTC)
 ///   4. bare date        "2026-07-01" (midnight UTC)
 /// `string(from:)` is unchanged (fractional ISO), so round-trips still work.
-final class ServerDateFormatter: ISO8601DateFormatter, @unchecked Sendable {
+final class ServerDateFormatter: ISO8601DateFormatter {
     private let plainISO: ISO8601DateFormatter = {
         let f = ISO8601DateFormatter()
         f.formatOptions = [.withInternetDateTime]

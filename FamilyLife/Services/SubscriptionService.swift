@@ -43,14 +43,15 @@ final class SubscriptionService {
     private(set) var isPurchasing = false
     var lastError: String?
 
-    // `nonisolated(unsafe)` so the nonisolated `deinit` can cancel it. Only ever
-    // assigned on the main actor, and `Task.cancel()` is safe to call anywhere.
+    // `nonisolated(unsafe)` so the nonisolated `deinit` can cancel it. Plain
+    // `nonisolated` is rejected on mutable stored properties; `(unsafe)` is the
+    // only form allowed. Only ever assigned on the main actor, and
+    // `Task.cancel()` is safe to call from anywhere.
     //
-    // `@ObservationIgnored` is what makes that opt-out actually apply. Without
-    // it the @Observable macro rewrites this into a computed property, and
-    // `nonisolated(unsafe)` on a computed property does nothing — which is
-    // exactly what the compiler warned about. Nothing observes this task
-    // anyway; it is bookkeeping, not state a view renders.
+    // `@ObservationIgnored` is required: without it the @Observable macro
+    // rewrites this into a computed property, and `nonisolated(unsafe)` on a
+    // computed property does nothing. Nothing observes this task anyway; it is
+    // bookkeeping, not state a view renders.
     @ObservationIgnored nonisolated(unsafe) private var updatesTask: Task<Void, Never>?
 
     /// Begin listening for transaction updates and load initial state.
