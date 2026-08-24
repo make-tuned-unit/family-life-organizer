@@ -152,3 +152,54 @@ test('group member-add: shared-group users allowed, strangers rejected, pseudo-i
   const addSam = await pam('POST', `/api/groups/${clanId}/members`, { user_id: samId });
   assert.equal(addSam.status, 403, 'stranger rejected');
 });
+
+test('coverage: share links are branded and the /c/:token page works without an account', async () => {
+  const rae = makeClient();
+  await rae('POST', '/api/auth/register', { username: 'rae_c', password: 'password123', name: 'Rae Consent' });
+  const contact = await rae('POST', '/api/contacts', { name: 'Sophie Helper', relationship: 'friend' });
+  assert.equal(contact.status, 200, JSON.stringify(contact.body));
+  const contactId = contact.body.id;
+
+  const cov = await rae('POST', '/api/coverage', {
+    reason: 'Watch the kids', note: 'Back by 3',
+    windows: [{ window_date: '2026-09-02', start_time: '09:00', end_time: '12:00' }, { window_date: '2026-09-03', start_time: '13:00', end_time: '15:00' }],
+    contact_ids: [contactId],
+  });
+  assert.equal(cov.status, 200, JSON.stringify(cov.body));
+  const rec = cov.body.recipients[0];
+  assert.equal(rec.client_contact_id, contactId);
+  assert.match(rec.share_url, new RegExp(`^http://localhost:${PORT}/c/[a-f0-9]{32}$`), 'test env links point at this server');
+  assert.ok(!rec.share_url.includes('/api/'), 'no API path in a human link');
+
+  // It shows up as pending for the requester, with the link on the detail.
+  const mine = await rae('GET', '/api/coverage');
+  assert.ok(mine.body.some(r => r.id === cov.body.id && r.status === 'pending'));
+  const detail = await rae('GET', `/api/coverage/${cov.body.id}`);
+  assert.equal(detail.body.recipients[0].share_url, rec.share_url);
+
+  // The page renders for the helper: names, reason, both windows, no login.
+  const anon = makeClient();
+  const pageRes = await fetch(`${BASE}/c/${rec.invite_token}`);
+  assert.equal(pageRes.status, 200);
+  assert.match(pageRes.headers.get('content-type'), /text\/html/);
+  const html = await pageRes.text();
+  assert.ok(html.includes('Hi Sophie Helper') && html.includes('Rae') && html.includes('watch the kids'));
+  assert.ok(html.includes('Back by 3'));
+  assert.ok((html.match(/name="window_id"/g) || []).length === 2);
+
+  // Bad token → friendly page, not JSON, not a 500.
+  const bad = await fetch(`${BASE}/c/deadbeefdeadbeefdeadbeefdeadbeef`);
+  assert.equal(bad.status, 200);
+  assert.ok((await bad.text()).includes("isn't valid any more"));
+
+  // The page's form posts to the JSON route; afterwards the page shows "done".
+  const windowId = detail.body.windows[1].id;
+  const approve = await anon('POST', `/api/coverage/approve/${rec.invite_token}`, { window_id: windowId, helper_note: 'Happy to' });
+  assert.equal(approve.status, 200, JSON.stringify(approve.body));
+  const after = await (await fetch(`${BASE}/c/${rec.invite_token}`)).text();
+  assert.ok(after.includes("You're covering this"));
+  // …and the requester no longer gets a share link for an answered recipient.
+  const detail2 = await rae('GET', `/api/coverage/${cov.body.id}`);
+  assert.equal(detail2.body.recipients[0].status, 'approved');
+  assert.equal(detail2.body.recipients[0].share_url, undefined);
+});

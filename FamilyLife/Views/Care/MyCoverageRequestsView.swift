@@ -92,7 +92,11 @@ struct MyCoverageRequestsView: View {
                 }
             }
         }
-        .sheet(isPresented: $showingCareCascade) {
+        .sheet(isPresented: $showingCareCascade, onDismiss: {
+            // The request is saved the moment it's sent — closing the flow
+            // mid-way must still show it here as pending.
+            Task { await loadAll() }
+        }) {
             NavigationStack { CareCascadeView() }
         }
         .sheet(item: $selectedIncoming) { request in
@@ -262,6 +266,15 @@ struct CoverageDetailSheet: View {
                                 .font(.flSubheadline.weight(.semibold))
                                 .foregroundStyle(WarmPalette.ink1)
                             Spacer()
+                            if recipient.status != "approved", let s = recipient.share_url, let url = URL(string: s) {
+                                ShareLink(item: url,
+                                          subject: Text("Can you help \(detail.reason.lowercased())?"),
+                                          message: Text("Could you help with \(detail.reason.lowercased())? Pick a time here — no app needed: \(url.absoluteString)")) {
+                                    Label("Send link", systemImage: "square.and.arrow.up")
+                                        .font(.flCaption.weight(.semibold))
+                                        .foregroundStyle(TabAccent.care.color)
+                                }
+                            }
                             recipientStatusBadge(recipient.status)
                         }
                         .padding(12)

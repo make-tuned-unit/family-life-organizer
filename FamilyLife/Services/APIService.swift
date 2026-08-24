@@ -1486,6 +1486,9 @@ final class APIService {
         var contact_name: String?
         var contact_phone: String?
         var avatar_initial: String?
+        /// The branded approval link (kinrows.com/c/…) — requester only, and
+        /// only while the recipient hasn't answered yet.
+        var share_url: String?
     }
 
     struct CoverageApprovalResponse: Codable, Identifiable {
@@ -1525,6 +1528,11 @@ final class APIService {
         struct RecipientToken: Codable {
             let id: Int
             let invite_token: String
+            let contact_id: Int?
+            /// The id the app sent (household members are negative pseudo-ids),
+            /// so the share button can be matched back to the right person.
+            let client_contact_id: Int?
+            let share_url: String?
         }
     }
 

@@ -21,7 +21,7 @@ struct CoverageCascadeView: View {
 
     // After send
     @State private var createdRequestId: Int?
-    @State private var inviteTokens: [Int: String] = [:] // contactId -> token
+    @State private var shareURLs: [Int: URL] = [:]       // the contact id the picker used -> branded link
     @State private var requestDetail: APIService.CoverageDetailResponse?
 
     // Step 4 state
@@ -197,7 +197,9 @@ struct CoverageCascadeView: View {
             )
             createdRequestId = result.id
             for rec in result.recipients {
-                inviteTokens[rec.id] = rec.invite_token
+                let key = rec.client_contact_id ?? rec.contact_id ?? rec.id
+                if let s = rec.share_url, let url = URL(string: s) { shareURLs[key] = url }
+                else if let url = approvalURL(token: rec.invite_token) { shareURLs[key] = url }
             }
             currentStep = .pending
         } catch {
@@ -213,13 +215,15 @@ struct CoverageCascadeView: View {
             VStack(alignment: .leading, spacing: 0) {
                 FLScreenHeader(
                     eyebrow: "Coverage request sent",
-                    title: "Waiting for reply"
+                    title: "Waiting for reply",
+                    subtitle: "It's saved under Coverage — close this any time. Send each person their own link; they can answer without the app.",
+                    accent: TabAccent.care.color
                 )
 
                 // Recipients with share buttons
                 let selectedContacts = household.members.filter { selectedContactIds.contains($0.id) }
                 ForEach(selectedContacts) { contact in
-                    let token = inviteTokens.values.first // simplified - in production would map per contact
+                    let url = shareURLs[contact.id]
                     HStack(spacing: 12) {
                         FamilyAvatar(initial: contact.avatar_initial ?? String(contact.name.prefix(1)).uppercased(), size: 36, name: contact.name)
                         VStack(alignment: .leading, spacing: 2) {
@@ -230,9 +234,11 @@ struct CoverageCascadeView: View {
                             }
                         }
                         Spacer()
-                        if let token, let url = approvalURL(token: token) {
-                            ShareLink(item: url) {
-                                Text("Share Link")
+                        if let url {
+                            ShareLink(item: url,
+                                      subject: Text("Can you help \(coverageReason.lowercased())?"),
+                                      message: Text("\(auth.currentUser?.name ?? "We") could use a hand with \(coverageReason.lowercased()). Pick a time here — no app needed: \(url.absoluteString)")) {
+                                Text("Send link")
                                     .font(.flCaption.weight(.semibold))
                                     .padding(.horizontal, 12).padding(.vertical, 8)
                                     .background(WarmPalette.cardSurface, in: Capsule())
@@ -255,7 +261,11 @@ struct CoverageCascadeView: View {
                     .foregroundStyle(TabAccent.care.color).frame(maxWidth: .infinity).padding(.vertical, 14)
                     .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
                 }
-                .padding(.horizontal, DesignTokens.Spacing.horizontalMargin).padding(.top, 8).padding(.bottom, 40)
+                .padding(.horizontal, DesignTokens.Spacing.horizontalMargin).padding(.top, 8)
+
+                Button { dismiss() } label: { Text("Done for now") }
+                    .buttonStyle(.flCTA)
+                    .padding(.horizontal, DesignTokens.Spacing.horizontalMargin).padding(.top, 10).padding(.bottom, 40)
             }
         }
     }
@@ -402,8 +412,9 @@ struct CoverageCascadeView: View {
 
     // MARK: - Helpers
 
+    /// Fallback only — the server normally returns the branded kinrows.com link.
     private func approvalURL(token: String) -> URL? {
-        URL(string: "\(api.baseURL)/api/coverage/approve/\(token)")
+        URL(string: "\(api.baseURL)/c/\(token)")
     }
 
     private func addWindow() {

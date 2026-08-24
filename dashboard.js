@@ -471,6 +471,15 @@ async function requireWindowInRequest(db, windowId, requestId, res) {
 // Final approved date/times: honor the helper's values, else default to the
 // chosen window's. Guarantees the NOT NULL coverage_approvals columns are set
 // (a client omitting them used to 500). Returns null after sending a 400.
+// Where human-facing links (the coverage approval page) should point. The
+// marketing host fronts the API in production, so links read as kinrows.com
+// rather than a Railway hostname; locally they point at this server.
+function publicBaseUrl() {
+  if (process.env.SITE_URL) return process.env.SITE_URL.replace(/\/$/, '');
+  return IS_PROD ? 'https://kinrows.com' : `http://localhost:${PORT}`;
+}
+function coverageShareUrl(token) { return `${publicBaseUrl()}/c/${token}`; }
+
 function resolveApprovalTimes(win, body, res) {
   const approved_date = normalizeDate(body.approved_date || win.window_date || '');
   const approved_start = body.approved_start || win.start_time;
@@ -6817,10 +6826,11 @@ app.post('/api/coverage', requireAuth, async (req, res) => {
     const rawIds = Array.isArray(req.body.contact_ids) ? req.body.contact_ids : [];
     if (rawIds.length > 20) return res.status(400).json({ error: 'Too many recipients' });
     const contact_ids = [];
+    const clientIdFor = new Map();   // resolved contact id -> the id the client sent
     for (const rawId of rawIds) {
       const resolved = await resolveOwnedContactId(db, rawId, userId, res);
       if (resolved === null) return;  // 4xx already sent
-      if (!contact_ids.includes(resolved)) contact_ids.push(resolved);
+      if (!contact_ids.includes(resolved)) { contact_ids.push(resolved); clientIdFor.set(resolved, Number(rawId)); }
     }
 
     // Create request
@@ -6837,7 +6847,10 @@ app.post('/api/coverage', requireAuth, async (req, res) => {
     const recipients = [];
     for (const contactId of (contact_ids || [])) {
       const rec = await db.addCoverageRecipient({ request_id: request.id, contact_id: contactId });
-      recipients.push(rec);
+      // The client keys its share buttons by the id it sent (household members
+      // arrive as negative pseudo-ids), so hand that back alongside the link.
+      recipients.push({ ...rec, contact_id: contactId, client_contact_id: clientIdFor.get(contactId) ?? contactId,
+        share_url: coverageShareUrl(rec.invite_token) });
     }
 
     res.json({ success: true, id: request.id, recipients });
@@ -6915,7 +6928,14 @@ app.get('/api/coverage/:id', requireAuth, async (req, res) => {
       return res.status(403).json({ error: 'Forbidden' });
     }
     const windows = await db.getCoverageWindows(req.params.id);
-    const recipients = await db.getCoverageRecipients(req.params.id);
+    // The invite link is the requester's to share — a fellow recipient viewing
+    // the request must not be handed everyone else's tokens.
+    const isRequester = request.requester_id === userId;
+    const recipients = (await db.getCoverageRecipients(req.params.id)).map(r => ({
+      ...r,
+      invite_token: isRequester ? r.invite_token : undefined,
+      share_url: isRequester && r.invite_token && r.status !== 'approved' ? coverageShareUrl(r.invite_token) : undefined,
+    }));
     const approvals = await db.getCoverageApprovals(req.params.id);
     res.json({ ...request, windows, recipients, approvals });
   } catch (err) {
@@ -6966,6 +6986,84 @@ app.get('/api/coverage/approve/:token', async (req, res) => {
     db.close();
   }
 });
+
+// PUBLIC: the branded approval page a helper opens from the share link. No
+// account needed. Everything the page shows comes from the same token lookup
+// the JSON route uses; the form posts to /api/coverage/approve/:token.
+app.get('/c/:token', async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const token = String(req.params.token || '');
+    const recipient = /^[a-f0-9]{16,64}$/i.test(token) ? await db.getRecipientByToken(token) : null;
+    const windows = recipient ? await db.getCoverageWindows(recipient.request_id) : [];
+    res.set('Cache-Control', 'no-store');
+    res.type('html').send(coveragePage({ recipient, windows, token }));
+  } catch (err) {
+    sendServerError(res, err);
+  } finally {
+    db.close();
+  }
+});
+
+function coveragePage({ recipient, windows, token }) {
+  const esc = (v) => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const site = publicBaseUrl();
+  const fmtDate = (iso) => {
+    const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso || ''));
+    if (!m) return esc(iso);
+    const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+    return d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+  };
+  const fmtTime = (hm) => {
+    const m = /^(\d{1,2}):(\d{2})/.exec(String(hm || ''));
+    if (!m) return esc(hm);
+    const h = Number(m[1]); const ap = h >= 12 ? 'pm' : 'am'; const h12 = ((h + 11) % 12) + 1;
+    return `${h12}:${m[2]}${ap}`;
+  };
+  const head = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex"><title>Can you help? · Kinrows</title>
+<link rel="icon" href="${site}/assets/favicon.png">
+<style>
+:root{--cream-1:#fdf5e0;--cream-2:#fbecca;--card:#fef8ea;--card-2:#fffdf6;--ink-1:#2a1f1a;--ink-2:#5a463a;--ink-3:#7a6353;--ink-4:#b8a394;--sage:#7ba05b;--terracotta:#c46a4a;--line:rgba(42,31,26,.10);--shadow:0 10px 30px rgba(120,74,46,.10),0 2px 8px rgba(120,74,46,.06)}
+*{box-sizing:border-box}body{margin:0;font-family:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;background:radial-gradient(120% 80% at 50% -10%,var(--cream-2),var(--cream-1) 60%);color:var(--ink-1);min-height:100vh}
+.wrap{max-width:520px;margin:0 auto;padding:28px 18px 60px}.brand{display:flex;align-items:center;gap:10px;font-weight:700;letter-spacing:-.01em;color:var(--ink-2);text-decoration:none;font-size:15px}.brand img{width:28px;height:28px;border-radius:8px}
+.eyebrow{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--sage);margin:26px 0 6px}h1{font-size:28px;line-height:1.15;margin:0 0 8px;letter-spacing:-.02em}.lede{color:var(--ink-3);margin:0 0 20px;font-size:15px;line-height:1.5}
+.card{background:var(--card-2);border:1px solid var(--line);border-radius:22px;padding:16px;box-shadow:var(--shadow);margin-bottom:12px}.note{background:var(--card);border-radius:14px;padding:12px;color:var(--ink-2);font-style:italic;font-size:14px;margin-bottom:12px}
+.label{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3);margin:6px 0 10px}
+.win{display:flex;gap:12px;align-items:center;padding:12px;border:1px solid var(--line);border-radius:14px;margin-bottom:8px;cursor:pointer;background:var(--card)}.win input{accent-color:var(--sage);width:18px;height:18px}.win b{display:block;font-size:15px}.win span{color:var(--sage);font-weight:600;font-size:13px}.win small{display:block;color:var(--ink-3);font-size:12px;margin-top:2px}
+.row{display:flex;gap:8px}.field{flex:1}.field label{display:block;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);margin-bottom:4px}input[type=time],textarea{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:12px;font:inherit;font-size:15px;background:var(--card)}textarea{min-height:64px;resize:vertical}
+details{margin:6px 0 12px}summary{cursor:pointer;color:var(--ink-3);font-size:13px;font-weight:600}
+.btn{display:block;width:100%;padding:15px;border:0;border-radius:999px;background:var(--sage);color:#fff;font:inherit;font-size:16px;font-weight:700;cursor:pointer;box-shadow:var(--shadow)}.btn[disabled]{opacity:.5;cursor:default}
+.err{color:var(--terracotta);font-size:14px;margin:10px 0 0;min-height:1.2em}.done{text-align:center;padding:30px 10px}.done .tick{width:64px;height:64px;border-radius:50%;background:var(--sage);color:#fff;display:flex;align-items:center;justify-content:center;font-size:30px;margin:0 auto 14px}
+.foot{margin-top:26px;color:var(--ink-4);font-size:12px;text-align:center}.foot a{color:var(--ink-3)}
+</style></head><body><div class="wrap"><a class="brand" href="${site}/"><img src="${site}/assets/logo.png" alt=""> Kinrows</a>`;
+  const foot = `<p class="foot">Sent from the Kinrows app. No account needed — this link is just for ${recipient ? esc(recipient.contact_name) : 'you'}. <a href="${site}/privacy.html">Privacy</a></p></div></body></html>`;
+
+  if (!recipient) {
+    return head + `<p class="eyebrow">Coverage request</p><h1>This link isn't valid any more.</h1><p class="lede">It may have been cancelled, or the address was copied incompletely. Ask whoever sent it to share it again.</p>` + foot;
+  }
+  const first = esc(String(recipient.requester_name || 'Someone').split(/\s+/)[0]);
+  if (recipient.status === 'approved') {
+    return head + `<p class="eyebrow">Coverage request</p><div class="done"><div class="tick">✓</div><h1>You're covering this. Thank you.</h1><p class="lede">${first} has been told. If anything changes, just let them know directly.</p></div>` + foot;
+  }
+  const winHtml = windows.map((w, i) => `<label class="win"><input type="radio" name="window_id" value="${w.id}" ${i === 0 ? 'checked' : ''} data-start="${esc(w.start_time)}" data-end="${esc(w.end_time)}"><div><b>${fmtDate(w.window_date)}</b><span>${fmtTime(w.start_time)} – ${fmtTime(w.end_time)}</span>${w.description ? `<small>${esc(w.description)}</small>` : ''}</div></label>`).join('');
+  return head + `<p class="eyebrow">Hi ${esc(recipient.contact_name)}</p><h1>${first} needs a hand with <em>${esc((recipient.reason || 'some coverage').toLowerCase())}</em>.</h1><p class="lede">Pick a time that works and ${first} will get it on their calendar straight away.</p>
+${recipient.note ? `<div class="note">“${esc(recipient.note)}”</div>` : ''}
+<form class="card" id="f"><div class="label">When could you help?</div>${winHtml || '<p class="lede">No times were proposed — reply to ' + first + ' directly.</p>'}
+<details><summary>I can do part of that window</summary><div class="row" style="margin-top:10px"><div class="field"><label for="s">From</label><input type="time" id="s" name="approved_start"></div><div class="field"><label for="e">To</label><input type="time" id="e" name="approved_end"></div></div></details>
+<div class="field"><label for="n">A note for ${first} (optional)</label><textarea id="n" name="helper_note" placeholder="e.g. I'll bring the kids back by 3"></textarea></div>
+<p class="err" id="err"></p><button class="btn" id="go" type="submit" ${windows.length ? '' : 'disabled'}>I can help</button></form>
+<script>
+(function(){var f=document.getElementById('f'),go=document.getElementById('go'),err=document.getElementById('err');
+f.addEventListener('submit',async function(ev){ev.preventDefault();err.textContent='';go.disabled=true;go.textContent='Sending…';
+var w=f.querySelector('input[name=window_id]:checked');var body={window_id:w?Number(w.value):null,helper_note:f.helper_note.value||''};
+if(f.approved_start.value&&f.approved_end.value){body.approved_start=f.approved_start.value;body.approved_end=f.approved_end.value;}
+try{var r=await fetch('/api/coverage/approve/${esc(token)}',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});var j=await r.json().catch(function(){return {}});
+if(!r.ok){throw new Error(j.error||'Something went wrong');}
+f.outerHTML='<div class="done"><div class="tick">✓</div><h1>Thank you — ${first} has been told.</h1><p class="lede">You\'ll hear from them if anything changes.</p></div>';}
+catch(e){err.textContent=e.message;go.disabled=false;go.textContent='I can help';}});})();
+</script>` + foot;
+}
 
 // PUBLIC: Submit approval (care team member confirms a window)
 app.post('/api/coverage/approve/:token', async (req, res) => {
