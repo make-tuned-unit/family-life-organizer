@@ -5915,6 +5915,7 @@ app.get('/api/routines/chores-today', requireAuth, async (req, res) => {
         open_slots: todayCol.reduce((n, c) => n + c.slots.filter(s => !s.done).length, 0),
         total_slots: todayCol.reduce((n, c) => n + c.slots.length, 0),
         streak_days: summary.streak_days,
+        lifetime_done: summary.lifetime_done,
         week_total: summary.earnings.total,
         currency: summary.earnings.currency,
       });

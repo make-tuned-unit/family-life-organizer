@@ -81,7 +81,7 @@ struct ChoreBar: View {
             let slot = next.slots.first { !$0.done }
             bits.append(slot.map { $0.slot == "anytime" ? next.title : "\(next.title) · \($0.label.lowercased())" } ?? next.title)
         }
-        if summary.streak_days > 1 { bits.append("\(summary.streak_days)-day streak") }
+        if let n = summary.lifetime_done, n > 0 { bits.append("helped \(n)×") }
         if summary.week_total > 0 { bits.append(summary.week_total.formatted(.currency(code: summary.currency).precision(.fractionLength(0...2))) + " this week") }
         return bits.isEmpty ? "Chores" : bits.joined(separator: " · ")
     }

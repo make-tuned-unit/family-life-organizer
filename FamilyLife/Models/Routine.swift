@@ -636,7 +636,10 @@ struct ChoreSuggestion: Codable, Identifiable {
     let icon: String
     let slots: [String]
     let note: String?
+    /// A two-person job at this age (pet feeding under 5) — shown as "with you".
+    let supervised: Bool?
     var id: String { title }
+    var isSupervised: Bool { supervised ?? false }
 }
 
 struct ChoreGuidance: Codable {
@@ -661,6 +664,10 @@ struct ChoreSummary: Codable {
     let done_total: Int
     let expected_total: Int
     let streak_days: Int
+    /// Share of the last 14 days fully done — tolerant of a missed day, which
+    /// is what the habit research says a missed day deserves.
+    let steady_pct: Int?
+    let steady_days: Int?
     let lifetime_done: Int
     let bonuses: [ChoreBonusState]
     let earnings: ChoreEarnings
@@ -685,6 +692,7 @@ struct ChoresTodaySummary: Codable, Identifiable {
     let open_slots: Int
     let total_slots: Int
     let streak_days: Int
+    let lifetime_done: Int?
     let week_total: Double
     let currency: String
     var id: Int { routine_id }
@@ -703,6 +711,9 @@ struct ChoresTodayChore: Codable, Identifiable {
 struct ChoreBandAllowance: Codable {
     let label: String
     let note: String
+    /// What the evidence says about behaviour bonuses at this age (e.g. use
+    /// the Bedtime Pass rather than a cash bedtime bonus).
+    let bonus_note: String?
 }
 
 struct ChoreBand: Codable, Identifiable {

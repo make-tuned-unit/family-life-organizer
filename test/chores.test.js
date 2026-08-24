@@ -114,6 +114,7 @@ test('chores engine: nudge waits for the 4th birthday and a steady record', () =
   // 3y11m, 20-day streak: "turning 4 soon" beats "add a chore".
   let s = chores.compute(full, CONFIG, { today: '2026-08-20', birthdate: '2022-09-10' });
   assert.equal(s.streak_days, 20);
+  assert.equal(s.steady_pct, 100);
   assert.equal(s.guidance.nudge.kind, 'soon');
   // 4y2m with a steady record: add.
   s = chores.compute(full, CONFIG, { today: '2026-08-20', birthdate: '2022-06-10' });
@@ -125,12 +126,27 @@ test('chores engine: nudge waits for the 4th birthday and a steady record', () =
   assert.equal(chores.compute([], { chores: [] }, { today: '2026-08-20', birthdate: '2022-06-10' }).guidance.nudge.kind, 'start');
 });
 
+test('chores engine: steadiness tolerates a single missed day', () => {
+  const entries = [];
+  for (let i = 1; i <= 14; i++) {
+    if (i === 5) continue;                                   // one missed day
+    const iso = `2026-08-${String(i).padStart(2, '0')}`;
+    for (const slot of ['morning', 'evening']) entries.push({ id: entries.length + 1, entry_date: iso, entry_type: 'chore_done', value: JSON.stringify({ chore_id: 'dog', slot }) });
+  }
+  const s = chores.compute(entries, CONFIG, { today: '2026-08-15', birthdate: '2022-01-10' });
+  assert.equal(s.streak_days, 9);                             // the chain broke…
+  assert.equal(s.steady_pct, 93);                             // …but they are plainly steady
+  assert.equal(s.guidance.nudge.kind, 'add');
+});
+
 test('chores template: bands are contiguous from 2 to 13+ and every band cites a rewards note', () => {
   const tpl = chores.template();
   assert.ok(tpl.bands.length >= 5);
   for (let i = 1; i < tpl.bands.length; i++) assert.equal(tpl.bands[i].min_years, tpl.bands[i - 1].max_years);
   for (const b of tpl.bands) { assert.ok(b.suggested.length >= 4); assert.ok(b.allowance.note); }
-  assert.ok(tpl.sources.length >= 8);
+  assert.ok(tpl.sources.length >= 15);
+  assert.ok(tpl.bands[0].suggested.some(x => x.supervised), 'toddler pet feeding is flagged supervised');
+  assert.ok(tpl.bands[0].allowance.bonus_note);
   assert.ok(tpl.sources.every(s => /^https?:\/\//.test(s.url)));
 });
 

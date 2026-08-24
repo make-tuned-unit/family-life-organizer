@@ -8,30 +8,45 @@
 // sleep-training program: a static, sourced template plus `guidanceForBirthdate`.
 //
 // Design choices, and the evidence they lean on (see SOURCES; keep in sync):
-//  * Chores are framed as CONTRIBUTION, not jobs — kids who do chores from 3–4
-//    do better decades later (Rossmann 2002), and even kindergarten chores
-//    predict competence at grade 3 (White et al. 2019).
+//  * Chores are framed as CONTRIBUTION, not jobs — kids who did chores from 3–4
+//    did best decades later (Rossmann 2002, small and unreplicated), and
+//    kindergarten chores are associated with competence at grade 3 (White,
+//    DeBoer & Scharf 2019). Toddlers already help spontaneously (Coppens &
+//    Rogoff 2021); the job is not to train it out of them.
 //  * A small fixed weekly allowance is fine, but pay is NOT docked per missed
 //    chore. Contingent money undermines young children's spontaneous helping
 //    (Warneken & Tomasello 2008; Deci, Koestner & Ryan 1999 meta-analysis), so
 //    the app never turns a 3-year-old's dog-feeding into piecework.
-//  * Cumulative counts are the primary "reward"; a streak is shown only as a
-//    secondary encouragement and never as a punishment (see routineAchievements).
+//  * Cumulative counts are the primary "reward". A resettable streak says one
+//    miss is a catastrophe; Lally et al. 2010 found a single miss is harmless.
+//    So the UI leads with "helped 47 times", and the "ready for the next chore"
+//    nudge uses a tolerant 14-day steadiness measure, not an unbroken chain.
+//  * Pet feeding under 5 is a two-person job: no guideline places it as an
+//    independent chore before 4–5 (AACAP) or 5–7 (AAP), and food guarding is
+//    the top bite circumstance for familiar children under 6 (Reisner 2007).
 //  * Guidance is age-banded and gated: a 3-year-old gets one or two anchored
 //    chores; the "add a second chore" nudge waits for the 4th birthday AND a
 //    consistent record, not just a date.
 
 const SOURCES = [
-  { key: 'rossmann', title: 'Rossmann 2002 (Univ. of Minnesota) — longitudinal: chores begun at 3–4 predict adult success', url: 'https://ghk.h-cdn.co/assets/cm/15/12/550e21d3ea06e_-_Involving-children-in-household-tasks-U-of-M.pdf' },
-  { key: 'white2019', title: 'White, Gemmill et al. 2019, J Dev Behav Pediatr — kindergarten chores predict competence & self-efficacy at grade 3 (n≈9,971)', url: 'https://pubmed.ncbi.nlm.nih.gov/30985390/' },
-  { key: 'warneken', title: 'Warneken & Tomasello 2008, Dev Psychol — rewards undermine 20-month-olds\' helping', url: 'https://pubmed.ncbi.nlm.nih.gov/18999339/' },
-  { key: 'deci1999', title: 'Deci, Koestner & Ryan 1999, Psych Bulletin — meta-analysis: contingent rewards reduce intrinsic motivation', url: 'https://pubmed.ncbi.nlm.nih.gov/10589297/' },
-  { key: 'lally', title: 'Lally et al. 2010, Eur J Soc Psychol — habits form over ~66 days (18–254) of same-context repetition', url: 'https://onlinelibrary.wiley.com/doi/10.1002/ejsp.674' },
-  { key: 'dweck', title: 'Mueller & Dweck 1998 — process praise ("you fed him every day") beats person praise', url: 'https://pubmed.ncbi.nlm.nih.gov/9686450/' },
-  { key: 'aap', title: 'AAP HealthyChildren.org — chores and responsibility by age', url: 'https://www.healthychildren.org/English/family-life/family-dynamics/communication-discipline/Pages/Chores-and-Responsibility.aspx' },
-  { key: 'lieber', title: 'Ron Lieber, The Opposite of Spoiled (2015) — allowance as a teaching tool, separate from chores', url: 'https://www.ronlieber.com/books/the-opposite-of-spoiled/' },
-  { key: 'trowe', title: 'T. Rowe Price Parents, Kids & Money survey — allowance prevalence and amounts by age', url: 'https://www.troweprice.com/personal-investing/resources/insights/parents-kids-money-survey.html' },
-  { key: 'coppens', title: 'Coppens, Alcalá, Mejía-Arauz & Rogoff 2014 — "acomedido": children who help without being asked', url: 'https://pubmed.ncbi.nlm.nih.gov/25016183/' },
+  { key: 'rossmann', title: 'Rossmann 2002 (Univ. of Minnesota, n=84 longitudinal) — chores begun at 3–4 best predicted success in the mid-20s; NOT peer-reviewed, and Rossmann herself: "they should not be made to do the tasks for an allowance"', url: 'https://ghk.h-cdn.co/assets/cm/15/12/55071e0298a05_-_Involving-children-in-household-tasks-U-of-M.pdf' },
+  { key: 'white2019', title: 'White, DeBoer & Scharf 2019, J Dev Behav Pediatr (n=9,971) — kindergarten chores associated with competence at grade 3 (association, not causation)', url: 'https://doi.org/10.1097/DBP.0000000000000637' },
+  { key: 'warneken2008', title: 'Warneken & Tomasello 2008, Dev Psychol — material reward cut 20-month-olds\' helping from 89% to 53%; praise did not', url: 'https://doi.org/10.1037/a0013860' },
+  { key: 'deci1999', title: 'Deci, Koestner & Ryan 1999, Psych Bulletin — 128-study meta-analysis: tangible, completion-contingent rewards undermine intrinsic motivation, more so in children', url: 'https://doi.org/10.1037/0033-2909.125.6.627' },
+  { key: 'coppens2021', title: 'Coppens & Rogoff 2021, Social Development — most 2–3-year-olds help on their own initiative; by 6–7 many US middle-class children help only under "contractual arrangements"', url: 'https://doi.org/10.1111/sode.12566' },
+  { key: 'patall2008', title: 'Patall, Cooper & Robinson 2008, Psych Bulletin — choice raises motivation and effort, most for children and with 2–4 options', url: 'https://selfdeterminationtheory.org/wp-content/uploads/2019/10/2008_PatallCooperRobinson_PsychBulletin.pdf' },
+  { key: 'lally2010', title: 'Lally et al. 2010, Eur J Soc Psychol — habits take ~66 days of same-context repetition; missing one day "did not materially affect" habit formation (adult sample)', url: 'https://doi.org/10.1002/ejsp.674' },
+  { key: 'gunderson2013', title: 'Gunderson et al. 2013, Child Development — process praise to 1–3-year-olds predicts motivation at 7–8', url: 'https://doi.org/10.1111/cdev.12064' },
+  { key: 'fosterhanson2020', title: 'Foster-Hanson et al. 2020, Child Development — "be a helper" framing backfires after setbacks in 4–5-year-olds', url: 'https://doi.org/10.1111/cdev.13147' },
+  { key: 'moore2007', title: 'Moore, Friman et al. 2007, J Pediatr Psychol — Bedtime Pass RCT (ages 3–6): the evidence-based tool for bedtime, not a cash bonus', url: 'https://academic.oup.com/jpepsy/article/32/3/283/2951943' },
+  { key: 'reisner2007', title: 'Reisner, Shofer & Nance 2007, Injury Prevention — food guarding is the most common circumstance for dog bites to familiar children under 6', url: 'https://doi.org/10.1136/ip.2007.015396' },
+  { key: 'aap_chores', title: 'AAP HealthyChildren.org — age-appropriate chores (pet feeding listed from 5–7)', url: 'https://www.healthychildren.org/English/family-life/family-dynamics/communication-discipline/Pages/Chores-and-Responsibility.aspx' },
+  { key: 'aap_bites', title: 'AAP HealthyChildren.org — dog bite prevention: never bother a dog that is eating', url: 'https://www.healthychildren.org/English/safety-prevention/all-around/Pages/Dog-Bite-Prevention-Tips.aspx' },
+  { key: 'aacap125', title: 'AACAP Facts for Families #125 — chores by age (feed pets at 4–5)', url: 'https://www.aacap.org/AACAP/Families_and_Youth/Facts_for_Families/FFF-Guide/Chores_and_Children-125.aspx' },
+  { key: 'levitt2016', title: 'Levitt, List, Neckermann & Sadoff 2016, AEJ Policy — delayed incentives lose all motivating power; non-financial beats financial for young children', url: 'https://www.nber.org/papers/w18165' },
+  { key: 'bingham2013', title: 'Bingham & Whitebread 2013 (Money Advice Service) — money concepts consolidate around age 7', url: 'https://altorwealth.com/wp-content/uploads/2024/04/the-money-advice-service-habit-formation-and-learning-in-young-children-may2013.pdf' },
+  { key: 'greenlight', title: 'Greenlight 2025 platform data — average weekly allowance by age ($6.18 at 5 → $21.47 at 17)', url: 'https://greenlight.com/learning-center/earning/average-allowance-by-age-for-kids' },
+  { key: 'lieber', title: 'Ron Lieber, The Opposite of Spoiled (2015) — allowance as a teaching tool, kept separate from chores', url: 'https://www.ronlieber.com/books/the-opposite-of-spoiled/' },
 ];
 
 // Age bands. `minYears`/`maxYears` are inclusive-exclusive. Each band carries
@@ -44,9 +59,10 @@ const BANDS = [
     age_label: '2–3 years',
     minYears: 2, maxYears: 4,
     chore_count: '1–2 chores, done together',
-    description: 'At this age the chore is the togetherness. Toddlers want to help (Warneken & Tomasello showed helping emerges before age two) — pick something visible, physical, and tied to a moment in the day, and expect to do it alongside them for months.',
+    description: 'At this age the chore is the togetherness. Toddlers already help on their own — most 2–3-year-olds do (Coppens & Rogoff 2021), and helping shows up before age two (Warneken & Tomasello). Pick something visible, physical, and tied to a moment in the day, and expect to do it alongside them for months.',
     suggested: [
-      { title: 'Feed the pet', icon: 'pawprint.fill', slots: ['morning', 'evening'], note: 'Scoop-and-pour with you beside them; you handle portions and the pantry.' },
+      { title: 'Help feed the pet', icon: 'pawprint.fill', slots: ['morning', 'evening'], supervised: true, note: 'A two-person job under 5: they tip in the scoop you hold, then you both step away before the dog eats. Never let a child near a dog that is eating (AAP).' },
+      { title: 'Fill the water bowl', icon: 'drop.fill', slots: ['morning'], note: 'The pet job that is safely theirs — no food, no guarding.' },
       { title: 'Put toys in the bin', icon: 'shippingbox.fill', slots: ['evening'], note: 'One bin, one category — "all the blocks".' },
       { title: 'Carry plate to the counter', icon: 'fork.knife', slots: ['evening'] },
       { title: 'Put clothes in the hamper', icon: 'basket.fill', slots: ['evening'] },
@@ -57,16 +73,18 @@ const BANDS = [
       'Anchor each chore to something that already happens — "after breakfast, we feed the dog". Same time, same order, every day.',
       'Do it WITH them for as long as it takes; the goal is participation, not a finished job.',
       'Use a picture chart, not words: a photo of the dog bowl they can tap or tick.',
-      'Praise the doing, not the child: "you filled the bowl right to the line" rather than "good boy".',
+      'Praise the doing, not the child: "you filled the bowl right to the line" rather than "good helper" — identity labels backfire after a bad day (Foster-Hanson 2020).',
       'Keep allowance (if any) tiny and separate from whether the chore got done. Never dock it.',
     ],
     tips: [
-      'A missed day is not a failure — just start again tomorrow. Consistency over months is what builds the habit (Lally et al.).',
+      'A missed day is not a failure — just start again tomorrow. One miss does not dent a forming habit (Lally et al.); months of the same cue do build it.',
       'Expect helping to be slower than doing it yourself. That is the investment.',
+      'A 3-year-old has no working idea of "per week". If you give money, hand it over visibly and count it together; the praise in the moment is what actually reinforces the chore.',
     ],
     allowance: {
-      label: 'Optional. $1–3/week is typical if you start now.',
-      note: 'Research on allowance for 3-year-olds is thin; most experts (Lieber, AAP) see a small fixed amount as a chance to practise counting and saving, not as wages. Keep it fixed and keep the chore "because we all help".',
+      label: 'Optional. $1–3/week is typical if you start now — as a family dividend, not wages.',
+      note: 'Paying a toddler per chore is the one case where every camp of the rewards research agrees it backfires: material reward cut 20-month-olds\' helping from 89% to 53% while praise did not (Warneken & Tomasello 2008), and Rossmann\'s own advice was "not for an allowance". So Kinrows keeps the allowance fixed and unlinked. Money ideas consolidate around 7 (Bingham & Whitebread) — until then it is counting practice.',
+      bonus_note: 'A cash bonus for bedtime has no evidence at this age. The Bedtime Pass — one card, one sanctioned get-up, then nothing — has an RCT with 3–6-year-olds (Moore et al. 2007) and lives in the sleep-training program. Use the pass; if you keep a bonus, make it a weekly "mostly went well".',
     },
     next_band: 'Around the 4th birthday, once the first chore has been steady for a few weeks, add a second chore they can start doing on their own.',
   },
@@ -78,7 +96,7 @@ const BANDS = [
     chore_count: '2–3 chores, some done alone',
     description: 'Preschoolers can follow a two- or three-step chore and begin to own one without a parent beside them. This is the age Rossmann found matters most: children who began regular chores at 3–4 were the most likely to thrive as young adults.',
     suggested: [
-      { title: 'Feed the pet', icon: 'pawprint.fill', slots: ['morning', 'evening'] },
+      { title: 'Feed the pet', icon: 'pawprint.fill', slots: ['morning', 'evening'], supervised: true, note: 'AACAP lists it from 4–5, always with a grown-up nearby and the dog kept away while food is out.' },
       { title: 'Make the bed', icon: 'bed.double.fill', slots: ['morning'], note: 'Pull up the duvet — "made" means tried.' },
       { title: 'Set the table', icon: 'fork.knife', slots: ['evening'], note: 'Napkins and forks first; plates when you trust the hands.' },
       { title: 'Clear their own plate', icon: 'takeoutbag.and.cup.and.straw.fill', slots: ['evening'] },
@@ -90,16 +108,17 @@ const BANDS = [
     steps: [
       'Add ONE new chore at a time and keep the old one running — stacking on an existing habit is far easier than starting fresh.',
       'Show, do together, then step back: the "I do, we do, you do" sequence.',
-      'Let them choose the second chore from a short list. Choice is the cheapest motivator there is (self-determination theory).',
+      'Let them choose the second chore from two or three options. Choice lifts effort more in children than adults (Patall et al. 2008) — and works less well when a payment follows it.',
       'Keep the chart visual and let them mark it themselves.',
     ],
     tips: [
       'Quality will be uneven. Resist redoing it in front of them.',
-      'A small behaviour bonus (a good bedtime, teeth without a fight) works better as a weekly "did we mostly manage it?" than a nightly pass/fail.',
+      'A small behaviour bonus (teeth without a fight, a calm morning) works better as a weekly "did we mostly manage it?" than a nightly pass/fail. For bedtime specifically, use the Bedtime Pass.',
     ],
     allowance: {
-      label: '$2–5/week is typical (roughly $0.50–1 per year of age).',
-      note: 'Introduce three jars — spend, save, give — so the money teaches something. Keep it fixed; use praise and the chart, not pay, to drive the chores.',
+      label: '$2–6/week is typical (Greenlight\'s 2025 average at age 5 is $6.18).',
+      note: 'Introduce three jars — spend, save, give — so the money teaches something. Keep it fixed; use praise and the chart, not pay, to drive the chores. Most parents pay per chore (T. Rowe Price: 83%) and most experts advise against it (Lieber, Kobliner, Rossmann) — Kinrows defaults to the experts.',
+      bonus_note: 'Bedtime: the Bedtime Pass (in the sleep program) is the evidence-based tool. Keep cash bonuses for things with no better tool.',
     },
     next_band: 'By 6 they can take real responsibility for a chore that has consequences if skipped — an unfed pet, an unset table. That is when "it\'s yours" starts to mean something.',
   },
@@ -217,8 +236,10 @@ function template() {
       'Anchor to the day: tie each chore to a moment that already happens (after breakfast, before bed).',
       'One new chore at a time, stacked on one that already sticks.',
       'Pictures for pre-readers, a checklist for readers — and let them mark it.',
-      'Praise the process. Never dock pay for a missed chore.',
+      'Praise the process. Never dock pay for a missed chore, and never make a missed day look like a broken chain.',
       'Fixed, small allowance for money practice; optional paid extras for the big stuff later.',
+      'Pet feeding is a two-person job under 5, and nobody goes near a dog that is eating.',
+      'Each child sees their own contributions, never a sibling scoreboard.',
     ],
     bands: BANDS.map(b => ({ ...b, min_years: b.minYears, max_years: b.maxYears, minYears: undefined, maxYears: undefined })),
     sources: SOURCES,
@@ -360,6 +381,16 @@ function compute(entries, config, { today, birthdate } = {}) {
       streak++; cursor = addDays(cursor, -1);
     }
   }
+  // Steadiness over the last 14 days (yesterday back), as a share of days
+  // fully done. Tolerant on purpose: one miss shouldn't zero anything.
+  let steadyDone = 0, steadyDays = 0;
+  for (let i = 1; i <= 14; i++) {
+    const d = addDays(day, -i);
+    const expectedAny = cfg.chores.some(c => c.active && (!c.days || c.days.includes(parseISO(d).getDay())) && (!c.started_on || d >= c.started_on));
+    if (!expectedAny) continue;
+    steadyDays++; if (fullDay(d)) steadyDone++;
+  }
+  const steadyPct = steadyDays ? Math.round((steadyDone / steadyDays) * 100) : null;
 
   const bonuses = cfg.bonuses.map(b => {
     const map = bonusDays.get(b.id) || new Map();
@@ -401,7 +432,7 @@ function compute(entries, config, { today, birthdate } = {}) {
     allowance_label: band.allowance.label,
     next_band: band.next_band,
     suggested: band.suggested.filter(s => !cfg.chores.some(c => c.title.toLowerCase() === s.title.toLowerCase())),
-    nudge: nextChoreNudge({ years, band, chores: cfg.chores, chorePayload: chores, streak, birthdate, today: day }),
+    nudge: nextChoreNudge({ years, band, chores: cfg.chores, steadyPct, steadyDays, birthdate, today: day }),
   } : null;
 
   return {
@@ -414,6 +445,8 @@ function compute(entries, config, { today, birthdate } = {}) {
     done_total: doneTotal,
     expected_total: expectedTotal,
     streak_days: streak,
+    steady_pct: steadyPct,
+    steady_days: steadyDays,
     lifetime_done: done.size,
     bonuses,
     earnings: {
@@ -438,7 +471,8 @@ function compute(entries, config, { today, birthdate } = {}) {
 // The one forward-looking sentence: when to add a chore, or why not yet. Age
 // alone never triggers it — the record has to be steady too, because a second
 // chore stacked on a shaky first one usually sinks both.
-function nextChoreNudge({ years, band, chores, chorePayload, streak, birthdate, today }) {
+function nextChoreNudge({ years, band, chores, steadyPct, steadyDays, birthdate, today }) {
+  const steady = steadyDays >= 10 && steadyPct >= 80;
   const active = chores.filter(c => c.active);
   if (!active.length) return { kind: 'start', text: `Start with one chore from the ${band.age_label} list — something anchored to a moment in the day.` };
   const target = { toddler: 2, preschool: 3, early_school: 4, tween: 5, teen: 4 }[band.key] || 3;
@@ -448,11 +482,11 @@ function nextChoreNudge({ years, band, chores, chorePayload, streak, birthdate, 
     const daysTo = Math.round((fourth - parseISO(today)) / 86400000);
     if (daysTo > 0 && daysTo <= 60) return { kind: 'soon', text: `Turning 4 in ${daysTo} day${daysTo === 1 ? '' : 's'} — a good moment to let them pick a second chore.` };
   }
-  if (active.length < target && streak >= 14) {
-    return { kind: 'add', text: `${streak} days steady — ready to add a chore. Keep the current one running and stack the new one on it.` };
+  if (active.length < target && steady) {
+    return { kind: 'add', text: `Steady for two weeks — ready to add a chore. Let them pick from two or three, and stack it on the one that already works.` };
   }
-  if (active.length < target && streak < 14) {
-    return { kind: 'hold', text: 'Keep going with what\'s there — two steady weeks before adding the next one.' };
+  if (active.length < target && !steady) {
+    return { kind: 'hold', text: 'Keep going with what\'s there — about two steady weeks before adding the next one. A missed day doesn\'t reset anything.' };
   }
   return { kind: 'steady', text: `${active.length} chore${active.length === 1 ? '' : 's'} is plenty for ${band.age_label}. Consistency beats quantity.` };
 }

@@ -173,7 +173,14 @@ private struct BandCard: View {
                                 .frame(width: 18)
                                 .padding(.top, 2)
                             VStack(alignment: .leading, spacing: 1) {
-                                Text(s.title).font(.flSubheadline).foregroundStyle(WarmPalette.ink1)
+                                HStack(spacing: 6) {
+                                    Text(s.title).font(.flSubheadline).foregroundStyle(WarmPalette.ink1)
+                                    if s.isSupervised {
+                                        Text("WITH A GROWN-UP")
+                                            .font(.flOverline)
+                                            .foregroundStyle(AccentTheme.terracotta.color)
+                                    }
+                                }
                                 if let note = s.note {
                                     Text(note).font(.flCaption).foregroundStyle(WarmPalette.ink3)
                                 }
@@ -200,6 +207,14 @@ private struct BandCard: View {
                     Text(band.allowance.note)
                         .font(.flFootnote)
                         .foregroundStyle(WarmPalette.ink3)
+                    if let bonus = band.allowance.bonus_note {
+                        Label(bonus, systemImage: "moon.stars.fill")
+                            .font(.flFootnote)
+                            .foregroundStyle(WarmPalette.ink2)
+                            .padding(10)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(AccentTheme.saffron.color.opacity(0.10), in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.small))
+                    }
                 }
 
                 if !band.tips.isEmpty {

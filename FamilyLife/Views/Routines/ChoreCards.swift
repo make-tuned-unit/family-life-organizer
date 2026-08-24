@@ -25,17 +25,20 @@ struct ChoreWeekCard: View {
                         .foregroundStyle(WarmPalette.ink3)
                 }
                 Spacer()
-                if summary.streak_days > 0 {
+                // The number that only goes up. A resettable streak tells a
+                // child one missed day is a catastrophe; the habit research
+                // says it isn't, so the chain is never the headline here.
+                if summary.lifetime_done > 0 {
                     HStack(spacing: 4) {
-                        Image(systemName: "flame.fill").font(.system(size: 11, weight: .semibold))
-                        Text("\(summary.streak_days) day\(summary.streak_days == 1 ? "" : "s")")
+                        Image(systemName: "hands.clap.fill").font(.system(size: 11, weight: .semibold))
+                        Text("helped \(summary.lifetime_done)×")
                     }
                     .font(.flCaption.weight(.semibold))
-                    .foregroundStyle(AccentTheme.terracotta.color)
+                    .foregroundStyle(accent)
                     .padding(.horizontal, 9)
                     .padding(.vertical, 4)
-                    .background(AccentTheme.terracotta.color.opacity(0.12), in: Capsule())
-                    .accessibilityLabel("\(summary.streak_days) day streak")
+                    .background(accent.opacity(0.12), in: Capsule())
+                    .accessibilityLabel("helped \(summary.lifetime_done) times so far")
                 }
             }
 
@@ -213,6 +216,18 @@ struct ChoreEarningsCard: View {
                     .foregroundStyle(WarmPalette.ink3)
             }
 
+            if summary.bonuses.contains(where: { $0.title.localizedCaseInsensitiveContains("bed") }) {
+                NavigationLink {
+                    SleepTrainingProgramView()
+                } label: {
+                    Label("For bedtime, the Bedtime Pass has the evidence (ages 3–6) — it's in the sleep program.", systemImage: "moon.stars.fill")
+                        .font(.flCaption)
+                        .foregroundStyle(WarmPalette.ink3)
+                        .multilineTextAlignment(.leading)
+                }
+                .buttonStyle(.plain)
+            }
+
             if !summary.ledger.unpaid_weeks.isEmpty {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Owed from earlier weeks · \(money(summary.ledger.owed))")
@@ -332,6 +347,11 @@ struct ChoreGuidanceCard: View {
                                     HStack(spacing: 6) {
                                         Image(systemName: s.icon).font(.system(size: 12, weight: .medium))
                                         Text(s.title)
+                                        if s.isSupervised {
+                                            Text("with you")
+                                                .font(.flCaption2)
+                                                .foregroundStyle(WarmPalette.ink3)
+                                        }
                                         Image(systemName: "plus").font(.system(size: 10, weight: .bold))
                                     }
                                     .font(.flCaption.weight(.medium))
