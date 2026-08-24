@@ -258,6 +258,10 @@ struct SettingsView: View {
                     Label("Security & 2FA", systemImage: "lock.shield.fill")
                         .foregroundStyle(TabAccent.home.color)
                 }
+                NavigationLink { DeveloperAPIView() } label: {
+                    Label("Developer API", systemImage: "terminal.fill")
+                        .foregroundStyle(TabAccent.home.color)
+                }
                 Button(role: .destructive) {
                     showingDeleteAccount = true
                 } label: {

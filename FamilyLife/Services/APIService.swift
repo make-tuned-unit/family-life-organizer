@@ -129,6 +129,43 @@ final class APIService {
         let _: SuccessResponse = try await post("/api/account/email/verify", body: ["challenge": challenge, "code": code])
     }
 
+    // MARK: - Developer API keys (Settings → Developer API)
+
+    struct DeveloperKey: Codable, Identifiable {
+        let id: Int
+        let name: String
+        let key_prefix: String
+        let scope: String
+        let last_used_at: String?
+        let created_at: String?
+    }
+
+    struct DeveloperKeyList: Codable {
+        let keys: [DeveloperKey]
+    }
+
+    /// Only `createDeveloperKey` ever returns the plaintext `key`.
+    struct DeveloperKeyCreated: Codable {
+        let key: String
+        let id: Int
+        let name: String
+        let key_prefix: String
+        let scope: String
+    }
+
+    func fetchDeveloperKeys() async throws -> [DeveloperKey] {
+        let list: DeveloperKeyList = try await get("/api/developer/keys")
+        return list.keys
+    }
+
+    func createDeveloperKey(name: String, scope: String) async throws -> DeveloperKeyCreated {
+        try await post("/api/developer/keys", body: ["name": name, "scope": scope])
+    }
+
+    func revokeDeveloperKey(id: Int) async throws {
+        let _: SuccessResponse = try await delete("/api/developer/keys/\(id)")
+    }
+
     // MARK: - Dashboard
 
     struct DashboardData: Codable {

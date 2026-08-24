@@ -22,7 +22,8 @@ dashboard.js                # Express server — ALL ~190 /api routes live here 
 database.js                 # FamilyDB class — promisified sqlite3, schema bootstrap + inline migrations
 schema.sql                  # ~50 tables; applied idempotently at every boot
 services/                   # anthropic.js, concierge{Chat,Tools,Brief,Context,Nudge}.js,
-                            #   subscription.js, appleVerify.js, email.js, rateLimit.js
+                            #   subscription.js, appleVerify.js, email.js, rateLimit.js,
+│                           #   developerApi.js (bring-your-own-agent keys + /v1 REST/MCP surface)
 push.js                     # Raw APNs over HTTP/2 (env-configured, silently off if unset)
 test/                       # node --test suites (npm test) — boot real servers on ports 3995-3999
 scripts/                    # demo seeds + concierge-tool-eval.js (structural + live tool-routing eval)
@@ -60,4 +61,4 @@ website/                    # kinrows.com static marketing site + llms.txt/llms-
 5. **No third-party dependencies** on either side unless strictly necessary (backend deps: express, sqlite3, bcryptjs, helmet, connect-sqlite3 — keep it that way).
 6. **Route order matters in dashboard.js** — specific paths before `/:param` siblings (e.g. `/api/budget/stats` before `/api/budget/:month`).
 7. **iPhone first**; iPad is secondary.
-8. Docs: `docs/PRD.md` (vision), `docs/SECURITY_AUDIT.md` + `docs/PROD_READINESS.md` (posture/checklists — keep them current when you change auth/security).
+8. Docs: `docs/PRD.md` (vision), `docs/DEVELOPER_API.md` (public `/v1` agent API — update with `website/developers.html` when the tool surface or auth changes), `docs/SECURITY_AUDIT.md` + `docs/PROD_READINESS.md` (posture/checklists — keep them current when you change auth/security).

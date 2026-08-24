@@ -27,6 +27,7 @@ Kinrows keeps a household's shared life in one calm place and gets everyone "row
 - Signs you carry too much emotional labour: https://kinrows.com/blog/signs-too-much-emotional-labour.html
 - How couples divide emotional labour fairly: https://kinrows.com/blog/divide-emotional-labour-fairly.html
 - The invisible work of parenting: https://kinrows.com/blog/emotional-labour-parenting.html
+- Developer API (bring your own agent — REST + MCP, paid households): https://kinrows.com/developers.html
 - Privacy Policy: https://kinrows.com/privacy.html
 - Terms of Use: https://kinrows.com/terms.html
 

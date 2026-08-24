@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<script>document.documentElement.classList.add('js')</script>
+<title>Developer API — Kinrows</title>
+<meta name="description" content="Plug your own AI agent into Kinrows. A paid household can mint an API key and let Claude, ChatGPT, Cursor or a custom bot manage the family organizer through the same tools our Concierge uses — REST or MCP." />
+<meta name="theme-color" content="#fdf5e0" />
+<meta name="robots" content="index,follow" />
+
+<link rel="icon" type="image/png" href="assets/favicon.png" />
+<link rel="apple-touch-icon" href="assets/logo.png" />
+
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,400&family=Inter:wght@400;450;500;600&display=swap" rel="stylesheet" />
+
+<link rel="stylesheet" href="assets/style.css" />
+<link rel="canonical" href="https://kinrows.com/developers.html" />
+<meta property="og:title" content="Developer API — Kinrows" />
+<meta property="og:description" content="Bring your own agent. Mint an API key and let it run your household in Kinrows — REST or MCP." />
+<meta property="og:type" content="website" />
+<meta property="og:url" content="https://kinrows.com/developers.html" />
+<meta property="og:image" content="https://kinrows.com/assets/og-image.jpg" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:image" content="https://kinrows.com/assets/og-image.jpg" />
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    { "@type": "ListItem", "position": 1, "name": "Home", "item": "https://kinrows.com/" },
+    { "@type": "ListItem", "position": 2, "name": "Developer API", "item": "https://kinrows.com/developers.html" }
+  ]
+}
+</script>
+<style>
+  .legal-prose pre{
+    background:#2b211b;color:#f6ead2;border-radius:14px;padding:16px 18px;overflow-x:auto;
+    font:450 .84rem/1.55 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;margin:14px 0 22px;
+  }
+  .legal-prose code{
+    font:500 .86em ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    background:rgba(120,90,60,.10);padding:.1em .38em;border-radius:6px;
+  }
+  .legal-prose pre code{background:none;padding:0;font-size:inherit}
+  .legal-prose table{width:100%;border-collapse:collapse;margin:12px 0 24px;font-size:.92rem}
+  .legal-prose th,.legal-prose td{text-align:left;padding:9px 10px;border-bottom:1px solid rgba(120,90,60,.16);vertical-align:top}
+  .legal-prose th{font-weight:600;font-size:.8rem;letter-spacing:.02em;text-transform:uppercase;opacity:.75}
+  .tbl-wrap{overflow-x:auto}
+</style>
+<script>window.permagentCollectUrl='/api/permagent-analytics/collect';</script>
+<script src="/analytics.js" defer></script>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
+    <symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></symbol>
+  </defs>
+</svg>
+
+<!-- ───────────────────────────── Nav ───────────────────────────── -->
+<header class="nav" id="nav">
+  <div class="nav-inner">
+    <a class="brand" href="index.html#top" aria-label="Kinrows home">
+      <span class="brand-name">Kinrows</span>
+    </a>
+    <nav class="nav-links" id="primary-nav" aria-label="Primary">
+      <a href="index.html#plan">The app</a>
+      <a href="index.html#everything">Everything inside</a>
+      <a href="compare.html">Compare</a>
+      <a href="blog/">Blog</a>
+      <a href="index.html#assist">Concierge</a>
+    </nav>
+    <a href="index.html#notify" class="btn btn-pill">Join the waitlist</a>
+    <button class="nav-toggle" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="primary-nav">
+      <svg class="ic ic-menu" aria-hidden="true"><use href="#i-menu"/></svg>
+      <svg class="ic ic-close" aria-hidden="true"><use href="#i-close"/></svg>
+    </button>
+  </div>
+</header>
+
+<main id="top">
+
+  <section class="legal-hero">
+    <div class="legal-wrap">
+      <p class="eyebrow eyebrow-accent" style="--ac:var(--sage)">For developers</p>
+      <h1>Bring your own agent</h1>
+      <p class="muted">
+        Kinrows Concierge already runs the app for you. With the Developer API, <em>your</em> agent can too —
+        Claude, ChatGPT, Cursor, a cron'd script, anything that can call an HTTP tool. Same actions,
+        same household-level privacy, your model.
+      </p>
+      <div class="legal-meta">
+        <span>Requires: an active Concierge subscription (Lite or Premium)</span>
+        <span>Protocols: REST &amp; MCP</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="legal-body">
+    <div class="legal-wrap">
+
+      <div class="legal-tldr">
+        <span class="tldr-kicker">The short version</span>
+        <h2>How it works</h2>
+        <ul>
+          <li>Open the app → <strong>Settings → Account → Developer API</strong> → <strong>Create key</strong>. Copy it — it is shown once.</li>
+          <li>Send it as <code>Authorization: Bearer kr_live_…</code> to the <code>/v1</code> endpoints below, or point any MCP-capable agent at <code>/v1/mcp</code>.</li>
+          <li>Your agent gets the <strong>exact same 100+ actions</strong> our Concierge uses — tasks, lists, calendar, budget, pantry, polls, trips, messages, baby sleep, and more.</li>
+          <li>A key only ever acts on <strong>your</strong> household. Choose <strong>read-only</strong> if you just want your agent to see, not touch.</li>
+          <li>Revoke a key any time; lapsed subscriptions switch keys off instantly.</li>
+        </ul>
+      </div>
+
+      <nav class="legal-toc" aria-label="Sections">
+        <p>On this page</p>
+        <ol>
+          <li><a href="#keys">Getting a key</a></li>
+          <li><a href="#endpoints">Endpoints</a></li>
+          <li><a href="#tools">The tool catalog</a></li>
+          <li><a href="#mcp">Connect via MCP</a></li>
+          <li><a href="#rest">Connect via REST</a></li>
+          <li><a href="#limits">Limits &amp; errors</a></li>
+          <li><a href="#security">Security &amp; privacy</a></li>
+        </ol>
+      </nav>
+
+      <div class="legal-prose">
+
+        <section id="keys">
+          <h2><span class="h-num">1</span>Getting a key</h2>
+          <p>API keys are created in the iPhone app under <strong>Settings → Account → Developer API</strong>. You can hold up to ten active keys, each with a name and a scope:</p>
+          <ul>
+            <li><strong>Read &amp; write</strong> (default) — everything the Concierge can do.</li>
+            <li><strong>Read-only</strong> — listing and lookups only. Any call that would change data is refused with <code>403</code>.</li>
+          </ul>
+          <p>The full key is displayed exactly once. We store only a hash, so if you lose it, revoke it and create another.</p>
+        </section>
+
+        <section id="endpoints">
+          <h2><span class="h-num">2</span>Endpoints</h2>
+          <p>Base URL: <code>https://family-life-organizer-production.up.railway.app</code>. Every request needs <code>Authorization: Bearer &lt;your key&gt;</code>.</p>
+          <div class="tbl-wrap"><table>
+            <thead><tr><th>Method</th><th>Path</th><th>What it does</th></tr></thead>
+            <tbody>
+              <tr><td><code>GET</code></td><td><code>/v1/me</code></td><td>Who the key belongs to: user, household, scope, tier, today's date.</td></tr>
+              <tr><td><code>GET</code></td><td><code>/v1/snapshot</code></td><td>A digest of the household right now (today's tasks and appointments, open polls, expiring pantry items, budget, live trips…). Ideal context to hand your model before it acts.</td></tr>
+              <tr><td><code>GET</code></td><td><code>/v1/tools</code></td><td>The tool catalog as JSON-schema definitions. Anthropic shape by default; add <code>?format=openai</code> for OpenAI function-calling shape.</td></tr>
+              <tr><td><code>POST</code></td><td><code>/v1/tools/{name}</code></td><td>Call one tool. The body is the tool's input, e.g. <code>{"action":"add","title":"Book dentist"}</code>.</td></tr>
+              <tr><td><code>POST</code></td><td><code>/v1/mcp</code></td><td>A Model Context Protocol server (Streamable HTTP). Supports <code>initialize</code>, <code>tools/list</code>, <code>tools/call</code>, <code>ping</code>.</td></tr>
+            </tbody>
+          </table></div>
+        </section>
+
+        <section id="tools">
+          <h2><span class="h-num">3</span>The tool catalog</h2>
+          <p>Tools are grouped by area of the app, and each takes an <code>action</code>:</p>
+          <div class="tbl-wrap"><table>
+            <thead><tr><th>Tool</th><th>Actions</th></tr></thead>
+            <tbody>
+              <tr><td><code>calendar</code></td><td>list · add · update · delete</td></tr>
+              <tr><td><code>tasks</code></td><td>list · add · complete · update · delete</td></tr>
+              <tr><td><code>lists</code></td><td>list_all · get · add · check_off · create · rename · delete · update_item · delete_item · move_item</td></tr>
+              <tr><td><code>budget</code></td><td>get · list_expenses · log_expense · delete_expense · add/update/delete_category</td></tr>
+              <tr><td><code>pantry</code></td><td>list · add · update · delete</td></tr>
+              <tr><td><code>decisions</code></td><td>list · create · vote · comment · delete</td></tr>
+              <tr><td><code>trips</code> / <code>itineraries</code></td><td>live ETA trips; multi-day itineraries with stays and expenses</td></tr>
+              <tr><td><code>routines</code></td><td>list · get · log_sleep · start_sleep · end_sleep · stats · analyze · log_entry</td></tr>
+              <tr><td><code>people</code>, <code>gifts</code>, <code>special_events</code>, <code>coverage</code>, <code>notes</code>, <code>contacts</code>, <code>rivalries</code>, <code>projects</code>, <code>recurring_payments</code>, <code>feed</code></td><td>the rest of the app</td></tr>
+              <tr><td><code>send_message</code>, <code>remember</code>, <code>get_addresses</code>, <code>update_my_name</code></td><td>standalone tools</td></tr>
+            </tbody>
+          </table></div>
+          <p>Don't memorise this — fetch <code>/v1/tools</code> and hand the result to your model as its <code>tools</code>. Every parameter and its description is in the schema, and the catalog is generated from the same source our own Concierge runs on, so it never drifts.</p>
+        </section>
+
+        <section id="mcp">
+          <h2><span class="h-num">4</span>Connect via MCP</h2>
+          <p>If your agent host speaks MCP (Claude Desktop, Claude Code, Cursor, ChatGPT connectors and many others), this is the one-line setup:</p>
+<pre><code>{
+  "mcpServers": {
+    "kinrows": {
+      "url": "https://family-life-organizer-production.up.railway.app/v1/mcp",
+      "headers": { "Authorization": "Bearer kr_live_…" }
+    }
+  }
+}</code></pre>
+          <p>The server is stateless — no session IDs to manage — and your model will see every Kinrows tool immediately.</p>
+        </section>
+
+        <section id="rest">
+          <h2><span class="h-num">5</span>Connect via REST</h2>
+          <p>Any language, any model. Sanity-check the key:</p>
+<pre><code>curl https://family-life-organizer-production.up.railway.app/v1/me \
+  -H "Authorization: Bearer $KINROWS_KEY"</code></pre>
+          <p>Add a task and log an expense:</p>
+<pre><code>curl https://family-life-organizer-production.up.railway.app/v1/tools/tasks \
+  -H "Authorization: Bearer $KINROWS_KEY" -H "Content-Type: application/json" \
+  -d '{"action":"add","title":"Book dentist","due_date":"2026-09-02"}'
+
+curl https://family-life-organizer-production.up.railway.app/v1/tools/budget \
+  -H "Authorization: Bearer $KINROWS_KEY" -H "Content-Type: application/json" \
+  -d '{"action":"log_expense","amount":42.10,"merchant":"Costco","category":"Groceries"}'</code></pre>
+          <p>A minimal agent loop with the Anthropic SDK — fetch the catalog, let the model pick tools, execute them against <code>/v1/tools</code>, repeat:</p>
+<pre><code>const BASE = 'https://family-life-organizer-production.up.railway.app';
+const H = { Authorization: `Bearer ${process.env.KINROWS_KEY}`, 'Content-Type': 'application/json' };
+const { tools } = await (await fetch(`${BASE}/v1/tools`, { headers: H })).json();
+
+let messages = [{ role: 'user', content: 'Move the dentist task to Friday and add milk to Groceries.' }];
+for (;;) {
+  const r = await anthropic.messages.create({ model: 'claude-sonnet-5', max_tokens: 1024, tools, messages });
+  messages.push({ role: 'assistant', content: r.content });
+  if (r.stop_reason !== 'tool_use') break;
+  const results = [];
+  for (const b of r.content.filter(c =&gt; c.type === 'tool_use')) {
+    const out = await (await fetch(`${BASE}/v1/tools/${b.name}`, { method: 'POST', headers: H, body: JSON.stringify(b.input) })).json();
+    results.push({ type: 'tool_result', tool_use_id: b.id, content: JSON.stringify(out) });
+  }
+  messages.push({ role: 'user', content: results });
+}</code></pre>
+        </section>
+
+        <section id="limits">
+          <h2><span class="h-num">6</span>Limits &amp; errors</h2>
+          <ul>
+            <li><strong>120 requests per minute per key.</strong> Over that you get <code>429</code>.</li>
+            <li><strong>10 active keys per user.</strong></li>
+            <li><code>401</code> — missing, malformed, or revoked key. <code>402</code> — the household's Concierge subscription is not active. <code>403</code> — a read-only key tried to write. <code>400</code> — bad action or missing fields (the message tells you which).</li>
+            <li>Tool-level problems ("no list named Costco") come back as <code>400 {"error": "…"}</code> so your model can recover and try again.</li>
+          </ul>
+        </section>
+
+        <section id="security">
+          <h2><span class="h-num">7</span>Security &amp; privacy</h2>
+          <ul>
+            <li>A key is bound to one person and one household. It cannot see or touch any other household — the same database-level isolation that protects every Kinrows family applies to every API call.</li>
+            <li>Keys are 256-bit random values, stored only as a hash. Revoke from the app at any time; it takes effect immediately.</li>
+            <li>A key can never log in, change your password or email, or delete your account. Those stay behind sign-in and two-factor in the app.</li>
+            <li>Whatever your agent does with your data happens on <em>your</em> model and <em>your</em> provider under <em>your</em> terms. Kinrows still never sells data or uses it to train AI.</li>
+            <li>Treat the key like a password. Anyone holding it can act as you inside your household.</li>
+          </ul>
+          <p>Questions or ideas for the API? <a href="mailto:kinrows@atlasatlantic.co">kinrows@atlasatlantic.co</a>.</p>
+        </section>
+
+        <div class="legal-footer-links">
+          <a href="privacy.html">Privacy Policy</a>
+          <span class="lfl-spacer"></span>
+          <a href="terms.html">Terms of Use</a>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+</main>
+
+<!-- ───────────────────────────── Footer ───────────────────────────── -->
+<footer class="footer">
+  <div class="container footer-inner">
+    <div class="footer-brand">
+      <a class="brand" href="index.html#top">
+        <img class="brand-logo" src="assets/logo.png" alt="" width="26" height="26" />
+        <span class="brand-name">Kinrows</span>
+      </a>
+      <p class="footer-tag">One calm place for the whole household.</p>
+    </div>
+    <nav class="footer-cols" aria-label="Footer">
+      <div><p class="fc-head">App</p><a href="index.html#plan">The app</a><a href="index.html#everything">Everything inside</a><a href="index.html#assist">Concierge</a></div>
+      <div><p class="fc-head">Explore</p><a href="compare.html">Compare</a><a href="blog/">Blog</a><a href="developers.html">Developers</a></div>
+      <div><p class="fc-head">Company</p><a href="index.html#notify">Join the waitlist</a><a href="mailto:kinrows@atlasatlantic.co">Contact</a></div>
+      <div><p class="fc-head">Legal</p><a href="privacy.html">Privacy Policy</a><a href="terms.html">Terms of Use</a></div>
+    </nav>
+  </div>
+  <div class="container footer-bottom">
+    <span>© 2026 Atlas Atlantic. Made for families.</span>
+    <span>iPhone · iOS 18+ · September 2026</span>
+  </div>
+</footer>
+
+<script src="assets/app.js"></script>
+</body>
+</html>

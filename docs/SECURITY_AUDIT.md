@@ -3,6 +3,19 @@
 Date: 2026-06-25. Scope: full-codebase review (auth, authz/isolation, AI/concierge,
 payments, email, DB, deploy, iOS) followed by remediation of P0/P1 findings.
 
+## 2026-08-24 — Developer API (bring-your-own-agent)
+
+New bearer-key surface (`/v1/*`, `services/developerApi.js`, full reference in `docs/DEVELOPER_API.md`):
+
+- Keys: `kr_live_` + 256-bit random; SHA-256 at rest (`api_keys.key_hash`), plaintext shown once; `ON DELETE CASCADE` with the user. 10 active per user.
+- Minting (`POST /api/developer/keys`) is `requireAuth + requirePremium`; revoke is session-auth only (lapsed subscribers can still clean up).
+- `requireApiKey` re-checks the household subscription on **every** `/v1` request (402 on lapse, 401 on revoke) — no entitlement caching on this path.
+- Every tool call is built with the key owner's `userId`/`groupId` and goes through `conciergeTools.run`, so the existing per-handler household guards apply unchanged. Cross-household test in `test/developer-api.test.js`.
+- `read` scope enforced server-side via `conciergeTools.isReadOnly` (handler-name allowlist `get_/list_/analyze_`; unknown ⇒ write ⇒ refused).
+- `/v1` never reads the cookie session; account/password/email/delete routes are unreachable with a key.
+- Rate limit 120/min keyed on a hash of the bearer (bad keys can't pollute a real key's bucket).
+- Residual: keys have no expiry and no IP allow-list (documented as "treat like a password"); consider optional expiry if abuse appears.
+
 ## 2026-07-20 — stability & isolation sweep
 
 A second multi-surface review (backend, concierge tools, iOS) with remediation:

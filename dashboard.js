@@ -15,6 +15,7 @@ const { buildSnapshot } = require('./services/conciergeContext');
 const { generateBrief } = require('./services/conciergeBrief');
 const { handleChat, handleChatStream } = require('./services/conciergeChat');
 const subscription = require('./services/subscription');
+const developerApi = require('./services/developerApi');
 const { runProactiveSweep } = require('./services/conciergeNudge');
 const { announceRivalryCompletion } = require('./services/rivalryAnnounce');
 const { createRateLimiter } = require('./services/rateLimit');
@@ -336,6 +337,8 @@ app.get('/privacy', serveWebsiteHtml('privacy.html'));
 app.get('/privacy.html', serveWebsiteHtml('privacy.html'));
 app.get('/terms', serveWebsiteHtml('terms.html'));
 app.get('/terms.html', serveWebsiteHtml('terms.html'));
+app.get('/developers', serveWebsiteHtml('developers.html'));
+app.get('/developers.html', serveWebsiteHtml('developers.html'));
 app.get('/compare', serveWebsiteHtml('compare.html'));
 app.get('/compare.html', serveWebsiteHtml('compare.html'));
 app.get('/best-chore-app-for-families', serveWebsiteHtml('best-chore-app-for-families.html'));
@@ -3608,6 +3611,130 @@ app.get('/api/subscription/status', requireAuth, async (req, res) => {
     db.close();
   }
 });
+
+// ============================================
+// Developer API — bring-your-own-agent (premium)
+// ============================================
+// Key management uses the normal session auth + premium gate. The `/v1/*`
+// surface below authenticates with the minted key instead. See
+// docs/DEVELOPER_API.md and services/developerApi.js.
+
+app.get('/api/developer/keys', requireAuth, requirePremium, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    res.json({ keys: await developerApi.listKeys(db, req.session.user.id) });
+  } catch (err) { sendServerError(res, err); }
+  finally { db.close(); }
+});
+
+app.post('/api/developer/keys', requireAuth, requirePremium, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const { name, scope } = req.body || {};
+    if (scope !== undefined && scope !== 'read' && scope !== 'write') {
+      return res.status(400).json({ error: "scope must be 'read' or 'write'" });
+    }
+    const created = await developerApi.createKey(db, req.session.user.id, { name, scope });
+    res.status(201).json(created);
+  } catch (err) {
+    if (err.status) return res.status(err.status).json({ error: err.message });
+    sendServerError(res, err);
+  } finally { db.close(); }
+});
+
+app.delete('/api/developer/keys/:id', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (!Number.isInteger(id)) return res.status(400).json({ error: 'Invalid key id' });
+    // Deliberately NOT premium-gated: a lapsed subscriber must still be able to
+    // revoke keys they minted.
+    const ok = await developerApi.revokeKey(db, req.session.user.id, id);
+    if (!ok) return res.status(404).json({ error: 'Key not found' });
+    res.json({ success: true });
+  } catch (err) { sendServerError(res, err); }
+  finally { db.close(); }
+});
+
+// Bearer-key auth for /v1. Opens a DB handle for the request (req.devDb) and
+// closes it when the response finishes, so handlers share one connection.
+async function requireApiKey(req, res, next) {
+  const db = new FamilyDB();
+  let closed = false;
+  const close = () => { if (!closed) { closed = true; db.close(); } };
+  res.on('finish', close);
+  res.on('close', close);
+  try {
+    req.apiKeyAuth = await developerApi.authenticateKey(db, req.get('authorization'));
+    req.devDb = db;
+    next();
+  } catch (err) {
+    if (err.status) {
+      res.set('WWW-Authenticate', 'Bearer realm="kinrows"');
+      return res.status(err.status).json({ error: err.message });
+    }
+    sendServerError(res, err);
+  }
+}
+
+// Per-key limiter keyed on the hashed bearer (so a bad key can't be used to
+// pollute another key's bucket) — falls back to IP for unauthenticated hits.
+const developerLimiter = createRateLimiter({
+  windowMs: 60000, max: 120,
+  keyFn: req => {
+    const m = /^Bearer\s+(\S+)$/i.exec(req.get('authorization') || '');
+    return m ? `key:${crypto.createHash('sha256').update(m[1]).digest('hex').slice(0, 16)}` : `ip:${clientIp(req)}`;
+  },
+});
+
+app.use('/v1', developerLimiter, requireApiKey);
+
+app.get('/v1/me', async (req, res) => {
+  try { res.json(await developerApi.whoami(req.devDb, req.apiKeyAuth)); }
+  catch (err) { sendServerError(res, err); }
+});
+
+// Household snapshot (same digest the Concierge daily brief is built from).
+app.get('/v1/snapshot', async (req, res) => {
+  try { res.json(await developerApi.snapshot(req.devDb, req.apiKeyAuth)); }
+  catch (err) { sendServerError(res, err); }
+});
+
+// Tool catalog. ?format=openai returns OpenAI function-calling shape.
+app.get('/v1/tools', (req, res) => {
+  res.json({ tools: developerApi.catalog(req.query.format === 'openai' ? 'openai' : 'anthropic') });
+});
+
+app.post('/v1/tools/:name', async (req, res) => {
+  try {
+    const out = await developerApi.callTool(req.devDb, req.apiKeyAuth, req.params.name, req.body);
+    if (out.forbidden) return res.status(403).json({ error: out.result.error });
+    const payload = out?.result ?? out;
+    if (payload && typeof payload === 'object' && payload.error) return res.status(400).json(payload);
+    res.json({ result: payload });
+  } catch (err) { sendServerError(res, err); }
+});
+
+// MCP Streamable HTTP endpoint (stateless). Accepts a single JSON-RPC message
+// or a batch; notifications get 202 with no body.
+app.post('/v1/mcp', async (req, res) => {
+  try {
+    const body = req.body;
+    const batch = Array.isArray(body);
+    const msgs = batch ? body : [body];
+    const replies = [];
+    for (const m of msgs) {
+      const r = await developerApi.handleMcp(req.devDb, req.apiKeyAuth, m);
+      if (r) replies.push(r);
+    }
+    if (!replies.length) return res.status(202).end();
+    res.json(batch ? replies : replies[0]);
+  } catch (err) { sendServerError(res, err); }
+});
+app.get('/v1/mcp', (req, res) => res.status(405).json({ error: 'This MCP server is stateless; use POST.' }));
+app.delete('/v1/mcp', (req, res) => res.status(204).end());
+
+app.use('/v1', (req, res) => res.status(404).json({ error: 'Not found' }));
 
 // Concierge - conversational chat with tool-calling (premium)
 app.post('/api/concierge/chat', requireAuth, conciergeLimiter, conciergeChatDailyLimiter, requirePremium, async (req, res) => {

@@ -955,3 +955,21 @@ CREATE TABLE IF NOT EXISTS permagent_analytics_events (
 CREATE INDEX IF NOT EXISTS idx_permagent_analytics_id ON permagent_analytics_events(id);
 CREATE INDEX IF NOT EXISTS idx_permagent_analytics_created ON permagent_analytics_events(created_at);
 CREATE INDEX IF NOT EXISTS idx_permagent_analytics_bot_date ON permagent_analytics_events(is_bot, created_at);
+
+-- Developer API keys (paid households). Lets a user plug their own agent into
+-- Kinrows: the key drives the same tool surface the Concierge uses. Only the
+-- SHA-256 hash is stored; the plaintext is shown once at creation. Scope is
+-- 'read' (list/get actions only) or 'write' (everything the Concierge can do).
+CREATE TABLE IF NOT EXISTS api_keys (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    name TEXT NOT NULL,
+    key_hash TEXT NOT NULL UNIQUE,
+    key_prefix TEXT NOT NULL,
+    scope TEXT NOT NULL DEFAULT 'write' CHECK (scope IN ('read', 'write')),
+    revoked INTEGER DEFAULT 0,
+    last_used_at DATETIME,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_api_keys_user ON api_keys(user_id);

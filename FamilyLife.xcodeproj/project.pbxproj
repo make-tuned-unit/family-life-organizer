@@ -122,6 +122,7 @@
 		AA000200 /* ChangePasswordView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000200 /* ChangePasswordView.swift */; };
 		AA000201 /* TwoFactorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000201 /* TwoFactorView.swift */; };
 		AA000202 /* SecurityView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000202 /* SecurityView.swift */; };
+		AA00021B /* DeveloperAPIView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00021B /* DeveloperAPIView.swift */; };
 		AA000210 /* Person.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000210 /* Person.swift */; };
 		AA000211 /* PeopleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000211 /* PeopleView.swift */; };
 		AA000212 /* PersonDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000212 /* PersonDetailView.swift */; };
@@ -251,6 +252,7 @@
 		BB000200 /* ChangePasswordView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChangePasswordView.swift; sourceTree = "<group>"; };
 		BB000201 /* TwoFactorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TwoFactorView.swift; sourceTree = "<group>"; };
 		BB000202 /* SecurityView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecurityView.swift; sourceTree = "<group>"; };
+		BB00021B /* DeveloperAPIView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeveloperAPIView.swift; sourceTree = "<group>"; };
 		BB000210 /* Person.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Person.swift; sourceTree = "<group>"; };
 		BB000211 /* PeopleView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PeopleView.swift; sourceTree = "<group>"; };
 		BB000212 /* PersonDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersonDetailView.swift; sourceTree = "<group>"; };
@@ -401,6 +403,7 @@
 				BB000098 /* NotesView.swift */,
 				BB000200 /* ChangePasswordView.swift */,
 				BB000202 /* SecurityView.swift */,
+				BB00021B /* DeveloperAPIView.swift */,
 				BB000051 /* HouseholdView.swift */,
 				BB000054 /* NewPostView.swift */,
 				BB000055 /* FeedCardView.swift */,
@@ -810,6 +813,7 @@
 				AA000098 /* NotesView.swift in Sources */,
 				AA000200 /* ChangePasswordView.swift in Sources */,
 				AA000202 /* SecurityView.swift in Sources */,
+				AA00021B /* DeveloperAPIView.swift in Sources */,
 				AA000210 /* Person.swift in Sources */,
 				AA000211 /* PeopleView.swift in Sources */,
 				AA000212 /* PersonDetailView.swift in Sources */,

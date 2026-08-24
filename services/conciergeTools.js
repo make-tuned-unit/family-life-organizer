@@ -2916,4 +2916,15 @@ async function run(name, ctx, input) {
   }
 }
 
-module.exports = { definitions, run, TOOLS };
+// Read-only classification for the developer API's `read` scope. A call is
+// read-only when it resolves to a handler whose name starts with get_/list_
+// (plus the analytical sleep helpers, which only read). Unknown tools are
+// treated as writes so a scope check can never fail open.
+const READ_HANDLER_RE = /^(get_|list_|analyze_)/;
+function isReadOnly(name, input) {
+  const group = GROUP_TOOLS.get(name);
+  const handler = group ? group._actions[input?.action] : (BY_NAME.has(name) ? name : null);
+  return !!handler && READ_HANDLER_RE.test(handler);
+}
+
+module.exports = { definitions, run, isReadOnly, TOOLS };

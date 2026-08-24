@@ -97,6 +97,12 @@
     <priority>0.6</priority>
   </url>
   <url>
+    <loc>https://kinrows.com/developers.html</loc>
+    <lastmod>2026-08-24</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
     <loc>https://kinrows.com/privacy.html</loc>
     <lastmod>2026-07-11</lastmod>
     <changefreq>yearly</changefreq>
