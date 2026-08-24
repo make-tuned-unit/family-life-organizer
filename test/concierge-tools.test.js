@@ -152,6 +152,22 @@ test('key dates: a named person is resolved onto their People card', async () =>
   const row = await get('SELECT person_id FROM special_events WHERE id = ?', [added.result.id]);
   assert.equal(row.person_id, person.result.id, 'the date appears in Rowan\'s People key dates');
 
+  // No person_name, but the title leads with a household person's name →
+  // attach it so it shows up on their People card, not just in the feed.
+  const inferred = await tools.run('special_events', ctx, {
+    action: 'add', title: 'Rowan violin anniversary', date: '2026-09-01',
+  });
+  assert.equal(inferred.result.ok, true, JSON.stringify(inferred.result));
+  assert.equal(inferred.action.person_id, person.result.id, 'inferred from the title');
+  assert.match(inferred.action.summary, /for Rowan/);
+
+  // A genuinely household-wide date stays unattached.
+  const shared = await tools.run('special_events', ctx, {
+    action: 'add', title: 'Dating anniversary', date: '2026-08-28',
+  });
+  assert.equal(shared.result.ok, true);
+  assert.equal((await get('SELECT person_id FROM special_events WHERE id = ?', [shared.result.id])).person_id, null);
+
   const missing = await tools.run('add_special_event', ctx, {
     title: 'Mystery date', date: '2026-12-15', person_name: 'Not In Household',
   });

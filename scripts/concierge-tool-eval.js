@@ -48,6 +48,7 @@ const CASES = [
   { say: 'is Jude getting enough sleep?', tool: 'routines', actions: ['stats', 'analyze', 'list'] },
   { say: 'my period started today', tool: 'routines', actions: ['log_entry', 'list'] },
   { say: "add Grandma's birthday on July 20th as a key date", tool: 'special_events', actions: ['add'] },
+  { say: 'add a key date: Rowan violin anniversary, September 1st', tool: 'special_events', actions: ['add'] },
   { say: 'start a step-count competition between me and Sophie', tool: 'rivalries', actions: ['create'] },
   { say: 'post to the family feed that soccer practice is cancelled', tool: 'feed', actions: ['post'] },
   { say: 'track our Netflix subscription at $17 a month', tool: 'recurring_payments', actions: ['add'] },

@@ -4942,6 +4942,17 @@ app.put('/api/gifts/events/:id', requireAuth, async (req, res) => {
     if (data.date) data.date = normalizeDate(data.date);
     delete data.group_id;
     delete data.created_by;
+    // Re-homing a date onto a person (or detaching it with null) is allowed,
+    // but the person must be one of OURS — otherwise a key date could be hung
+    // off another household's People card.
+    if ('person_id' in data && data.person_id != null) {
+      const pid = parseInt(data.person_id, 10);
+      const person = Number.isInteger(pid)
+        ? await dbGet(db, 'SELECT id FROM gift_people WHERE id = ? AND group_id = ?', [pid, row.group_id])
+        : null;
+      if (!person) return res.status(403).json({ error: 'That person is not in this household' });
+      data.person_id = pid;
+    }
     if ('shared_scope' in data) {
       // Only two values are meaningful, and only the owner may choose — the same
       // rule milestones follow, so the two features can't drift.

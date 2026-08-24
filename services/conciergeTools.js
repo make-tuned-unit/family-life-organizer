@@ -2042,6 +2042,20 @@ const TOOLS = [
       requireDate(input.date, 'date');
       let personId = input.person_id ?? null;
       let personName = null;
+      // The model sometimes folds the person into the title ("Rowan violin
+      // anniversary") and omits person_name. A date like that used to land
+      // with person_id NULL — visible in the feed but under nobody in People.
+      // If the title's first word is exactly one household person's name,
+      // treat it as that person's date.
+      if (!input.person_name && personId == null && input.title) {
+        await ctx.db.ensureHouseholdUserPeople(ctx.groupId);
+        const firstWord = String(input.title).trim().split(/[\s'’]+/)[0]?.toLocaleLowerCase();
+        if (firstWord) {
+          const hits = (await ctx.db.getPeople(ctx.groupId))
+            .filter(p => String(p.name).trim().split(/\s+/)[0].toLocaleLowerCase() === firstWord);
+          if (hits.length === 1) input = { ...input, person_name: hits[0].name };
+        }
+      }
       if (input.person_name) {
         await ctx.db.ensureHouseholdUserPeople(ctx.groupId);
         const wanted = String(input.person_name).trim().toLocaleLowerCase();

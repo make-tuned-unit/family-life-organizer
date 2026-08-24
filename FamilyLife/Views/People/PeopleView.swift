@@ -7,8 +7,10 @@ struct PeopleView: View {
     @Environment(APIService.self) private var api
 
     @State private var people: [PersonResponse] = []
+    @State private var householdDates: [SpecialEventResponse] = []
     @State private var isLoading = true
     @State private var showingAddPerson = false
+    @State private var assigningDate: SpecialEventResponse?
 
     var body: some View {
         ScrollView(showsIndicators: false) {
@@ -27,6 +29,10 @@ struct PeopleView: View {
                         }
                         .buttonStyle(.flCardPress)
                     }
+                }
+
+                if !householdDates.isEmpty {
+                    householdDatesCard
                 }
 
                 NavigationLink { YearRecapView() } label: {
@@ -70,10 +76,65 @@ struct PeopleView: View {
         .sheet(isPresented: $showingAddPerson) {
             AddPersonSheet { await load() }
         }
+        .sheet(item: $assigningDate) { ev in
+            AssignKeyDateSheet(event: ev, people: people) { await load() }
+        }
         .task { await load() }
         .onReceive(NotificationCenter.default.publisher(for: APIService.conciergeDataDidChange)) { _ in
             Task { await load() }
         }
+    }
+
+    /// Key dates with no person attached (e.g. "Dating anniversary", or one the
+    /// Concierge added without linking anyone). Without this section they only
+    /// ever appear in the feed and look lost. Tap one to hang it on a person.
+    private var householdDatesCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                Image(systemName: "calendar")
+                    .font(.system(size: 14))
+                    .foregroundStyle(AccentTheme.saffron.color)
+                Text("Household dates")
+                    .font(.flSubheadline.weight(.semibold))
+                    .foregroundStyle(WarmPalette.ink1)
+                Spacer()
+                Text("\(householdDates.count)")
+                    .font(.flOverline)
+                    .foregroundStyle(WarmPalette.ink3)
+            }
+            Text("Shared dates not tied to anyone. Tap to attach one to a person.")
+                .font(.flCaption)
+                .foregroundStyle(WarmPalette.ink3)
+            ForEach(householdDates) { ev in
+                Button { assigningDate = ev } label: {
+                    HStack(spacing: 10) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(ev.title)
+                                .font(.flBody)
+                                .foregroundStyle(WarmPalette.ink1)
+                            Text(keyDateLabel(ev))
+                                .font(.flCaption)
+                                .foregroundStyle(WarmPalette.ink3)
+                        }
+                        Spacer()
+                        Image(systemName: "person.crop.circle.badge.plus")
+                            .font(.system(size: 15))
+                            .foregroundStyle(WarmPalette.ink3)
+                    }
+                    .padding(.vertical, 4)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(14)
+        .flCard()
+    }
+
+    private func keyDateLabel(_ ev: SpecialEventResponse) -> String {
+        let recurring = (ev.is_recurring ?? 1) == 1
+        guard let date = ISO8601DateFormatter.flexible.date(from: ev.date) else { return ev.date }
+        let fmt: Date.FormatStyle = recurring ? .dateTime.month(.abbreviated).day() : .dateTime.month(.abbreviated).day().year()
+        return (recurring ? "Every " : "") + date.formatted(fmt)
     }
 
     private var emptyState: some View {
@@ -140,11 +201,15 @@ struct PeopleView: View {
     }
 
     private func load() async {
+        async let dates = api.fetchSpecialEvents()
         do {
             people = try await api.fetchPeople()
         } catch {
             // Non-fatal: keep whatever we had; the empty state covers first load.
         }
+        householdDates = ((try? await dates) ?? [])
+            .filter { $0.person_id == nil }
+            .sorted { $0.date < $1.date }
         isLoading = false
     }
 }
@@ -364,4 +429,86 @@ struct YearRecapView: View {
 #Preview {
     NavigationStack { PeopleView() }
         .environment(APIService())
+}
+
+
+/// Attach a household-wide key date to a person so it shows on their card.
+struct AssignKeyDateSheet: View {
+    @Environment(APIService.self) private var api
+    @Environment(\.dismiss) private var dismiss
+
+    let event: SpecialEventResponse
+    let people: [PersonResponse]
+    let onSaved: () async -> Void
+
+    @State private var selected: Int?
+    @State private var isSaving = false
+    @State private var error: String?
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    Text(event.title).font(.flHeadline)
+                } header: {
+                    Text("Key date")
+                } footer: {
+                    Text("Pick whose date this is. It will move from Household dates onto their People card and reminders will mention them.")
+                }
+                Section("Who is it for?") {
+                    ForEach(people) { person in
+                        Button {
+                            selected = person.id
+                        } label: {
+                            HStack {
+                                FamilyAvatar(initial: String(person.name.prefix(1)), size: 28, name: person.name)
+                                Text(person.name).foregroundStyle(WarmPalette.ink1)
+                                Spacer()
+                                if selected == person.id {
+                                    Image(systemName: "checkmark").foregroundStyle(AccentTheme.sage.color)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            .scrollContentBackground(.hidden)
+            .background { AmbientBackground(style: .gifts) }
+            .navigationTitle("Attach to person")
+            .navigationBarTitleDisplayMode(.inline)
+            .inlineError(error) { error = nil }
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Attach") { save() }.disabled(selected == nil || isSaving)
+                }
+            }
+        }
+    }
+
+    private func save() {
+        guard let selected else { return }
+        isSaving = true
+        Task {
+            defer { isSaving = false }
+            do {
+                try await api.updateSpecialEvent(id: event.id, data: ["person_id": selected])
+                await onSaved()
+                dismiss()
+            } catch {
+                self.error = error.localizedDescription
+            }
+        }
+    }
+}
+
+#Preview("Assign key date") {
+    AssignKeyDateSheet(
+        event: SpecialEventResponse(id: 1, person_id: nil, title: "Rowan violin anniversary", date: "2026-09-01",
+                                    is_recurring: 1, event_type: "custom", notes: nil, shared_scope: nil, created_by: nil, created_at: nil),
+        people: [PersonResponse(id: 1, name: "Rowan", relationship: "son", birthday: nil, anniversary: nil, notes: nil,
+                                user_id: nil, is_dependent: 1, avatar_color: nil, created_at: nil,
+                                gift_idea_count: 0, milestone_count: 0, decision_count: 0, key_date_count: 0)]
+    ) {}
+    .environment(APIService())
 }

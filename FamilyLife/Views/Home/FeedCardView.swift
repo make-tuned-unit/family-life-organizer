@@ -10,7 +10,7 @@ struct FeedCard: View {
     var onRoutineTap: ((Int) -> Void)?
     var onMilestoneTap: ((Int) -> Void)?
     var onDecisionTap: ((Int) -> Void)?
-    var onKeyDateTap: ((Int) -> Void)?
+    var onKeyDateTap: ((Int?) -> Void)?
 
     @Environment(APIService.self) private var api
     @Environment(AuthService.self) private var auth
@@ -527,7 +527,9 @@ struct FeedCard: View {
         case "event": onEventTap?(item.ref_id)
         case "rivalry": onRivalryTap?(item.ref_id)
         case "coverage": onCoverageTap?()
-        case "key_date": onKeyDateTap?(item.ref_id)
+        // A key date belongs to a PERSON (target_id), not to itself — ref_id is
+        // the event row. nil means a household-wide date with no People card.
+        case "key_date": onKeyDateTap?(item.target_id)
         case "post":
             // A post that stands for something else (a milestone, a shared
             // routine, an event) opens that thing; a plain post expands.

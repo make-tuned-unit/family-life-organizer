@@ -466,3 +466,26 @@ test('milestones: a private one is celebrated nowhere', async () => {
   assert.ok(!feedTitles.some(t => t.includes('A private moment')), 'no feed post for a private milestone');
   assert.ok(feedTitles.some(t => t.includes('First steps')), 'a shared one does post');
 });
+
+test('key dates: a household-wide date can be attached to OUR person, never another household\'s', async () => {
+  const [jesse] = await member('kd_attach', 'Attach KD');
+  const [stranger] = await member('kd_stranger', 'Stranger KD'); // separate household
+  const rowan = await jesse('POST', '/api/people', { name: 'Rowan Attach' });
+  const theirs = await stranger('POST', '/api/people', { name: 'Their Kid' });
+
+  const created = await jesse('POST', '/api/gifts/events', { title: 'Rowan violin anniversary', date: '2026-09-01' });
+  const id = created.body.id;
+  assert.equal((await jesse('GET', '/api/gifts/events')).body.find(e => e.id === id).person_id, null, 'starts unattached');
+
+  // Cross-household person id is refused and nothing changes.
+  const bad = await jesse('PUT', `/api/gifts/events/${id}`, { person_id: theirs.body.id });
+  assert.equal(bad.status, 403);
+  assert.equal((await jesse('GET', '/api/gifts/events')).body.find(e => e.id === id).person_id, null);
+
+  // Our own person is fine, and the People card count reflects it.
+  const ok = await jesse('PUT', `/api/gifts/events/${id}`, { person_id: rowan.body.id });
+  assert.equal(ok.status, 200);
+  assert.equal((await jesse('GET', '/api/gifts/events')).body.find(e => e.id === id).person_id, rowan.body.id);
+  const card = (await jesse('GET', '/api/people')).body.find(p => p.id === rowan.body.id);
+  assert.equal(card.key_date_count, 1);
+});
