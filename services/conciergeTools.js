@@ -87,6 +87,94 @@ async function resolveSubjectBirthdate(ctx, routine) {
   return row?.date ? String(row.date).slice(0, 10) : null;
 }
 
+// ---- Chores helpers ----------------------------------------------------------
+
+function slug(title) {
+  const base = String(title || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 24);
+  return `${base || 'chore'}-${Math.random().toString(36).slice(2, 6)}`;
+}
+
+function newChore(c, today) {
+  const slots = (Array.isArray(c.slots) ? c.slots : []).filter(s => choresEngine.SLOT_ORDER.includes(s));
+  const days = Array.isArray(c.days) ? c.days.map(Number).filter(n => Number.isInteger(n) && n >= 0 && n <= 6) : null;
+  return {
+    id: slug(c.title), title: String(c.title).trim(), icon: choreIcon(c.title),
+    slots: slots.length ? slots : ['anytime'], days: days && days.length ? days : null,
+    active: true, started_on: today || null,
+  };
+}
+
+function choreIcon(title) {
+  const t = String(title || '').toLowerCase();
+  if (/dog|cat|pet|fish/.test(t)) return 'pawprint.fill';
+  if (/bed/.test(t)) return 'bed.double.fill';
+  if (/table|plate|dinner|meal|cook/.test(t)) return 'fork.knife';
+  if (/toy|tidy/.test(t)) return 'shippingbox.fill';
+  if (/laundry|clothes|sock/.test(t)) return 'tshirt.fill';
+  if (/plant|garden|lawn/.test(t)) return 'leaf.fill';
+  if (/dish/.test(t)) return 'dishwasher.fill';
+  if (/trash|bin|garbage|recycl/.test(t)) return 'trash.fill';
+  if (/teeth|brush/.test(t)) return 'mouth.fill';
+  if (/bag|school/.test(t)) return 'backpack.fill';
+  if (/sweep|vacuum|floor/.test(t)) return 'wind';
+  if (/wipe|clean/.test(t)) return 'sparkles';
+  return 'checkmark.circle.fill';
+}
+
+// A full config from a setup call. With `replace`, the chore list, allowance
+// and bonuses given override what was there; fields left out are kept.
+function buildChoreConfig(existing, input, { replace } = {}) {
+  const cfg = existing || choresEngine.parseConfig(null);
+  if (Array.isArray(input.chores)) {
+    const wanted = input.chores.filter(c => c?.title);
+    if (replace && existing) {
+      // Keep ids for chores that survive (so history stays attached); retire the rest.
+      const keep = cfg.chores.map(c => {
+        const still = wanted.find(w => String(w.title).trim().toLowerCase() === c.title.toLowerCase());
+        return still ? { ...c, active: true, slots: (still.slots && still.slots.length) ? still.slots : c.slots } : { ...c, active: false };
+      });
+      const added = wanted.filter(w => !cfg.chores.some(c => c.title.toLowerCase() === String(w.title).trim().toLowerCase())).map(w => newChore(w));
+      cfg.chores = [...keep, ...added];
+    } else {
+      cfg.chores = wanted.map(w => newChore(w));
+    }
+  }
+  if (input.weekly_allowance != null) cfg.allowance.weekly_amount = Math.max(0, Number(input.weekly_allowance) || 0);
+  if (Number.isInteger(input.payday) && input.payday >= 0 && input.payday <= 6) cfg.allowance.payday = input.payday;
+  if (Array.isArray(input.bonuses)) {
+    cfg.bonuses = input.bonuses.filter(b => b?.title && Number(b.amount) > 0)
+      .map(b => ({ id: slug(b.title), title: String(b.title).trim(), amount: Math.round(Number(b.amount) * 100) / 100, icon: 'star.fill' }));
+  }
+  return cfg;
+}
+
+// The one chores routine for a child in this household, by name — exact, then
+// first name, and only when unambiguous.
+async function findChoresRoutine(ctx, child) {
+  const rows = (await ctx.db.getRoutines(ctx.groupId, ctx.userId)).filter(r => r.routine_type === 'chores' && r.active !== 0);
+  const wanted = String(child || '').trim().toLowerCase();
+  if (!wanted) return null;
+  const first = (n) => String(n || '').trim().toLowerCase().split(/\s+/)[0];
+  let m = rows.filter(r => String(r.subject_name || '').trim().toLowerCase() === wanted);
+  if (!m.length) m = rows.filter(r => first(r.subject_name) === first(wanted));
+  return m.length === 1 ? m[0] : null;
+}
+
+async function requireChoresRoutine(ctx, input) {
+  let routine = null;
+  if (input.routine_id != null) {
+    await assertRoutineAccess(ctx, input.routine_id);
+    routine = await ctx.db.getRoutineById(input.routine_id);
+  } else if (input.child) {
+    routine = await findChoresRoutine(ctx, input.child);
+    if (!routine) throw new Error(`No chores routine found for "${input.child}" — use setup_chores to start one`);
+  } else {
+    throw new Error('routine_id or child is required');
+  }
+  if (routine.routine_type !== 'chores') throw new Error(`Routine #${routine.id} is not a chores routine`);
+  return routine;
+}
+
 // Guard for routines. Household membership is not enough: a routine is private
 // to its creator until shared, and the concierge must not become the back door
 // into a housemate's cycle tracker.
@@ -1165,23 +1253,22 @@ const TOOLS = [
   // ---- Chores (a `chores` routine per child) ----
   {
     name: 'log_chore',
-    description: "Mark a child's chore done (or undo it) for a day — 'Jude fed the dog', 'he did his morning chore', 'undo tonight's dog feeding'. Needs the chores routine id (list_routines) and the chore id from get_chores; slot is morning | afternoon | evening | anytime.",
+    description: "Mark a child's chore done (or undo it) for a day — 'Jude fed the dog', 'he did his morning chore', 'undo tonight's dog feeding'. Give routine_id (from list_routines) or just the child's name; chore_id is the id from get_chores or the chore's title; slot is morning | afternoon | evening | anytime.",
     write: true,
     input_schema: {
       type: 'object',
       properties: {
         routine_id: { type: 'number' },
+        child: { type: 'string', description: "The child's name, if routine_id is unknown" },
         chore_id: { type: 'string', description: 'From get_chores; matching the chore title works too' },
         slot: { type: 'string', description: 'morning | afternoon | evening | anytime — infer from the time of day if unsaid' },
         date: { type: 'string', description: 'YYYY-MM-DD, defaults to today' },
         done: { type: 'boolean', description: 'true to mark done (default), false to undo' },
       },
-      required: ['routine_id', 'chore_id'],
+      required: ['chore_id'],
     },
     async run(ctx, input) {
-      await assertRoutineAccess(ctx, input.routine_id);
-      const routine = await ctx.db.getRoutineById(input.routine_id);
-      if (routine.routine_type !== 'chores') throw new Error(`Routine #${input.routine_id} is not a chores routine`);
+      const routine = await requireChoresRoutine(ctx, input);
       const cfg = choresEngine.parseConfig(routine.config);
       const wanted = String(input.chore_id || '').toLowerCase();
       const chore = cfg.chores.find(c => c.id.toLowerCase() === wanted)
@@ -1207,11 +1294,9 @@ const TOOLS = [
     name: 'get_chores',
     description: "This week's chore picture for a child — each chore's id and which slots are done today, the streak, what's earned this week (allowance + bonuses), what's unpaid, and age-based guidance (when to add the next chore). Use for 'did Jude feed the dog', 'how are chores going', 'what does he get paid this week', 'is he ready for a second chore'.",
     write: false,
-    input_schema: { type: 'object', properties: { routine_id: { type: 'number' } }, required: ['routine_id'] },
+    input_schema: { type: 'object', properties: { routine_id: { type: 'number' }, child: { type: 'string', description: "The child's name, if routine_id is unknown" } } },
     async run(ctx, input) {
-      await assertRoutineAccess(ctx, input.routine_id);
-      const routine = await ctx.db.getRoutineById(input.routine_id);
-      if (routine.routine_type !== 'chores') throw new Error(`Routine #${input.routine_id} is not a chores routine`);
+      const routine = await requireChoresRoutine(ctx, input);
       const entries = await ctx.db.getRoutineEntries(routine.id, { limit: 1000 });
       const birthdate = await resolveSubjectBirthdate(ctx, routine);
       const s = choresEngine.compute(entries, routine.config, { today: ctx.today, birthdate });
@@ -1235,16 +1320,15 @@ const TOOLS = [
       type: 'object',
       properties: {
         routine_id: { type: 'number' },
+        child: { type: 'string', description: "The child's name, if routine_id is unknown" },
         bonus_id: { type: 'string', description: 'From get_chores; the bonus title works too' },
         date: { type: 'string', description: 'YYYY-MM-DD, defaults to today' },
         earned: { type: 'boolean', description: 'true (default) or false to undo' },
       },
-      required: ['routine_id', 'bonus_id'],
+      required: ['bonus_id'],
     },
     async run(ctx, input) {
-      await assertRoutineAccess(ctx, input.routine_id);
-      const routine = await ctx.db.getRoutineById(input.routine_id);
-      if (routine.routine_type !== 'chores') throw new Error(`Routine #${input.routine_id} is not a chores routine`);
+      const routine = await requireChoresRoutine(ctx, input);
       const cfg = choresEngine.parseConfig(routine.config);
       const wanted = String(input.bonus_id || '').toLowerCase();
       const bonus = cfg.bonuses.find(b => b.id.toLowerCase() === wanted) || cfg.bonuses.find(b => b.title.toLowerCase().includes(wanted));
@@ -1260,6 +1344,121 @@ const TOOLS = [
       }
       const summary = `${wantEarned ? 'Earned' : 'Removed'} "${bonus.title}" bonus on ${date}`;
       return { result: { ok: true, earned: wantEarned, summary }, action: { tool: 'log_chore_bonus', summary } };
+    },
+  },
+
+  {
+    name: 'setup_chores',
+    description: "Start (or replace the setup of) a child's chores routine: the child's name, their chores with when in the day each happens, a fixed weekly allowance, and optional weekly behaviour bonuses. Use for 'set up chores for Jude: feed the dog morning and evening, $2 a week, $1 bonus for good bedtimes'. If the child already has a chores routine this updates it in place. Shared with the household by default.",
+    write: true,
+    input_schema: {
+      type: 'object',
+      properties: {
+        child: { type: 'string', description: "The child's name (matches their People card for age guidance)" },
+        birthdate: { type: 'string', description: 'YYYY-MM-DD (optional — used for age-based guidance if not already on their People card)' },
+        chores: { type: 'array', description: 'Chores, each { title, slots?: ["morning"|"afternoon"|"evening"|"anytime"], days?: [0-6 weekday numbers, Sunday=0] }',
+          items: { type: 'object', properties: { title: { type: 'string' }, slots: { type: 'array', items: { type: 'string' } }, days: { type: 'array', items: { type: 'number' } } }, required: ['title'] } },
+        weekly_allowance: { type: 'number', description: 'Fixed weekly amount; 0 or omitted = no allowance' },
+        payday: { type: 'number', description: 'Weekday the allowance is paid, 0=Sunday … 6=Saturday (default 0)' },
+        bonuses: { type: 'array', description: 'Weekly behaviour bonuses, each { title, amount }',
+          items: { type: 'object', properties: { title: { type: 'string' }, amount: { type: 'number' } }, required: ['title', 'amount'] } },
+      },
+      required: ['child'],
+    },
+    async run(ctx, input) {
+      if (!ctx.groupId) throw new Error('Join a household first');
+      const child = String(input.child || '').trim();
+      if (!child) throw new Error('child is required');
+      const existing = await findChoresRoutine(ctx, child);
+      const cfg = buildChoreConfig(existing ? choresEngine.parseConfig(existing.config) : null, input, { replace: true });
+      const birthdate = input.birthdate ? requireDate(input.birthdate, 'birthdate') : null;
+      if (existing) {
+        await ctx.db.updateRoutine(existing.id, { config: cfg, ...(birthdate ? { subject_birthdate: birthdate } : {}) });
+        const summary = `Updated ${child}'s chores: ${cfg.chores.map(c => c.title).join(', ') || 'no chores'}${cfg.allowance.weekly_amount ? `, $${cfg.allowance.weekly_amount}/week` : ''}`;
+        return { result: { ok: true, routine_id: existing.id, summary }, action: { tool: 'setup_chores', summary } };
+      }
+      const first = child.split(/\s+/)[0];
+      const r = await ctx.db.createRoutine({
+        group_id: ctx.groupId, created_by: ctx.userId, name: `${first}'s chores`, routine_type: 'chores',
+        subject_name: child, subject_birthdate: birthdate, config: JSON.stringify(cfg),
+        shared_scope: 'household', start_date: ctx.today,
+      });
+      const summary = `Set up ${child}'s chores: ${cfg.chores.map(c => c.title).join(', ') || 'no chores yet'}${cfg.allowance.weekly_amount ? `, $${cfg.allowance.weekly_amount}/week` : ''}`;
+      return { result: { ok: true, routine_id: r.id, summary }, action: { tool: 'setup_chores', summary } };
+    },
+  },
+  {
+    name: 'update_chores',
+    description: "Change a child's chores setup without starting over: add or remove chores, change the weekly allowance or payday, add or remove bonuses. Use for 'add making the bed to Jude's chores', 'raise Jude's allowance to $3', 'drop the bedtime bonus'.",
+    write: true,
+    input_schema: {
+      type: 'object',
+      properties: {
+        routine_id: { type: 'number', description: 'From list_routines (or give child instead)' },
+        child: { type: 'string', description: "The child's name, if routine_id is unknown" },
+        add_chores: { type: 'array', items: { type: 'object', properties: { title: { type: 'string' }, slots: { type: 'array', items: { type: 'string' } }, days: { type: 'array', items: { type: 'number' } } }, required: ['title'] } },
+        remove_chores: { type: 'array', description: 'Chore ids or titles to retire', items: { type: 'string' } },
+        weekly_allowance: { type: 'number' },
+        payday: { type: 'number', description: '0=Sunday … 6=Saturday' },
+        add_bonuses: { type: 'array', items: { type: 'object', properties: { title: { type: 'string' }, amount: { type: 'number' } }, required: ['title', 'amount'] } },
+        remove_bonuses: { type: 'array', description: 'Bonus ids or titles', items: { type: 'string' } },
+      },
+    },
+    async run(ctx, input) {
+      const routine = await requireChoresRoutine(ctx, input);
+      const cfg = choresEngine.parseConfig(routine.config);
+      const norm = (s) => String(s || '').trim().toLowerCase();
+      const removeC = (input.remove_chores || []).map(norm);
+      // Retiring keeps history intact: an inactive chore drops out of the grid
+      // but its past ticks stay in the record.
+      cfg.chores = cfg.chores.map(c => removeC.includes(norm(c.id)) || removeC.includes(norm(c.title)) ? { ...c, active: false } : c);
+      for (const c of input.add_chores || []) {
+        if (!c?.title) continue;
+        if (cfg.chores.some(x => x.active && norm(x.title) === norm(c.title))) continue;
+        cfg.chores.push(newChore(c, ctx.today));
+      }
+      if (input.weekly_allowance != null) cfg.allowance.weekly_amount = Math.max(0, Number(input.weekly_allowance) || 0);
+      if (Number.isInteger(input.payday) && input.payday >= 0 && input.payday <= 6) cfg.allowance.payday = input.payday;
+      const removeB = (input.remove_bonuses || []).map(norm);
+      cfg.bonuses = cfg.bonuses.filter(b => !(removeB.includes(norm(b.id)) || removeB.includes(norm(b.title))));
+      for (const b of input.add_bonuses || []) {
+        if (!b?.title || !(Number(b.amount) > 0)) continue;
+        if (cfg.bonuses.some(x => norm(x.title) === norm(b.title))) continue;
+        cfg.bonuses.push({ id: slug(b.title), title: String(b.title).trim(), amount: Math.round(Number(b.amount) * 100) / 100, icon: 'star.fill' });
+      }
+      await ctx.db.updateRoutine(routine.id, { config: cfg });
+      const active = cfg.chores.filter(c => c.active);
+      const summary = `Updated ${routine.subject_name || routine.name}: ${active.map(c => c.title).join(', ') || 'no active chores'}${cfg.allowance.weekly_amount ? `, $${cfg.allowance.weekly_amount}/week` : ''}${cfg.bonuses.length ? `, bonuses: ${cfg.bonuses.map(b => b.title).join(', ')}` : ''}`;
+      return { result: { ok: true, routine_id: routine.id, summary }, action: { tool: 'update_chores', summary } };
+    },
+  },
+  {
+    name: 'log_chore_payout',
+    description: "Record that a child's allowance was paid — 'paid Jude his allowance', 'settled last week's chores money'. Defaults to this week and what it earned; pass week_start to settle an older unpaid week (see get_chores → owed_from_past_weeks).",
+    write: true,
+    input_schema: {
+      type: 'object',
+      properties: {
+        routine_id: { type: 'number' },
+        child: { type: 'string', description: "The child's name, if routine_id is unknown" },
+        week_start: { type: 'string', description: 'YYYY-MM-DD of the week to settle (any day in it works)' },
+        amount: { type: 'number', description: 'Override the amount paid' },
+      },
+    },
+    async run(ctx, input) {
+      const routine = await requireChoresRoutine(ctx, input);
+      const entries = await ctx.db.getRoutineEntries(routine.id, { limit: 1000 });
+      const s = choresEngine.compute(entries, routine.config, { today: ctx.today });
+      const weekStart = input.week_start ? choresEngine.weekStartOf(requireDate(input.week_start, 'week_start'), s.week_start_day) : s.week_start;
+      const owed = s.ledger.unpaid_weeks.find(w => w.week_start === weekStart);
+      const amount = input.amount != null ? Math.round(Number(input.amount) * 100) / 100
+        : (weekStart === s.week_start ? s.earnings.total : (owed ? owed.amount : 0));
+      if (!(amount >= 0)) throw new Error('Invalid amount');
+      const r = await ctx.db.addRoutineEntry(routine.id, {
+        entry_date: ctx.today, entry_type: 'payout', value: { amount, week_start: weekStart }, created_by: ctx.userId,
+      });
+      const summary = `Recorded $${amount.toFixed(2)} paid to ${routine.subject_name || routine.name} for the week of ${weekStart}`;
+      return { result: { ok: true, id: r.id, amount, week_start: weekStart, summary }, action: { tool: 'log_chore_payout', summary } };
     },
   },
 
@@ -2887,11 +3086,12 @@ const GROUPS = {
     incoming: 'get_incoming_coverage', approve: 'approve_incoming_coverage' } },
   notes: { desc: 'Private/household notes (take/jot/write a note).', actions: {
     list: 'list_notes', add: 'add_note', update: 'update_note', delete: 'delete_note' } },
-  routines: { desc: 'Routines: baby sleep / sleep-training logs, cycle tracking, activity streaks, and kids\' chores. Sleep can be logged after the fact (log_sleep) or live (start_sleep now, end_sleep on waking). Action "analyze" explains night-waking patterns and what to try. Chores: "chores" reads a child\'s week (done today, streak, allowance earned, when to add the next chore); "log_chore" marks a chore done/undone; "chore_bonus" marks a behaviour bonus like a good bedtime.', actions: {
+  routines: { desc: 'Routines: baby sleep / sleep-training logs, cycle tracking, activity streaks, and kids\' chores ("setup_chores" starts or replaces a child\'s chores + allowance + bonuses; "update_chores" adds/removes chores or changes the allowance; "chore_payout" records allowance paid). Sleep can be logged after the fact (log_sleep) or live (start_sleep now, end_sleep on waking). Action "analyze" explains night-waking patterns and what to try. Chores: "chores" reads a child\'s week (done today, streak, allowance earned, when to add the next chore); "log_chore" marks a chore done/undone; "chore_bonus" marks a behaviour bonus like a good bedtime.', actions: {
     list: 'list_routines', get: 'get_routine', log_sleep: 'log_sleep', log_entry: 'log_routine_entry',
     start_sleep: 'start_sleep', end_sleep: 'end_sleep', set_start: 'set_sleep_start',
     stats: 'get_sleep_stats', analyze: 'analyze_sleep',
-    chores: 'get_chores', log_chore: 'log_chore', chore_bonus: 'log_chore_bonus' } },
+    chores: 'get_chores', log_chore: 'log_chore', chore_bonus: 'log_chore_bonus',
+    setup_chores: 'setup_chores', update_chores: 'update_chores', chore_payout: 'log_chore_payout' } },
   people: { desc: 'Household people (adults, kids) and their milestones.', actions: {
     list: 'list_people', add: 'add_person', update: 'update_person', delete: 'delete_person',
     list_milestones: 'list_milestones', log_milestone: 'log_milestone',

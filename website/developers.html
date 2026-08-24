@@ -148,7 +148,7 @@
             <thead><tr><th>Method</th><th>Path</th><th>What it does</th></tr></thead>
             <tbody>
               <tr><td><code>GET</code></td><td><code>/v1/me</code></td><td>Who the key belongs to: user, household, scope, tier, today's date.</td></tr>
-              <tr><td><code>GET</code></td><td><code>/v1/snapshot</code></td><td>A digest of the household right now (today's tasks and appointments, open polls, expiring pantry items, budget, live trips…). Ideal context to hand your model before it acts.</td></tr>
+              <tr><td><code>GET</code></td><td><code>/v1/snapshot</code></td><td>A digest of the household right now (today's tasks and appointments, open polls, expiring pantry items, budget, live trips, kids' chores still open today…). Ideal context to hand your model before it acts.</td></tr>
               <tr><td><code>GET</code></td><td><code>/v1/tools</code></td><td>The tool catalog as JSON-schema definitions. Anthropic shape by default; add <code>?format=openai</code> for OpenAI function-calling shape.</td></tr>
               <tr><td><code>POST</code></td><td><code>/v1/tools/{name}</code></td><td>Call one tool. The body is the tool's input, e.g. <code>{"action":"add","title":"Book dentist"}</code>.</td></tr>
               <tr><td><code>POST</code></td><td><code>/v1/mcp</code></td><td>A Model Context Protocol server (Streamable HTTP). Supports <code>initialize</code>, <code>tools/list</code>, <code>tools/call</code>, <code>ping</code>.</td></tr>
@@ -169,7 +169,7 @@
               <tr><td><code>pantry</code></td><td>list · add · update · delete</td></tr>
               <tr><td><code>decisions</code></td><td>list · create · vote · comment · delete</td></tr>
               <tr><td><code>trips</code> / <code>itineraries</code></td><td>live ETA trips; multi-day itineraries with stays and expenses</td></tr>
-              <tr><td><code>routines</code></td><td>list · get · log_sleep · start_sleep · end_sleep · set_start · stats · analyze · log_entry · chores · log_chore · chore_bonus</td></tr>
+              <tr><td><code>routines</code></td><td>list · get · log_sleep · start_sleep · end_sleep · set_start · stats · analyze · log_entry · <strong>chores</strong> · setup_chores · update_chores · log_chore · chore_bonus · chore_payout</td></tr>
               <tr><td><code>people</code>, <code>gifts</code>, <code>special_events</code>, <code>coverage</code>, <code>notes</code>, <code>contacts</code>, <code>rivalries</code>, <code>projects</code>, <code>recurring_payments</code>, <code>feed</code></td><td>the rest of the app</td></tr>
               <tr><td><code>send_message</code>, <code>remember</code>, <code>get_addresses</code>, <code>update_my_name</code></td><td>standalone tools</td></tr>
             </tbody>
@@ -203,7 +203,20 @@
 
 curl https://kinrows.com/v1/tools/budget \
   -H "Authorization: Bearer $KINROWS_KEY" -H "Content-Type: application/json" \
-  -d '{"action":"log_expense","amount":42.10,"merchant":"Costco","category":"Groceries"}'</code></pre>
+  -d '{"action":"log_expense","amount":42.10,"merchant":"Costco","category":"Groceries"}'
+
+# Kids' chores: set up, tick, read the week, pay
+curl https://kinrows.com/v1/tools/routines \
+  -H "Authorization: Bearer $KINROWS_KEY" -H "Content-Type: application/json" \
+  -d '{"action":"setup_chores","child":"Jude","chores":[{"title":"Feed the dog","slots":["morning","evening"]}],"weekly_allowance":2,"bonuses":[{"title":"Good bedtime","amount":1}]}'
+
+curl https://kinrows.com/v1/tools/routines \
+  -H "Authorization: Bearer $KINROWS_KEY" -H "Content-Type: application/json" \
+  -d '{"action":"log_chore","child":"Jude","chore_id":"feed the dog","slot":"evening"}'
+
+curl https://kinrows.com/v1/tools/routines \
+  -H "Authorization: Bearer $KINROWS_KEY" -H "Content-Type: application/json" \
+  -d '{"action":"chores","child":"Jude"}'   # week grid, streak, earnings, owed, age guidance</code></pre>
           <p>A minimal agent loop with the Anthropic SDK — fetch the catalog, let the model pick tools, execute them against <code>/v1/tools</code>, repeat:</p>
 <pre><code>const BASE = 'https://kinrows.com';
 const H = { Authorization: `Bearer ${process.env.KINROWS_KEY}`, 'Content-Type': 'application/json' };

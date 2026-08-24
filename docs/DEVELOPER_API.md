@@ -37,7 +37,7 @@ Authorization: Bearer kr_live_…
 | Method | Path | Purpose |
 |---|---|---|
 | `GET` | `/v1/me` | Who the key is: `{ user, household, key: {id,name,scope}, tier, today, now_time }`. Good first call / health check. |
-| `GET` | `/v1/snapshot` | The household digest the Concierge daily brief is built from (today's tasks, appointments, open polls, pantry expiring, budget, trips, …). Feed it to your agent as context. |
+| `GET` | `/v1/snapshot` | The household digest the Concierge daily brief is built from (today's tasks, appointments, open polls, pantry expiring, budget, trips, kids' chores open today (`choresToday`), …). Feed it to your agent as context. |
 | `GET` | `/v1/tools` | Tool catalog. Default is Anthropic shape (`name`, `description`, `input_schema`). `?format=openai` returns `{type:"function", function:{name, description, parameters}}`. Pass straight into your model's `tools` parameter. |
 | `POST` | `/v1/tools/:name` | Call a tool. Body is the tool's input, e.g. `{"action":"add","title":"Book dentist"}`. `200 {result}` · `400 {error}` (bad action / missing fields / handler error) · `403` (read-only key attempting a write). |
 | `POST` | `/v1/mcp` | **MCP server** (Streamable HTTP, stateless JSON-RPC 2.0). Supports `initialize`, `ping`, `tools/list`, `tools/call`; notifications get `202`; batches supported. `GET` → `405`, `DELETE` → `204`. |
@@ -47,6 +47,21 @@ Error statuses across `/v1`: `401` missing/invalid/revoked key · `402` no activ
 ### 3.1 Tool catalog shape
 
 Tools are grouped by domain, each with an `action` enum — `calendar`, `tasks`, `lists`, `budget`, `pantry`, `decisions`, `trips`, `itineraries`, `rivalries`, `gifts`, `coverage`, `notes`, `routines`, `people`, `contacts`, `recurring_payments`, `projects`, `feed`, `special_events` — plus four standalone tools: `get_addresses`, `remember`, `update_my_name`, `send_message`. The catalog is generated from `services/conciergeTools.js`, so it is always identical to what the in-app Concierge sees. Read-only classification (`isReadOnly`) is by handler name prefix: `get_`, `list_`, `analyze_`.
+
+**Kids' chores** live under `routines` (one `chores` routine per child; see `services/chores.js`). Actions:
+
+| action | handler | read/write | what it does |
+|---|---|---|---|
+| `setup_chores` | `setup_chores` | write | Start a child's chores routine, or replace its setup in place: `child`, optional `birthdate`, `chores[{title, slots?, days?}]`, `weekly_allowance`, `payday`, `bonuses[{title, amount}]`. Shared with the household by default. |
+| `update_chores` | `update_chores` | write | Incremental edits by `routine_id` or `child`: `add_chores`, `remove_chores` (retires — history stays), `weekly_allowance`, `payday`, `add_bonuses`, `remove_bonuses`. |
+| `chores` | `get_chores` | read | The week: each chore's id, today's open/done slots, streak, completion, allowance + bonuses earned, `owed_from_past_weeks`, and age guidance (`nudge` says when to add the next chore). |
+| `log_chore` | `log_chore` | write | Mark a slot done/undone (`chore_id` accepts the id or the title; `slot` = morning/afternoon/evening/anytime; `date` defaults to today; `done:false` undoes). |
+| `chore_bonus` | `log_chore_bonus` | write | Mark a behaviour bonus earned (or not) for a day. A bonus pays once per week regardless of how many days it's marked. |
+| `chore_payout` | `log_chore_payout` | write | Record allowance paid — defaults to this week and what it earned; `week_start` settles an older unpaid week. |
+
+Design rule the engine enforces: allowance is a fixed weekly amount and is never docked per missed chore (the engine has no way to do it) — see `docs/CHORES_RESEARCH.md` for why.
+
+`GET /v1/snapshot` → `choresToday[]`: `{ routine_id, child, open: ["Feed the dog (evening)"], streak_days, week_earned, paid_this_week, owed_from_past_weeks }`, plus `counts.choresOpen`.
 
 ### 3.2 Examples
 
@@ -63,6 +78,23 @@ curl -s https://kinrows.com/v1/tools/tasks \
 curl -s https://kinrows.com/v1/tools/budget \
   -H "Authorization: Bearer $KINROWS_KEY" -H "Content-Type: application/json" \
   -d '{"action":"log_expense","amount":42.10,"merchant":"Costco","category":"Groceries"}'
+
+# Kids' chores: set up → tick → read → pay
+curl -s https://kinrows.com/v1/tools/routines \
+  -H "Authorization: Bearer $KINROWS_KEY" -H "Content-Type: application/json" \
+  -d '{"action":"setup_chores","child":"Jude","birthdate":"2023-05-10","chores":[{"title":"Feed the dog","slots":["morning","evening"]}],"weekly_allowance":2,"bonuses":[{"title":"Good bedtime","amount":1}]}'
+
+curl -s https://kinrows.com/v1/tools/routines \
+  -H "Authorization: Bearer $KINROWS_KEY" -H "Content-Type: application/json" \
+  -d '{"action":"log_chore","child":"Jude","chore_id":"feed the dog","slot":"evening"}'
+
+curl -s https://kinrows.com/v1/tools/routines \
+  -H "Authorization: Bearer $KINROWS_KEY" -H "Content-Type: application/json" \
+  -d '{"action":"chores","child":"Jude"}'
+
+curl -s https://kinrows.com/v1/tools/routines \
+  -H "Authorization: Bearer $KINROWS_KEY" -H "Content-Type: application/json" \
+  -d '{"action":"chore_payout","child":"Jude"}'
 ```
 
 > `https://kinrows.com` resolves directly to the Railway service (verified 2026-08-24: `server: railway-hikari`, `/v1/me` → 401 JSON), so the marketing site and the API share one host. The iOS app still uses the raw Railway URL from `AppConfig.swift`; both hit the same deployment. Dev: `http://localhost:3456`.

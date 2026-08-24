@@ -2,6 +2,8 @@
 // Composes existing FamilyDB reads into one structured, household-scoped
 // snapshot of "what needs attention right now". Pure data — no AI here.
 
+const chores = require('./chores');
+
 const HORIZON_DAYS = 7;        // calendar / events look-ahead
 const PANTRY_DAYS = 3;         // flag pantry expiring within N days
 const EVENT_DAYS = 14;         // flag birthdays/anniversaries within N days
@@ -57,7 +59,7 @@ async function buildSnapshot(db, userId) {
   const month = currentMonth();
   const groupId = await safe(db.getUserHouseholdId(userId), null, 'household');
 
-  const [tasks, appts, decisions, pantry, events, coverage, budget, trips, itineraries, milestones] = await Promise.all([
+  const [tasks, appts, decisions, pantry, events, coverage, budget, trips, itineraries, milestones, choreRoutines] = await Promise.all([
     safe(db.getTasks({ status: 'active' }, userId), [], 'tasks'),
     safe(db.getAppointments({}, userId), [], 'appointments'),
     safe(db.getDecisions({ status: 'active' }, userId), [], 'decisions'),
@@ -71,7 +73,27 @@ async function buildSnapshot(db, userId) {
     safe(groupId ? db.getTrips({ status: 'active' }, groupId) : Promise.resolve([]), [], 'trips'),
     safe(db.getItineraries(userId), [], 'itineraries'),
     safe(groupId ? db.getMilestones(groupId, null, userId) : Promise.resolve([]), [], 'milestones'),
+    safe(groupId ? db.getRoutines(groupId, userId) : Promise.resolve([]), [], 'routines'),
   ]);
+
+  // Kids' chores today: what's still open, the streak, this week's money, and
+  // anything owed from earlier weeks — so an agent can say "Jude still needs
+  // to feed the dog tonight" without a second call.
+  const choresToday = [];
+  for (const r of (choreRoutines || []).filter(r => r.routine_type === 'chores' && r.active !== 0).slice(0, 4)) {
+    const entries = await safe(db.getRoutineEntries(r.id, { limit: 1000 }), [], 'chore entries');
+    const s = chores.compute(entries, r.config, { today });
+    const open = [];
+    for (const c of s.chores) {
+      const d = c.days.find(x => x.today);
+      if (!d || !d.applies) continue;
+      for (const slot of d.slots) if (!slot.done) open.push(slot.slot === 'anytime' ? c.title : `${c.title} (${slot.slot})`);
+    }
+    choresToday.push({
+      routine_id: r.id, child: r.subject_name || r.name, open, streak_days: s.streak_days,
+      week_earned: s.earnings.total, paid_this_week: s.earnings.paid, owed_from_past_weeks: s.ledger.owed,
+    });
+  }
 
   const overdueTasks = tasks
     .filter(t => t.due_date && daysUntil(t.due_date) < 0)
@@ -162,6 +184,7 @@ async function buildSnapshot(db, userId) {
       upcomingItineraries: upcomingItineraries.length,
       recentMilestones: recentMilestones.length,
       onThisDay: onThisDay.length,
+      choresOpen: choresToday.reduce((n, c) => n + c.open.length, 0),
     },
     overdueTasks,
     upcomingAppointments,
@@ -174,6 +197,7 @@ async function buildSnapshot(db, userId) {
     upcomingItineraries,
     recentMilestones,
     onThisDay,
+    choresToday,
   };
 }
 

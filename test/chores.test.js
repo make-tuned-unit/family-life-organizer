@@ -195,3 +195,76 @@ test('chores routes: create, toggle slots idempotently, bonus, payout, home summ
   const sleep = await kim('POST', '/api/routines', { name: 'Sleep', routine_type: 'baby_sleep', subject_name: 'Jude' });
   assert.equal((await kim('POST', `/api/routines/${sleep.body.id}/chores/toggle`, { chore_id: 'dog' })).status, 400);
 });
+
+// ---- Agent surface: the same handlers /v1 and MCP route to ------------------
+// Exercised directly through tools.run with a ctx shaped like developerApi's,
+// against a second temp DB, so the whole setup → tick → pay loop is covered
+// without needing a paid household.
+
+test('chores tools: setup_chores → update_chores → log_chore → get_chores → chore_payout', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fl-chores-tools-'));
+  process.env.FAMILY_DB_DIR = dir;
+  const FamilyDB = require('../database');
+  const tools = require('../services/conciergeTools');
+  const { buildSnapshot } = require('../services/conciergeContext');
+  const db = new FamilyDB();
+  await db.initSchema();
+  try {
+    const u = await db.createUser({ username: 'agent_parent', password_hash: 'x', name: 'Agent Parent' });
+    const userId = u.id;
+    const g = await db.createGroup({ name: 'Agent House', group_type: 'household', created_by: userId });
+    const groupId = g.id;
+    await db.addGroupMember(groupId, { user_id: userId, role: 'admin', added_by: userId });
+    const today = new Date(); const iso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    const ctx = { db, userId, groupId, today: iso, nowTime: '09:00', userName: 'Agent Parent' };
+
+    let r = await tools.run('routines', ctx, { action: 'setup_chores', child: 'Jude', birthdate: '2023-05-10',
+      chores: [{ title: 'Feed the dog', slots: ['morning', 'evening'] }], weekly_allowance: 2, bonuses: [{ title: 'Good bedtime', amount: 1 }] });
+    assert.ok(r.result.ok, JSON.stringify(r));
+    const routineId = r.result.routine_id;
+
+    r = await tools.run('routines', ctx, { action: 'update_chores', child: 'Jude', add_chores: [{ title: 'Make the bed', slots: ['morning'] }], weekly_allowance: 3 });
+    assert.ok(r.result.ok, JSON.stringify(r));
+    assert.match(r.result.summary, /Make the bed/);
+
+    r = await tools.run('routines', ctx, { action: 'log_chore', routine_id: routineId, chore_id: 'feed the dog', slot: 'morning' });
+    assert.ok(r.result.ok, JSON.stringify(r));
+    r = await tools.run('routines', ctx, { action: 'chore_bonus', routine_id: routineId, bonus_id: 'bedtime' });
+    assert.ok(r.result.ok, JSON.stringify(r));
+
+    r = await tools.run('routines', ctx, { action: 'chores', child: 'Jude' });   // by name works too
+    assert.equal(r.result.chores.length, 2);
+    r = await tools.run('routines', ctx, { action: 'chores', child: 'Nobody' });
+    assert.match(r.result.error, /No chores routine/);
+    r = await tools.run('routines', ctx, { action: 'chores', routine_id: routineId });
+    assert.equal(r.result.earnings.total, 4);           // $3 allowance + $1 bonus
+    assert.equal(r.result.guidance.age, 3);
+
+    // Read-only classification: get_chores is read, the rest write.
+    assert.equal(tools.isReadOnly('routines', { action: 'chores' }), true);
+    assert.equal(tools.isReadOnly('routines', { action: 'log_chore' }), false);
+    assert.equal(tools.isReadOnly('routines', { action: 'setup_chores' }), false);
+
+    // Snapshot carries today's open chores.
+    const snap = await buildSnapshot(db, userId);
+    assert.equal(snap.choresToday.length, 1);
+    assert.equal(snap.choresToday[0].child, 'Jude');
+    assert.deepEqual(snap.choresToday[0].open, ['Feed the dog (evening)', 'Make the bed (morning)']);
+    assert.equal(snap.counts.choresOpen, 2);
+
+    r = await tools.run('routines', ctx, { action: 'chore_payout', child: 'Jude' });
+    assert.ok(r.result.ok, JSON.stringify(r));
+    assert.equal(r.result.amount, 4);
+    r = await tools.run('routines', ctx, { action: 'chores', routine_id: routineId });
+    assert.equal(r.result.earnings.paid, true);
+
+    // Re-running setup replaces the chore list but keeps the routine.
+    r = await tools.run('routines', ctx, { action: 'setup_chores', child: 'Jude', chores: [{ title: 'Feed the dog', slots: ['morning'] }] });
+    assert.equal(r.result.routine_id, routineId);
+    r = await tools.run('routines', ctx, { action: 'chores', routine_id: routineId });
+    assert.equal(r.result.chores.length, 1);
+  } finally {
+    db.close();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
