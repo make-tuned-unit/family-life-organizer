@@ -3,7 +3,6 @@ import SwiftUI
 struct HomeView: View {
     @Binding var selectedTab: MainTab
     @Binding var pendingListName: String?
-    var ptt: PushToTalkController? = nil
     @Environment(APIService.self) private var api
     @Environment(AuthService.self) private var auth
     @Environment(CalendarService.self) private var calendarService
@@ -75,13 +74,10 @@ struct HomeView: View {
             await loadOnThisDay()
         }
         .task { await loadOnThisDay() }
-        .onChange(of: ptt?.completedSends ?? 0) { _, new in
-            // A quick voice note just landed — the concierge may have added
-            // tasks, events, or list items. Silently refresh so the numbers
-            // update in place without a pull-to-refresh.
-            guard new != 0 else { return }
+        .onReceive(NotificationCenter.default.publisher(for: APIService.conciergeDataDidChange)) { _ in
             Task {
                 await viewModel.loadAll(api: api, userName: auth.currentUser?.name, username: auth.currentUser?.username)
+                await loadOnThisDay()
             }
         }
         .background { AmbientBackground(style: .home) }

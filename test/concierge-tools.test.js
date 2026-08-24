@@ -137,6 +137,28 @@ test('gifts: idea lifecycle to purchased', async () => {
   assert.equal((await tools.run('gifts', ctx, { action: 'delete_idea', id: lego.id })).result.ok, true);
 });
 
+test('key dates: a named person is resolved onto their People card', async () => {
+  const person = await tools.run('add_person', ctx, { name: 'Rowan', relationship: 'son' });
+  assert.equal(person.result.ok, true, JSON.stringify(person.result));
+
+  const added = await tools.run('add_special_event', ctx, {
+    title: 'School concert', date: '2026-12-14', person_name: 'rowan', is_recurring: false,
+  });
+  assert.equal(added.result.ok, true, JSON.stringify(added.result));
+  assert.equal(added.action.person_name, 'Rowan');
+  assert.equal(added.action.person_id, person.result.id);
+  assert.match(added.action.summary, /for Rowan/);
+
+  const row = await get('SELECT person_id FROM special_events WHERE id = ?', [added.result.id]);
+  assert.equal(row.person_id, person.result.id, 'the date appears in Rowan\'s People key dates');
+
+  const missing = await tools.run('add_special_event', ctx, {
+    title: 'Mystery date', date: '2026-12-15', person_name: 'Not In Household',
+  });
+  assert.equal(missing.result.ok, false);
+  assert.equal(await get("SELECT id FROM special_events WHERE title = 'Mystery date'"), undefined);
+});
+
 test('routines: concierge logs a nap and an overnight sleep', async () => {
   const created = await run(
     "INSERT INTO routines (group_id, created_by, name, routine_type, subject_name, shared_scope) VALUES (?, ?, 'Jude sleep', 'baby_sleep', 'Jude', 'private')",

@@ -2022,7 +2022,7 @@ const TOOLS = [
   },
   {
     name: 'add_special_event',
-    description: 'Add a key date / special event. Optionally tie it to a person (use list_people for person_id). Set private=true when the user says it is just for them ("don\'t tell", "keep this to myself", "private") — a private date and its reminders are invisible to the rest of the household.',
+    description: 'Add a key date / special event. When the user says it is for/about a person, person_name is required and the tool resolves and attaches that People card (use list_people first). Only omit person_name for a genuinely household-wide date. Set private=true when the user says it is just for them ("don\'t tell", "keep this to myself", "private") — a private date and its reminders are invisible to the rest of the household.',
     write: true,
     input_schema: {
       type: 'object',
@@ -2030,6 +2030,7 @@ const TOOLS = [
         title: { type: 'string' },
         date: { type: 'string', description: 'YYYY-MM-DD' },
         person_id: { type: 'integer', description: 'Optional person this date is about' },
+        person_name: { type: 'string', description: 'Name of the person this date is for. Pass this whenever the user names someone; it is verified against People.' },
         event_type: { type: 'string', description: 'e.g. "birthday", "anniversary", "custom"' },
         is_recurring: { type: 'boolean', description: 'Repeats every year (default true)' },
         private: { type: 'boolean', description: 'Visible only to this user (default false)' },
@@ -2039,17 +2040,42 @@ const TOOLS = [
     },
     async run(ctx, input) {
       requireDate(input.date, 'date');
-      if (input.person_id != null) await assertHousehold(ctx, 'gift_people', input.person_id);
+      let personId = input.person_id ?? null;
+      let personName = null;
+      if (input.person_name) {
+        await ctx.db.ensureHouseholdUserPeople(ctx.groupId);
+        const wanted = String(input.person_name).trim().toLocaleLowerCase();
+        const matches = (await ctx.db.getPeople(ctx.groupId))
+          .filter(p => String(p.name).trim().toLocaleLowerCase() === wanted);
+        if (matches.length !== 1) {
+          return { result: { ok: false, error: matches.length ? `More than one person is named ${input.person_name}` : `No person named ${input.person_name} was found` } };
+        }
+        if (personId != null && personId !== matches[0].id) {
+          return { result: { ok: false, error: `person_id does not match ${input.person_name}` } };
+        }
+        personId = matches[0].id;
+        personName = matches[0].name;
+      }
+      if (personId != null) {
+        await assertHousehold(ctx, 'gift_people', personId);
+        if (!personName) {
+          const person = (await ctx.db.getPeople(ctx.groupId)).find(p => p.id === personId);
+          personName = person?.name || null;
+        }
+      }
       const r = await ctx.db.addSpecialEvent({
-        title: input.title, date: input.date, person_id: input.person_id || null,
+        title: input.title, date: input.date, person_id: personId,
         event_type: input.event_type || 'custom', is_recurring: input.is_recurring !== false,
         notes: input.notes || null, group_id: ctx.groupId,
         // Ownership is what makes a private row reachable by its author.
         created_by: ctx.userId,
         shared_scope: input.private ? 'private' : 'household',
       });
-      const summary = `Added ${input.private ? 'private ' : ''}key date "${input.title}" (${input.date})`;
-      return { result: { ok: true, id: r.id, summary }, action: { tool: 'add_special_event', summary } };
+      const summary = `Added ${input.private ? 'private ' : ''}key date "${input.title}"${personName ? ` for ${personName}` : ''} (${input.date})`;
+      return {
+        result: { ok: true, id: r.id, person_id: personId, person_name: personName, summary },
+        action: { tool: 'add_special_event', summary, entity_id: r.id, person_id: personId, person_name: personName },
+      };
     },
   },
   {

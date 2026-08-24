@@ -57,6 +57,16 @@ struct ConciergeChatResponse: Codable {
 struct ConciergeAction: Codable, Hashable {
     let tool: String
     let summary: String
+    let entityId: Int?
+    let personId: Int?
+    let personName: String?
+
+    enum CodingKeys: String, CodingKey {
+        case tool, summary
+        case entityId = "entity_id"
+        case personId = "person_id"
+        case personName = "person_name"
+    }
 }
 
 /// Summary row for a past conversation (from `GET /api/concierge/conversations`).

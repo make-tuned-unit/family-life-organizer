@@ -67,9 +67,14 @@ final class PushToTalkController {
 
     /// Warm the mic + permissions the moment a press begins, before we know if
     /// it's a tap or a hold — cuts the spin-up lag that clips the first word.
-    func prewarm() {
+    func prewarm(api: APIService) {
         guard phase == .idle else { return }
-        Task { await recognizer.prewarm() }
+        Task {
+            if let people = try? await api.fetchPeople() {
+                recognizer.setContextualStrings(people.map(\.name))
+            }
+            await recognizer.prewarm()
+        }
     }
 
     /// Finger held past the tap threshold — start listening. Shows a brief
@@ -106,11 +111,14 @@ final class PushToTalkController {
         // Flip out of .starting first so a late onReady tears the mic back down.
         let wasListening = phase == .listening
         phase = .sending
-        recognizer.stop()
-        let text = transcript.trimmingCharacters(in: .whitespacesAndNewlines)
-        transcript = ""
-        guard wasListening, !text.isEmpty else { phase = .idle; return }
-        Task { await send(text, api: api) }
+        guard wasListening else { recognizer.stop(); phase = .idle; return }
+        Task {
+            let final = await recognizer.finish()
+            let text = final.trimmingCharacters(in: .whitespacesAndNewlines)
+            transcript = ""
+            guard !text.isEmpty else { phase = .idle; return }
+            await send(text, api: api)
+        }
     }
 
     /// Abort a live dictation without sending.
@@ -123,10 +131,20 @@ final class PushToTalkController {
 
     private func send(_ text: String, api: APIService) async {
         do {
+            var completedResponse: ConciergeChatResponse?
             for try await event in api.conciergeMessageStream(text, conversationId: conversationId) {
-                if case .done(let response) = event { conversationId = response.conversationId }
+                if case .done(let response) = event {
+                    conversationId = response.conversationId
+                    completedResponse = response
+                }
             }
-            banner = "Sent to your concierge"
+            guard let response = completedResponse else { throw APIError.invalidResponse }
+            APIService.publishConciergeActions(response.actions)
+            if let action = response.actions.first {
+                banner = "Task complete — \(action.summary)"
+            } else {
+                banner = response.reply
+            }
             completedSends += 1
         } catch {
             banner = "Couldn't send — try again"
@@ -169,7 +187,7 @@ struct ConciergeLauncherButton: View {
                         let start = Date()
                         pressStart = start
                         // Warm the mic immediately so a hold starts capturing fast.
-                        ptt.prewarm()
+                        ptt.prewarm(api: api)
                         // Promote to dictation once held past a tap.
                         Task { @MainActor in
                             try? await Task.sleep(for: .seconds(0.3))

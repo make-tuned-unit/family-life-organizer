@@ -71,6 +71,7 @@ final class ConciergeChatViewModel {
                     } else {
                         messages.append(Message(role: .assistant, text: response.reply, actions: response.actions))
                     }
+                    APIService.publishConciergeActions(response.actions)
                 }
             }
         } catch {

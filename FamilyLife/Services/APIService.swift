@@ -4,6 +4,19 @@ import UIKit
 @Observable
 final class APIService {
     static let unauthorizedNotification = Notification.Name("APIServiceUnauthorizedNotification")
+    /// Published after the concierge has finished successful writes. Screens
+    /// subscribe to this instead of holding stale, independently fetched data.
+    static let conciergeDataDidChange = Notification.Name("APIServiceConciergeDataDidChange")
+
+    @MainActor
+    static func publishConciergeActions(_ actions: [ConciergeAction]) {
+        guard !actions.isEmpty else { return }
+        NotificationCenter.default.post(
+            name: conciergeDataDidChange,
+            object: nil,
+            userInfo: ["actions": actions]
+        )
+    }
 
     var baseURL: String
 

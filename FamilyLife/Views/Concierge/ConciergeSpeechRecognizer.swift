@@ -20,8 +20,16 @@ final class ConciergeSpeechRecognizer {
     private let audioEngine = AVAudioEngine()
     private var request: SFSpeechAudioBufferRecognitionRequest?
     private var task: SFSpeechRecognitionTask?
+    private var tapInstalled = false
+    private var contextualStrings: [String] = []
 
     var isAvailable: Bool { recognizer?.isAvailable ?? false }
+
+    /// Proper nouns are the easiest words for dictation to miss. Supplying the
+    /// household's names biases recognition toward what the user is likely to say.
+    func setContextualStrings(_ strings: [String]) {
+        contextualStrings = Array(Set(strings.filter { !$0.isEmpty })).prefix(100).map { $0 }
+    }
 
     /// Request the two permissions voice input needs. Returns true if both granted.
     @discardableResult
@@ -83,6 +91,9 @@ final class ConciergeSpeechRecognizer {
 
             let request = SFSpeechAudioBufferRecognitionRequest()
             request.shouldReportPartialResults = true
+            request.taskHint = .dictation
+            request.addsPunctuation = true
+            request.contextualStrings = contextualStrings + ["key date", "birthday", "anniversary", "milestone"]
             if recognizer.supportsOnDeviceRecognition { request.requiresOnDeviceRecognition = true }
             self.request = request
 
@@ -102,6 +113,7 @@ final class ConciergeSpeechRecognizer {
             input.installTap(onBus: 0, bufferSize: 1024, format: format) { [weak self] buffer, _ in
                 self?.request?.append(buffer)
             }
+            tapInstalled = true
             audioEngine.prepare()
             try audioEngine.start()
             isRecording = true
@@ -127,11 +139,35 @@ final class ConciergeSpeechRecognizer {
         }
     }
 
+    /// End the audio input but give Speech a short window to emit its final,
+    /// corrected transcription. Immediate cancellation commonly drops the last
+    /// word spoken — especially a person's name at the end of a command.
+    func finish() async -> String {
+        guard isRecording || audioEngine.isRunning else { return transcript }
+        audioEngine.stop()
+        if tapInstalled {
+            audioEngine.inputNode.removeTap(onBus: 0)
+            tapInstalled = false
+        }
+        request?.endAudio()
+        isRecording = false
+        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        try? await Task.sleep(for: .milliseconds(450))
+        let finalTranscript = transcript
+        task?.cancel()
+        request = nil
+        task = nil
+        return finalTranscript
+    }
+
     /// Stop dictation and tear down the audio graph.
     func stop() {
-        guard isRecording || audioEngine.isRunning else { return }
+        guard isRecording || audioEngine.isRunning || request != nil || task != nil else { return }
         audioEngine.stop()
-        audioEngine.inputNode.removeTap(onBus: 0)
+        if tapInstalled {
+            audioEngine.inputNode.removeTap(onBus: 0)
+            tapInstalled = false
+        }
         request?.endAudio()
         task?.cancel()
         request = nil

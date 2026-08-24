@@ -53,6 +53,9 @@ struct ConciergeChatView: View {
                 if draft.isEmpty, let initialPrompt, !initialPrompt.isEmpty { draft = initialPrompt }
             }
             .task {
+                if let people = try? await api.fetchPeople() {
+                    speech.setContextualStrings(people.map(\.name))
+                }
                 // Long-press launch: jump straight into listening so the user can
                 // speak a command without tapping into the chat first.
                 guard autoListen, !didAutoListen else { return }
@@ -122,13 +125,16 @@ struct ConciergeChatView: View {
                 }
                 if !message.actions.isEmpty {
                     VStack(alignment: .leading, spacing: 4) {
+                        Label("Task complete", systemImage: "checkmark.circle.fill")
+                            .font(.flFootnote.weight(.bold))
                         ForEach(message.actions, id: \.self) { action in
-                            Label(action.summary, systemImage: "checkmark.circle.fill")
+                            Text(action.summary)
                                 .font(.flCaption.weight(.medium))
-                                .foregroundStyle(AccentTheme.sage.color)
                         }
                     }
+                    .foregroundStyle(AccentTheme.sage.color)
                     .padding(.leading, 38)
+                    .accessibilityElement(children: .combine)
                 }
             }
         }
@@ -221,8 +227,11 @@ struct ConciergeChatView: View {
         Button {
             Task {
                 if speech.isRecording {
-                    speech.stop()
+                    _ = await speech.finish()
                 } else {
+                    if let people = try? await api.fetchPeople() {
+                        speech.setContextualStrings(people.map(\.name))
+                    }
                     micBase = draft.isEmpty ? "" : draft.trimmingCharacters(in: .whitespaces) + " "
                     inputFocused = false
                     await speech.start { transcript in draft = micBase + transcript }
@@ -244,7 +253,10 @@ struct ConciergeChatView: View {
     }
 
     private func submit() async {
-        if speech.isRecording { speech.stop() }
+        if speech.isRecording {
+            let final = await speech.finish()
+            draft = micBase + final
+        }
         let text = draft
         draft = ""
         await viewModel.send(text, api: api)

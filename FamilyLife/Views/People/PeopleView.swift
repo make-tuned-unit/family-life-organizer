@@ -71,6 +71,9 @@ struct PeopleView: View {
             AddPersonSheet { await load() }
         }
         .task { await load() }
+        .onReceive(NotificationCenter.default.publisher(for: APIService.conciergeDataDidChange)) { _ in
+            Task { await load() }
+        }
     }
 
     private var emptyState: some View {

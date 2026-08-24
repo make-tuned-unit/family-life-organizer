@@ -124,6 +124,11 @@ struct PersonDetailView: View {
             Text("Their milestones, gift ideas and key dates go too. This can't be undone.")
         }
         .task { await load() }
+        .onReceive(NotificationCenter.default.publisher(for: APIService.conciergeDataDidChange)) { note in
+            guard let actions = note.userInfo?["actions"] as? [ConciergeAction],
+                  actions.contains(where: { $0.personId == person.id || $0.personId == nil }) else { return }
+            Task { await load() }
+        }
     }
 
     // MARK: - Header
