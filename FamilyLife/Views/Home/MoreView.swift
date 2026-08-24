@@ -19,6 +19,12 @@ struct MoreView: View {
                 VStack(spacing: 18) {
                     // FAMILY
                     section("Family") {
+                        // The household itself — members, invite code, addresses —
+                        // used to live three levels down behind Settings, while
+                        // onboarding told people to find it at More → Household.
+                        NavigationLink { HouseholdView() } label: {
+                            moreRow(icon: "house.fill", title: "Household", subtitle: "Members, invite code & addresses", color: TabAccent.home.color)
+                        }
                         NavigationLink { DecisionsView() } label: {
                             moreRow(icon: "chart.bar.fill", title: "Decisions", subtitle: "Polls and family decisions", color: TabAccent.decisions.color)
                         }
