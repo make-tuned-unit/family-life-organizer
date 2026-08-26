@@ -1,6 +1,9 @@
 # FamilyLife iOS Production Readiness
 
-Last updated: 2026-04-07
+Last updated: 2026-04-07. **Historical.** Launch checkboxes now live in
+[PRODUCTION_CHECKLIST.md](PRODUCTION_CHECKLIST.md); security findings in
+[SECURITY_AUDIT.md](SECURITY_AUDIT.md) (2026-08-26 pre-launch addendum). Do not
+treat the SwiftData / Render items below as current.
 
 This file is the maintained list of work required before the app should be treated as production-ready.
 

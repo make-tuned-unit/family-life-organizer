@@ -2,7 +2,7 @@
 
 **Maintained live.** This is the single source of truth for what's left before
 App Store submission. Update the checkboxes as items land. Last updated
-2026-08-27.
+2026-08-31 (rebased pre-launch security PR onto main).
 
 Legend: ✅ done · ⏳ deferred (needs a human / external action) · 🔜 code-ready, needs a build/deploy step.
 
@@ -30,6 +30,7 @@ Legend: ✅ done · ⏳ deferred (needs a human / external action) · 🔜 code-
 - ⏳ **Archive & upload to TestFlight** from Xcode 26 (Apple's iOS 26 SDK mandate). Paid Apps agreement + the four IAP products must exist in App Store Connect first or the binary review will fail Guideline 2.1.
 - ⏳ First real-device / TestFlight pass exercising: Sign in with Apple **and** password login → silent re-login, **account deletion** (both re-auth paths), Concierge first-use disclosure, receipt-scan consent, cooking mode, Report on a DM, and **notification taps**.
 - 🔜 Bump marketing version for the first public build (currently developing at 1.0).
+- 🔜 Deploy this branch so live `robots.txt` `Disallow: /c/`, blog CSP, and coverage-page CSP match the code (verified absent on production 2026-08-26).
 
 ## 3. Security (human-owned)
 
@@ -44,27 +45,28 @@ Legend: ✅ done · ⏳ deferred (needs a human / external action) · 🔜 code-
 ## 4. Privacy posture (leader-grade)
 
 - ✅ Account deletion, concierge memory/conversation deletion, DM deletion.
-- ✅ Location presence sharing **opt-in** (off by default); trip-ETA location only while a trip is active.
+- ✅ Location presence sharing **opt-in and server-enforced** (`users.share_presence`, default off); trip-ETA location only while a trip is active.
 - ✅ No third-party analytics/ads/crash SDKs; on-device-first AI; transient receipt images; PII removed from server logs.
 - ⏳ **Reconcile `website/privacy.html`** — DONE for the two known contradictions (GPS collection, receipt images, removed false "usage data" claim). **Re-review the whole policy** end-to-end against the shipped App Privacy label before launch, and have it counsel-reviewed if possible.
-- ✅ **Data export** — policy offers a copy by emailing `kinrows@atlasatlantic.co` (no in-app download yet). In-app account deletion is the App Store requirement.
+- ✅ **Data export** — `GET /api/account/export` + Settings → Export my data (no hashes/tokens/blobs). Email `kinrows@atlasatlantic.co` remains an alternate path.
 - ⏳ Consider **APNs payload minimization** — pushes currently carry message/coverage/child-name text in the visible alert (Apple can read payloads). A Notification Service Extension fetching content post-delivery would be the privacy-max move (deferred; not a blocker).
 
 ## 5. Infrastructure / ops
 
-- ✅ `.env.example` documents all 26 server env vars.
-- ⏳ Confirm Railway env has: `SESSION_SECRET`, `ANTHROPIC_API_KEY`, APNs trio (`APNS_KEY_ID`/`TEAM_ID`/`KEY_BASE64`), `RESEND_API_KEY`, `APNS_BUNDLE_ID`, and for web Concierge billing `STRIPE_SECRET_KEY` + `STRIPE_WEBHOOK_SECRET` (test keys locally; live keys only in production). Push, email, and Stripe Checkout are silently disabled if unset.
+- ✅ `.env.example` documents server env vars including `STRIPE_ALLOW_TEST` / `STOREKIT_ALLOW_SANDBOX` / `COMP_PREMIUM_ALL` (all default off).
+- ⏳ Confirm Railway env has: `SESSION_SECRET` (**rotated since 2026-07-11 rewrite**), `ANTHROPIC_API_KEY`, APNs trio (`APNS_KEY_ID`/`TEAM_ID`/`KEY_BASE64`), `RESEND_API_KEY`, `APNS_BUNDLE_ID`, and for web Concierge billing `STRIPE_SECRET_KEY` + `STRIPE_WEBHOOK_SECRET` (test keys locally; live keys only in production). Push, email, and Stripe Checkout are silently disabled if unset.
+- ⏳ **Confirm these are unset in production:** `AUTH_2FA_ECHO_CODE`, `STRIPE_ALLOW_TEST`, `STOREKIT_ALLOW_SANDBOX`, `COMP_PREMIUM_ALL`. Set `ADMIN_USER_IDS` to real ids only.
 - ⏳ Verify the **APNs production** certificate/key and `aps-environment: production` match the distribution build.
 - ⏳ **StoreKit / subscriptions**: products configured in App Store Connect matching `services/subscription.js` IDs; test a sandbox purchase end-to-end (verify, entitlement unlock, `/api/subscription/notifications` server-to-server).
 - ⚠️ **Verify DB persistence on Railway.** Production has accumulated real data, so persistence is presumably already working — but *confirm how*: `database.js` picks the DB dir from `FAMILY_DB_DIR` → (legacy `RENDER_DISK_PATH`, unused) → a `$HOME`-based fallback. On Railway, either `FAMILY_DB_DIR` must point at a mounted volume **or** a volume must be mounted at that fallback path; otherwise `family.db` (and the nightly `backups/`) sit on ephemeral storage and are lost on redeploy. Check the Railway volume mount matches the effective DB path. (Render config removed 2026-07-11 — the project uses Railway.)
-- 🔜 Set up basic uptime monitoring on `/healthz`.
+- 🔜 Set up basic uptime monitoring on `/healthz` (live probe returns `{"ok":true}` only; TLS 1.3 + HSTS verified 2026-08-26).
 
 ## 6. Nice-to-have polish (post-launch OK)
 
 - ⏳ Notification upgrades from the audit: trip pushes to the *household* (not the traveler's own device), rivalry score-update spam throttle, in-context banner suppression (don't notify a DM while that chat is open), `INSendMessageIntent` communication notifications with sender avatars, quick-action categories (reply/approve/check-off). Deep-linking + threading + time-sensitive levels are ✅ done.
 - ✅ Concierge `complete_rivalry` now posts the feed celebration + win/loss pushes (parity with the UI button).
 - ✅ **Waitlist referral program** (2026-07-11) — each signup gets a shareable `?ref=` code; referring friends moves you up the queue (rank by referrals then signup id). Post-signup card shows position + copy/share link + referral count. `/api/waitlist` returns standing; `/api/waitlist/status` refreshes it. Covered by `test/waitlist-referral.test.js` (5 tests). The higher-leverage conversion lever from the UX research, now built.
-- ⏳ iOS unit/UI test target (backend has 28 tests; the app has none).
+- ⏳ iOS unit/UI test target (backend `npm test` is 150 cases; the app has none).
 - ⏳ Widgets / Live Activities (coverage "who has the kids now", active-trip next stop) — flagged by UI/UX research.
 - ⏳ **Avatar cache invalidation** (from bug sweep, low) — `ProfileImageCache.loadFromHousehold` guards on `images[userId] == nil`, so another member's *new* profile photo isn't picked up until app relaunch/logout even though `fetchGroupMembers` returns fresh base64. Fix: overwrite the cached image when the inline base64 differs, or add an avatar version/hash to the me/group-members payload and refetch on change.
 - ⏳ **Coverage deep-link precision** (from bug sweep, low) — `handleDeepLink` maps `coverage`/`coverage_request`/`coverage_confirmed` to the combined list and ignores `ref_id`, so a helper tapping "X needs your help" lands on the list rather than the specific request. Recoverable, but thread `pendingRefId` into the coverage view to scroll to the referenced request.
