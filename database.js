@@ -4370,6 +4370,31 @@ class FamilyDB {
     });
   }
 
+  getSubscriptionByOriginalTransactionId(originalTransactionId) {
+    return new Promise((resolve, reject) => {
+      this.db.get(
+        'SELECT * FROM subscriptions WHERE original_transaction_id = ?',
+        [String(originalTransactionId)],
+        (err, row) => err ? reject(err) : resolve(row || null)
+      );
+    });
+  }
+
+  // Most recent Stripe-billed row for a household (active or not) — used to
+  // reuse the Stripe Customer on a later checkout / customer portal session.
+  getLatestStripeSubscriptionForGroup(groupId) {
+    return new Promise((resolve, reject) => {
+      if (!groupId) return resolve(null);
+      this.db.get(
+        `SELECT * FROM subscriptions
+         WHERE group_id = ? AND original_transaction_id LIKE 'stripe:%'
+         ORDER BY updated_at DESC LIMIT 1`,
+        [groupId],
+        (err, row) => err ? reject(err) : resolve(row || null)
+      );
+    });
+  }
+
   updateSubscriptionStatus(originalTransactionId, status, expiresAt) {
     return new Promise((resolve, reject) => {
       this.db.run(

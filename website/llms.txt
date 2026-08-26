@@ -15,6 +15,7 @@ Kinrows keeps a household's shared life in one calm place and gets everyone "row
 
 ## Key URLs
 - Homepage: https://kinrows.com/
+- Subscribe (Concierge, web billing): https://kinrows.com/subscribe.html
 - Compare vs other family apps: https://kinrows.com/compare.html
 - Best family organizer apps (honest 2026 comparison): https://kinrows.com/best-family-organizer-apps.html
 - Best family calendar app (comparison): https://kinrows.com/best-family-calendar-app.html

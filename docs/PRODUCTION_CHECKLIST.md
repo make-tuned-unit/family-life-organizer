@@ -51,7 +51,7 @@ Legend: ✅ done · ⏳ deferred (needs a human / external action) · 🔜 code-
 ## 5. Infrastructure / ops
 
 - ✅ `.env.example` documents all 26 server env vars.
-- ⏳ Confirm Railway env has: `SESSION_SECRET`, `ANTHROPIC_API_KEY`, APNs trio (`APNS_KEY_ID`/`TEAM_ID`/`KEY_BASE64`), `RESEND_API_KEY`, `APNS_BUNDLE_ID`. Push and email are silently disabled if unset.
+- ⏳ Confirm Railway env has: `SESSION_SECRET`, `ANTHROPIC_API_KEY`, APNs trio (`APNS_KEY_ID`/`TEAM_ID`/`KEY_BASE64`), `RESEND_API_KEY`, `APNS_BUNDLE_ID`, and for web Concierge billing `STRIPE_SECRET_KEY` + `STRIPE_WEBHOOK_SECRET` (test keys locally; live keys only in production). Push, email, and Stripe Checkout are silently disabled if unset.
 - ⏳ Verify the **APNs production** certificate/key and `aps-environment: production` match the distribution build.
 - ⏳ **StoreKit / subscriptions**: products configured in App Store Connect matching `services/subscription.js` IDs; test a sandbox purchase end-to-end (verify, entitlement unlock, `/api/subscription/notifications` server-to-server).
 - ⚠️ **Verify DB persistence on Railway.** Production has accumulated real data, so persistence is presumably already working — but *confirm how*: `database.js` picks the DB dir from `FAMILY_DB_DIR` → (legacy `RENDER_DISK_PATH`, unused) → a `$HOME`-based fallback. On Railway, either `FAMILY_DB_DIR` must point at a mounted volume **or** a volume must be mounted at that fallback path; otherwise `family.db` (and the nightly `backups/`) sit on ephemeral storage and are lost on redeploy. Check the Railway volume mount matches the effective DB path. (Render config removed 2026-07-11 — the project uses Railway.)

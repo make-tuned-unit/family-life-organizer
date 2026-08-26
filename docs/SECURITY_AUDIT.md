@@ -3,6 +3,24 @@
 Date: 2026-06-25. Scope: full-codebase review (auth, authz/isolation, AI/concierge,
 payments, email, DB, deploy, iOS) followed by remediation of P0/P1 findings.
 
+## 2026-08-26 — Stripe web subscriptions (Concierge)
+
+Web Checkout for the four Concierge plans (Lite/Premium × monthly/yearly). Entitlement
+is still per-household in `subscriptions`; Stripe rows are keyed `stripe:<sub id>` so
+they cannot collide with StoreKit original transaction ids.
+
+- Checkout and Customer Portal require a session (`requireAuth`) and a household.
+  Metadata on the Checkout Session + Subscription is the only bind (`kinrows_group_id` /
+  `kinrows_user_id` / `kinrows_product_id`) — the webhook never trusts a client-supplied
+  household id.
+- Webhook (`POST /api/subscription/stripe`) verifies Stripe's `v1` HMAC (5-minute
+  tolerance) against the **raw** body before parsing JSON. Unsigned events are 400.
+- Test-mode events are refused in production unless `STRIPE_ALLOW_TEST=1` (same idea as
+  `STOREKIT_ALLOW_SANDBOX`).
+- Secret and restricted keys live in env only (`.env` gitignored). Prefer a restricted
+  key with Checkout / Billing / Webhooks / Customers once this is proven on test keys.
+- Tests: `test/stripe-billing.test.js`.
+
 ## 2026-08-26 — Pre-signup onboarding + Sign in with Apple
 
 - Unauthenticated first launch now shows the product tour **before** login/signup.

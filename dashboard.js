@@ -1,3 +1,23 @@
+(function loadDotEnv() {
+  if (process.env.NODE_ENV === 'test') return;
+  const envPath = require('path').join(__dirname, '.env');
+  let text;
+  try { text = require('fs').readFileSync(envPath, 'utf8'); } catch { return; }
+  for (const raw of text.split('\n')) {
+    const line = raw.trim();
+    if (!line || line.startsWith('#')) continue;
+    const eq = line.indexOf('=');
+    if (eq < 1) continue;
+    const key = line.slice(0, eq).trim();
+    if (!/^[A-Z_][A-Z0-9_]*$/.test(key) || process.env[key] != null) continue;
+    let val = line.slice(eq + 1).trim();
+    if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+      val = val.slice(1, -1);
+    }
+    process.env[key] = val;
+  }
+})();
+
 process.env.TZ = process.env.TZ || 'America/Halifax';
 
 const express = require('express');
@@ -15,6 +35,7 @@ const { buildSnapshot } = require('./services/conciergeContext');
 const { generateBrief } = require('./services/conciergeBrief');
 const { handleChat, handleChatStream } = require('./services/conciergeChat');
 const subscription = require('./services/subscription');
+const stripeBilling = require('./services/stripe');
 const developerApi = require('./services/developerApi');
 const { runProactiveSweep } = require('./services/conciergeNudge');
 const { announceRivalryCompletion } = require('./services/rivalryAnnounce');
@@ -268,6 +289,9 @@ const LARGE_BODY_PATHS = [
   /^\/api\/milestones(\/\d+)?$/,  // optional base64 photo on create/update
 ];
 app.use((req, res, next) => {
+  if (req.method === 'POST' && req.path === '/api/subscription/stripe') {
+    return bodyParser.raw({ type: 'application/json', limit: '1mb' })(req, res, next);
+  }
   const parser = LARGE_BODY_PATHS.some(re => re.test(req.path)) ? jsonLarge : jsonSmall;
   parser(req, res, next);
 });
@@ -342,6 +366,8 @@ app.get('/developers', serveWebsiteHtml('developers.html'));
 app.get('/developers.html', serveWebsiteHtml('developers.html'));
 app.get('/compare', serveWebsiteHtml('compare.html'));
 app.get('/compare.html', serveWebsiteHtml('compare.html'));
+app.get('/subscribe', serveWebsiteHtml('subscribe.html'));
+app.get('/subscribe.html', serveWebsiteHtml('subscribe.html'));
 app.get('/best-chore-app-for-families', serveWebsiteHtml('best-chore-app-for-families.html'));
 app.get('/best-chore-app-for-families.html', serveWebsiteHtml('best-chore-app-for-families.html'));
 app.get('/best-family-calendar-app', serveWebsiteHtml('best-family-calendar-app.html'));
@@ -3740,6 +3766,100 @@ app.get('/api/subscription/status', requireAuth, async (req, res) => {
     res.json(await subscription.getStatus(db, req.session.user.id));
   } catch (err) {
     sendServerError(res, err);
+  } finally {
+    db.close();
+  }
+});
+
+// Public Concierge plan list (no secrets). Used by the website subscribe page.
+app.get('/api/subscription/catalog', (req, res) => {
+  res.json({
+    stripe: stripeBilling.isConfigured(),
+    plans: subscription.CATALOG,
+  });
+});
+
+// Create a Stripe Checkout Session for a Concierge plan. Bound to the caller's
+// household so the webhook can't attach the entitlement anywhere else.
+app.post('/api/subscription/checkout', requireAuth, async (req, res) => {
+  const productId = String(req.body?.product_id || '');
+  if (!subscription.CATALOG.some((p) => p.product_id === productId)) {
+    return res.status(400).json({ error: 'Unknown plan' });
+  }
+  if (!stripeBilling.isConfigured()) {
+    return res.status(503).json({ error: 'Web billing is not configured' });
+  }
+  const db = new FamilyDB();
+  try {
+    const userId = req.session.user.id;
+    const groupId = await db.getUserHouseholdId(userId);
+    if (!groupId) return res.status(400).json({ error: 'Join a household before subscribing' });
+    const user = await db.getUserById(userId);
+    let customerId = null;
+    try { customerId = await subscription.stripeCustomerIdForGroup(db, groupId); } catch { /* first purchase */ }
+    const base = publicBaseUrl();
+    const session = await stripeBilling.createCheckoutSession({
+      productId,
+      userId,
+      groupId,
+      customerId,
+      customerEmail: (!customerId && user?.email) ? user.email : null,
+      successUrl: `${base}/subscribe.html?success=1`,
+      cancelUrl: `${base}/subscribe.html?canceled=1`,
+    });
+    res.json({ url: session.url, id: session.id });
+  } catch (err) {
+    if (err.status === 400) return res.status(400).json({ error: err.message });
+    console.error('[subscription/checkout]', err && err.stack ? err.stack : err);
+    res.status(502).json({ error: 'Could not start checkout' });
+  } finally {
+    db.close();
+  }
+});
+
+// Stripe Customer Portal — manage payment method / cancel a web subscription.
+app.post('/api/subscription/portal', requireAuth, async (req, res) => {
+  if (!stripeBilling.isConfigured()) {
+    return res.status(503).json({ error: 'Web billing is not configured' });
+  }
+  const db = new FamilyDB();
+  try {
+    const groupId = await db.getUserHouseholdId(req.session.user.id);
+    if (!groupId) return res.status(400).json({ error: 'No household' });
+    const customerId = await subscription.stripeCustomerIdForGroup(db, groupId);
+    if (!customerId) return res.status(404).json({ error: 'No web subscription to manage' });
+    const session = await stripeBilling.createPortalSession({
+      customerId,
+      returnUrl: `${publicBaseUrl()}/subscribe.html`,
+    });
+    res.json({ url: session.url });
+  } catch (err) {
+    console.error('[subscription/portal]', err && err.stack ? err.stack : err);
+    res.status(502).json({ error: 'Could not open billing portal' });
+  } finally {
+    db.close();
+  }
+});
+
+// Stripe webhooks. Auth is the signature — never a session cookie.
+app.post('/api/subscription/stripe', async (req, res) => {
+  const secret = process.env.STRIPE_WEBHOOK_SECRET;
+  const raw = Buffer.isBuffer(req.body) ? req.body : Buffer.from(String(req.body || ''), 'utf8');
+  if (!stripeBilling.verifyWebhookSignature(raw, req.headers['stripe-signature'], secret)) {
+    return res.status(400).json({ error: 'Invalid signature' });
+  }
+  let event;
+  try { event = JSON.parse(raw.toString('utf8')); } catch {
+    return res.status(400).json({ error: 'Invalid payload' });
+  }
+  const db = new FamilyDB();
+  try {
+    const result = await subscription.applyStripeEvent(db, event);
+    _householdEntitlementCache.clear();
+    res.json(result);
+  } catch (err) {
+    console.error('[subscription/stripe]', err && err.stack ? err.stack : err);
+    res.status(400).json({ error: 'Event rejected' });
   } finally {
     db.close();
   }
@@ -7517,6 +7637,7 @@ initializeDatabase().then(() => {
   const server = app.listen(PORT, () => {
     console.log('Kinrows running on port', PORT);
     console.log('AI features:', process.env.ANTHROPIC_API_KEY ? 'ENABLED' : 'DISABLED (no ANTHROPIC_API_KEY)');
+    console.log('Stripe billing:', stripeBilling.isConfigured() ? 'ENABLED' : 'DISABLED (no STRIPE_SECRET_KEY)');
     startProactiveNudges();
     startNightlyBackups();
     startOnboardingEmails();

@@ -3,6 +3,7 @@
 // user's household group unlocks premium for everyone in that group.
 
 const { verifyTransaction } = require('./appleVerify');
+const stripe = require('./stripe');
 
 const BUNDLE_ID = process.env.APNS_BUNDLE_ID || 'com.kinrows.app';
 
@@ -26,6 +27,14 @@ const PRODUCTS = {
   'com.mylauft.kinrows.concierge.premium.yearly':  { tier: 'premium', period: 'yearly'  },
   'com.mylauft.kinrows.concierge.monthly':         { tier: 'premium', period: 'monthly' },
 };
+// Display catalog for the website paywall (USD). Yearly = two months free.
+const CATALOG = [
+  { product_id: 'com.kinrows.app.concierge.lite.monthly',    tier: 'lite',    period: 'monthly', amount_cents: 499,  chats: 10 },
+  { product_id: 'com.kinrows.app.concierge.lite.yearly',     tier: 'lite',    period: 'yearly',  amount_cents: 4999, chats: 10 },
+  { product_id: 'com.kinrows.app.concierge.premium.monthly', tier: 'premium', period: 'monthly', amount_cents: 999,  chats: 40 },
+  { product_id: 'com.kinrows.app.concierge.premium.yearly',  tier: 'premium', period: 'yearly',  amount_cents: 9999, chats: 40 },
+];
+
 // Product used for comped (non-billed) entitlements — grants the premium tier.
 const COMP_PRODUCT_ID = 'com.kinrows.app.concierge.premium.monthly';
 // Back-compat export for any caller still referencing a single product id.
@@ -181,12 +190,109 @@ async function verifyAndApplyNotification(db, signedPayload) {
 async function getStatus(db, userId) {
   const groupId = await db.getUserHouseholdId(userId);
   const sub = await db.getActiveSubscriptionForGroup(groupId);
+  const stripeManaged = !!(sub && stripe.isStripeTxn(sub.original_transaction_id));
   return {
     premium: !!sub,
     tier: sub ? tierForProduct(sub.product_id) : null,
     product_id: sub ? sub.product_id : null,
     expires_at: sub ? sub.expires_at : null,
+    source: sub ? (stripeManaged ? 'stripe' : (String(sub.environment || '').startsWith('Comp') ? 'comp' : 'apple')) : null,
+    stripe_managed: stripeManaged,
   };
 }
 
-module.exports = { verifyAndStore, verifyAndApplyNotification, getStatus, isHouseholdPremium, getHouseholdTier, tierForProduct, grantCompForGroup, revokeCompForGroup, ensureCompPremium, PRODUCTS, PRODUCT_ID, BUNDLE_ID };
+function toSqlDateFromUnix(seconds) {
+  const n = Number(seconds);
+  if (!n || Number.isNaN(n)) return null;
+  return toSqlDate(n * 1000);
+}
+
+// Persist a Stripe Subscription onto the household entitlement row.
+// `groupId`/`userId`/`productId` come from Checkout metadata (or an existing row).
+async function applyStripeSubscription(db, stripeSub, extras = {}) {
+  if (!stripeSub || !stripeSub.id) return { applied: false, reason: 'no_subscription' };
+  if (stripeSub.livemode === false && !stripe.allowTestStripe()) {
+    throw new Error('Refusing Stripe test-mode subscription on production');
+  }
+
+  const originalTransactionId = stripe.txnId(stripeSub.id);
+  const existing = await db.getSubscriptionByOriginalTransactionId(originalTransactionId);
+
+  const groupId = Number(stripeSub.metadata?.kinrows_group_id || extras.groupId || existing?.group_id);
+  const userId = Number(stripeSub.metadata?.kinrows_user_id || extras.userId || existing?.user_id);
+  if (!Number.isInteger(groupId) || groupId <= 0 || !Number.isInteger(userId) || userId <= 0) {
+    return { applied: false, reason: 'unbound' };
+  }
+
+  const price = stripeSub.items?.data?.[0]?.price;
+  const productId = await stripe.productIdForPrice(price)
+    || extras.productId
+    || stripeSub.metadata?.kinrows_product_id
+    || existing?.product_id;
+  if (!PRODUCTS[productId]) {
+    return { applied: false, reason: 'unknown_product' };
+  }
+
+  const status = stripe.statusFromStripe(stripeSub);
+  const expiresAt = toSqlDateFromUnix(stripe.periodEndUnix(stripeSub))
+    || (status === 'active' ? toSqlDate(Date.now() + 35 * 24 * 60 * 60 * 1000) : existing?.expires_at);
+
+  await db.upsertSubscription({
+    group_id: groupId,
+    user_id: userId,
+    product_id: productId,
+    original_transaction_id: originalTransactionId,
+    expires_at: expiresAt,
+    environment: stripe.environmentFromLivemode(stripeSub.livemode),
+    status,
+  });
+
+  return { applied: true, status, groupId, userId, productId, originalTransactionId };
+}
+
+async function applyStripeEvent(db, event) {
+  const type = event?.type;
+  const obj = event?.data?.object;
+  if (!type || !obj) return { applied: false, reason: 'malformed' };
+
+  if (type === 'checkout.session.completed') {
+    if (obj.mode && obj.mode !== 'subscription') return { applied: false, reason: 'not_subscription' };
+    const subRef = obj.subscription;
+    if (!subRef) return { applied: false, reason: 'no_subscription' };
+    const stripeSub = typeof subRef === 'object' ? subRef : await stripe.retrieveSubscription(subRef);
+    return applyStripeSubscription(db, stripeSub, {
+      groupId: obj.client_reference_id || obj.metadata?.kinrows_group_id,
+      userId: obj.metadata?.kinrows_user_id,
+      productId: obj.metadata?.kinrows_product_id,
+    });
+  }
+
+  if (type === 'customer.subscription.updated' || type === 'customer.subscription.deleted') {
+    return applyStripeSubscription(db, obj);
+  }
+
+  if (type === 'invoice.paid' || type === 'invoice.payment_failed') {
+    const subRef = obj.subscription || obj.parent?.subscription_details?.subscription;
+    if (!subRef) return { applied: false, reason: 'no_subscription' };
+    const stripeSub = typeof subRef === 'object' ? subRef : await stripe.retrieveSubscription(subRef);
+    return applyStripeSubscription(db, stripeSub);
+  }
+
+  return { applied: false, reason: 'ignored' };
+}
+
+async function stripeCustomerIdForGroup(db, groupId) {
+  const row = await db.getLatestStripeSubscriptionForGroup(groupId);
+  if (!row) return null;
+  const subId = stripe.stripeSubscriptionIdFromTxn(row.original_transaction_id);
+  if (!subId) return null;
+  const sub = await stripe.retrieveSubscription(subId);
+  return typeof sub.customer === 'string' ? sub.customer : sub.customer?.id || null;
+}
+
+module.exports = {
+  verifyAndStore, verifyAndApplyNotification, getStatus, isHouseholdPremium, getHouseholdTier,
+  tierForProduct, grantCompForGroup, revokeCompForGroup, ensureCompPremium,
+  applyStripeSubscription, applyStripeEvent, stripeCustomerIdForGroup,
+  PRODUCTS, PRODUCT_ID, BUNDLE_ID, CATALOG,
+};

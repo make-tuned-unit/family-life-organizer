@@ -86,11 +86,14 @@ wired up for real billing yet**. Before this can sell:
 - [ ] End-to-end test the purchase → backend verify → entitlement → tier-cap path in
   sandbox for both tiers and both billing periods (incl. upgrade Lite→Premium and the
   per-household cap flipping 10→40 immediately after verify).
-- [ ] **Stripe web-subscription flow** (bypass the Apple cut, ~$0.90/sub): Stripe Checkout
-  on the website → webhook → mark household premium in the existing `subscriptions` table
-  (non-Apple `original_transaction_id`) → Universal Link back to the app. The app already
-  reads premium/tier from the backend, so the server side is the main work. Verify current
-  App Store external-link compliance before shipping.
+- [x] **Stripe web-subscription flow** (test-mode catalog + Checkout + webhook coded
+  2026-08-26): `POST /api/subscription/checkout` (session auth) → Stripe Checkout →
+  `POST /api/subscription/stripe` (signed webhook) → household row in `subscriptions`
+  with `original_transaction_id` `stripe:sub_…`. Customer Portal at
+  `POST /api/subscription/portal`. Website: `/subscribe.html`. Still before live
+  charges: put **live** keys + `STRIPE_WEBHOOK_SECRET` on Railway, enable Stripe Tax
+  once you have a registration, and confirm App Store external-link / reader-app
+  rules before promoting the web paywall from the iOS app.
 - [ ] Decide whether to lower the Premium cap from 40/day or keep the per-household cap as
   the abuse backstop (at the 40/day ceiling a household can exceed the $8.49 net — extreme,
   but possible). Revisit once real usage data exists.
