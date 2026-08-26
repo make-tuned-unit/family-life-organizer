@@ -121,6 +121,8 @@ struct CookView: View {
                     .font(.system(size: 16))
                     .foregroundStyle(TabAccent.cook.color)
             }
+            .accessibilityLabel("Get recipe suggestions")
+            .help("Get recipe suggestions")
             .disabled(viewModel.query.isEmpty || viewModel.isLoading)
         }
         .padding(14)

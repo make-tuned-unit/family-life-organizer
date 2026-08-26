@@ -54,6 +54,8 @@ struct ExpensesView: View {
                         Image(systemName: "slider.horizontal.3")
                             .foregroundStyle(WarmPalette.ink2)
                     }
+                    .accessibilityLabel("Budget categories")
+                    .help("Budget categories")
                     Menu {
                         Button { showingScanner = true } label: {
                             Label("Scan Receipt", systemImage: "camera")
@@ -65,6 +67,8 @@ struct ExpensesView: View {
                         Image(systemName: "plus")
                             .foregroundStyle(WarmPalette.ink2)
                     }
+                    .accessibilityLabel("Add receipt")
+                    .help("Add receipt")
                 }
             }
         }
@@ -247,11 +251,15 @@ struct ExpensesView: View {
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundStyle(WarmPalette.ink2)
                 }
+                .accessibilityLabel("Previous month")
+                .help("Previous month")
                 Button { viewModel.nextMonth() } label: {
                     Image(systemName: "chevron.right")
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundStyle(WarmPalette.ink2)
                 }
+                .accessibilityLabel("Next month")
+                .help("Next month")
             }
         }
         .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)

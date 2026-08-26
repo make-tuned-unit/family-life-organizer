@@ -48,6 +48,8 @@ struct HouseholdView: View {
                     Image(systemName: "ellipsis.circle")
                         .foregroundStyle(TabAccent.home.color)
                 }
+                .accessibilityLabel("Household actions")
+                .help("Household actions")
             }
         }
         .sheet(isPresented: $showingAddMember) {

@@ -61,6 +61,8 @@ struct RoutinesView: View {
                         .font(.system(size: 16, weight: .semibold))
                         .foregroundStyle(accent)
                 }
+                .accessibilityLabel("New routine")
+                .help("New routine")
             }
         }
         .inlineError(errorMessage) { errorMessage = nil }

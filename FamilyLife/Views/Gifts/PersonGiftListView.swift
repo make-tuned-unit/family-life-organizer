@@ -98,6 +98,7 @@ struct PersonGiftListView: View {
                     Image(systemName: "plus")
                 }
                 .accessibilityLabel("Add gift idea")
+                .help("Add gift idea")
             }
         }
         .sheet(isPresented: $showingAddIdea) {
@@ -171,6 +172,8 @@ struct GiftIdeaRowRemote: View {
                 Image(systemName: statusIcon)
                     .foregroundStyle(statusColor)
             }
+            .accessibilityLabel("Advance gift status from \(idea.statusValue.rawValue)")
+            .help("Mark gift as next status")
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(idea.title)
@@ -198,6 +201,8 @@ struct GiftIdeaRowRemote: View {
                         .font(.flCaption)
                         .foregroundStyle(AccentTheme.ocean.color)
                 }
+                .accessibilityLabel("Open gift link")
+                .help("Open gift link")
             }
 
             Button(role: .destructive) {
@@ -205,6 +210,8 @@ struct GiftIdeaRowRemote: View {
             } label: {
                 Image(systemName: "trash")
             }
+            .accessibilityLabel("Delete gift idea")
+            .help("Delete gift idea")
         }
     }
 

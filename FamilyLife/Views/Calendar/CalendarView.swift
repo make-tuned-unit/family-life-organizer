@@ -411,6 +411,8 @@ struct CalendarView: View {
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundStyle(WarmPalette.ink2)
                 }
+                .accessibilityLabel("Previous month")
+                .help("Previous month")
                 Button {
                     movingForward = true
                     withAnimation(.snappy) { viewModel.nextMonth() }
@@ -419,6 +421,8 @@ struct CalendarView: View {
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundStyle(WarmPalette.ink2)
                 }
+                .accessibilityLabel("Next month")
+                .help("Next month")
             }
         }
         .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)

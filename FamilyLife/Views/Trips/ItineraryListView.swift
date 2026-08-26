@@ -68,6 +68,7 @@ struct ItineraryListView: View {
                     Image(systemName: "plus")
                 }
                 .accessibilityLabel("Plan new itinerary")
+                .help("Plan new itinerary")
             }
         }
         .sheet(isPresented: $showingNewItinerary) {
