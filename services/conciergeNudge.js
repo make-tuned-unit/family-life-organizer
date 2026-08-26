@@ -44,8 +44,9 @@ async function sleepNudgeFor(db, groupId, { today = null } = {}) {
     }
   }
 
+  const entriesBy = await db.getRoutineEntriesForIds(routines.map(r => r.id), { limitPer: 600 });
   for (const routine of routines) {
-    const entries = await db.getRoutineEntries(routine.id, { limit: 600 });
+    const entries = entriesBy.get(routine.id) || [];
     const birthdate = routine.subject_birthdate || null;
     const analysis = sleepStats.analyzeWakings(entries, { birthdate, today, windowDays: 14 });
     if (analysis.nights_analyzed < SLEEP_MIN_NIGHTS) continue;

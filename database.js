@@ -3281,11 +3281,10 @@ class FamilyDB {
   }
 
   getFeedPosts(groupId, { limit = 50, before_id } = {}) {
-    return new Promise((resolve, reject) => {
+    const all = (sql, p) => new Promise((res, rej) => this.db.all(sql, p, (e, rows) => e ? rej(e) : res(rows || [])));
+    return (async () => {
       let sql = `
-        SELECT fp.*, u.name as author_name, u.avatar as author_avatar,
-          (SELECT COUNT(*) FROM feed_reactions WHERE post_id = fp.id) as reaction_count,
-          (SELECT COUNT(*) FROM feed_comments WHERE post_id = fp.id) as comment_count
+        SELECT fp.*, u.name as author_name, u.avatar as author_avatar
         FROM feed_posts fp
         JOIN users u ON u.id = fp.author_id
         WHERE fp.group_id = ?
@@ -3297,8 +3296,22 @@ class FamilyDB {
       }
       sql += ' ORDER BY fp.id DESC LIMIT ?';
       params.push(limit);
-      this.db.all(sql, params, (err, rows) => err ? reject(err) : resolve(rows));
-    });
+      const rows = await all(sql, params);
+      if (!rows.length) return rows;
+      const ids = rows.map(r => r.id);
+      const ph = ids.map(() => '?').join(',');
+      const [reactions, comments] = await Promise.all([
+        all(`SELECT post_id, COUNT(*) AS n FROM feed_reactions WHERE post_id IN (${ph}) GROUP BY post_id`, ids),
+        all(`SELECT post_id, COUNT(*) AS n FROM feed_comments WHERE post_id IN (${ph}) GROUP BY post_id`, ids),
+      ]);
+      const rc = new Map(reactions.map(r => [r.post_id, r.n]));
+      const cc = new Map(comments.map(r => [r.post_id, r.n]));
+      return rows.map(r => ({
+        ...r,
+        reaction_count: rc.get(r.id) || 0,
+        comment_count: cc.get(r.id) || 0,
+      }));
+    })();
   }
 
   // Retract the feed post(s) that announced something, for when that thing is
@@ -3706,21 +3719,23 @@ class FamilyDB {
 
   getLists(userId) {
     return new Promise((resolve, reject) => {
+      const counts = `LEFT JOIN (
+          SELECT list_id,
+            SUM(CASE WHEN is_done = 0 THEN 1 ELSE 0 END) AS active_count,
+            COUNT(*) AS total_count
+          FROM list_items GROUP BY list_id
+        ) c ON c.list_id = l.id`;
       const sql = userId
-        ? `SELECT l.*,
-            (SELECT COUNT(*) FROM list_items WHERE list_id = l.id AND is_done = 0) as active_count,
-            (SELECT COUNT(*) FROM list_items WHERE list_id = l.id) as total_count
-          FROM lists l
+        ? `SELECT l.*, COALESCE(c.active_count, 0) as active_count, COALESCE(c.total_count, 0) as total_count
+          FROM lists l ${counts}
           WHERE l.created_by = ? OR l.created_by IN (
             SELECT gm2.user_id FROM group_members gm2
             JOIN groups g ON g.id = gm2.group_id AND g.group_type = 'household'
             WHERE gm2.group_id IN (SELECT group_id FROM group_members WHERE user_id = ?)
           )
           ORDER BY l.pinned DESC, l.created_at ASC`
-        : `SELECT l.*,
-            (SELECT COUNT(*) FROM list_items WHERE list_id = l.id AND is_done = 0) as active_count,
-            (SELECT COUNT(*) FROM list_items WHERE list_id = l.id) as total_count
-          FROM lists l ORDER BY l.created_at ASC`;
+        : `SELECT l.*, COALESCE(c.active_count, 0) as active_count, COALESCE(c.total_count, 0) as total_count
+          FROM lists l ${counts} ORDER BY l.created_at ASC`;
       this.db.all(sql, userId ? [userId, userId] : [], (err, rows) => err ? reject(err) : resolve(rows));
     });
   }
@@ -4527,9 +4542,13 @@ class FamilyDB {
       if (groupId == null || userId == null) return resolve([]);
       this.db.all(
         `SELECT r.*,
-          (SELECT COUNT(*) FROM routine_entries WHERE routine_id = r.id) AS entry_count,
-          (SELECT MAX(entry_date) FROM routine_entries WHERE routine_id = r.id) AS last_entry_date
+          COALESCE(e.entry_count, 0) AS entry_count,
+          e.last_entry_date
          FROM routines r
+         LEFT JOIN (
+           SELECT routine_id, COUNT(*) AS entry_count, MAX(entry_date) AS last_entry_date
+           FROM routine_entries GROUP BY routine_id
+         ) e ON e.routine_id = r.id
          WHERE r.group_id = ?
            AND (r.created_by = ? OR r.shared_scope = 'household')
          ORDER BY r.active DESC, r.created_at DESC`,
@@ -4613,6 +4632,31 @@ class FamilyDB {
     });
   }
 
+  // One query for many routines, then slice per id in memory. Home/nudge
+  // callers were issuing getRoutineEntries once per row (O(N) on a hot path).
+  getRoutineEntriesForIds(routineIds, { limitPer = 200 } = {}) {
+    return new Promise((resolve, reject) => {
+      if (!routineIds.length) return resolve(new Map());
+      const cap = Math.max(1, Math.min(1000, parseInt(limitPer, 10) || 200));
+      const ph = routineIds.map(() => '?').join(',');
+      this.db.all(
+        `SELECT * FROM routine_entries WHERE routine_id IN (${ph})
+         ORDER BY routine_id, entry_date DESC, COALESCE(entry_time, "") DESC, id DESC`,
+        routineIds,
+        (err, rows) => {
+          if (err) return reject(err);
+          const by = new Map();
+          for (const row of rows || []) {
+            if (!by.has(row.routine_id)) by.set(row.routine_id, []);
+            const list = by.get(row.routine_id);
+            if (list.length < cap) list.push(row);
+          }
+          resolve(by);
+        }
+      );
+    });
+  }
+
   addRoutineEntry(routineId, e) {
     return new Promise((resolve, reject) => {
       this.db.run(
@@ -4636,6 +4680,28 @@ class FamilyDB {
            AND value LIKE '%"in_progress":true%'
          ORDER BY entry_date DESC, id DESC LIMIT 1`,
         [routineId], (err, row) => err ? reject(err) : resolve(row));
+    });
+  }
+
+  getOpenSleepEntriesForIds(routineIds) {
+    return new Promise((resolve, reject) => {
+      if (!routineIds.length) return resolve(new Map());
+      const ph = routineIds.map(() => '?').join(',');
+      this.db.all(
+        `SELECT * FROM routine_entries
+         WHERE routine_id IN (${ph}) AND entry_type IN ('nap', 'night_sleep')
+           AND value LIKE '%"in_progress":true%'
+         ORDER BY entry_date DESC, id DESC`,
+        routineIds,
+        (err, rows) => {
+          if (err) return reject(err);
+          const by = new Map();
+          for (const row of rows || []) {
+            if (!by.has(row.routine_id)) by.set(row.routine_id, row);
+          }
+          resolve(by);
+        }
+      );
     });
   }
 
