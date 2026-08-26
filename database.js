@@ -175,6 +175,7 @@ class FamilyDB {
         this.db.run('ALTER TABLE special_events ADD COLUMN group_id INTEGER REFERENCES groups(id)', () => {});
         this.db.run('ALTER TABLE family_addresses ADD COLUMN group_id INTEGER REFERENCES groups(id)', () => {});
         this.db.run('CREATE INDEX IF NOT EXISTS idx_receipts_group ON receipts(group_id)', () => {});
+        this.db.run('CREATE INDEX IF NOT EXISTS idx_receipts_group_date_id ON receipts(group_id, date DESC, id DESC)', () => {});
         this.db.run('CREATE INDEX IF NOT EXISTS idx_budget_projects_group ON budget_projects(group_id)', () => {});
         this.db.run('CREATE INDEX IF NOT EXISTS idx_project_expenses_group ON project_expenses(group_id)', () => {});
         this.db.run('CREATE INDEX IF NOT EXISTS idx_pantry_group ON pantry(group_id)', () => {});
@@ -799,7 +800,7 @@ class FamilyDB {
                    WHERE gm.user_id = ${uid} AND g.group_type = 'household')`;
       }
 
-      sql += ' ORDER BY appointment_date, appointment_time';
+      sql += ' ORDER BY appointment_date, appointment_time LIMIT 1000';
 
       this.db.all(sql, params, (err, rows) => {
         if (err) reject(err);
@@ -1084,7 +1085,7 @@ class FamilyDB {
     });
   }
 
-  getReceipts(filters = {}, groupId = null) {
+  getReceipts(filters = {}, groupId = null, { limit = 1000, before_id, before_date } = {}) {
     return new Promise((resolve, reject) => {
       // Fail closed: a null groupId must never mean "every household" — the
       // route guards enforce this, this is defense-in-depth for future callers.
@@ -1104,8 +1105,19 @@ class FamilyDB {
         sql += ' AND LOWER(category) = LOWER(?)';
         params.push(filters.category);
       }
+      // Keyset: date DESC, id DESC. before_date+before_id is the stable cursor;
+      // before_id alone is accepted only as a fallback (id is not the sort key).
+      if (before_date && before_id) {
+        sql += ' AND (date < ? OR (date = ? AND id < ?))';
+        params.push(before_date, before_date, before_id);
+      } else if (before_id) {
+        sql += ' AND id < ?';
+        params.push(before_id);
+      }
 
-      sql += ' ORDER BY date DESC, created_at DESC';
+      const cap = Math.max(1, Math.min(1000, parseInt(limit, 10) || 1000));
+      sql += ' ORDER BY date DESC, id DESC LIMIT ?';
+      params.push(cap);
 
       this.db.all(sql, params, (err, rows) => {
         if (err) reject(err);
@@ -1236,7 +1248,7 @@ class FamilyDB {
       if (groupId != null) { sql += ' AND group_id = ?'; params.push(groupId); }
       if (filters.location) { sql += ' AND LOWER(location) = LOWER(?)'; params.push(filters.location); }
       if (filters.category) { sql += ' AND LOWER(category) = LOWER(?)'; params.push(filters.category); }
-      sql += ' ORDER BY category, item';
+      sql += ' ORDER BY category, item LIMIT 1000';
       this.db.all(sql, params, (err, rows) => {
         if (err) reject(err);
         else resolve(rows);
@@ -2241,7 +2253,7 @@ class FamilyDB {
           AND (COALESCE(m.shared_scope, 'household') != 'private' OR m.created_by = ?)`;
       const params = [groupId, userId];
       if (personId != null) { sql += ' AND m.person_id = ?'; params.push(personId); }
-      sql += ' ORDER BY m.milestone_date DESC, m.id DESC';
+      sql += ' ORDER BY m.milestone_date DESC, m.id DESC LIMIT 1000';
       this.db.all(sql, params, (err, rows) => err ? reject(err) : resolve(rows || []));
     });
   }
@@ -2453,7 +2465,7 @@ class FamilyDB {
          LEFT JOIN groups g ON g.id = n.group_id
          WHERE n.user_id = ?
             OR (n.shared_scope != 'private' AND n.group_id IN (SELECT group_id FROM group_members WHERE user_id = ?))
-         ORDER BY n.pinned DESC, datetime(n.updated_at) DESC`,
+         ORDER BY n.pinned DESC, datetime(n.updated_at) DESC LIMIT 1000`,
         [uid, uid], (err, rows) => err ? reject(err) : resolve(rows || []));
     });
   }
@@ -3744,7 +3756,7 @@ class FamilyDB {
   getListItems(listId) {
     return new Promise((resolve, reject) => {
       this.db.all(
-        'SELECT * FROM list_items WHERE list_id = ? ORDER BY is_done ASC, category ASC, sort_order ASC, id DESC',
+        'SELECT * FROM list_items WHERE list_id = ? ORDER BY is_done ASC, category ASC, sort_order ASC, id DESC LIMIT 1000',
         [listId], (err, rows) => err ? reject(err) : resolve(rows)
       );
     });

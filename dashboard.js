@@ -3083,7 +3083,11 @@ app.get('/api/receipts', requireAuth, async (req, res) => {
     if (req.query.category) filters.category = req.query.category;
     const groupId = await db.getUserHouseholdId(req.session.user?.id);
     if (!groupId) return res.json([]);
-    const receipts = await db.getReceipts(filters, groupId);
+    const receipts = await db.getReceipts(filters, groupId, {
+      limit: req.query.limit != null ? clampLimit(req.query.limit, 50, 1000) : 1000,
+      before_id: req.query.before_id ? parseInt(req.query.before_id, 10) : undefined,
+      before_date: typeof req.query.before_date === 'string' ? req.query.before_date : undefined,
+    });
     res.json(receipts);
   } catch (err) {
     sendServerError(res, err);

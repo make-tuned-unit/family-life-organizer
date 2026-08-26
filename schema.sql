@@ -693,6 +693,7 @@ CREATE INDEX IF NOT EXISTS idx_groceries_status ON groceries(status);
 CREATE INDEX IF NOT EXISTS idx_appointments_date ON appointments(appointment_date);
 CREATE INDEX IF NOT EXISTS idx_receipts_date ON receipts(date);
 CREATE INDEX IF NOT EXISTS idx_receipts_category ON receipts(category);
+CREATE INDEX IF NOT EXISTS idx_receipts_group_date_id ON receipts(group_id, date DESC, id DESC);
 
 -- Device tokens for APNs push notifications
 CREATE TABLE IF NOT EXISTS device_tokens (
