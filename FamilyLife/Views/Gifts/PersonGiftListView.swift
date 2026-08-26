@@ -125,11 +125,14 @@ struct PersonGiftListView: View {
     }
 
     private func updateStatus(for id: Int, status: GiftIdeaStatus) async {
+        guard let idx = ideas.firstIndex(where: { $0.id == id }) else { return }
+        let previous = ideas[idx].status
+        ideas[idx].status = status.rawValue
         do {
             try await api.updateGiftIdea(id: id, data: ["status": status.rawValue])
-            await loadIdeas()
         } catch {
             guard !error.isCancellation else { return }
+            ideas[idx].status = previous
             self.error = error.localizedDescription
         }
     }

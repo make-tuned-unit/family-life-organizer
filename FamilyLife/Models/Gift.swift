@@ -25,7 +25,7 @@ struct GiftIdeaResponse: Codable, Identifiable {
     let notes: String?
     let link_url: String?
     let estimated_price: Double?
-    let status: String
+    var status: String
     let for_event: String?
     let created_at: String?
 }

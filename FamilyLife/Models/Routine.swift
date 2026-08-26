@@ -546,7 +546,7 @@ struct SleepGuidance: Codable {
 
 struct ChoreSlotState: Codable, Identifiable {
     let slot: String            // morning | afternoon | evening | anytime
-    let done: Bool
+    var done: Bool
     let entry_id: Int?
     var id: String { slot }
 
@@ -688,8 +688,8 @@ struct ChoresTodaySummary: Codable, Identifiable {
     let subject_name: String?
     let color: String?
     let today: String
-    let chores: [ChoresTodayChore]
-    let open_slots: Int
+    var chores: [ChoresTodayChore]
+    var open_slots: Int
     let total_slots: Int
     let streak_days: Int
     let lifetime_done: Int?
@@ -703,7 +703,7 @@ struct ChoresTodayChore: Codable, Identifiable {
     let id: String
     let title: String
     let icon: String
-    let slots: [ChoreSlotState]
+    var slots: [ChoreSlotState]
 }
 
 // The static chores program (age bands + sources).
