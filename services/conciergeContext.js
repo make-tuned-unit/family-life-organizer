@@ -87,8 +87,14 @@ async function buildSnapshot(db, userId) {
   // anything owed from earlier weeks — so an agent can say "Jude still needs
   // to feed the dog tonight" without a second call.
   const choresToday = [];
-  for (const r of (choreRoutines || []).filter(r => r.routine_type === 'chores' && r.active !== 0).slice(0, 4)) {
-    const entries = await safe(db.getRoutineEntries(r.id, { limit: 1000 }), [], 'chore entries');
+  const choreList = (choreRoutines || []).filter(r => r.routine_type === 'chores' && r.active !== 0).slice(0, 4);
+  const choreEntriesBy = await safe(
+    db.getRoutineEntriesForIds(choreList.map(r => r.id), { limitPer: 1000 }),
+    new Map(),
+    'chore entries'
+  );
+  for (const r of choreList) {
+    const entries = choreEntriesBy.get(r.id) || [];
     const s = chores.compute(entries, r.config, { today });
     const open = [];
     for (const c of s.chores) {

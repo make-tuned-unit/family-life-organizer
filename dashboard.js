@@ -6153,9 +6153,10 @@ app.get('/api/routines/chores-today', requireAuth, async (req, res) => {
     const routines = (await db.getRoutines(groupId, userId))
       .filter(r => r.active !== 0 && r.routine_type === 'chores')
       .slice(0, 4);
+    const entriesBy = await db.getRoutineEntriesForIds(routines.map(r => r.id), { limitPer: 1000 });
     const out = [];
     for (const routine of routines) {
-      const entries = await db.getRoutineEntries(routine.id, { limit: 1000 });
+      const entries = entriesBy.get(routine.id) || [];
       const birthdate = await resolveSubjectBirthdate(db, routine, userId);
       const summary = chores.compute(entries, routine.config, { today: todayLocal(), birthdate });
       const todayCol = summary.chores.map(c => {
@@ -6201,14 +6202,19 @@ app.get('/api/routines/sleep-now', requireAuth, async (req, res) => {
       // Home has room for a couple of these; more than that belongs in Routines.
       .slice(0, 4);
 
+    const ids = routines.map(r => r.id);
+    const [entriesBy, openBy] = await Promise.all([
+      db.getRoutineEntriesForIds(ids, { limitPer: 120 }),
+      db.getOpenSleepEntriesForIds(ids),
+    ]);
     const out = [];
     for (const routine of routines) {
-      const entries = await db.getRoutineEntries(routine.id, { limit: 120 });
+      const entries = entriesBy.get(routine.id) || [];
       const birthdate = await resolveSubjectBirthdate(db, routine, userId);
 
       // A sleep in progress wins: the useful line then is "asleep 40m", and the
       // next-sleep prediction is meaningless until they wake.
-      const open = await db.getOpenSleepEntry(routine.id);
+      const open = openBy.get(routine.id) || null;
       let openValue = null;
       if (open) { try { openValue = JSON.parse(open.value || 'null'); } catch { openValue = null; } }
       const asleepSince = openValue?.sleep_start || null;
@@ -6945,11 +6951,22 @@ app.get('/api/lists/:id/items', requireAuth, async (req, res) => {
     );
     const items = await db.getListItems(req.params.id);
     if (isGrocery) {
-      for (const item of items) {
-        if (!item.category) {
+      const missing = items.filter(item => !item.category);
+      if (missing.length) {
+        const run = (sql, p) => new Promise((res, rej) => db.db.run(sql, p, function (e) { e ? rej(e) : res(); }));
+        const cases = [];
+        const params = [];
+        for (const item of missing) {
           item.category = FamilyDB.categorizeGroceryItem(item.title);
-          db.db.run('UPDATE list_items SET category = ? WHERE id = ?', [item.category, item.id]);
+          cases.push('WHEN ? THEN ?');
+          params.push(item.id, item.category);
         }
+        const ids = missing.map(item => item.id);
+        params.push(...ids);
+        await run(
+          `UPDATE list_items SET category = CASE id ${cases.join(' ')} END WHERE id IN (${ids.map(() => '?').join(',')})`,
+          params
+        );
       }
     }
     res.json(items);

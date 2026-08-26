@@ -295,3 +295,34 @@ test('chores tools: setup_chores → update_chores → log_chore → get_chores 
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test('getRoutineEntriesForIds matches per-routine reads in one query', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fl-n1-'));
+  process.env.FAMILY_DB_DIR = dir;
+  delete require.cache[require.resolve('../database')];
+  const FamilyDB = require('../database');
+  const db = new FamilyDB();
+  await db.initSchema();
+  try {
+    const u = await db.createUser({ username: 'n1_parent', password_hash: 'x', name: 'N1' });
+    const g = await db.createGroup({ name: 'N1 House', group_type: 'household', created_by: u.id });
+    await db.addGroupMember(g.id, { user_id: u.id, role: 'admin', added_by: u.id });
+    const a = await db.createRoutine({ group_id: g.id, created_by: u.id, name: 'Sleep A', routine_type: 'baby_sleep', start_date: '2026-08-01' });
+    const b = await db.createRoutine({ group_id: g.id, created_by: u.id, name: 'Sleep B', routine_type: 'baby_sleep', start_date: '2026-08-01' });
+    await db.addRoutineEntry(a.id, { entry_date: '2026-08-01', entry_type: 'nap', notes: 'a1' });
+    await db.addRoutineEntry(a.id, { entry_date: '2026-08-02', entry_type: 'nap', notes: 'a2' });
+    await db.addRoutineEntry(b.id, { entry_date: '2026-08-01', entry_type: 'nap', notes: 'b1' });
+
+    const sequential = {
+      a: await db.getRoutineEntries(a.id, { limit: 200 }),
+      b: await db.getRoutineEntries(b.id, { limit: 200 }),
+    };
+    const batched = await db.getRoutineEntriesForIds([a.id, b.id], { limitPer: 200 });
+    assert.equal((batched.get(a.id) || []).length, sequential.a.length);
+    assert.equal((batched.get(b.id) || []).length, sequential.b.length);
+    assert.deepEqual((batched.get(a.id) || []).map(r => r.notes), sequential.a.map(r => r.notes));
+  } finally {
+    db.close();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
