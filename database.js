@@ -225,6 +225,8 @@ class FamilyDB {
         this.db.run(`CREATE UNIQUE INDEX IF NOT EXISTS idx_rivalry_entries_daily
           ON rivalry_entries(rivalry_id, member_name, activity_date)
           WHERE note = 'Synced from Apple Health'`, () => {});
+        this.db.run('ALTER TABLE users ADD COLUMN apple_user_id TEXT', () => {});
+        this.db.run('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_apple_user_id ON users(apple_user_id) WHERE apple_user_id IS NOT NULL', () => {});
         this.db.run('ALTER TABLE users ADD COLUMN last_location_at DATETIME', (err) => {
           if (err) console.error('Migration error:', err.message);
           // budget_categories: rebuild to drop the global UNIQUE(name) so each
@@ -2569,13 +2571,62 @@ class FamilyDB {
   createUser(user) {
     return new Promise((resolve, reject) => {
       this.db.run(
-        'INSERT INTO users (username, password_hash, name, email, phone, avatar) VALUES (?, ?, ?, ?, ?, ?)',
-        [user.username, user.password_hash, user.name, user.email || null, user.phone || null, user.avatar || null],
+        'INSERT INTO users (username, password_hash, name, email, phone, avatar, apple_user_id, email_verified) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        [
+          user.username,
+          user.password_hash,
+          user.name,
+          user.email || null,
+          user.phone || null,
+          user.avatar || null,
+          user.apple_user_id || null,
+          user.email_verified ? 1 : 0,
+        ],
         function(err) {
           if (err) reject(err);
           else resolve({ id: this.lastID, username: user.username, name: user.name });
         }
       );
+    });
+  }
+
+  getUserByAppleId(appleUserId) {
+    return new Promise((resolve, reject) => {
+      this.db.get('SELECT * FROM users WHERE apple_user_id = ?', [appleUserId], (err, row) => {
+        if (err) reject(err);
+        else resolve(row || null);
+      });
+    });
+  }
+
+  getUserByVerifiedEmail(email) {
+    return new Promise((resolve, reject) => {
+      this.db.get(
+        'SELECT * FROM users WHERE email = ? AND email_verified = 1',
+        [email],
+        (err, row) => {
+          if (err) reject(err);
+          else resolve(row || null);
+        }
+      );
+    });
+  }
+
+  linkAppleUserId(userId, appleUserId, { email = null, markEmailVerified = false } = {}) {
+    return new Promise((resolve, reject) => {
+      if (email && markEmailVerified) {
+        this.db.run(
+          'UPDATE users SET apple_user_id = ?, email = ?, email_verified = 1 WHERE id = ?',
+          [appleUserId, email, userId],
+          (err) => (err ? reject(err) : resolve({ ok: true }))
+        );
+      } else {
+        this.db.run(
+          'UPDATE users SET apple_user_id = ? WHERE id = ?',
+          [appleUserId, userId],
+          (err) => (err ? reject(err) : resolve({ ok: true }))
+        );
+      }
     });
   }
 

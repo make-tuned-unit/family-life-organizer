@@ -36,9 +36,22 @@ enum MainTab: Hashable, CaseIterable {
 struct ContentView: View {
     @Environment(AuthService.self) private var authService
     @AppStorage("hasSeenOnboardingTour") private var hasSeenOnboardingTour = false
+    @State private var unauthScreen: UnauthScreen?
+
+    private enum UnauthScreen: Equatable {
+        case tour
+        case login
+        case signUp(SignUpView.Mode)
+    }
 
     var body: some View {
         content
+            .onChange(of: authService.isAuthenticated) { _, authed in
+                if authed {
+                    hasSeenOnboardingTour = true
+                    unauthScreen = nil
+                }
+            }
         #if DEBUG
             .task { await ScreenshotHarness.autoLoginIfNeeded(authService) }
         #endif
@@ -54,17 +67,31 @@ struct ContentView: View {
             }
         } else if authService.isAuthenticated {
             MainTabView()
-                // First-run welcome tour; Settings → About can clear the flag
-                // to replay it. The derived binding marks it seen on dismissal.
-                .fullScreenCover(isPresented: Binding(
-                    get: { !hasSeenOnboardingTour },
-                    set: { hasSeenOnboardingTour = !$0 }
-                )) {
-                    OnboardingTourView()
-                }
         } else {
-            LoginView()
+            unauthenticatedRoot
         }
+    }
+
+    @ViewBuilder
+    private var unauthenticatedRoot: some View {
+        switch unauthScreen ?? (hasSeenOnboardingTour ? .login : .tour) {
+        case .tour:
+            OnboardingTourView(
+                mode: .preAuth,
+                onSignIn: { goTo(.login) },
+                onCreateHousehold: { goTo(.signUp(.create)) },
+                onJoinHousehold: { goTo(.signUp(.join)) }
+            )
+        case .login:
+            LoginView(onCreateAccount: { goTo(.signUp(.create)) })
+        case .signUp(let mode):
+            SignUpView(mode: mode, onCancel: { goTo(.login) })
+        }
+    }
+
+    private func goTo(_ screen: UnauthScreen) {
+        hasSeenOnboardingTour = true
+        unauthScreen = screen
     }
 }
 

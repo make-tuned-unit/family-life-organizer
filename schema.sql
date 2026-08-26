@@ -441,6 +441,7 @@ CREATE TABLE IF NOT EXISTS users (
     password_hash TEXT NOT NULL,
     name TEXT NOT NULL,
     email TEXT,
+    apple_user_id TEXT UNIQUE,             -- Sign in with Apple `sub`; null for password accounts
     phone TEXT,
     avatar TEXT,
     profile_image TEXT,

@@ -915,6 +915,7 @@ final class APIService {
         let user: UserInfo?
         let refresh_token: String?
         let household: RegisterHousehold?
+        let created: Bool?
 
         struct RegisterHousehold: Codable {
             let id: Int
@@ -942,6 +943,24 @@ final class APIService {
         if let inviteCode { body["invite_code"] = inviteCode }
         if let householdName { body["household_name"] = householdName }
         return try await post("/api/auth/register", body: body)
+    }
+
+    func signInWithApple(
+        identityToken: String,
+        nonce: String,
+        name: String?,
+        inviteCode: String? = nil,
+        householdName: String? = nil
+    ) async throws -> RegisterResponse {
+        var body: [String: Any] = [
+            "identity_token": identityToken,
+            "nonce": nonce,
+            "device_name": Self.deviceName
+        ]
+        if let name, !name.isEmpty { body["name"] = name }
+        if let inviteCode, !inviteCode.isEmpty { body["invite_code"] = inviteCode }
+        if let householdName, !householdName.isEmpty { body["household_name"] = householdName }
+        return try await post("/api/auth/apple", body: body)
     }
 
     func fetchMe() async throws -> MeResponse {

@@ -29,7 +29,7 @@ struct SettingsView: View {
     // Off by default — household presence sharing is strictly opt-in.
     @AppStorage("sharePresenceEnabled") private var sharePresenceEnabled = false
     @AppStorage(AppleCalendarSyncMode.storageKey) private var calendarSyncMode: AppleCalendarSyncMode = .off
-    @AppStorage("hasSeenOnboardingTour") private var hasSeenOnboardingTour = false
+    @State private var showingWelcomeTour = false
 
     /// Never-asked and refused are different situations with different fixes,
     /// so they must not both read "Disabled".
@@ -345,8 +345,7 @@ struct SettingsView: View {
 
             Section("About") {
                 Button {
-                    // Clearing the flag re-presents the tour from ContentView.
-                    hasSeenOnboardingTour = false
+                    showingWelcomeTour = true
                 } label: {
                     Label("Replay the welcome tour", systemImage: "sparkles")
                         .foregroundStyle(TabAccent.home.color)
@@ -380,6 +379,9 @@ struct SettingsView: View {
             }
         }
         .scrollContentBackground(.hidden)
+        .fullScreenCover(isPresented: $showingWelcomeTour) {
+            OnboardingTourView(mode: .replay)
+        }
         // Clearance for the floating tab bar + chat button, which overlay content
         // in MainTabView's ZStack — without it the Sign Out row can never scroll
         // above them. Sheets (showsDismissButton) have no tab bar underneath.

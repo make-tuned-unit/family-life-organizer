@@ -114,6 +114,8 @@
 		AA0000A0 /* CookingModeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000A0 /* CookingModeView.swift */; };
 		AA0000A1 /* TabBarChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000A1 /* TabBarChrome.swift */; };
 		AA0000A2 /* OnboardingTourView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000A2 /* OnboardingTourView.swift */; };
+		AA0000A3 /* OnboardingMocks.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000A3 /* OnboardingMocks.swift */; };
+		AA0000A4 /* AppleSignInButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000A4 /* AppleSignInButton.swift */; };
 		AA000100 /* EventAttachment.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000100 /* EventAttachment.swift */; };
 		AA000101 /* EventAttachmentsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000101 /* EventAttachmentsView.swift */; };
 		AA000102 /* ConciergeHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000102 /* ConciergeHistoryView.swift */; };
@@ -247,6 +249,8 @@
 		BB0000A0 /* CookingModeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CookingModeView.swift; sourceTree = "<group>"; };
 		BB0000A1 /* TabBarChrome.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabBarChrome.swift; sourceTree = "<group>"; };
 		BB0000A2 /* OnboardingTourView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingTourView.swift; sourceTree = "<group>"; };
+		BB0000A3 /* OnboardingMocks.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingMocks.swift; sourceTree = "<group>"; };
+		BB0000A4 /* AppleSignInButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleSignInButton.swift; sourceTree = "<group>"; };
 		BB000100 /* EventAttachment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventAttachment.swift; sourceTree = "<group>"; };
 		BB000101 /* EventAttachmentsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventAttachmentsView.swift; sourceTree = "<group>"; };
 		BB000102 /* ConciergeHistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConciergeHistoryView.swift; sourceTree = "<group>"; };
@@ -318,6 +322,7 @@
 				BB000001 /* FamilyLifeApp.swift */,
 				BB000002 /* ContentView.swift */,
 				BB000003 /* LoginView.swift */,
+				BB0000A4 /* AppleSignInButton.swift */,
 				BB000201 /* TwoFactorView.swift */,
 				BB00004D /* SignUpView.swift */,
 				BB000048 /* AppConfig.swift */,
@@ -591,6 +596,7 @@
 			isa = PBXGroup;
 			children = (
 				BB0000A2 /* OnboardingTourView.swift */,
+				BB0000A3 /* OnboardingMocks.swift */,
 			);
 			path = Onboarding;
 			sourceTree = "<group>";
@@ -802,6 +808,8 @@
 				AA00003B /* DesignTokens.swift in Sources */,
 				AA0000A1 /* TabBarChrome.swift in Sources */,
 				AA0000A2 /* OnboardingTourView.swift in Sources */,
+				AA0000A3 /* OnboardingMocks.swift in Sources */,
+				AA0000A4 /* AppleSignInButton.swift in Sources */,
 				AA00003C /* FLCardModifier.swift in Sources */,
 				AA000041 /* ButtonStyles.swift in Sources */,
 				AA000042 /* DateFormatters.swift in Sources */,

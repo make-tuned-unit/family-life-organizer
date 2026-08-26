@@ -32,6 +32,8 @@ struct HomeView: View {
     /// name one (a key date with no person attached).
     @State private var selectedFeedPerson: PersonResponse?
     @State private var showingPeople = false
+    @AppStorage("hasDismissedFirstWeekCard") private var hasDismissedFirstWeekCard = false
+    @AppStorage("household_invite_code") private var householdInviteCode = ""
     /// Tasks mid-checkoff in Up Next — held for the filled-dot + strikethrough
     /// beat before they poof away.
     @State private var completingTaskIds: Set<Int> = []
@@ -57,6 +59,7 @@ struct HomeView: View {
         ScrollView(showsIndicators: false) {
             VStack(spacing: 0) {
                 greetingSection
+                firstWeekCard
                 presenceRow
                 sleepBarSection
                 choreBarSection
@@ -348,6 +351,81 @@ struct HomeView: View {
         .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
         .padding(.top, 8)
         .padding(.bottom, 18)
+    }
+
+    private var showFirstWeekCard: Bool {
+        guard !hasDismissedFirstWeekCard else { return false }
+        let noEvents = viewModel.todayAppointments.isEmpty
+            && viewModel.nextAppointment == nil
+            && viewModel.weekEventCount == 0
+            && (viewModel.summary?.appointments_today ?? 0) == 0
+        let noLists = viewModel.groceries.isEmpty && (viewModel.summary?.groceries_needed ?? 0) == 0
+        return noEvents && noLists
+    }
+
+    @ViewBuilder
+    private var firstWeekCard: some View {
+        if showFirstWeekCard {
+            VStack(alignment: .leading, spacing: DesignTokens.Spacing.cardGap) {
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Your first week")
+                            .font(.flOverline)
+                            .tracking(0.4)
+                            .textCase(.uppercase)
+                            .foregroundStyle(WarmPalette.ink2)
+                        Text("Start with the week you're in.")
+                            .font(.flHeadline)
+                            .foregroundStyle(WarmPalette.ink1)
+                    }
+                    Spacer()
+                    Button {
+                        hasDismissedFirstWeekCard = true
+                    } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(WarmPalette.ink3)
+                            .frame(width: 32, height: 32)
+                            .contentShape(Rectangle())
+                    }
+                    .accessibilityLabel("Dismiss")
+                }
+
+                Button { showingNewEvent = true } label: {
+                    Label("Put tonight on the calendar", systemImage: "calendar.badge.plus")
+                        .font(.flSubheadline.weight(.semibold))
+                        .foregroundStyle(WarmPalette.ink1)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+
+                Button {
+                    pendingListName = "Groceries"
+                    selectedTab = .lists
+                } label: {
+                    Label("Start a grocery list", systemImage: "cart")
+                        .font(.flSubheadline.weight(.semibold))
+                        .foregroundStyle(WarmPalette.ink1)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+
+                if !householdInviteCode.isEmpty {
+                    ShareLink(
+                        item: "Join my household on Kinrows! Use invite code: \(householdInviteCode)",
+                        subject: Text("Join my household"),
+                        message: Text("I set up our family organizer. Use this code to join: \(householdInviteCode)")
+                    ) {
+                        Label("Invite with \(householdInviteCode)", systemImage: "square.and.arrow.up")
+                            .font(.flSubheadline.weight(.semibold))
+                            .foregroundStyle(AccentTheme.sage.color)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
+            }
+            .padding(DesignTokens.Spacing.cardPadding)
+            .flCard(tint: AccentTheme.sage.color)
+            .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
+            .padding(.bottom, 18)
+        }
     }
 
     private var currentLocationLabel: String {

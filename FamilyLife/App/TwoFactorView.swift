@@ -20,79 +20,79 @@ struct TwoFactorView: View {
     @State private var resendNote: String?
 
     var body: some View {
-        ZStack {
-            Image("LoginBackground")
-                .resizable().aspectRatio(contentMode: .fill)
-                .ignoresSafeArea()
-            Rectangle().fill(.black.opacity(0.45)).ignoresSafeArea()
+        ScrollView(showsIndicators: false) {
+            VStack(spacing: 16) {
+                Spacer(minLength: 80)
 
-            ScrollView(showsIndicators: false) {
-                VStack(spacing: 16) {
-                    Spacer(minLength: 120)
+                Image(systemName: "lock.shield.fill")
+                    .font(.system(size: 40))
+                    .foregroundStyle(AccentTheme.sage.color)
 
-                    Image(systemName: "lock.shield.fill")
-                        .font(.system(size: 40))
-                        .foregroundStyle(.white)
+                Text(mode == .email ? "Verify your email" : "Enter your code")
+                    .font(.flScreenTitle)
+                    .foregroundStyle(WarmPalette.ink1)
 
-                    Text(mode == .email ? "Verify your email" : "Enter your code")
-                        .font(.flScreenTitle)
-                        .foregroundStyle(.white)
+                Text(subtitle)
+                    .font(.flSubheadline)
+                    .foregroundStyle(WarmPalette.ink2)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 32)
 
-                    Text(subtitle)
-                        .font(.flSubheadline)
-                        .foregroundStyle(.white.opacity(0.85))
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, 32)
-
-                    if mode == .email {
-                        field {
-                            TextField("you@example.com", text: $email)
-                                .textContentType(.emailAddress)
-                                .keyboardType(.emailAddress)
-                                .textInputAutocapitalization(.never)
-                                .autocorrectionDisabled()
-                        }
-                    } else {
-                        field {
-                            TextField("123456", text: $code)
-                                .textContentType(.oneTimeCode)   // iOS autofills from the email
-                                .keyboardType(.numberPad)
-                                .font(.system(size: 22, weight: .semibold, design: .rounded))
-                                .tracking(6)
-                        }
+                if mode == .email {
+                    field {
+                        TextField("you@example.com", text: $email)
+                            .textContentType(.emailAddress)
+                            .keyboardType(.emailAddress)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
                     }
-
-                    if let errorMessage {
-                        label(errorMessage, icon: "exclamationmark.circle.fill", color: WarmPalette.bad)
+                } else {
+                    field {
+                        TextField("123456", text: $code)
+                            .textContentType(.oneTimeCode)
+                            .keyboardType(.numberPad)
+                            .font(.system(.title2, design: .rounded).weight(.semibold))
+                            .tracking(6)
                     }
-                    if let resendNote {
-                        label(resendNote, icon: "checkmark.circle.fill", color: .white)
-                    }
-
-                    Button { primaryAction() } label: {
-                        if isWorking { ProgressView() }
-                        else { Text(mode == .email ? "Send code" : "Verify") }
-                    }
-                    .buttonStyle(.flCTA(fill: AccentTheme.sage.color))
-                    .disabled(!canSubmit)
-                    .opacity(canSubmit ? 1 : 0.6)
-                    .padding(.top, 4)
-
-                    if mode == .code {
-                        Button { resend() } label: {
-                            Text("Resend code").font(.flSubheadline).foregroundStyle(.white.opacity(0.85))
-                        }
-                        .disabled(isWorking)
-                    }
-
-                    Button { dismiss() } label: {
-                        Text("Back").font(.flSubheadline).foregroundStyle(.white.opacity(0.6))
-                    }
-                    .padding(.top, 4)
                 }
-                .padding(.horizontal, 28)
+
+                if let resendNote {
+                    Label(resendNote, systemImage: "checkmark.circle.fill")
+                        .font(.flFootnote)
+                        .foregroundStyle(WarmPalette.good)
+                }
+
+                Button { primaryAction() } label: {
+                    if isWorking { ProgressView() }
+                    else { Text(mode == .email ? "Send code" : "Verify") }
+                }
+                .buttonStyle(.flCTA(fill: AccentTheme.sage.color))
+                .disabled(!canSubmit)
+                .opacity(canSubmit ? 1 : 0.6)
+                .padding(.top, 4)
+
+                if mode == .code {
+                    Button { resend() } label: {
+                        Text("Resend code")
+                            .font(.flSubheadline)
+                            .foregroundStyle(WarmPalette.ink2)
+                    }
+                    .disabled(isWorking)
+                }
+
+                Button { dismiss() } label: {
+                    Text("Back")
+                        .font(.flSubheadline)
+                        .foregroundStyle(WarmPalette.ink3)
+                }
+                .padding(.top, 4)
             }
+            .padding(.horizontal, 28)
+            .padding(.bottom, 40)
         }
+        .background { AmbientBackground(style: .home) }
+        .inlineError(errorMessage) { errorMessage = nil }
+        .preferredColorScheme(.light)
         .onAppear(perform: configureFromStep)
     }
 
@@ -108,8 +108,6 @@ struct TwoFactorView: View {
         return mode == .email ? email.contains("@") : code.count >= 6
     }
 
-    // Shown when the server issued the challenge but couldn't deliver the code —
-    // otherwise the user waits on an inbox that will never get one.
     private let deliveryFailedMessage = "We couldn't send your code — check the address or tap Resend."
 
     private func configureFromStep() {
@@ -136,7 +134,6 @@ struct TwoFactorView: View {
                     }
                 } else {
                     try await auth.verifyLoginCode(challenge: challenge, code: code.trimmingCharacters(in: .whitespaces))
-                    // Success → AuthService.isAuthenticated flips; root view replaces us.
                 }
             } catch {
                 errorMessage = mode == .email
@@ -163,21 +160,16 @@ struct TwoFactorView: View {
 
     @ViewBuilder private func field<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
         content()
-            .foregroundStyle(.white)
-            .tint(.white)
+            .foregroundStyle(WarmPalette.ink1)
             .font(.flBody)
             .padding(16)
             .frame(maxWidth: .infinity)
-            .background(.ultraThinMaterial.opacity(0.85), in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.tile))
-            .overlay(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.tile).stroke(.white.opacity(0.2), lineWidth: 0.5))
+            .flGlassSurface(tint: .white.opacity(0.03), strokeOpacity: 0.08, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.tile))
             .multilineTextAlignment(.center)
     }
+}
 
-    private func label(_ text: String, icon: String, color: Color) -> some View {
-        HStack(spacing: 6) {
-            Image(systemName: icon).font(.system(size: 13))
-            Text(text).font(.flFootnote)
-        }
-        .foregroundStyle(color)
-    }
+#Preview {
+    TwoFactorView(initialStep: .needsCode(challenge: "x", emailHint: "j***@icloud.com", emailSent: true))
+        .environment(AuthService())
 }

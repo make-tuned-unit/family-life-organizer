@@ -129,6 +129,18 @@ test('cross-household IDOR: user B cannot read/edit/delete user A\'s appointment
   assert.ok(JSON.stringify(aList.body).includes('Alice private event'), 'alice sees her own event');
 });
 
+test('register with an unknown invite code is rejected (does not mint a second household)', async () => {
+  const c = makeClient();
+  const res = await c('POST', '/api/auth/register', {
+    username: 'invite_bad',
+    password: 'password123',
+    name: 'Bad Invite',
+    invite_code: 'NOTAREALCODE',
+  });
+  assert.equal(res.status, 400);
+  assert.match(res.body.error, /invite code/i);
+});
+
 test('unauthenticated API requests are rejected', async () => {
   const anon = makeClient();
   const res = await anon('GET', '/api/appointments');

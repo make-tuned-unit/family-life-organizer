@@ -21,6 +21,7 @@ const { announceRivalryCompletion } = require('./services/rivalryAnnounce');
 const { createRateLimiter } = require('./services/rateLimit');
 const email = require('./services/email');
 const { runOnboardingEmailSweep } = require('./services/onboardingEmail');
+const appleSignIn = require('./services/appleSignIn');
 const crypto = require('crypto');
 
 const IS_PROD = process.env.NODE_ENV === 'production';
@@ -394,6 +395,51 @@ function sendServerError(res, err) {
 // window tolerates a lost rotation response without stranding the device.
 const hashAuthToken = hashCode;
 const AUTH_TOKEN_GRACE_SECONDS = Number(process.env.AUTH_TOKEN_GRACE_SECONDS ?? 60);
+
+// Place a brand-new user in a household. An invite code that doesn't resolve
+// is an error (don't silently mint a second household — that was the Cozi-style
+// "I tapped Sign Up instead of Join" trap).
+async function assignHousehold(db, user, { invite_code, household_name } = {}) {
+  const code = invite_code != null ? String(invite_code).trim().toUpperCase() : '';
+  if (code) {
+    const household = await db.getGroupByInviteCode(code);
+    if (!household) {
+      const err = new Error('invite_not_found');
+      err.status = 400;
+      throw err;
+    }
+    await db.addGroupMember(household.id, { user_id: user.id, role: 'member', added_by: user.id });
+    return { id: household.id, invite_code: household.invite_code };
+  }
+  const householdName = (household_name && String(household_name).trim()) || `${user.name}'s Home`;
+  const created = await db.createGroup({
+    name: householdName,
+    group_type: 'household',
+    created_by: user.id
+  });
+  await db.addGroupMember(created.id, { user_id: user.id, role: 'admin', added_by: user.id });
+  return { id: created.id, invite_code: created.invite_code };
+}
+
+async function uniqueAppleUsername(db, appleSub) {
+  const base = `apple_${crypto.createHash('sha256').update(appleSub).digest('hex').slice(0, 8)}`;
+  if (!(await db.getUserByUsername(base))) return base;
+  for (let i = 0; i < 8; i++) {
+    const candidate = `${base}${crypto.randomBytes(2).toString('hex')}`;
+    if (!(await db.getUserByUsername(candidate))) return candidate;
+  }
+  throw new Error('Could not allocate a unique username');
+}
+
+function sanitizeDisplayName(name) {
+  const cleaned = String(name || '').replace(/[\x00-\x1f\x7f]/g, '').trim();
+  if (!cleaned) return 'Kinrows member';
+  return cleaned.slice(0, 80);
+}
+
+function jsonUser(user) {
+  return { id: user.id, username: user.username, name: user.name, avatar: user.avatar || null };
+}
 
 async function issueAuthToken(db, userId, deviceName) {
   const token = crypto.randomBytes(32).toString('hex');
@@ -782,30 +828,19 @@ app.post('/api/auth/register', registerLimiter, async (req, res) => {
       return res.status(409).json({ error: 'Username already taken' });
     }
 
+    const inviteCode = invite_code != null ? String(invite_code).trim() : '';
+    if (inviteCode && !(await db.getGroupByInviteCode(inviteCode.toUpperCase()))) {
+      return res.status(400).json({ error: "That invite code isn't valid" });
+    }
+
     // Hash password and create user
     const password_hash = await bcrypt.hash(password, 12);
     const user = await db.createUser({ username, password_hash, name, email: signupEmail });
 
-    // If invite code provided, join that household
-    let household = null;
-    if (invite_code) {
-      household = await db.getGroupByInviteCode(invite_code);
-      if (household) {
-        await db.addGroupMember(household.id, { user_id: user.id, role: 'member', added_by: user.id });
-      }
-    }
-
-    // If no invite code (or invalid), create a new household
-    if (!household) {
-      const householdName = req.body.household_name || (name + "'s Home");
-      const newHousehold = await db.createGroup({
-        name: householdName,
-        group_type: 'household',
-        created_by: user.id
-      });
-      await db.addGroupMember(newHousehold.id, { user_id: user.id, role: 'admin', added_by: user.id });
-      household = { id: newHousehold.id, invite_code: newHousehold.invite_code };
-    }
+    const household = await assignHousehold(db, { id: user.id, name }, {
+      invite_code: inviteCode,
+      household_name: req.body.household_name,
+    });
 
     // Set session (regenerated to avoid fixation)
     await establishSession(req, { username, name: user.name, id: user.id });
@@ -817,6 +852,95 @@ app.post('/api/auth/register', registerLimiter, async (req, res) => {
       refresh_token
     });
   } catch (err) {
+    sendServerError(res, err);
+  } finally {
+    db.close();
+  }
+});
+
+// Sign in with Apple — native identity token. Apple already did 2FA; we
+// establish a session immediately (no email OTP). Replay is blocked by nonce.
+app.post('/api/auth/apple', loginLimiter, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const identityToken = req.body.identity_token;
+    const nonce = req.body.nonce;
+    let claims;
+    try {
+      claims = await appleSignIn.verifyIdentityToken(identityToken, { nonce });
+    } catch (err) {
+      const clientErrors = new Set([
+        'invalid_token', 'bad_iss', 'bad_aud', 'bad_sub', 'expired',
+        'not_yet_valid', 'nonce_required', 'bad_nonce', 'bad_alg',
+        'unknown_kid', 'bad_signature',
+      ]);
+      if (clientErrors.has(err.message)) {
+        return res.status(401).json({ error: 'Apple sign-in could not be verified' });
+      }
+      throw err;
+    }
+
+    const inviteCode = req.body.invite_code != null ? String(req.body.invite_code).trim() : '';
+    if (inviteCode && !(await db.getGroupByInviteCode(inviteCode.toUpperCase()))) {
+      return res.status(400).json({ error: "That invite code isn't valid" });
+    }
+
+    let user = await db.getUserByAppleId(claims.sub);
+    let household = null;
+    let isNew = false;
+
+    if (!user && claims.email && claims.emailVerified) {
+      const linked = await db.getUserByVerifiedEmail(claims.email);
+      if (linked) {
+        await db.linkAppleUserId(linked.id, claims.sub, {
+          email: claims.email,
+          markEmailVerified: true,
+        });
+        user = await db.getUserById(linked.id);
+      }
+    }
+
+    if (!user) {
+      isNew = true;
+      const displayName = sanitizeDisplayName(req.body.name);
+      const username = await uniqueAppleUsername(db, claims.sub);
+      const password_hash = await bcrypt.hash(crypto.randomBytes(32).toString('hex'), 12);
+      const created = await db.createUser({
+        username,
+        password_hash,
+        name: displayName,
+        email: claims.email,
+        apple_user_id: claims.sub,
+        email_verified: !!(claims.email && claims.emailVerified),
+      });
+      user = { id: created.id, username: created.username, name: created.name, avatar: null };
+      household = await assignHousehold(db, user, {
+        invite_code: inviteCode,
+        household_name: req.body.household_name,
+      });
+    }
+
+    const sessionUser = await db.getUserById(user.id);
+    await establishSession(req, { username: sessionUser.username, name: sessionUser.name, id: sessionUser.id });
+    const refresh_token = await issueAuthToken(db, sessionUser.id, req.body.device_name);
+
+    if (!household) {
+      const groups = await db.getGroupsByUser(sessionUser.id);
+      const hh = (groups || []).find((g) => g.group_type === 'household') || (groups || [])[0];
+      household = hh ? { id: hh.id, invite_code: hh.invite_code } : null;
+    }
+
+    res.json({
+      success: true,
+      user: jsonUser(sessionUser),
+      household,
+      refresh_token,
+      created: isNew,
+    });
+  } catch (err) {
+    if (err.status === 400 && err.message === 'invite_not_found') {
+      return res.status(400).json({ error: "That invite code isn't valid" });
+    }
     sendServerError(res, err);
   } finally {
     db.close();

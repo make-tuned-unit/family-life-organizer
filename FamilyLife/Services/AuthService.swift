@@ -8,7 +8,6 @@ final class AuthService {
     var isAuthenticated = false
     var isRestoringSession = false
     var currentUser: UserProfile?
-    var needsOnboarding = false
 
     /// Thumbnail-sized UIImage for ProfileAvatar (max 256x256)
     private(set) var profileUIImage: UIImage?
@@ -247,8 +246,6 @@ final class AuthService {
         }
         currentUser = UserProfile(id: user.id, username: user.username, name: user.name, avatar: user.avatar ?? "")
         isAuthenticated = true
-        needsOnboarding = true
-
         UserDefaults.standard.set(user.username, forKey: "auth_username")
         UserDefaults.standard.set(user.name, forKey: "auth_name")
         if let id = user.id { UserDefaults.standard.set(id, forKey: "auth_user_id") }
@@ -263,6 +260,29 @@ final class AuthService {
         }
     }
 
+    func signInWithApple(
+        identityToken: String,
+        rawNonce: String,
+        name: String?,
+        inviteCode: String? = nil,
+        householdName: String? = nil
+    ) async throws {
+        let response = try await api.signInWithApple(
+            identityToken: identityToken,
+            nonce: rawNonce,
+            name: name,
+            inviteCode: inviteCode,
+            householdName: householdName
+        )
+        guard response.success, let user = response.user else {
+            throw APIError.serverError(400)
+        }
+        completeLogin(user: user, refreshToken: response.refresh_token, username: user.username)
+        if let household = response.household {
+            UserDefaults.standard.set(household.invite_code, forKey: "household_invite_code")
+        }
+    }
+
     func logout() {
         // Invalidate any in-flight silent re-login so it can't resurrect the
         // session by saving a freshly-rotated token after we've torn down.
@@ -273,7 +293,6 @@ final class AuthService {
         isRestoringSession = false
         let username = currentUser?.username
         currentUser = nil
-        needsOnboarding = false
         profileUIImage = nil
         profileImageData = nil
         try? FileManager.default.removeItem(at: Self.profileImageURL)
@@ -281,6 +300,7 @@ final class AuthService {
         UserDefaults.standard.removeObject(forKey: "auth_name")
         UserDefaults.standard.removeObject(forKey: "auth_user_id")
         UserDefaults.standard.removeObject(forKey: "household_invite_code")
+        UserDefaults.standard.removeObject(forKey: "hasDismissedFirstWeekCard")
         // Per-account notification watermarks — a fresh account must not
         // inherit (or re-fire against) the previous account's history.
         UserDefaults.standard.removeObject(forKey: "notified_dm_ids")

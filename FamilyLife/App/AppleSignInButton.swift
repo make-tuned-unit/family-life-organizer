@@ -1,0 +1,89 @@
+import AuthenticationServices
+import CryptoKit
+import SwiftUI
+
+enum AppleNonce {
+    static func random() -> String {
+        UUID().uuidString
+    }
+
+    static func sha256(_ raw: String) -> String {
+        SHA256.hash(data: Data(raw.utf8)).map { String(format: "%02x", $0) }.joined()
+    }
+}
+
+/// Official Sign in with Apple control, sized to match `.flCTA`.
+struct AppleSignInButton: View {
+    var label: SignInWithAppleButton.Label = .signIn
+    var inviteCode: String? = nil
+    var householdName: String? = nil
+    var onError: (String) -> Void
+
+    @Environment(AuthService.self) private var auth
+    @State private var rawNonce = ""
+    @State private var isWorking = false
+
+    var body: some View {
+        SignInWithAppleButton(label) { request in
+            rawNonce = AppleNonce.random()
+            request.requestedScopes = [.fullName, .email]
+            request.nonce = AppleNonce.sha256(rawNonce)
+        } onCompletion: { result in
+            Task { await handle(result) }
+        }
+        .signInWithAppleButtonStyle(.black)
+        .frame(maxWidth: .infinity)
+        .frame(height: 52)
+        .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
+        .disabled(isWorking)
+        .accessibilityLabel(label == .signUp ? "Sign up with Apple" : "Sign in with Apple")
+    }
+
+    @MainActor
+    private func handle(_ result: Result<ASAuthorization, Error>) async {
+        switch result {
+        case .failure(let error):
+            let ns = error as NSError
+            if ns.domain == ASAuthorizationError.errorDomain,
+               ns.code == ASAuthorizationError.canceled.rawValue {
+                return
+            }
+            onError("Apple sign-in didn’t complete. Try again or use email.")
+        case .success(let authorization):
+            guard let credential = authorization.credential as? ASAuthorizationAppleIDCredential,
+                  let tokenData = credential.identityToken,
+                  let identityToken = String(data: tokenData, encoding: .utf8) else {
+                onError("Apple sign-in didn’t complete. Try again or use email.")
+                return
+            }
+            isWorking = true
+            defer { isWorking = false }
+            let name: String? = {
+                guard let fullName = credential.fullName else { return nil }
+                let formatted = PersonNameComponentsFormatter().string(from: fullName)
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                return formatted.isEmpty ? nil : formatted
+            }()
+            do {
+                try await auth.signInWithApple(
+                    identityToken: identityToken,
+                    rawNonce: rawNonce,
+                    name: name,
+                    inviteCode: inviteCode,
+                    householdName: householdName
+                )
+            } catch APIError.serverMessage(_, let message) {
+                onError(message)
+            } catch {
+                onError("Apple sign-in didn’t complete. Try again or use email.")
+            }
+        }
+    }
+}
+
+#Preview {
+    AppleSignInButton { _ in }
+        .padding()
+        .background { AmbientBackground(style: .home) }
+        .environment(AuthService())
+}

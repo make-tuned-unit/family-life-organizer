@@ -3,6 +3,14 @@
 Date: 2026-06-25. Scope: full-codebase review (auth, authz/isolation, AI/concierge,
 payments, email, DB, deploy, iOS) followed by remediation of P0/P1 findings.
 
+## 2026-08-26 — Pre-signup onboarding + Sign in with Apple
+
+- Unauthenticated first launch now shows the product tour **before** login/signup.
+- `POST /api/auth/apple` verifies a native Sign in with Apple identity token (RS256 + Apple JWKS, `aud` = `com.kinrows.app`, nonce hashed SHA-256). Apple-already-2FA: no email OTP on this path.
+- `users.apple_user_id` unique; SIWA accounts get a discarded random `password_hash` so password login cannot succeed. Matching **verified** email links to an existing password account instead of minting a second household.
+- `POST /api/auth/register` with an unknown `invite_code` now returns 400 (previously silently created a second household).
+- Tests: `test/apple-signin.test.js` (injected JWKS). Enable Sign in with Apple on App ID `com.kinrows.app` in the developer portal — that cannot be done in code.
+
 ## 2026-08-24 — Developer API (bring-your-own-agent)
 
 New bearer-key surface (`/v1/*`, `services/developerApi.js`, full reference in `docs/DEVELOPER_API.md`):

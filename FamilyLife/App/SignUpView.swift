@@ -1,6 +1,14 @@
 import SwiftUI
 
 struct SignUpView: View {
+    enum Mode: Equatable {
+        case create
+        case join
+    }
+
+    var mode: Mode = .create
+    var onCancel: (() -> Void)? = nil
+
     @Environment(AuthService.self) private var authService
     @Environment(\.dismiss) private var dismiss
     @State private var name = ""
@@ -9,7 +17,7 @@ struct SignUpView: View {
     @State private var email = ""
     @State private var inviteCode = ""
     @State private var householdName = ""
-    @State private var hasInviteCode = false
+    @State private var showEmailForm = false
     @State private var isLoading = false
     @State private var errorMessage: String?
 
@@ -17,95 +25,48 @@ struct SignUpView: View {
         NavigationStack {
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 0) {
-                    VStack(spacing: 8) {
-                        Image(systemName: "person.crop.circle.badge.plus")
-                            .font(.system(size: 48))
-                            .foregroundStyle(AccentTheme.sage.color)
-                            .padding(.bottom, 8)
-                        Text("Create Account")
-                            .font(.flScreenTitle)
-                            .foregroundStyle(WarmPalette.ink1)
-                        Text("Set up your family hub")
-                            .font(.flSubheadline)
-                            .foregroundStyle(WarmPalette.ink3)
-                    }
-                    .padding(.top, 30)
-                    .padding(.bottom, 32)
+                    header
+                        .padding(.top, 30)
+                        .padding(.bottom, 28)
 
                     VStack(spacing: 14) {
-                        formField(icon: "person.fill", placeholder: "Your name", text: $name)
-                            .textContentType(.name)
-                        formField(icon: "at", placeholder: "Username", text: $username)
-                            .textContentType(.username)
-                            .textInputAutocapitalization(.never)
-                            .autocorrectionDisabled()
-                        formField(icon: "lock.fill", placeholder: "Password", text: $password, isSecure: true)
-                            .textContentType(.newPassword)
-                        formField(icon: "envelope.fill", placeholder: "Email (optional)", text: $email)
-                            .textContentType(.emailAddress)
-                            .keyboardType(.emailAddress)
-                            .textInputAutocapitalization(.never)
-                            .autocorrectionDisabled()
+                        if mode == .create {
+                            formField(icon: "house.fill", placeholder: "Household name (e.g. Our house)", text: $householdName)
+                        } else {
+                            inviteField
+                        }
 
-                        // Invite code toggle
-                        Button {
-                            withAnimation { hasInviteCode.toggle() }
-                        } label: {
-                            HStack(spacing: 8) {
-                                Image(systemName: hasInviteCode ? "checkmark.circle.fill" : "envelope.badge")
-                                    .foregroundStyle(hasInviteCode ? AccentTheme.sage.color : WarmPalette.ink3)
-                                Text("I have an invite code")
+                        AppleSignInButton(
+                            label: .signUp,
+                            inviteCode: mode == .join ? inviteCode : nil,
+                            householdName: mode == .create ? (householdName.isEmpty ? nil : householdName) : nil,
+                            onError: { errorMessage = $0 }
+                        )
+                        .disabled(mode == .join && inviteCode.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                        .opacity(mode == .join && inviteCode.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 0.5 : 1)
+                        .padding(.top, 4)
+
+                        orDivider
+
+                        if showEmailForm {
+                            emailFields
+                        } else {
+                            Button { withAnimation { showEmailForm = true } } label: {
+                                Text("or use email")
                                     .font(.flSubheadline.weight(.medium))
                                     .foregroundStyle(WarmPalette.ink2)
-                                Spacer()
-                            }
-                            .padding(14)
-                            .flGlassSurface(tint: .white.opacity(0.03), strokeOpacity: 0.08, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.small))
-                        }
-
-                        if hasInviteCode {
-                            formField(icon: "ticket.fill", placeholder: "Invite code", text: $inviteCode)
-                                .textInputAutocapitalization(.characters)
-                                .autocorrectionDisabled()
-                                .transition(.move(edge: .top).combined(with: .opacity))
-                        } else {
-                            formField(icon: "house.fill", placeholder: "Household name (e.g. The Smiths)", text: $householdName)
-                                .transition(.move(edge: .top).combined(with: .opacity))
-                        }
-
-                        if let errorMessage {
-                            HStack(spacing: 6) {
-                                Image(systemName: "exclamationmark.circle.fill")
-                                    .font(.system(size: 13))
-                                Text(errorMessage)
-                                    .font(.flFootnote)
-                            }
-                            .foregroundStyle(WarmPalette.bad)
-                            .padding(.top, 2)
-                        }
-
-                        Button(action: signUp) {
-                            if isLoading {
-                                ProgressView()
-                            } else {
-                                Text(hasInviteCode ? "Join Household" : "Create Household")
                             }
                         }
-                        .buttonStyle(.flCTA(fill: AccentTheme.sage.color))
-                        .disabled(name.isEmpty || username.isEmpty || password.isEmpty || isLoading)
-                        .opacity(name.isEmpty || username.isEmpty || password.isEmpty ? 0.5 : 1)
-                        .padding(.top, 8)
                     }
                     .padding(.horizontal, 24)
 
-                    if !hasInviteCode {
-                        VStack(spacing: 6) {
-                            Text("Name your household and invite your partner after signing up.")
-                                .font(.flFootnote)
-                                .foregroundStyle(WarmPalette.ink3)
-                                .multilineTextAlignment(.center)
-                        }
-                        .padding(.top, 16)
+                    if mode == .create {
+                        Text("Name your household and invite your partner after signing up.")
+                            .font(.flFootnote)
+                            .foregroundStyle(WarmPalette.ink3)
+                            .multilineTextAlignment(.center)
+                            .padding(.top, 16)
+                            .padding(.horizontal, 24)
                     }
                 }
                 .padding(.bottom, 40)
@@ -114,11 +75,99 @@ struct SignUpView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
+                    Button("Cancel") { cancel() }
                         .foregroundStyle(WarmPalette.ink2)
                 }
             }
+            .inlineError(errorMessage) { errorMessage = nil }
         }
+        .preferredColorScheme(.light)
+    }
+
+    private var header: some View {
+        VStack(spacing: 8) {
+            Image(systemName: mode == .join ? "person.badge.plus" : "house.fill")
+                .font(.system(size: 40, weight: .semibold))
+                .foregroundStyle(AccentTheme.sage.color)
+                .padding(.bottom, 4)
+            Text(mode == .join ? "Join a household" : "Create your household")
+                .font(.flScreenTitle)
+                .foregroundStyle(WarmPalette.ink1)
+            Text(mode == .join
+                 ? "Enter the code your partner shared."
+                 : "So the house can share this — not just this phone.")
+                .font(.flSubheadline)
+                .foregroundStyle(WarmPalette.ink2)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 12)
+        }
+    }
+
+    private var inviteField: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "ticket.fill")
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(WarmPalette.ink3)
+                .frame(width: 20)
+            TextField("Invite code", text: $inviteCode)
+                .font(.system(.body, design: .monospaced).weight(.semibold))
+                .textInputAutocapitalization(.characters)
+                .autocorrectionDisabled()
+                .textContentType(.oneTimeCode)
+        }
+        .padding(16)
+        .flGlassSurface(tint: .white.opacity(0.03), strokeOpacity: 0.08, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.small))
+    }
+
+    private var orDivider: some View {
+        HStack(spacing: 12) {
+            Rectangle().fill(WarmPalette.ink4.opacity(0.4)).frame(height: 1)
+            Text("or")
+                .font(.flCaption)
+                .foregroundStyle(WarmPalette.ink3)
+            Rectangle().fill(WarmPalette.ink4.opacity(0.4)).frame(height: 1)
+        }
+        .padding(.vertical, 4)
+    }
+
+    @ViewBuilder
+    private var emailFields: some View {
+        formField(icon: "person.fill", placeholder: "Your name", text: $name)
+            .textContentType(.name)
+        formField(icon: "at", placeholder: "Username", text: $username)
+            .textContentType(.username)
+            .textInputAutocapitalization(.never)
+            .autocorrectionDisabled()
+        VStack(alignment: .leading, spacing: 6) {
+            formField(icon: "lock.fill", placeholder: "Password", text: $password, isSecure: true)
+                .textContentType(.newPassword)
+            Text("At least 8 characters.")
+                .font(.flCaption)
+                .foregroundStyle(WarmPalette.ink3)
+        }
+        formField(icon: "envelope.fill", placeholder: "Email (optional)", text: $email)
+            .textContentType(.emailAddress)
+            .keyboardType(.emailAddress)
+            .textInputAutocapitalization(.never)
+            .autocorrectionDisabled()
+
+        Button(action: signUp) {
+            if isLoading {
+                ProgressView()
+            } else {
+                Text(mode == .join ? "Join household" : "Create household")
+            }
+        }
+        .buttonStyle(.flCTA(fill: AccentTheme.sage.color))
+        .disabled(!canSubmitEmail || isLoading)
+        .opacity(canSubmitEmail ? 1 : 0.5)
+        .padding(.top, 8)
+    }
+
+    private var canSubmitEmail: Bool {
+        if name.isEmpty || username.isEmpty || password.count < 8 { return false }
+        if mode == .join && inviteCode.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return false }
+        return true
     }
 
     private func formField(icon: String, placeholder: String, text: Binding<String>, isSecure: Bool = false) -> some View {
@@ -139,10 +188,26 @@ struct SignUpView: View {
         .flGlassSurface(tint: .white.opacity(0.03), strokeOpacity: 0.08, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.small))
     }
 
+    private func cancel() {
+        if let onCancel {
+            onCancel()
+        } else {
+            dismiss()
+        }
+    }
+
     private func signUp() {
         let trimmedEmail = email.trimmingCharacters(in: .whitespacesAndNewlines)
         if !trimmedEmail.isEmpty, !trimmedEmail.contains("@") || !trimmedEmail.contains(".") {
             errorMessage = "That email doesn't look right"
+            return
+        }
+        if password.count < 8 {
+            errorMessage = "Password must be at least 8 characters"
+            return
+        }
+        if mode == .join, inviteCode.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            errorMessage = "Enter the invite code your partner shared"
             return
         }
         isLoading = true
@@ -154,13 +219,11 @@ struct SignUpView: View {
                     password: password,
                     name: name,
                     email: trimmedEmail.isEmpty ? nil : trimmedEmail,
-                    inviteCode: hasInviteCode ? inviteCode : nil,
-                    householdName: !hasInviteCode && !householdName.isEmpty ? householdName : nil
+                    inviteCode: mode == .join ? inviteCode : nil,
+                    householdName: mode == .create && !householdName.isEmpty ? householdName : nil
                 )
                 dismiss()
-            } catch APIError.serverMessage(409, let message) {
-                errorMessage = message
-            } catch APIError.serverMessage(400, let message) {
+            } catch APIError.serverMessage(_, let message) {
                 errorMessage = message
             } catch APIError.serverError(409) {
                 errorMessage = "Username already taken"
@@ -172,7 +235,12 @@ struct SignUpView: View {
     }
 }
 
-#Preview {
-    SignUpView()
+#Preview("Create") {
+    SignUpView(mode: .create)
+        .environment(AuthService())
+}
+
+#Preview("Join") {
+    SignUpView(mode: .join)
         .environment(AuthService())
 }
