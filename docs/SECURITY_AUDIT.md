@@ -3,6 +3,15 @@
 Date: 2026-06-25. Scope: full-codebase review (auth, authz/isolation, AI/concierge,
 payments, email, DB, deploy, iOS) followed by remediation of P0/P1 findings.
 
+## 2026-08-26 — SQLite job outbox
+
+Push and waitlist email no longer run inline on the request that produced them.
+`jobs` rows (`pending`/`running`/`done`/`failed`, `attempts`, `available_at` backoff)
+are claimed by an in-process drain (kick-after-enqueue + ~5s interval). Failures
+retry up to `max_attempts` then stay inspectable as `failed`. No new npm dependency;
+single-process SQLite (no SKIP LOCKED). Onboarding drip, 2FA, concierge chat, and
+receipt scan stay on their existing paths. Tests: `test/jobs.test.js`.
+
 ## 2026-08-26 — Stripe web subscriptions (Concierge)
 
 Web Checkout for the four Concierge plans (Lite/Premium × monthly/yearly). Entitlement

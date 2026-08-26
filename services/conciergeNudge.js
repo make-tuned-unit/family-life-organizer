@@ -2,7 +2,7 @@
 // Detects what most needs attention in a household and sends ONE throttled
 // push nudge that deep-links into the Concierge tab. Premium households only.
 
-const push = require('../push');
+const jobs = require('./jobs');
 const { buildSnapshot } = require('./conciergeContext');
 const sleepStats = require('./sleepStats');
 
@@ -129,7 +129,7 @@ function pickNudge(s) {
 // Safe to call repeatedly — throttling lives in the concierge_nudges log.
 async function runProactiveSweep(db, { dailyCapHours = DAILY_CAP_HOURS, dedupeHours = DEDUPE_HOURS } = {}) {
   const summary = { groups: 0, considered: 0, sent: 0 };
-  if (!push.isConfigured()) return summary;
+  if (!jobs.isConfigured()) return summary;
 
   const groups = await db.getPremiumGroups();
   summary.groups = groups.length;
@@ -156,9 +156,9 @@ async function runProactiveSweep(db, { dailyCapHours = DAILY_CAP_HOURS, dedupeHo
     if (nudge.routine_id) payload.routine_id = nudge.routine_id;
     if (nudge.audience_user_id) {
       // Private routine: its owner only. See the PRIVACY note on sleepNudgeFor.
-      await push.pushToUser(db, nudge.audience_user_id, nudge.title, nudge.body, payload);
+      await jobs.pushToUser(db, nudge.audience_user_id, nudge.title, nudge.body, payload);
     } else {
-      await push.pushToGroup(db, groupId, null, nudge.title, nudge.body, payload);
+      await jobs.pushToGroup(db, groupId, null, nudge.title, nudge.body, payload);
     }
     summary.sent++;
   }

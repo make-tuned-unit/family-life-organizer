@@ -14,6 +14,16 @@ test('pushToUser swallows token-lookup failures instead of throwing', async () =
   );
 });
 
+test('pushToUser rethrows when the job drain asks for throwOnError', async () => {
+  await assert.rejects(
+    () => push.pushToUser(
+      { getDeviceTokens() { return Promise.reject(new Error('db down')); } },
+      1, 'Title', 'Body', {}, { throwOnError: true }
+    ),
+    /db down/
+  );
+});
+
 test('pushToGroup swallows member-lookup failures instead of throwing', async () => {
   await assert.doesNotReject(() =>
     push.pushToGroup(

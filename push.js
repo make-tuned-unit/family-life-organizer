@@ -167,7 +167,9 @@ function sendPush(deviceToken, payload, db = null) {
  * @param {object} [data] - custom data payload
  */
 async function pushToTokens(tokens, title, body, data = {}, db = null) {
-  if (!isConfigured() || !tokens || tokens.length === 0) return;
+  if (!isConfigured() || !tokens || tokens.length === 0) {
+    return { sent: 0, total: tokens ? tokens.length : 0, skipped: !isConfigured() };
+  }
 
   const payload = {
     aps: {
@@ -184,6 +186,7 @@ async function pushToTokens(tokens, title, body, data = {}, db = null) {
 
   const sent = results.filter(r => r.status === 'fulfilled' && r.value).length;
   if (sent > 0) console.log(`📱 Push sent to ${sent}/${tokens.length} devices`);
+  return { sent, total: tokens.length, skipped: false };
 }
 
 /**
@@ -194,14 +197,19 @@ async function pushToTokens(tokens, title, body, data = {}, db = null) {
  * @param {string} body
  * @param {object} [data]
  */
-async function pushToUser(db, userId, title, body, data = {}) {
+async function pushToUser(db, userId, title, body, data = {}, opts = {}) {
   try {
     const tokens = await db.getDeviceTokens(userId);
-    await pushToTokens(tokens, title, body, data, db);
+    const result = await pushToTokens(tokens, title, body, data, db);
+    if (opts.throwOnError && result && result.total > 0 && result.sent === 0 && !result.skipped) {
+      throw new Error('APNs delivered to 0 devices');
+    }
+    return result;
   } catch (err) {
-    // Callers fire-and-forget (no queue). Swallow so an APNs blip cannot
-    // reject the HTTP handler; log so the failure is still inspectable.
+    // Direct callers (legacy fire-and-forget) must not reject the HTTP
+    // handler. The job drain passes throwOnError so a blip is retried.
     console.error('[push] pushToUser failed:', err.message);
+    if (opts.throwOnError) throw err;
   }
 }
 
@@ -214,19 +222,24 @@ async function pushToUser(db, userId, title, body, data = {}) {
  * @param {string} body
  * @param {object} [data]
  */
-async function pushToGroup(db, groupId, excludeUserId, title, body, data = {}) {
+async function pushToGroup(db, groupId, excludeUserId, title, body, data = {}, opts = {}) {
   try {
     const members = await db.getGroupMembers(groupId);
     const userIds = members
       .filter(m => m.user_id && m.user_id !== excludeUserId)
       .map(m => m.user_id);
-    if (userIds.length === 0) return;
+    if (userIds.length === 0) return { sent: 0, total: 0 };
 
     const tokenRows = await db.getDeviceTokensForUsers(userIds);
     const tokens = tokenRows.map(r => r.token);
-    await pushToTokens(tokens, title, body, data, db);
+    const result = await pushToTokens(tokens, title, body, data, db);
+    if (opts.throwOnError && result && result.total > 0 && result.sent === 0 && !result.skipped) {
+      throw new Error('APNs delivered to 0 devices');
+    }
+    return result;
   } catch (err) {
     console.error('[push] pushToGroup failed:', err.message);
+    if (opts.throwOnError) throw err;
   }
 }
 
