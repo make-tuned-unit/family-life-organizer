@@ -1038,10 +1038,15 @@ struct TasksDetailSection: View {
         // Show checkmark + strikethrough in place, then let it fade out of the active list.
         withAnimation(.easeInOut(duration: 0.2)) { _ = recentlyToggledIds.insert(task.id) }
         Task {
-            try? await api.completeTask(id: task.id)
-            try? await Task.sleep(for: .milliseconds(700))
-            await loadTasks()
-            withAnimation(.easeInOut(duration: 0.2)) { _ = recentlyToggledIds.remove(task.id) }
+            do {
+                try await api.completeTask(id: task.id)
+                try? await Task.sleep(for: .milliseconds(700))
+                await loadTasks()
+                withAnimation(.easeInOut(duration: 0.2)) { _ = recentlyToggledIds.remove(task.id) }
+            } catch {
+                guard !error.isCancellation else { return }
+                withAnimation(.easeInOut(duration: 0.2)) { _ = recentlyToggledIds.remove(task.id) }
+            }
         }
     }
 

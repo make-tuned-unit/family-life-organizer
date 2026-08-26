@@ -125,13 +125,22 @@ final class HomeViewModel {
     /// Tick a chore slot from Home. Optimistic flip first so the dot responds
     /// under the finger; the server's answer then settles the row.
     func toggleChore(routineId: Int, choreId: String, slot: String, api: APIService) async {
-        guard let idx = choresToday.firstIndex(where: { $0.routine_id == routineId }) else { return }
+        guard let rIdx = choresToday.firstIndex(where: { $0.routine_id == routineId }),
+              let cIdx = choresToday[rIdx].chores.firstIndex(where: { $0.id == choreId }),
+              let sIdx = choresToday[rIdx].chores[cIdx].slots.firstIndex(where: { $0.slot == slot })
+        else { return }
+        let snapshot = choresToday
+        let title = choresToday[rIdx].chores[cIdx].title
+        let wasDone = choresToday[rIdx].chores[cIdx].slots[sIdx].done
+        choresToday[rIdx].chores[cIdx].slots[sIdx].done = !wasDone
+        choresToday[rIdx].open_slots = max(0, choresToday[rIdx].open_slots + (wasDone ? 1 : -1))
         do {
             _ = try await api.toggleChore(routineId: routineId, choreId: choreId, slot: slot)
             choresToday = try await api.fetchChoresToday()
         } catch {
             guard !error.isCancellation else { return }
-            self.error = "Couldn't update \(choresToday[idx].chores.first { $0.id == choreId }?.title ?? "that chore")."
+            choresToday = snapshot
+            self.error = "Couldn't update \(title)."
         }
     }
 
@@ -267,21 +276,25 @@ final class HomeViewModel {
     }
 
     func completeTask(_ id: Int, api: APIService) async {
+        guard let idx = activeTasks.firstIndex(where: { $0.id == id }) else { return }
+        let removed = activeTasks.remove(at: idx)
+        let previousSummary = summary
+        if let s = summary {
+            summary = APIService.DailySummary(
+                tasks_today: max(0, s.tasks_today - 1),
+                active_tasks: s.active_tasks.map { max(0, $0 - 1) },
+                appointments_today: s.appointments_today,
+                groceries_needed: s.groceries_needed,
+                overdue_tasks: s.overdue_tasks,
+                pinned_list_name: s.pinned_list_name
+            )
+        }
         do {
             try await api.completeTask(id: id)
-            activeTasks.removeAll { $0.id == id }
-            if let s = summary {
-                summary = APIService.DailySummary(
-                    tasks_today: max(0, s.tasks_today - 1),
-                    active_tasks: s.active_tasks.map { max(0, $0 - 1) },
-                    appointments_today: s.appointments_today,
-                    groceries_needed: s.groceries_needed,
-                    overdue_tasks: s.overdue_tasks,
-                    pinned_list_name: s.pinned_list_name
-                )
-            }
         } catch {
             guard !error.isCancellation else { return }
+            activeTasks.insert(removed, at: min(idx, activeTasks.count))
+            summary = previousSummary
             self.error = error.localizedDescription
         }
     }
@@ -337,21 +350,25 @@ final class HomeViewModel {
     }
 
     func completeGrocery(_ id: Int, api: APIService) async {
+        guard let idx = groceries.firstIndex(where: { $0.id == id }) else { return }
+        let removed = groceries.remove(at: idx)
+        let previousSummary = summary
+        if let s = summary {
+            summary = APIService.DailySummary(
+                tasks_today: s.tasks_today,
+                active_tasks: s.active_tasks,
+                appointments_today: s.appointments_today,
+                groceries_needed: max(0, s.groceries_needed - 1),
+                overdue_tasks: s.overdue_tasks,
+                pinned_list_name: s.pinned_list_name
+            )
+        }
         do {
             try await api.completeGrocery(id: id)
-            groceries.removeAll { $0.id == id }
-            if let s = summary {
-                summary = APIService.DailySummary(
-                    tasks_today: s.tasks_today,
-                    active_tasks: s.active_tasks,
-                    appointments_today: s.appointments_today,
-                    groceries_needed: max(0, s.groceries_needed - 1),
-                    overdue_tasks: s.overdue_tasks,
-                    pinned_list_name: s.pinned_list_name
-                )
-            }
         } catch {
             guard !error.isCancellation else { return }
+            groceries.insert(removed, at: min(idx, groceries.count))
+            summary = previousSummary
             self.error = error.localizedDescription
         }
     }
