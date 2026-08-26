@@ -43,6 +43,13 @@ function parseJsonObject(raw) {
   try { return JSON.parse(raw); } catch { return null; }
 }
 
+function parseJobRow(row) {
+  if (!row) return null;
+  let payload = {};
+  try { payload = row.payload ? JSON.parse(row.payload) : {}; } catch { payload = {}; }
+  return { ...row, payload };
+}
+
 // Columns that must never be set from a client-supplied update body. Blocks
 // mass-assignment of ownership/isolation/identity fields in the dynamic update*
 // helpers (a future sensitive column is protected by default, not exposed).
@@ -228,6 +235,7 @@ class FamilyDB {
           WHERE note = 'Synced from Apple Health'`, () => {});
         this.db.run('ALTER TABLE users ADD COLUMN apple_user_id TEXT', () => {});
         this.db.run('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_apple_user_id ON users(apple_user_id) WHERE apple_user_id IS NOT NULL', () => {});
+        this.db.run('CREATE INDEX IF NOT EXISTS idx_jobs_drain ON jobs(status, available_at, id)', () => {});
         this.db.run('ALTER TABLE users ADD COLUMN last_location_at DATETIME', (err) => {
           if (err) console.error('Migration error:', err.message);
           // budget_categories: rebuild to drop the global UNIQUE(name) so each
@@ -4751,6 +4759,138 @@ class FamilyDB {
     return new Promise((resolve, reject) => {
       this.db.run('DELETE FROM routine_entries WHERE id = ? AND routine_id = ?', [id, routineId],
         function (err) { err ? reject(err) : resolve({ deleted: this.changes }); });
+    });
+  }
+
+  // ── Job outbox (APNs + waitlist email) ─────────────────────────────────────
+  enqueueJob({ kind, payload, maxAttempts = 5 }) {
+    const body = JSON.stringify(payload == null ? {} : payload);
+    const max = Math.min(Math.max(1, Number(maxAttempts) || 5), 20);
+    return new Promise((resolve, reject) => {
+      this.db.run(
+        `INSERT INTO jobs (kind, payload, max_attempts) VALUES (?, ?, ?)`,
+        [String(kind), body, max],
+        function (err) {
+          if (err) return reject(err);
+          resolve({ id: this.lastID, kind: String(kind), status: 'pending', attempts: 0, max_attempts: max });
+        }
+      );
+    });
+  }
+
+  getJob(id) {
+    return new Promise((resolve, reject) => {
+      this.db.get('SELECT * FROM jobs WHERE id = ?', [id], (err, row) => {
+        if (err) return reject(err);
+        resolve(parseJobRow(row));
+      });
+    });
+  }
+
+  listJobs({ status, limit = 50 } = {}) {
+    const cap = Math.min(Math.max(1, Number(limit) || 50), 200);
+    const sql = status
+      ? 'SELECT * FROM jobs WHERE status = ? ORDER BY id DESC LIMIT ?'
+      : 'SELECT * FROM jobs ORDER BY id DESC LIMIT ?';
+    const params = status ? [status, cap] : [cap];
+    return new Promise((resolve, reject) => {
+      this.db.all(sql, params, (err, rows) => {
+        if (err) return reject(err);
+        resolve((rows || []).map(parseJobRow));
+      });
+    });
+  }
+
+  // Claim a page of due pending jobs for this process. Single-writer SQLite
+  // plus the in-process drain mutex is the lock; each UPDATE still requires
+  // status='pending' so a concurrent drain cannot double-claim.
+  claimPendingJobs(limit = 10) {
+    const cap = Math.min(Math.max(1, Number(limit) || 10), 50);
+    return new Promise((resolve, reject) => {
+      this.db.all(
+        `SELECT * FROM jobs
+         WHERE status = 'pending' AND datetime(available_at) <= datetime('now')
+         ORDER BY id ASC
+         LIMIT ?`,
+        [cap],
+        (err, rows) => {
+          if (err) return reject(err);
+          const list = rows || [];
+          if (!list.length) return resolve([]);
+          const claimed = [];
+          const claimOne = (i) => {
+            if (i >= list.length) return resolve(claimed.map(parseJobRow));
+            const row = list[i];
+            this.db.run(
+              `UPDATE jobs SET status = 'running', started_at = CURRENT_TIMESTAMP, attempts = attempts + 1
+               WHERE id = ? AND status = 'pending'`,
+              [row.id],
+              function (updateErr) {
+                if (updateErr) return reject(updateErr);
+                if (this.changes) {
+                  row.status = 'running';
+                  row.attempts = (row.attempts || 0) + 1;
+                  claimed.push(row);
+                }
+                claimOne(i + 1);
+              }
+            );
+          };
+          claimOne(0);
+        }
+      );
+    });
+  }
+
+  markJobDone(id) {
+    return new Promise((resolve, reject) => {
+      this.db.run(
+        `UPDATE jobs SET status = 'done', finished_at = CURRENT_TIMESTAMP, last_error = NULL
+         WHERE id = ?`,
+        [id],
+        (err) => err ? reject(err) : resolve()
+      );
+    });
+  }
+
+  markJobRetry(id, error, delaySeconds) {
+    const delay = Math.max(1, Number(delaySeconds) || 5);
+    const msg = String(error || 'error').slice(0, 500);
+    return new Promise((resolve, reject) => {
+      this.db.run(
+        `UPDATE jobs SET status = 'pending', last_error = ?, available_at = datetime('now', ?),
+            started_at = NULL, finished_at = NULL
+         WHERE id = ?`,
+        [msg, `+${delay} seconds`, id],
+        (err) => err ? reject(err) : resolve()
+      );
+    });
+  }
+
+  markJobFailed(id, error) {
+    const msg = String(error || 'error').slice(0, 500);
+    return new Promise((resolve, reject) => {
+      this.db.run(
+        `UPDATE jobs SET status = 'failed', last_error = ?, finished_at = CURRENT_TIMESTAMP
+         WHERE id = ?`,
+        [msg, id],
+        (err) => err ? reject(err) : resolve()
+      );
+    });
+  }
+
+  // Crash recovery: a process that died mid-handler leaves status='running'.
+  // After staleSeconds, put those rows back in the pending pool.
+  reclaimStuckJobs(staleSeconds = 120) {
+    const stale = Math.max(30, Number(staleSeconds) || 120);
+    return new Promise((resolve, reject) => {
+      this.db.run(
+        `UPDATE jobs SET status = 'pending', last_error = COALESCE(last_error, 'reclaimed stale running job'),
+            started_at = NULL
+         WHERE status = 'running' AND datetime(started_at) <= datetime('now', ?)`,
+        [`-${stale} seconds`],
+        function (err) { err ? reject(err) : resolve({ reclaimed: this.changes }); }
+      );
     });
   }
 

@@ -38,6 +38,7 @@ Legend: ✅ done · ⏳ deferred (needs a human / external action) · 🔜 code-
 - ⏳ **Encrypt DB backups** — nightly `VACUUM INTO` snapshots are unencrypted on the same persistent disk (14-day retention). Consider app-level encryption (age/libsodium, key in env) or an encrypted off-disk destination.
 - ⏳ **Re-run `npm audit`** before release. Current 5 "high" advisories are all in `tar`, a **build-only** transitive dep of `sqlite3` (never runs in production) — not shipped, but recheck for anything runtime.
 - ✅ Rotating device-token auth, household authorization guards, parameterized SQL, money coercion, LIKE-injection escaping, cross-household tests.
+- ✅ **SQLite job outbox** (2026-08-26) — APNs and waitlist Resend go through `jobs` (`services/jobs.js`) with retry/backoff and a `failed` dead-letter. HTTP handlers return as soon as the row is inserted. Covered by `test/jobs.test.js`.
 
 ## 4. Privacy posture (leader-grade)
 

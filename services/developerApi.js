@@ -18,7 +18,7 @@
 const crypto = require('crypto');
 const tools = require('./conciergeTools');
 const subscription = require('./subscription');
-const push = require('../push');
+const jobs = require('./jobs');
 const { buildSnapshot, todayISO, nowTimeHM } = require('./conciergeContext');
 
 const KEY_PREFIX = 'kr_live_';
@@ -124,7 +124,7 @@ async function buildToolContext(db, auth) {
     userId: auth.userId,
     userName: user?.name || 'there',
     groupId: auth.groupId,
-    push,
+    push: jobs,
     today: todayISO(),
     nowTime: nowTimeHM(),
     source: 'developer_api',

@@ -29,7 +29,7 @@ const bcrypt = require('bcryptjs');
 const path = require('path');
 const fs = require('fs');
 const FamilyDB = require('./database');
-const push = require('./push');
+const jobs = require('./services/jobs');
 const ai = require('./services/anthropic');
 const { buildSnapshot } = require('./services/conciergeContext');
 const { generateBrief } = require('./services/conciergeBrief');
@@ -1304,15 +1304,14 @@ app.post('/api/waitlist', waitlistLimiter, async (req, res) => {
     res.json({ success: true, already: !created, ref_code, position, referrals, total });
 
     if (created && email.isEmailEnabled()) {
-      const welcome = email.waitlistWelcomeEmail();
-      const r = await email.sendEmail({ to: raw, subject: welcome.subject, html: welcome.html, text: welcome.text });
-      if (r.ok) await db.markWaitlistWelcomed(raw);
-      else console.error('[waitlist] welcome send failed:', r.error);
-
-      if (email.emailConfig.notify) {
-        const note = email.waitlistNotifyEmail(raw, total);
-        email.sendEmail({ to: email.emailConfig.notify, subject: note.subject, html: note.html, text: note.text })
-          .catch((e) => console.error('[waitlist] admin notify send failed:', e?.message || e));
+      try {
+        await jobs.enqueueWaitlist(db, {
+          email: raw,
+          total,
+          notify: Boolean(email.emailConfig.notify),
+        });
+      } catch (e) {
+        console.error('[waitlist] enqueue failed:', e?.message || e);
       }
     } else if (created) {
       // Don't log the raw email — note the domain only.
@@ -2809,7 +2808,7 @@ app.post('/api/appointments', requireAuth, async (req, res) => {
       const creator = await db.getUserById(userId);
       const senderName = (creator?.name || '').trim();
       const pushTitle = senderName ? `${senderName} added an event` : 'New event added';
-      push.pushToGroup(db, data.group_id, userId, pushTitle, body, { type: 'event', ref_id: created.id });
+      jobs.pushToGroup(db, data.group_id, userId, pushTitle, body, { type: 'event', ref_id: created.id });
     }
   } catch (err) {
     sendServerError(res, err);
@@ -4427,7 +4426,7 @@ app.post('/api/decisions', requireAuth, async (req, res) => {
     res.json({ success: true, id: result.id });
     // Push to household members
     if (data.group_id) {
-      push.pushToGroup(db, data.group_id, userId, `${senderName} needs your input`, data.title || 'New decision', { type: 'decision', ref_id: result.id });
+      jobs.pushToGroup(db, data.group_id, userId, `${senderName} needs your input`, data.title || 'New decision', { type: 'decision', ref_id: result.id });
     }
   } catch (err) {
     sendServerError(res, err);
@@ -4581,7 +4580,7 @@ app.post('/api/rivalries', requireAuth, async (req, res) => {
     for (const opName of opponents) {
       const opId = await db.getUserIdByName(opName, data.group_id);
       if (opId) {
-        push.pushToUser(db, opId, `${senderName} challenged you!`,
+        jobs.pushToUser(db, opId, `${senderName} challenged you!`,
           pick(RIVALRY_CHALLENGE_PUSH)(senderName, ct),
           { type: 'rivalry', ref_id: result.id });
       }
@@ -4691,16 +4690,16 @@ app.post('/api/rivalries/:id/entries', requireAuth, async (req, res) => {
 
           if (theirTotal > myTotal && diff > 0) {
             // They pulled ahead of this participant
-            push.pushToUser(db, pId, rivalry.title, pick(RIVALRY_AHEAD_PUSH)(loggerName, fmtDiff, ct), { type: 'rivalry', ref_id: rivalryId });
+            jobs.pushToUser(db, pId, rivalry.title, pick(RIVALRY_AHEAD_PUSH)(loggerName, fmtDiff, ct), { type: 'rivalry', ref_id: rivalryId });
           } else if (myTotal > theirTotal) {
             // This participant is still ahead
-            push.pushToUser(db, pId, rivalry.title, pick(RIVALRY_BEHIND_PUSH)(loggerName, ct), { type: 'rivalry', ref_id: rivalryId });
+            jobs.pushToUser(db, pId, rivalry.title, pick(RIVALRY_BEHIND_PUSH)(loggerName, ct), { type: 'rivalry', ref_id: rivalryId });
           } else if (diff === 0 && myTotal > 0) {
             // Tied
-            push.pushToUser(db, pId, rivalry.title, `It's a dead tie with ${loggerName}! ${fmt(myTotal)} ${ct} each`, { type: 'rivalry', ref_id: rivalryId });
+            jobs.pushToUser(db, pId, rivalry.title, `It's a dead tie with ${loggerName}! ${fmt(myTotal)} ${ct} each`, { type: 'rivalry', ref_id: rivalryId });
           } else if (diff > 0 && diff <= myTotal * 0.1) {
             // Very close
-            push.pushToUser(db, pId, rivalry.title, pick(RIVALRY_CLOSE_PUSH)(loggerName, fmtDiff, ct), { type: 'rivalry', ref_id: rivalryId });
+            jobs.pushToUser(db, pId, rivalry.title, pick(RIVALRY_CLOSE_PUSH)(loggerName, fmtDiff, ct), { type: 'rivalry', ref_id: rivalryId });
           }
         }
       }
@@ -4748,7 +4747,7 @@ app.post('/api/rivalries/:id/complete', requireAuth, async (req, res) => {
     const result = await db.completeRivalryWithTotals(Number(req.params.id));
     const { initiator_total, opponent_total, winner_name, winner_team } = result;
     // Shared with the concierge's complete_rivalry tool (feed post + pushes).
-    const message = await announceRivalryCompletion(db, push, result, req.session.user.id);
+    const message = await announceRivalryCompletion(db, jobs, result, req.session.user.id);
     const scores = result.scores || [];
     res.json({ success: true, winner_name, winner_team: winner_team || null, initiator_total, opponent_total, scores, message, is_tie: !winner_name });
   } catch (err) {
@@ -4958,7 +4957,7 @@ app.post('/api/stays/:stayId/request', requireAuth, async (req, res) => {
     if (stay.host_user_id) {
       const itinerary = await db.getItineraryById(stay.itinerary_id);
       const traveler = itinerary?.traveler_name || 'Someone';
-      push.pushToUser(db, stay.host_user_id,
+      jobs.pushToUser(db, stay.host_user_id,
         `${traveler} wants to stay with you`,
         `${stay.check_in} to ${stay.check_out}${stay.notes ? ' — ' + stay.notes : ''}`,
         { type: 'stay_request', ref_id: stay.id }
@@ -5033,7 +5032,7 @@ app.post('/api/stays/:stayId/respond', requireAuth, async (req, res) => {
 
       // Notify traveler
       if (itinerary?.traveler_id) {
-        push.pushToUser(db, itinerary.traveler_id,
+        jobs.pushToUser(db, itinerary.traveler_id,
           `${hostName} confirmed your stay!`,
           `${stay.check_in} to ${stay.check_out} is all set`,
           { type: 'stay_confirmed', ref_id: stay.id }
@@ -5044,7 +5043,7 @@ app.post('/api/stays/:stayId/respond', requireAuth, async (req, res) => {
 
       // Notify traveler
       if (itinerary?.traveler_id) {
-        push.pushToUser(db, itinerary.traveler_id,
+        jobs.pushToUser(db, itinerary.traveler_id,
           `${hostName} can't host ${stay.check_in} to ${stay.check_out}`,
           'You may need to adjust your itinerary',
           { type: 'stay_declined', ref_id: stay.id }
@@ -5399,7 +5398,7 @@ app.post('/api/milestones', requireAuth, async (req, res) => {
           reference_id: result.id,
         });
       } catch (e) { console.error('Milestone feed post error:', e.message); }
-      push.pushToGroup(db, gid, userId, 'A new milestone',
+      jobs.pushToGroup(db, gid, userId, 'A new milestone',
         `${person.name} — ${title}. Cheer them on!`, { type: 'milestone', ref_id: result.id });
     }
   } catch (err) {
@@ -5800,7 +5799,7 @@ app.post('/api/groups/:id/feed', requireAuth, async (req, res) => {
     // tap opens the exact group thread (the client router needs `name`).
     const preview = req.body.title || req.body.body || 'New post';
     const grp = await dbGet(db, 'SELECT name FROM groups WHERE id = ?', [groupId]);
-    push.pushToGroup(db, groupId, userId, `New from ${senderName}`, preview,
+    jobs.pushToGroup(db, groupId, userId, `New from ${senderName}`, preview,
       { type: 'group_message', ref_id: groupId, name: grp?.name || 'Group' });
   } catch (err) {
     sendServerError(res, err);
@@ -6357,7 +6356,7 @@ app.put('/api/routines/:id/share', requireAuth, async (req, res) => {
           reference_id: Number(req.params.id),
         });
       } catch (e) { console.error('Routine share feed post error:', e.message); }
-      push.pushToGroup(db, row.group_id, req.session.user?.id, 'A routine was shared',
+      jobs.pushToGroup(db, row.group_id, req.session.user?.id, 'A routine was shared',
         `${routine?.name || 'A routine'} is now shared with your household`);
     }
   } catch (err) { sendServerError(res, err); }
@@ -6754,9 +6753,9 @@ app.post('/api/messages', requireAuth, async (req, res) => {
       image_data: req.body.image_data
     });
     res.json({ success: true, id: result.id });
-    // Push notification to recipient (fire-and-forget)
+    // Push notification to recipient (enqueued; drain sends APNs)
     const text = req.body.image_data ? 'Sent you a photo' : (req.body.text || '');
-    push.pushToUser(db, req.body.recipient_id, `Message from ${senderName}`, text, { type: 'message', ref_id: senderId, name: senderName });
+    jobs.pushToUser(db, req.body.recipient_id, `Message from ${senderName}`, text, { type: 'message', ref_id: senderId, name: senderName });
   } catch (err) { sendServerError(res, err); }
   finally { db.close(); }
 });
@@ -7125,7 +7124,7 @@ app.post('/api/coverage', requireAuth, async (req, res) => {
     for (const contactId of (contact_ids || [])) {
       const helperId = await db.getUserIdByContactId(contactId);
       if (helperId) {
-        push.pushToUser(db, helperId, `${senderName} needs your help`, reason || 'Coverage request', {
+        jobs.pushToUser(db, helperId, `${senderName} needs your help`, reason || 'Coverage request', {
           type: 'coverage', ref_id: request.id
         });
       }
@@ -7361,7 +7360,7 @@ app.post('/api/coverage/approve/:token', async (req, res) => {
       const helperName = recipient.contact_name || 'Your care team';
       const requesterName = recipient.requester_name || 'Family';
       const timeDesc = approved_start && approved_end ? `${approved_start}–${approved_end}` : 'a time block';
-      push.pushToUser(db, request.requester_id, 'Coverage Confirmed', `${helperName} approved ${timeDesc}`, {
+      jobs.pushToUser(db, request.requester_id, 'Coverage Confirmed', `${helperName} approved ${timeDesc}`, {
         type: 'coverage', ref_id: recipient.request_id
       });
 
@@ -7421,7 +7420,7 @@ app.post('/api/coverage/incoming/:id/approve', requireAuth, async (req, res) => 
     if (request) {
       const helperName = req.session.user?.name || 'Your care team';
       const timeDesc = approved_start && approved_end ? `${approved_start}–${approved_end}` : 'a time block';
-      push.pushToUser(db, request.requester_id, 'Coverage Confirmed', `${helperName} approved ${timeDesc}`, {
+      jobs.pushToUser(db, request.requester_id, 'Coverage Confirmed', `${helperName} approved ${timeDesc}`, {
         type: 'coverage', ref_id: requestId
       });
 
@@ -7662,6 +7661,7 @@ initializeDatabase().then(() => {
     startProactiveNudges();
     startNightlyBackups();
     startOnboardingEmails();
+    jobs.startWorker();
   });
   // Graceful shutdown on platform-issued SIGTERM (deploys/restarts): stop
   // accepting connections, let in-flight requests finish, then exit. WAL keeps
