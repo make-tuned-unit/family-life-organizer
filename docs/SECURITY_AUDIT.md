@@ -106,20 +106,23 @@ disagreed. **This addendum is authoritative:**
 - APNs payloads still carry message/coverage/child-name text (Notification Service Extension deferred).
 - `npm audit` 2026-08-26: highs/critical are **build-only** under `sqlite3 → node-gyp` (`tar`, `ip-address`, `socks-proxy-agent`, `brace-expansion`). Not imported by `dashboard.js`. Do not `npm audit fix --force` (it wants sqlite3@6). CI continues `|| true` with that comment.
 
-### Human-owned (cannot be done from this agent)
+### Human-owned (Railway CLI applied 2026-08-26)
 
-Confirm on **Railway** before App Store submit:
+Done from this agent (project **Kinrows**, service **family-life-organizer**):
 
-1. `AUTH_2FA_ENABLED` — on or off, **deliberately**. If on, every TestFlight user must already have the 2FA UI.
-2. `AUTH_2FA_ECHO_CODE` **unset** (server refuse-to-boot if set in production).
-3. `STRIPE_ALLOW_TEST` and `STOREKIT_ALLOW_SANDBOX` **unset**.
-4. `COMP_PREMIUM_ALL` **unset**.
-5. `ADMIN_USER_IDS` set to real ids only (fail-closed if empty).
-6. `FAMILY_DB_DIR` points at the mounted volume (not ephemeral disk).
-7. **Rotate `SESSION_SECRET`** if it has not been rotated since the 2026-07-11 history rewrite; reset legacy jesse/sophie passwords if those accounts still exist.
-8. One real 2FA login on the live server if 2FA is intended to be on.
+1. **`SESSION_SECRET` rotated** (new 128-char hex). Live sessions/cookies are invalid — users sign in again.
+2. **`COMP_PREMIUM_ALL` deleted** (was `1`). Boot will no longer grant premium to every household. Existing `comp:` rows in SQLite may still entitle households until revoked via `POST /api/admin/comp`.
+3. **`FAMILY_DB_DIR=/opt/render/project/src/vault/family-life`** (same path as the attached 5 GB volume).
+4. **`AUTH_2FA_ECHO_CODE` unset.** `STOREKIT_ALLOW_SANDBOX` unset. Leftover **Gmail IMAP** env vars deleted.
+5. **`AUTH_2FA_ENABLED` is off** (key present, empty). `ADMIN_USER_IDS` is a single real id. `NODE_ENV=production`. `APNS_ENV=production`.
 
-iOS parse-check (`xcrun swiftc -parse`) was **not available** on this machine; touched Swift must compile in Xcode before submit.
+Still human:
+
+1. **Stripe is still test-mode in production** (`sk_test_` / `pk_test_` and `STRIPE_ALLOW_TEST=1`). Swap to live keys + live webhook secret, then delete `STRIPE_ALLOW_TEST`.
+2. Reset legacy jesse/sophie **passwords** if those accounts still exist.
+3. Enable `AUTH_2FA_ENABLED=1` only after every TestFlight user has the 2FA UI.
+4. Optionally revoke leftover comp entitlements and set a Railway `healthcheckPath` of `/healthz` (currently unset on the service).
+5. Compile touched Swift in Xcode before submit (`swiftc` was not on the audit machine).
 
 ## 2026-08-26 — Stripe web subscriptions (Concierge)
 
