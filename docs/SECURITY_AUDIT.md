@@ -118,11 +118,20 @@ Done from this agent (project **Kinrows**, service **family-life-organizer**):
 
 Still human:
 
-1. **Stripe is still test-mode in production** (`sk_test_` / `pk_test_` and `STRIPE_ALLOW_TEST=1`). Swap to live keys + live webhook secret, then delete `STRIPE_ALLOW_TEST`.
-2. Reset legacy jesse/sophie **passwords** if those accounts still exist.
-3. Enable `AUTH_2FA_ENABLED=1` only after every TestFlight user has the 2FA UI.
-4. Optionally revoke leftover comp entitlements and set a Railway `healthcheckPath` of `/healthz` (currently unset on the service).
-5. Compile touched Swift in Xcode before submit (`swiftc` was not on the audit machine).
+1. Reset legacy jesse/sophie **passwords** if those accounts still exist.
+2. Enable `AUTH_2FA_ENABLED=1` only after every TestFlight user has the 2FA UI.
+3. Optionally revoke leftover comp entitlements and set a Railway `healthcheckPath` of `/healthz` (currently unset on the service).
+4. Compile touched Swift in Xcode before submit (`swiftc` was not on the audit machine).
+5. First live web Checkout purchase (Lite + Premium) after this cutover — confirm entitlement + Customer Portal.
+
+### Stripe live cutover (2026-08-26, later the same day)
+
+Production is **live Stripe**, not test:
+
+- Live catalog on account `acct_1U8kNvAFD5YfBJgE`: Lite `prod_V98PyRIxlZ3v19`, Premium `prod_V98QNWgRBTE8mx`, four USD prices with StoreKit lookup keys (`price_1U8q9X…` / `price_1U8q9k…`).
+- Live webhook `we_1U8q9tAFD5YfBJgEICI8fCaV` → `https://kinrows.com/api/subscription/stripe` (checkout completed, subscription updated/deleted, invoice paid / payment_failed).
+- Railway: `sk_live_` / `pk_live_`, live `STRIPE_WEBHOOK_SECRET`, live `STRIPE_PRICE_*`. **`STRIPE_ALLOW_TEST` deleted.**
+- Deploy `50fbf719` SUCCESS. Read-only probes: `/healthz` `{"ok":true}`; `GET /api/subscription/catalog` `"stripe":true` + four plans; unauth checkout 401; unsigned webhook 400; logs `Stripe billing: ENABLED`.
 
 ## 2026-08-26 — Stripe web subscriptions (Concierge)
 
