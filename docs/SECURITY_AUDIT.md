@@ -96,8 +96,8 @@ disagreed. **This addendum is authoritative for the 2026-08-26 audit:**
 
 | Topic | Old claim A | Old claim B | 2026-08-26 |
 |---|---|---|---|
-| Email 2FA in prod | “already `AUTH_2FA_ENABLED=1` on Railway” | “still OFF / unset” | **Unconfirmed from here.** Code is opt-in. Owner must read Railway env. |
-| Git-history purge | “NOT done” (2026-07-11 addendum below) | Checklist: purged 2026-07-11 via `git filter-repo` | **Treat purge as done** per checklist evidence. **Rotation of `SESSION_SECRET` and legacy passwords is still required** — a rewrite does not un-expose clones/caches. |
+| Email 2FA in prod | “already `AUTH_2FA_ENABLED=1` on Railway” | “still OFF / unset” | **OFF.** Railway CLI 2026-08-26: `AUTH_2FA_ENABLED` is present but empty; `AUTH_2FA_ECHO_CODE` unset. |
+| Git-history purge | “NOT done” (2026-07-11 addendum below) | Checklist: purged 2026-07-11 via `git filter-repo` | **Treat purge as done** per checklist evidence. **`SESSION_SECRET` rotated 2026-08-26 via Railway CLI.** Reset legacy jesse/sophie passwords if those accounts still exist. |
 | Privacy copy | “contradicts GPS / receipts” | Checklist: GPS copy reconciled | **Reconciled in this pass** (GPS opt-in, first-party pageviews, SIWA, Resend, Railway, BYO-agent, in-app export). |
 | Host | Render in privacy label / old human-actions | Railway | **Railway.** Render config was removed 2026-07-11. |
 
