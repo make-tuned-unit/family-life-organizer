@@ -140,7 +140,7 @@ for (;;) {
 - The bearer middleware (`requireApiKey` in `dashboard.js`) re-checks the household's subscription on **every** request and stamps `last_used_at`.
 - The rate limiter buckets on a hash of the bearer, never the raw key, so a guessed/bad key cannot collide with a real key's bucket.
 - `/v1` never touches the cookie session; a key cannot be used to log in, change the password/email, or delete the account — those routes live only under `/api` with session auth.
-- Deleting the account cascades `api_keys` (FK `ON DELETE CASCADE`).
+- Deleting the account explicitly `DELETE`s `api_keys` for that user (account wipe turns foreign keys off on a private connection, so we do not rely on `ON DELETE CASCADE` here).
 - Tool calls run with `ctx.source = 'developer_api'` should any handler ever need to distinguish agent traffic.
 
 ## 5. Code map

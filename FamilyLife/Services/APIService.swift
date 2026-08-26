@@ -110,6 +110,8 @@ final class APIService {
         let email: String?
         let email_verified: Bool
         let two_factor_enabled: Bool
+        let has_apple: Bool?
+        let share_presence: Bool?
     }
 
     func fetchSecurityStatus() async throws -> SecurityStatus {
@@ -1353,9 +1355,34 @@ final class APIService {
         let _: SuccessResponse = try await put("/api/users/me/avatar", body: ["image": base64])
     }
 
-    /// Permanently delete the signed-in account. Re-auth with the password.
-    func deleteAccount(currentPassword: String) async throws {
-        let _: SuccessResponse = try await post("/api/account/delete", body: ["current_password": currentPassword])
+    /// Permanently delete the signed-in account. Re-auth with the password
+    /// and/or a Sign in with Apple identity token (required for Apple-only accounts).
+    func deleteAccount(currentPassword: String? = nil, identityToken: String? = nil, nonce: String? = nil) async throws {
+        var body: [String: Any] = [:]
+        if let currentPassword, !currentPassword.isEmpty { body["current_password"] = currentPassword }
+        if let identityToken { body["identity_token"] = identityToken }
+        if let nonce { body["nonce"] = nonce }
+        let _: SuccessResponse = try await post("/api/account/delete", body: body)
+    }
+
+    func setSharePresence(enabled: Bool) async throws {
+        let _: SuccessResponse = try await post("/api/account/presence", body: ["enabled": enabled])
+    }
+
+    func fetchSharePresence() async throws -> Bool {
+        struct Body: Codable { let enabled: Bool }
+        let body: Body = try await get("/api/account/presence")
+        return body.enabled
+    }
+
+    func exportAccountData() async throws -> Data {
+        guard let url = URL(string: baseURL + "/api/account/export") else { throw APIError.invalidResponse }
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.timeoutInterval = 60
+        let (data, response) = try await session.data(for: request)
+        try checkResponse(response, data: data)
+        return data
     }
 
     func updateName(_ name: String) async throws {

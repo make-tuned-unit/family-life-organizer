@@ -321,6 +321,24 @@ final class AuthService {
             Self.deletePassword(for: username)
         }
         UserDefaults.standard.removeObject(forKey: "apns_device_token")
+        // Per-account preferences — the next person on this phone must not
+        // inherit presence, calendar-share, HealthKit watermarks, or AI toggles.
+        UserDefaults.standard.removeObject(forKey: "sharePresenceEnabled")
+        UserDefaults.standard.removeObject(forKey: "cloudAIEnabled")
+        UserDefaults.standard.removeObject(forKey: "aiConciergeEnabled")
+        UserDefaults.standard.removeObject(forKey: "calendarShareEnabled")
+        UserDefaults.standard.removeObject(forKey: "calendarSharedIDs")
+        UserDefaults.standard.removeObject(forKey: "calendarShareAll")
+        UserDefaults.standard.removeObject(forKey: "kinrowsAppleEventMap")
+        UserDefaults.standard.removeObject(forKey: "appleCalendarSyncMode")
+        UserDefaults.standard.removeObject(forKey: "saved_recipes")
+        UserDefaults.standard.removeObject(forKey: "rivalry_xp")
+        UserDefaults.standard.removeObject(forKey: "dismissed_hero_ids")
+        for (key, _) in UserDefaults.standard.dictionaryRepresentation() {
+            if key.hasPrefix("hk_synced_") {
+                UserDefaults.standard.removeObject(forKey: key)
+            }
+        }
         HTTPCookieStorage.shared.cookies?.forEach { HTTPCookieStorage.shared.deleteCookie($0) }
     }
 

@@ -56,6 +56,22 @@ async function post(pathname, body) {
   return { status: res.status, body: json };
 }
 
+function makeClient() {
+  let cookie = '';
+  return async (method, pathname, body) => {
+    const res = await fetch(BASE + pathname, {
+      method,
+      headers: { 'Content-Type': 'application/json', ...(cookie ? { Cookie: cookie } : {}) },
+      body: body ? JSON.stringify(body) : undefined,
+      redirect: 'manual',
+    });
+    const sc = res.headers.get('set-cookie');
+    if (sc) cookie = sc.split(';')[0];
+    let json = null; try { json = await res.json(); } catch {}
+    return { status: res.status, body: json };
+  };
+}
+
 async function waitForHealth(timeoutMs = 15000) {
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
@@ -210,4 +226,34 @@ test('apple sign-in links a verified-email password account instead of minting a
   assert.equal(res.body.user.id, originalId);
   assert.equal(res.body.user.username, 'link_me');
   assert.equal(res.body.user.name, 'Linkable');
+});
+
+test('SIWA account cannot delete with a dummy password; Apple identity token works', async () => {
+  const c = makeClient();
+  const nonce = 'nonce-del-siwa';
+  const sub = 'apple-sub-del';
+  const created = await c('POST', '/api/auth/apple', {
+    identity_token: appleToken({ sub, nonce, email: 'del@privaterelay.appleid.com' }),
+    nonce,
+    name: 'Delete Me',
+    device_name: 'test',
+  });
+  assert.equal(created.status, 200, JSON.stringify(created.body));
+  const sec = await c('GET', '/api/account/security');
+  assert.equal(sec.status, 200);
+  assert.equal(sec.body.has_apple, true);
+
+  const dummy = await c('POST', '/api/account/delete', { current_password: 'password123' });
+  assert.equal(dummy.status, 401);
+
+  const noCreds = await c('POST', '/api/account/delete', {});
+  assert.equal(noCreds.status, 401);
+
+  const nonce2 = 'nonce-del-siwa-ok';
+  const ok = await c('POST', '/api/account/delete', {
+    identity_token: appleToken({ sub, nonce: nonce2, email: 'del@privaterelay.appleid.com' }),
+    nonce: nonce2,
+  });
+  assert.equal(ok.status, 200, JSON.stringify(ok.body));
+  assert.equal((await c('GET', '/api/auth/me')).status, 401);
 });

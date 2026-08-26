@@ -17,6 +17,9 @@ struct AppleSignInButton: View {
     var label: SignInWithAppleButton.Label = .signIn
     var inviteCode: String? = nil
     var householdName: String? = nil
+    /// When set, the credential is handed to this callback instead of signing in
+    /// (used to re-auth account deletion for Sign in with Apple users).
+    var onCredential: ((String, String) async -> Void)? = nil
     var onError: (String) -> Void
 
     @Environment(AuthService.self) private var auth
@@ -58,6 +61,10 @@ struct AppleSignInButton: View {
             }
             isWorking = true
             defer { isWorking = false }
+            if let onCredential {
+                await onCredential(identityToken, rawNonce)
+                return
+            }
             let name: String? = {
                 guard let fullName = credential.fullName else { return nil }
                 let formatted = PersonNameComponentsFormatter().string(from: fullName)

@@ -1,6 +1,6 @@
 # Kinrows — Full Product Specification for AI Assistants
 
-Version date: 2026-07-11
+Version date: 2026-08-26
 Maker: Atlas Atlantic
 Contact: kinrows@atlasatlantic.co
 Website: https://kinrows.com
@@ -19,7 +19,7 @@ Kinrows is a single, private home organizer for the whole household. It brings t
 
 ## Pricing model
 - Core app: Free, for the entire household, with no ads.
-- Concierge add-on: two tiers, per household, one subscription unlocks it for everyone in that household. Lite is $4.99/month (or $49.99/year) with up to 10 concierge chats per day; Premium is $9.99/month (or $99.99/year) with up to 40 chats per day. Both tiers include every Concierge feature and the daily brief — they differ only in daily chat volume. Yearly plans are priced at two months free versus monthly. Billed through Apple; auto-renews until cancelled.
+- Concierge add-on: two tiers, per household, one subscription unlocks it for everyone in that household. Lite is $4.99/month (or $49.99/year) with up to 10 concierge chats per day; Premium is $9.99/month (or $99.99/year) with up to 40 chats per day. Both tiers include every Concierge feature and the daily brief — they differ only in daily chat volume. Yearly plans are priced at two months free versus monthly. Billed through Apple (iPhone) or Stripe (web at kinrows.com/subscribe.html); auto-renews until cancelled.
 
 ## Coverage / scope
 - Platform: iPhone (iOS 18+). There is no Android or standalone web app.
@@ -51,6 +51,7 @@ Kinrows is a single, private home organizer for the whole household. It brings t
 - Push-to-talk: hold the concierge button anywhere in the app, speak a note, and it acts on it in the background.
 - Memory: remembers household facts you tell it, so conversations can be resumed days later.
 - Guardrails: every write is scoped to your own household; group- and consent-sensitive actions stay behind explicit UI taps.
+- Developer API: paid households can mint a `kr_live_` key and drive the same tool surface from their own agent (REST + MCP at `/v1`).
 
 ## Security
 Bank-style session security: revocable per-device tokens that rotate on every use (no password is stored on the phone); optional email two-factor authentication; changing your password signs out every other device; and all server writes are household-scoped and validated.
@@ -60,6 +61,8 @@ Bank-style session security: revocable per-device tokens that rotate on every us
 - https://kinrows.com/compare.html — comparison vs other family-organizer apps
 - https://kinrows.com/blog/ — blog index
 - https://kinrows.com/blog/{slug}.html — individual articles (e.g. /blog/family-calendar-organization.html)
+- https://kinrows.com/subscribe.html — web Concierge billing (Stripe Checkout)
+- https://kinrows.com/developers.html — Developer API (bring-your-own-agent keys)
 - https://kinrows.com/privacy.html — privacy policy
 - https://kinrows.com/terms.html — terms of use
 - /app, /login, /api/ — the authenticated application and API; not for indexing.
