@@ -70,10 +70,12 @@ struct ConciergeChatView: View {
                         Image(systemName: "clock.arrow.circlepath")
                     }
                     .accessibilityLabel("Conversation history")
+                    .help("Conversation history")
                     Button { viewModel.startNew(); draft = "" } label: {
                         Image(systemName: "square.and.pencil")
                     }
                     .accessibilityLabel("New conversation")
+                    .help("New conversation")
                     .disabled(viewModel.messages.isEmpty)
                 }
                 ToolbarItem(placement: .topBarTrailing) {
@@ -210,8 +212,9 @@ struct ConciergeChatView: View {
                         .foregroundStyle(.white)
                         .frame(width: 40, height: 40)
                         .background(canSend ? accent : WarmPalette.ink3.opacity(0.4), in: Circle())
-                        .accessibilityLabel("Send message")
                 }
+                .accessibilityLabel("Send message")
+                .help("Send message")
                 .disabled(!canSend)
             }
         }
@@ -246,6 +249,7 @@ struct ConciergeChatView: View {
                 .animation(.easeInOut(duration: 0.2), value: speech.isRecording)
         }
         .accessibilityLabel(speech.isRecording ? "Stop dictation" : "Dictate a message")
+        .help(speech.isRecording ? "Stop dictation" : "Dictate a message")
     }
 
     private var canSend: Bool {

@@ -51,6 +51,7 @@ struct FamilyAddressesView: View {
                     Image(systemName: "plus")
                 }
                 .accessibilityLabel("Add place")
+                .help("Add place")
             }
         }
         .inlineError(error) { error = nil }

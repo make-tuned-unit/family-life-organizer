@@ -308,6 +308,8 @@ struct GroupChatView: View {
                                 .font(.system(size: 16))
                                 .foregroundStyle(WarmPalette.ink4)
                         }
+                        .accessibilityLabel("Remove photo")
+                        .help("Remove photo")
                     }
                     .padding(.horizontal, 14)
                     .padding(.top, 8)
@@ -319,6 +321,8 @@ struct GroupChatView: View {
                             .font(.system(size: 18))
                             .foregroundStyle(WarmPalette.ink3)
                     }
+                    .accessibilityLabel("Attach photo")
+                    .help("Attach photo")
                     .onChange(of: selectedPhoto) {
                         Task {
                             if let data = try? await selectedPhoto?.loadTransferable(type: Data.self) {
@@ -332,6 +336,8 @@ struct GroupChatView: View {
                             .font(.system(size: 16))
                             .foregroundStyle(TabAccent.decisions.color)
                     }
+                    .accessibilityLabel("Start a decision")
+                    .help("Start a decision")
 
                     TextField("Message...", text: $newMessage)
                         .textFieldStyle(.roundedBorder)
@@ -343,6 +349,8 @@ struct GroupChatView: View {
                             .font(.system(size: 28))
                             .foregroundStyle(canSend ? TabAccent.home.color : WarmPalette.ink4)
                     }
+                    .accessibilityLabel("Send message")
+                    .help("Send message")
                     .disabled(!canSend)
                 }
                 .padding(.horizontal, 14)

@@ -349,6 +349,8 @@ struct FeedCard: View {
                             .font(.system(size: 22))
                             .foregroundStyle(prepared.accentColor)
                     }
+                    .accessibilityLabel("Post comment")
+                    .help("Post comment")
                     .disabled(isSendingComment)
                 }
             }

@@ -297,6 +297,8 @@ struct ListDetailSection: View {
                             .font(.system(size: 28))
                             .foregroundStyle(TabAccent.home.color)
                     }
+                    .accessibilityLabel("Add item")
+                    .help("Add item")
                 }
             }
             .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
@@ -471,6 +473,8 @@ struct ListDetailSection: View {
                     .foregroundStyle(item.isDone ? WarmPalette.good : WarmPalette.ink4)
             }
             .buttonStyle(.plain)
+            .accessibilityLabel(item.isDone ? "Mark \(item.title) as not done" : "Mark \(item.title) as done")
+            .help(item.isDone ? "Mark as not done" : "Mark as done")
 
             if isEditing {
                 TextField("Item name", text: $editingText)
@@ -500,12 +504,16 @@ struct ListDetailSection: View {
                         .foregroundStyle(WarmPalette.good)
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("Save item")
+                .help("Save item")
                 Button { editingItemId = nil } label: {
                     Image(systemName: "xmark.circle.fill")
                         .font(.system(size: 20))
                         .foregroundStyle(WarmPalette.ink4)
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("Cancel editing")
+                .help("Cancel editing")
             }
         }
         .contextMenu {
@@ -539,6 +547,8 @@ struct ListDetailSection: View {
                     .font(.system(size: 22))
                     .foregroundStyle(item.isDone ? WarmPalette.good : WarmPalette.ink4)
             }
+            .accessibilityLabel(item.isDone ? "Mark \(item.title) as not done" : "Mark \(item.title) as done")
+            .help(item.isDone ? "Mark as not done" : "Mark as done")
 
             if isEditing {
                 TextField("Item name", text: $editingText)
@@ -567,11 +577,15 @@ struct ListDetailSection: View {
                         .font(.system(size: 20))
                         .foregroundStyle(WarmPalette.good)
                 }
+                .accessibilityLabel("Save item")
+                .help("Save item")
                 Button { editingItemId = nil } label: {
                     Image(systemName: "xmark.circle.fill")
                         .font(.system(size: 20))
                         .foregroundStyle(WarmPalette.ink4)
                 }
+                .accessibilityLabel("Cancel editing")
+                .help("Cancel editing")
             } else if let by = item.added_by, !by.isEmpty, !item.isDone {
                 Text(by)
                     .font(.flCaption)
@@ -878,6 +892,8 @@ struct TasksDetailSection: View {
                             .font(.system(size: 28))
                             .foregroundStyle(TabAccent.home.color)
                     }
+                    .accessibilityLabel("Add task")
+                    .help("Add task")
                 }
             }
             .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
@@ -970,6 +986,8 @@ struct TasksDetailSection: View {
                     .foregroundStyle(isDone ? WarmPalette.good : WarmPalette.ink4)
             }
             .buttonStyle(.plain)
+            .accessibilityLabel(isDone ? "Mark \(task.title) as not done" : "Mark \(task.title) as done")
+            .help(isDone ? "Mark as not done" : "Mark as done")
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(task.title)

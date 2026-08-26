@@ -140,6 +140,7 @@ struct CookingModeView: View {
             .disabled(currentStep == 0)
             .opacity(currentStep == 0 ? 0.4 : 1)
             .accessibilityLabel("Previous step")
+            .help("Previous step")
 
             Button {
                 if isLastStep {

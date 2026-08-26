@@ -92,6 +92,8 @@ struct HomeView: View {
                 Button { showingSettings = true } label: {
                     ProfileAvatar(size: 36)
                 }
+                .accessibilityLabel("Settings")
+                .help("Settings")
             }
             ToolbarItem(placement: .principal) {
                 VStack(spacing: 3) {
@@ -128,6 +130,7 @@ struct HomeView: View {
                         .foregroundStyle(WarmPalette.ink2)
                 }
                 .accessibilityLabel("New item")
+                .help("New item")
             }
         }
         .sheet(isPresented: $showingAddTask) {

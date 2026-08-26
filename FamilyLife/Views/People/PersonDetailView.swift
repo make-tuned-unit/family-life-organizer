@@ -82,6 +82,8 @@ struct PersonDetailView: View {
                 } label: {
                     Image(systemName: "ellipsis.circle")
                 }
+                .accessibilityLabel("Person actions")
+                .help("Person actions")
             }
         }
         .sheet(isPresented: $showingAddMilestone) {

@@ -69,6 +69,7 @@ struct BudgetSettingsView: View {
                         .foregroundStyle(TabAccent.expenses.color)
                 }
                 .accessibilityLabel("Add budget category")
+                .help("Add budget category")
             }
         }
         .sheet(isPresented: $showingAdd) {

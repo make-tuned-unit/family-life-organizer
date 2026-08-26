@@ -410,6 +410,7 @@ struct GlassIconButton: View {
                 .foregroundStyle(WarmPalette.ink2)
         }
         .accessibilityLabel(accessibilityLabel ?? systemName)
+        .help(accessibilityLabel ?? systemName)
     }
 }
 
@@ -576,6 +577,8 @@ struct InlineErrorBanner: View {
                     .font(.system(size: 11, weight: .bold))
                     .foregroundStyle(WarmPalette.ink3)
             }
+            .accessibilityLabel("Dismiss error")
+            .help("Dismiss error")
         }
         .padding(12)
         .background(WarmPalette.bad.opacity(0.12), in: RoundedRectangle(cornerRadius: 14))

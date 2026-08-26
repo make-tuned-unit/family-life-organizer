@@ -23,6 +23,8 @@ struct EventAttachmentsSection: View {
                         .font(.system(size: 22))
                         .foregroundStyle(TabAccent.calendar.color)
                 }
+                .accessibilityLabel("Attach an item")
+                .help("Attach an item")
             }
             .padding(.bottom, 8)
 

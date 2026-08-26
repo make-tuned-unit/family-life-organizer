@@ -1253,6 +1253,8 @@ private struct EntryRow: View {
                     .foregroundStyle(WarmPalette.ink4)
             }
             .buttonStyle(.plain)
+            .accessibilityLabel("Delete this log")
+            .help("Delete this log")
         }
         .padding(12)
         .flCard()

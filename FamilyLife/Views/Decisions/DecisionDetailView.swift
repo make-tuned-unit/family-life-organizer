@@ -215,6 +215,8 @@ struct DecisionDetailView: View {
                                     .font(.flTitle)
                                     .foregroundStyle(newComment.isEmpty ? WarmPalette.ink4 : TabAccent.home.color)
                             }
+                            .accessibilityLabel("Post comment")
+                            .help("Post comment")
                             .disabled(newComment.isEmpty)
                         }
                         .padding(.horizontal)

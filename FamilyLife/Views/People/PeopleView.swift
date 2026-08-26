@@ -71,6 +71,8 @@ struct PeopleView: View {
                 Button { showingAddPerson = true } label: {
                     Image(systemName: "person.badge.plus")
                 }
+                .accessibilityLabel("Add person")
+                .help("Add person")
             }
         }
         .sheet(isPresented: $showingAddPerson) {
