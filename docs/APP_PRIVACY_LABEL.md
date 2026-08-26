@@ -3,7 +3,8 @@
 Copy these into App Store Connect → App Privacy. Verified against the code
 2026-08-27. **Every data type below: Linked to the user = YES, Used for
 tracking = NO, Purpose = App Functionality.** Kinrows uses no third-party
-analytics, advertising, or tracking SDKs.
+advertising or tracking SDKs. The marketing site has a first-party pageview
+collector (not used in the iPhone app).
 
 ## "Do you or your third-party partners collect data from this app?" → **Yes**
 
@@ -45,3 +46,4 @@ analytics, advertising, or tracking SDKs.
 - **Anthropic** — AI concierge / receipt & recipe reading (opt-in; not used to train models).
 - **Apple** — Push (APNs), StoreKit, Sign in with Apple, on-device speech.
 - **Railway** — hosting. **Resend** — transactional email (2FA codes, waitlist, content reports).
+- **Stripe** — web Concierge subscriptions (card data stays with Stripe).

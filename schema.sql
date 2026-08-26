@@ -453,6 +453,7 @@ CREATE TABLE IF NOT EXISTS users (
     last_lng REAL,
     last_location_name TEXT,
     last_location_at DATETIME,
+    share_presence INTEGER DEFAULT 0,  -- 1 = household may see last_lat/lng (server-enforced opt-in)
     email_verified INTEGER DEFAULT 0,
     two_factor_enabled INTEGER DEFAULT 0,
     email_opt_out INTEGER DEFAULT 0,     -- 1 = no product/onboarding email (2FA codes still send)

@@ -1,5 +1,6 @@
 import SwiftUI
 import PhotosUI
+import UserNotifications
 
 struct SettingsView: View {
     var showsDismissButton = false
@@ -14,6 +15,9 @@ struct SettingsView: View {
     @State private var showingLogoutConfirm = false
     @State private var showingDeleteAccount = false
     @State private var deleteError: String?
+    @State private var isExporting = false
+    @State private var showingExportShare = false
+    @State private var exportURL: URL?
     @State private var notificationsEnabled = false
     @State private var showingHousehold = false
     @State private var showingPhotoPicker = false
@@ -179,6 +183,7 @@ struct SettingsView: View {
                 // OS permission. Asking here means the switch does what it says
                 // rather than silently sharing nothing.
                 .onChange(of: sharePresenceEnabled) { _, isOn in
+                    Task { try? await api.setSharePresence(enabled: isOn) }
                     guard isOn else { return }
                     if locationService.authorizationStatus == .notDetermined {
                         locationService.requestPermission()
@@ -263,6 +268,12 @@ struct SettingsView: View {
                     Label("Developer API", systemImage: "terminal.fill")
                         .foregroundStyle(TabAccent.home.color)
                 }
+                Button {
+                    Task { await exportAccount() }
+                } label: {
+                    Label(isExporting ? "Preparing export…" : "Export my data", systemImage: "square.and.arrow.up")
+                }
+                .disabled(isExporting)
                 Button(role: .destructive) {
                     showingDeleteAccount = true
                 } label: {
@@ -438,6 +449,16 @@ struct SettingsView: View {
             .environment(api)
             .environment(auth)
         }
+        .sheet(isPresented: $showingExportShare) {
+            if let exportURL {
+                ShareLink(item: exportURL) {
+                    Label("Share export", systemImage: "square.and.arrow.up")
+                        .font(.flHeadline)
+                }
+                .padding()
+                .presentationDetents([.medium])
+            }
+        }
         .inlineError(deleteError) { deleteError = nil }
         .alert("Edit Name", isPresented: $showingNameEdit) {
             TextField("Your name", text: $editingName)
@@ -465,6 +486,24 @@ struct SettingsView: View {
             let settings = await UNUserNotificationCenter.current().notificationSettings()
             notificationsEnabled = settings.authorizationStatus == .authorized
             security = try? await api.fetchSecurityStatus()
+            if let enabled = try? await api.fetchSharePresence() {
+                sharePresenceEnabled = enabled
+            }
+        }
+    }
+
+    private func exportAccount() async {
+        isExporting = true
+        defer { isExporting = false }
+        do {
+            let data = try await api.exportAccountData()
+            let url = FileManager.default.temporaryDirectory.appendingPathComponent("kinrows-export.json")
+            try data.write(to: url, options: .atomic)
+            exportURL = url
+            showingExportShare = true
+        } catch {
+            guard !error.isCancellation else { return }
+            deleteError = "Couldn't export your data. Try again."
         }
     }
 }

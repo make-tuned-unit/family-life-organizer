@@ -116,6 +116,7 @@ final class APIService {
         let two_factor_enabled: Bool
         let has_password: Bool?
         let apple_linked: Bool?
+        let share_presence: Bool?
 
         var hasPassword: Bool { has_password ?? true }
         var appleLinked: Bool { apple_linked ?? false }
@@ -1432,6 +1433,26 @@ final class APIService {
             "ref_id": refId,
             "reason": reason,
         ])
+    }
+
+    func setSharePresence(enabled: Bool) async throws {
+        let _: SuccessResponse = try await post("/api/account/presence", body: ["enabled": enabled])
+    }
+
+    func fetchSharePresence() async throws -> Bool {
+        struct Body: Codable { let enabled: Bool }
+        let body: Body = try await get("/api/account/presence")
+        return body.enabled
+    }
+
+    func exportAccountData() async throws -> Data {
+        guard let url = URL(string: baseURL + "/api/account/export") else { throw APIError.invalidResponse }
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.timeoutInterval = 60
+        let (data, response) = try await session.data(for: request)
+        try checkResponse(response, data: data)
+        return data
     }
 
     func updateName(_ name: String) async throws {

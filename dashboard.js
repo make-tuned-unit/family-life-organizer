@@ -174,6 +174,19 @@ function codeMatches(code, hash) {
   const b = Buffer.from(hash);
   return a.length === b.length && crypto.timingSafeEqual(a, b);
 }
+function timingSafeEqualString(a, b) {
+  if (typeof a !== 'string' || typeof b !== 'string') return false;
+  const ba = Buffer.from(a);
+  const bb = Buffer.from(b);
+  if (ba.length !== bb.length) return false;
+  return crypto.timingSafeEqual(ba, bb);
+}
+// Coverage share links are 16 random bytes as hex (32 chars). Reject anything
+// else before hitting the DB so a scanner can't probe with arbitrary strings.
+function parseCoverageToken(raw) {
+  const t = String(raw || '');
+  return /^[a-f0-9]{32}$/i.test(t) ? t : null;
+}
 function challengeExpiry() {
   return new Date(Date.now() + TWO_FA_TTL_MS).toISOString();
 }
@@ -250,9 +263,9 @@ function haversineDistance(lat1, lng1, lat2, lng2) {
 // cookies and req.ip work correctly.
 app.set('trust proxy', 1);
 app.use(helmet({
-  // The API + a few server-rendered pages; CSP is enforced on the static
-  // marketing site via its own meta tags. Keep HSTS/no-sniff/frame-guard.
-  // The server-rendered /login and /app pages set their own CSP (PAGE_CSP).
+  // JSON API responses do not need a browser CSP. HTML surfaces set their own:
+  // WEBSITE_CSP on marketing/blog (header + static setHeaders), PAGE_CSP on
+  // /login, /app, and /c/:token. Keep HSTS / nosniff / frame-guard from Helmet.
   contentSecurityPolicy: false,
 }));
 
@@ -465,8 +478,24 @@ app.get('/best-shared-shopping-list-app.html', serveWebsiteHtml('best-shared-sho
 
 // Public static assets (CSS, JS, images, etc.) — serve after HTML routes
 // so /analytics.js and /assets/* are still available from express.static
-app.use(express.static(path.join(__dirname, 'website')));
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(__dirname, 'website'), {
+  setHeaders(res, filePath) {
+    if (filePath.endsWith('.html') || filePath.endsWith('.txt')) {
+      res.set('Content-Security-Policy', WEBSITE_CSP);
+    }
+    if (filePath.endsWith(`${path.sep}sw.js`) || filePath.endsWith('/sw.js')) {
+      res.set('Cache-Control', 'no-store');
+      res.set('Service-Worker-Allowed', '/');
+    }
+  }
+}));
+app.use(express.static(path.join(__dirname, 'public'), {
+  setHeaders(res, filePath) {
+    if (filePath.endsWith('sw.js')) {
+      res.set('Cache-Control', 'no-store');
+    }
+  }
+}));
 
 // Liveness/readiness probe (used by the host's health check). Pings the DB.
 app.get('/healthz', (req, res) => {
@@ -1292,6 +1321,18 @@ app.post('/api/account/delete', requireAuth, loginLimiter, async (req, res) => {
       return res.status(401).json({ error: hint });
     }
 
+    // Sole-owner households: cancel Stripe so billing does not outlive the wipe.
+    if (stripeBilling.isConfigured()) {
+      try {
+        const txns = await db.listSoleHouseholdStripeSubs(req.session.user.id);
+        for (const txn of txns) {
+          const sid = stripeBilling.stripeSubscriptionIdFromTxn(txn);
+          if (sid) {
+            await stripeBilling.stripeRequest('POST', `/subscriptions/${sid}/cancel`).catch(() => {});
+          }
+        }
+      } catch { /* deletion still proceeds */ }
+    }
     await db.deleteUserAccount(req.session.user.id);
     req.session.destroy(() => res.json({ success: true }));
   } catch (err) {
@@ -1391,7 +1432,7 @@ app.get('/api/account/security', requireAuth, async (req, res) => {
       two_factor_enabled: !!user?.two_factor_enabled,
       has_password: user?.password_login !== 0 && user?.password_login !== '0',
       apple_linked: !!user?.apple_user_id,
-    });
+      share_presence: !!user?.share_presence,    });
   } catch (err) {
     sendServerError(res, err);
   } finally {
@@ -1468,6 +1509,7 @@ const householdInviteLimiter = createRateLimiter({
   max: 10,
   keyFn: req => req.session?.user?.id ?? clientIp(req),
 });
+const analyticsCollectLimiter = createRateLimiter({ windowMs: 60000, max: 120, keyFn: clientIp });
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 app.post('/api/waitlist', waitlistLimiter, async (req, res) => {
@@ -1570,6 +1612,37 @@ app.post('/api/email/unsubscribe', unsubscribeLimiter, async (req, res) => {
   }
 });
 
+// Server-side opt-in for household presence GPS. The iOS toggle is not enough —
+// a modified client must not be able to publish coordinates without this flag.
+app.get('/api/account/presence', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const enabled = await db.getSharePresence(req.session.user.id);
+    res.json({ enabled });
+  } catch (err) { sendServerError(res, err); }
+  finally { db.close(); }
+});
+
+app.post('/api/account/presence', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const enabled = !!req.body.enabled;
+    await db.setSharePresence(req.session.user.id, enabled);
+    res.json({ success: true, enabled });
+  } catch (err) { sendServerError(res, err); }
+  finally { db.close(); }
+});
+
+app.get('/api/account/export', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const dump = await db.exportUserAccount(req.session.user.id);
+    res.set('Content-Disposition', 'attachment; filename="kinrows-export.json"');
+    res.json(dump);
+  } catch (err) { sendServerError(res, err); }
+  finally { db.close(); }
+});
+
 // Update work address for a user
 app.put('/api/users/:id/work-address', requireAuth, async (req, res) => {
   const db = new FamilyDB();
@@ -1601,6 +1674,9 @@ app.post('/api/location', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
     const userId = req.session.user.id;
+    if (!(await db.getSharePresence(userId))) {
+      return res.status(403).json({ error: 'Presence sharing is off' });
+    }
     const { lat, lng } = req.body;
 
     // Check against saved addresses to determine location name
@@ -3510,10 +3586,15 @@ app.put('/api/notes/:id', requireAuth, async (req, res) => {
 
     if (note.user_id === userId) {
       // Owner — full update including sharing + collaboration settings.
-      const updates = { ...req.body };
-      if (updates.shared_scope !== undefined) {
-        const groupId = await resolveNoteShare(db, userId, updates.shared_scope, updates.group_id);
-        updates.shared_scope = groupId ? updates.shared_scope : 'private';
+      // Never spread req.body: a client-supplied group_id without a matching
+      // shared_scope used to retarget the note at another household.
+      const updates = {};
+      for (const k of ['title', 'body', 'color', 'pinned', 'can_collaborate']) {
+        if (req.body[k] !== undefined) updates[k] = req.body[k];
+      }
+      if (req.body.shared_scope !== undefined) {
+        const groupId = await resolveNoteShare(db, userId, req.body.shared_scope, req.body.group_id);
+        updates.shared_scope = groupId ? req.body.shared_scope : 'private';
         updates.group_id = groupId;
       }
       await db.updateNote(req.params.id, updates, userId);
@@ -7172,7 +7253,11 @@ app.get('/api/messages', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
     const conversations = await db.getConversations(req.session.user.id);
-    res.json(conversations);
+    const visible = [];
+    for (const c of conversations) {
+      if (await usersShareGroup(db, req.session.user.id, c.partner_id)) visible.push(c);
+    }
+    res.json(visible);
   } catch (err) { sendServerError(res, err); }
   finally { db.close(); }
 });
@@ -7180,7 +7265,11 @@ app.get('/api/messages', requireAuth, async (req, res) => {
 app.get('/api/messages/:partnerId', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
-    const messages = await db.getMessages(req.session.user.id, parseInt(req.params.partnerId), {
+    const partnerId = parseInt(req.params.partnerId);
+    if (!(await usersShareGroup(db, req.session.user.id, partnerId))) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+    const messages = await db.getMessages(req.session.user.id, partnerId, {
       limit: clampLimit(req.query.limit, 50),
       before_id: req.query.before_id ? parseInt(req.query.before_id) : undefined,
       after_id: req.query.after_id ? parseInt(req.query.after_id) : undefined,
@@ -7271,14 +7360,20 @@ app.get('/api/admin/diagnostic', requireAuth, requireAdmin, async (req, res) => 
     const query = (sql, params = []) => new Promise((resolve, reject) => {
       db.db.all(sql, params, (err, rows) => err ? reject(err) : resolve(rows));
     });
-    const users = await query('SELECT id, username, name FROM users');
-    const groups = await query('SELECT * FROM groups');
-    const members = await query(`SELECT gm.*, u.name as user_name, u.username
-      FROM group_members gm LEFT JOIN users u ON u.id = gm.user_id`);
+    const users = await query('SELECT COUNT(*) AS n FROM users');
+    const groups = await query(`SELECT group_type, COUNT(*) AS n FROM groups GROUP BY group_type`);
+    const members = await query('SELECT COUNT(*) AS n FROM group_members');
     const apptStats = await query(`SELECT group_id, COUNT(*) as count FROM appointments GROUP BY group_id`);
     const decisionStats = await query(`SELECT group_id, COUNT(*) as count FROM decisions GROUP BY group_id`);
     const totalAppts = await query('SELECT COUNT(*) as count FROM appointments');
-    res.json({ users, groups, members, apptStats, decisionStats, totalAppts: totalAppts[0]?.count });
+    res.json({
+      user_count: users[0]?.n || 0,
+      groups,
+      member_count: members[0]?.n || 0,
+      apptStats,
+      decisionStats,
+      totalAppts: totalAppts[0]?.count,
+    });
   } catch (err) { sendServerError(res, err); }
   finally { db.close(); }
 });
@@ -7697,7 +7792,9 @@ app.post('/api/coverage/:id/cancel', requireAuth, async (req, res) => {
 app.get('/api/coverage/approve/:token', async (req, res) => {
   const db = new FamilyDB();
   try {
-    const recipient = await db.getRecipientByToken(req.params.token);
+    const token = parseCoverageToken(req.params.token);
+    if (!token) return res.status(404).json({ error: 'Invalid or expired link' });
+    const recipient = await db.getRecipientByToken(token);
     if (!recipient) return res.status(404).json({ error: 'Invalid or expired link' });
     const windows = await db.getCoverageWindows(recipient.request_id);
     res.json({
@@ -7723,10 +7820,11 @@ app.get('/api/coverage/approve/:token', async (req, res) => {
 app.get('/c/:token', async (req, res) => {
   const db = new FamilyDB();
   try {
-    const token = String(req.params.token || '');
-    const recipient = /^[a-f0-9]{16,64}$/i.test(token) ? await db.getRecipientByToken(token) : null;
+    const token = parseCoverageToken(req.params.token);
+    const recipient = token ? await db.getRecipientByToken(token) : null;
     const windows = recipient ? await db.getCoverageWindows(recipient.request_id) : [];
     res.set('Cache-Control', 'no-store');
+    res.set('Content-Security-Policy', PAGE_CSP);
     res.type('html').send(coveragePage({ recipient, windows, token }));
   } catch (err) {
     sendServerError(res, err);
@@ -7799,7 +7897,9 @@ catch(e){err.textContent=e.message;go.disabled=false;go.textContent='I can help'
 app.post('/api/coverage/approve/:token', async (req, res) => {
   const db = new FamilyDB();
   try {
-    const recipient = await db.getRecipientByToken(req.params.token);
+    const token = parseCoverageToken(req.params.token);
+    if (!token) return res.status(404).json({ error: 'Invalid or expired link' });
+    const recipient = await db.getRecipientByToken(token);
     if (!recipient) return res.status(404).json({ error: 'Invalid or expired link' });
     if (recipient.status === 'approved') return res.status(409).json({ error: 'Already approved' });
 
@@ -7935,12 +8035,11 @@ async function initializeDatabase() {
 // ============================================================================
 // Permagent self-hosted analytics: POST /api/permagent-analytics/collect
 // ============================================================================
-// IMPORTANT: This route is EXEMPT from global rate limiting — a normal browsing
-// session can produce many pageviews and must never be throttled. It is also NOT
-// gated behind auth — analytics must work for unauthenticated visitors.
-// navigator.sendBeacon sends Content-Type: text/plain, so we accept text/* and
-// parse defensively. Malformed bodies return 204, never 500.
-app.post('/api/permagent-analytics/collect', textAny, (req, res) => {
+// Not gated behind auth — marketing pageviews from signed-out visitors.
+// Rate-limited (120/min/IP) and capped in SQLite so an unauthenticated
+// collector cannot fill the disk. navigator.sendBeacon sends text/plain, so
+// we accept text/* and parse defensively. Malformed bodies return 204, never 500.
+app.post('/api/permagent-analytics/collect', analyticsCollectLimiter, textAny, (req, res) => {
   // textAny parser gives us req.body as a string (or empty string if no body)
   let body;
   
@@ -8075,7 +8174,7 @@ app.get('/api/permagent-analytics/drain', async (req, res) => {
   const KEY = process.env.PERMAGENT_ANALYTICS_KEY;
 
   // Fail closed: if the env var is not set or the header does not match, return 401
-  if (!KEY || req.get('x-permagent-key') !== KEY) {
+  if (!KEY || !timingSafeEqualString(req.get('x-permagent-key') || '', KEY)) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 

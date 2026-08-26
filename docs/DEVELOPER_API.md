@@ -174,7 +174,7 @@ for (;;) {
 - The rate limiter buckets on a hash of the bearer, never the raw key, so a guessed/bad key cannot collide with a real key's bucket.
 - MCP rejects untrusted `Host` and browser `Origin` values before authentication to prevent DNS rebinding. Production aliases must be explicit in `KINROWS_ALLOWED_HOSTS`; `KINROWS_PUBLIC_URL` controls discovery URLs behind a proxy.
 - `/v1` never touches the cookie session; a key cannot be used to log in, change the password/email, or delete the account — those routes live only under `/api` with session auth.
-- Deleting the account cascades `api_keys` (FK `ON DELETE CASCADE`).
+- Deleting the account explicitly `DELETE`s `api_keys` for that user (account wipe turns foreign keys off on a private connection, so we do not rely on `ON DELETE CASCADE` here).
 - Tool calls run with `ctx.source = 'developer_api'` should any handler ever need to distinguish agent traffic.
 
 ## 5. Code map

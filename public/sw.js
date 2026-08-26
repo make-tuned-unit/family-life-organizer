@@ -1,48 +1,18 @@
-// Family Life Organizer - Service Worker
-const CACHE_NAME = 'family-life-v1';
-const urlsToCache = [
-  '/',
-  '/login',
-  '/styles.css'
-];
-
-// Install event - cache assets
+// Previously a cache-first service worker for / and /login. That is unsafe on
+// a same-origin API host (stale login HTML, session cookies). If an old client
+// still has it registered, unregister and drop caches on activate.
 self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then((cache) => {
-        return cache.addAll(urlsToCache);
-      })
-  );
   self.skipWaiting();
 });
 
-// Fetch event - serve from cache or network
-self.addEventListener('fetch', (event) => {
-  event.respondWith(
-    caches.match(event.request)
-      .then((response) => {
-        // Return cached or fetch from network
-        if (response) {
-          return response;
-        }
-        return fetch(event.request);
-      })
-  );
-});
-
-// Activate event - clean up old caches
 self.addEventListener('activate', (event) => {
-  event.waitUntil(
-    caches.keys().then((cacheNames) => {
-      return Promise.all(
-        cacheNames.map((cacheName) => {
-          if (cacheName !== CACHE_NAME) {
-            return caches.delete(cacheName);
-          }
-        })
-      );
-    })
-  );
-  self.clients.claim();
+  event.waitUntil((async () => {
+    const keys = await caches.keys();
+    await Promise.all(keys.map((k) => caches.delete(k)));
+    await self.registration.unregister();
+    const clients = await self.clients.matchAll({ type: 'window' });
+    for (const client of clients) {
+      if (client.navigate) client.navigate(client.url);
+    }
+  })());
 });
