@@ -368,10 +368,12 @@ final class APIService {
 
     // MARK: - Receipts
 
-    func fetchReceipts(month: String? = nil, category: String? = nil) async throws -> [ReceiptResponse] {
-        var params: [String: String] = [:]
+    func fetchReceipts(month: String? = nil, category: String? = nil, limit: Int = 200, beforeId: Int? = nil, beforeDate: String? = nil) async throws -> [ReceiptResponse] {
+        var params: [String: String] = ["limit": String(limit)]
         if let month { params["month"] = month }
         if let category { params["category"] = category }
+        if let beforeId { params["before_id"] = String(beforeId) }
+        if let beforeDate { params["before_date"] = beforeDate }
         return try await get("/api/receipts", queryParams: params)
     }
 

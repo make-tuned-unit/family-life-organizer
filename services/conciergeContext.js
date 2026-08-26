@@ -13,6 +13,13 @@ function todayISO() {
   return new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD in server TZ
 }
 
+function addDaysISO(iso, n) {
+  const d = new Date(String(iso).slice(0, 10) + 'T00:00:00');
+  if (isNaN(d)) return iso;
+  d.setDate(d.getDate() + n);
+  return d.toLocaleDateString('en-CA');
+}
+
 // HH:MM in the server's timezone — the default "now" for a live sleep the user
 // starts or ends without naming a time.
 function nowTimeHM() {
@@ -61,7 +68,7 @@ async function buildSnapshot(db, userId) {
 
   const [tasks, appts, decisions, pantry, events, coverage, budget, trips, itineraries, milestones, choreRoutines] = await Promise.all([
     safe(db.getTasks({ status: 'active' }, userId), [], 'tasks'),
-    safe(db.getAppointments({}, userId), [], 'appointments'),
+    safe(db.getAppointments({ date_from: today, date_to: addDaysISO(today, HORIZON_DAYS) }, userId), [], 'appointments'),
     safe(db.getDecisions({ status: 'active' }, userId), [], 'decisions'),
     // Household-scoped reads must NOT run with a null groupId — the DB methods
     // treat null as "no filter" and would return every household's data. Only
