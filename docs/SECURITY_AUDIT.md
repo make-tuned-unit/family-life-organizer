@@ -3,6 +3,124 @@
 Date: 2026-06-25. Scope: full-codebase review (auth, authz/isolation, AI/concierge,
 payments, email, DB, deploy, iOS) followed by remediation of P0/P1 findings.
 
+**Live source of truth for launch checkboxes:** [PRODUCTION_CHECKLIST.md](PRODUCTION_CHECKLIST.md).
+`docs/PROD_READINESS.md` is a 2026-04 snapshot (SwiftData / Render era) and is **not**
+current. This log is append-only; later addenda supersede earlier claims when they
+conflict (notably 2FA on/off and git-history purge — see 2026-08-26 below).
+
+## 2026-08-26 — Pre-launch security audit
+
+Full-stack specialist pass (threat-model first, then every Express route, Concierge
+`GROUPS` handler, iOS `APIService` / entitlements, and unauthenticated path).
+**P0/P1 fixed in the same pass.** Live production was checked **read-only**
+(TLS, headers, public pages, `/healthz`, catalog). No authenticated probing, waitlist
+POSTs, analytics floods, or webhook replays against Railway.
+
+Standards used as checklists: OWASP ASVS L2 + API Top 10, MASVS, OWASP LLM Top 10,
+App Store 5.1.x.
+
+### Threat model (frozen)
+
+- **Assets:** household PII (kids’ sleep/chores/milestones, DMs, receipts, GPS,
+  EventKit titles, Concierge memory), session cookies + refresh tokens, developer
+  API keys, StoreKit/Stripe entitlements, invite/coverage URLs, SQLite + unencrypted
+  `VACUUM INTO` backups.
+- **Primary attackers:** a logged-in member of household B (IDOR / clan leakage —
+  historically #1), a stranger with a stolen cookie/token/key, a BYO-agent with a
+  `kr_live_` key, webhook forgers (Apple/Stripe), prompt injection via stored
+  notes/titles, same-origin XSS on `kinrows.com` (API + marketing share one Express origin).
+
+### Findings fixed in this pass (P0 / P1)
+
+| Sev | Finding | Fix |
+|---|---|---|
+| P0 | SIWA accounts had a random unusable `password_hash`; `POST /api/account/delete` required `current_password` — App Store **5.1.1(v)** blocker | Accept Apple `identity_token` + `nonce` (JWKS verify, `sub` must match `users.apple_user_id`) **or** password |
+| P0 | `deleteUserAccount` ran `PRAGMA foreign_keys = OFF` and could orphan `api_keys` (billing/agent keys outliving the user) | Explicit `DELETE FROM api_keys`; best-effort Stripe cancel for sole-owner households |
+| P0 | `PUT /api/notes/:id` spread `req.body`, so `group_id` could retarget a note at another household | Allowlisted fields only; `group_id` set solely via `resolveNoteShare` when `shared_scope` is present |
+| P0 | `POST /api/location` had no server opt-in; a modified client could always post GPS and `GET /api/household/presence` returned coords | `users.share_presence` (default 0); POST location 403 unless on; opt-out clears lat/lng; presence query nulls coords for opted-out members |
+| P1 | Coverage `/c/:token` (128-bit, no expiry, PII in HTML); JSON GET did not hex-validate | Token must be 32 hex chars; lookup requires not cancelled **and** `created_at` within 30 days; `robots.txt` `Disallow: /c/`; coverage HTML sets `PAGE_CSP` |
+| P1 | Analytics collect was unauthenticated with no rate limit; drain used `!==` | 120/min/IP; prune events older than 90 days / beyond newest 100k rows; drain uses `timingSafeEqualString` |
+| P1 | Privacy policy promised in-app export that did not exist | `GET /api/account/export` (JSON dump, no hashes/tokens/blobs) + Settings export |
+| P1 | DMs stayed readable after leaving a shared group | `GET /api/messages` filters to `usersShareGroup`; partner thread 403 otherwise |
+| P1 | Dormant `getHealthMetrics` interpolated `days` into SQL | Parameterized `'-' \|\| ? \|\| ' days'`, clamped 1–3650. Still not HTTP-routed |
+| P1 | Helmet CSP off; marketing CSP not applied to blog/static or coverage HTML | `WEBSITE_CSP` via `setHeaders` on `website/` HTML/txt; `PAGE_CSP` on `/c/:token` |
+| P1 | `public/sw.js` was cache-first for `/` and `/login` | Unregister + drop caches on activate |
+| P1 | Admin diagnostic dumped all users | Counts only (`user_count`, group-type counts). Fail-closed if `ADMIN_USER_IDS` unset |
+| P1 | iOS logout left presence / calendar-share / HealthKit watermarks; developer keys copied to general clipboard | Logout clears those keys; pasteboard `localOnly` (+ 60s expiry on API keys) |
+| P2 | `website/privacy.html` / App Privacy label stale (Render, no analytics, no SIWA/Resend/BYO) | Policy last-updated 2026-08-26; label host is Railway; Stripe + SIWA listed |
+
+Tests: `test/prelaunch-security.test.js` + SIWA delete case in `test/apple-signin.test.js`.
+`npm test` — 150 passing.
+
+### Wave 2 — remaining surfaces (verified, no extra P0/P1)
+
+Household CRUD (receipts, budget, pantry, trips, gifts, projects, recurring, cook,
+feed, lists, itineraries, coverage, people, routines, milestones) still 403s on
+`!groupId` and uses `requireHouseholdRow` / `requireGroupRow` / `requireListAccess` /
+`requireContactOwner` / `usersShareGroup` as appropriate. Clan vs household:
+`requireGroupManage` + rivalry `getUserIdByName(..., group_id)`. Invite codes reject
+unknowns. `COMP_PREMIUM_ALL` is env-only and defaults off. Email 2FA /
+`AUTH_2FA_ECHO_CODE` fail-fast in production. Push payload minimization remains
+deferred (not P0). `/v1` read-scope is handler-name prefix `get_|list_|analyze_`;
+write actions (`log_chore`, `add`, `log_expense`, …) do not sneak under it.
+`STRIPE_ALLOW_TEST` / `STOREKIT_ALLOW_SANDBOX` have **no code default on** — only
+the env flag or `NODE_ENV !== 'production'`.
+
+### Read-only production checks (2026-08-26, this agent)
+
+Against `https://kinrows.com` and `https://family-life-organizer-production.up.railway.app`:
+
+- TLS 1.3 (`TLS_AES_256_GCM_SHA384`), valid Let’s Encrypt chains, verify OK.
+- HSTS `max-age=31536000; includeSubDomains` on both hosts.
+- `/healthz` → `{"ok":true}` only (no DB leak). `/c/` without a token → 404.
+- Public `GET /api/subscription/catalog` returns product ids / prices only; Stripe is live (`"stripe":true`).
+- Marketing `/`, `/privacy`, `/developers`, `/subscribe` already send `WEBSITE_CSP`.
+  **Live blog HTML and `/c/:token` do not yet** — that lands when this branch deploys
+  (`setHeaders` + `PAGE_CSP`). Live `robots.txt` does not yet `Disallow: /c/` (same).
+- `llms.txt` / `llms-full.txt` do not publish admin ids or env internals.
+
+**Not done (by design):** login, waitlist POST, analytics POST, Stripe/Apple webhook replay, coverage-token enumeration.
+
+### Prior-doc contradictions (resolved here)
+
+Earlier sections of this file and [PRODUCTION_CHECKLIST.md](PRODUCTION_CHECKLIST.md)
+disagreed. **This addendum is authoritative:**
+
+| Topic | Old claim A | Old claim B | 2026-08-26 |
+|---|---|---|---|
+| Email 2FA in prod | “already `AUTH_2FA_ENABLED=1` on Railway” | “still OFF / unset” | **Unconfirmed from here.** Code is opt-in. Owner must read Railway env. |
+| Git-history purge | “NOT done” (2026-07-11 addendum below) | Checklist: purged 2026-07-11 via `git filter-repo` | **Treat purge as done** per checklist evidence. **Rotation of `SESSION_SECRET` and legacy passwords is still required** — a rewrite does not un-expose clones/caches. |
+| Privacy copy | “contradicts GPS / receipts” | Checklist: GPS copy reconciled | **Reconciled in this pass** (GPS opt-in, first-party pageviews, SIWA, Resend, Railway, BYO-agent, in-app export). |
+| Host | Render in privacy label / old human-actions | Railway | **Railway.** Render config was removed 2026-07-11. |
+
+### Residuals (P2 / P3 — documented, not built)
+
+- No TLS pinning (acceptable for Railway + ATS).
+- Token-login bypasses email 2FA **by design** (device already enrolled).
+- In-memory rate limiter (multi-replica bypass). Redis is out of “no new deps”; a SQLite-backed limiter is a follow-up if a second replica appears.
+- Unencrypted same-disk `VACUUM INTO` backups (14-day). Optional `age`/libsodium is P2.
+- Developer keys: no expiry / IP allow-list; `/v1/snapshot` is a full household dump to any valid key.
+- Indirect prompt injection via stored titles/notes — mitigation is prompt text + sanitizers + `remember` caps + `minimizedFacts` + `cloudAIEnabled` chokepoint. Not solvable as a filter.
+- No in-app lock / screenshot protection (product decision).
+- `NSHealthUpdateUsageDescription` remains in the Xcode project because the HealthKit **capability** is on for reads; Apple still expects the update string. App does not write HealthKit.
+- APNs payloads still carry message/coverage/child-name text (Notification Service Extension deferred).
+- `npm audit` 2026-08-26: highs/critical are **build-only** under `sqlite3 → node-gyp` (`tar`, `ip-address`, `socks-proxy-agent`, `brace-expansion`). Not imported by `dashboard.js`. Do not `npm audit fix --force` (it wants sqlite3@6). CI continues `|| true` with that comment.
+
+### Human-owned (cannot be done from this agent)
+
+Confirm on **Railway** before App Store submit:
+
+1. `AUTH_2FA_ENABLED` — on or off, **deliberately**. If on, every TestFlight user must already have the 2FA UI.
+2. `AUTH_2FA_ECHO_CODE` **unset** (server refuse-to-boot if set in production).
+3. `STRIPE_ALLOW_TEST` and `STOREKIT_ALLOW_SANDBOX` **unset**.
+4. `COMP_PREMIUM_ALL` **unset**.
+5. `ADMIN_USER_IDS` set to real ids only (fail-closed if empty).
+6. `FAMILY_DB_DIR` points at the mounted volume (not ephemeral disk).
+7. **Rotate `SESSION_SECRET`** if it has not been rotated since the 2026-07-11 history rewrite; reset legacy jesse/sophie passwords if those accounts still exist.
+8. One real 2FA login on the live server if 2FA is intended to be on.
+
+iOS parse-check (`xcrun swiftc -parse`) was **not available** on this machine; touched Swift must compile in Xcode before submit.
+
 ## 2026-08-26 — Stripe web subscriptions (Concierge)
 
 Web Checkout for the four Concierge plans (Lite/Premium × monthly/yearly). Entitlement
@@ -238,6 +356,11 @@ The system moved on substantially since the 2026-06-25 log. Current state:
   `.completeFileProtection`. PII (receipt amounts, raw emails) removed from logs.
 
 ### Still requiring HUMAN action (unchanged / new)
+
+> **Superseded 2026-08-26.** See the pre-launch addendum at the top of this file.
+> Git-history purge was completed 2026-07-11 (rotation still required). 2FA on
+> Railway is **unconfirmed**. Privacy copy and export were fixed in that pass.
+
 - **Git-history purge NOT done** — plaintext passwords + old session secret
   remain in early commits. Run `git filter-repo`, force-push, rotate the secret.
 - **2FA still OFF** in production (`AUTH_2FA_ENABLED` unset) — enable per the
