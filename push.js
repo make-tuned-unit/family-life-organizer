@@ -195,8 +195,14 @@ async function pushToTokens(tokens, title, body, data = {}, db = null) {
  * @param {object} [data]
  */
 async function pushToUser(db, userId, title, body, data = {}) {
-  const tokens = await db.getDeviceTokens(userId);
-  await pushToTokens(tokens, title, body, data, db);
+  try {
+    const tokens = await db.getDeviceTokens(userId);
+    await pushToTokens(tokens, title, body, data, db);
+  } catch (err) {
+    // Callers fire-and-forget (no queue). Swallow so an APNs blip cannot
+    // reject the HTTP handler; log so the failure is still inspectable.
+    console.error('[push] pushToUser failed:', err.message);
+  }
 }
 
 /**
@@ -209,15 +215,19 @@ async function pushToUser(db, userId, title, body, data = {}) {
  * @param {object} [data]
  */
 async function pushToGroup(db, groupId, excludeUserId, title, body, data = {}) {
-  const members = await db.getGroupMembers(groupId);
-  const userIds = members
-    .filter(m => m.user_id && m.user_id !== excludeUserId)
-    .map(m => m.user_id);
-  if (userIds.length === 0) return;
+  try {
+    const members = await db.getGroupMembers(groupId);
+    const userIds = members
+      .filter(m => m.user_id && m.user_id !== excludeUserId)
+      .map(m => m.user_id);
+    if (userIds.length === 0) return;
 
-  const tokenRows = await db.getDeviceTokensForUsers(userIds);
-  const tokens = tokenRows.map(r => r.token);
-  await pushToTokens(tokens, title, body, data, db);
+    const tokenRows = await db.getDeviceTokensForUsers(userIds);
+    const tokens = tokenRows.map(r => r.token);
+    await pushToTokens(tokens, title, body, data, db);
+  } catch (err) {
+    console.error('[push] pushToGroup failed:', err.message);
+  }
 }
 
 // ---------------------------------------------------------------------------
