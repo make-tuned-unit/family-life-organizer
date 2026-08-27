@@ -34,6 +34,8 @@ enum AppConfig {
 
     static let bundleID = "com.kinrows.app"
     static let appName = "Kinrows"
+    static let privacyPolicyURL = URL(string: "https://kinrows.com/privacy.html")!
+    static let termsOfUseURL = URL(string: "https://kinrows.com/terms.html")!
 
     static var appVersion: String {
         Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"

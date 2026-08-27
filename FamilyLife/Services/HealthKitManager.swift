@@ -15,6 +15,10 @@ final class HealthKitManager {
         self.isAvailable = available
     }
 
+    var hasUserGrantedRead: Bool {
+        UserDefaults.standard.bool(forKey: "healthkit_read_granted")
+    }
+
     func requestStepAuthorization() async -> Bool {
         guard let store, isAvailable else { return false }
         guard let stepType = HKQuantityType.quantityType(forIdentifier: .stepCount) else { return false }
@@ -22,6 +26,7 @@ final class HealthKitManager {
         do {
             try await store.requestAuthorization(toShare: Set(), read: Set([stepType]))
             isAuthorized = true
+            UserDefaults.standard.set(true, forKey: "healthkit_read_granted")
             return true
         } catch {
             return false
@@ -35,6 +40,7 @@ final class HealthKitManager {
         do {
             try await store.requestAuthorization(toShare: Set(), read: Set([flightsType]))
             isAuthorized = true
+            UserDefaults.standard.set(true, forKey: "healthkit_read_granted")
             return true
         } catch {
             return false

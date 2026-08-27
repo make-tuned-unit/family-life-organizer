@@ -9,12 +9,16 @@ struct ConciergeChatView: View {
     var initialPrompt: String? = nil
     /// When true, the composer opens straight into voice dictation (long-press launch).
     var autoListen: Bool = false
+    /// When true, `initialPrompt` is sent immediately (chat-bubble handoff).
+    var autoSend: Bool = false
 
     @State private var viewModel = ConciergeChatViewModel()
     @State private var speech = ConciergeSpeechRecognizer()
     @State private var draft = ""
     @State private var micBase = ""
     @State private var didAutoListen = false
+    @State private var didAutoSend = false
+    @State private var draftFromVoice = false
     @State private var showingHistory = false
     @FocusState private var inputFocused: Bool
 
@@ -50,11 +54,21 @@ struct ConciergeChatView: View {
             .navigationTitle("Concierge")
             .navigationBarTitleDisplayMode(.inline)
             .onAppear {
-                if draft.isEmpty, let initialPrompt, !initialPrompt.isEmpty { draft = initialPrompt }
+                if !autoSend, draft.isEmpty, let initialPrompt, !initialPrompt.isEmpty { draft = initialPrompt }
             }
             .task {
+                var names: [String] = []
                 if let people = try? await api.fetchPeople() {
-                    speech.setContextualStrings(people.map(\.name))
+                    names.append(contentsOf: people.map(\.name))
+                }
+                if let lists = try? await api.fetchLists() {
+                    names.append(contentsOf: lists.map(\.name))
+                }
+                speech.setContextualStrings(names)
+                if autoSend, let initialPrompt, !initialPrompt.isEmpty, !didAutoSend {
+                    didAutoSend = true
+                    await viewModel.send(initialPrompt, api: api, source: .chatExtract)
+                    return
                 }
                 // Long-press launch: jump straight into listening so the user can
                 // speak a command without tapping into the chat first.
@@ -62,7 +76,10 @@ struct ConciergeChatView: View {
                 didAutoListen = true
                 micBase = draft.isEmpty ? "" : draft.trimmingCharacters(in: .whitespaces) + " "
                 inputFocused = false
-                await speech.start { transcript in draft = micBase + transcript }
+                draftFromVoice = true
+                await speech.start(detectSilence: true, onSilence: {
+                    Task { _ = await speech.finish() }
+                }, onUpdate: { transcript in draft = micBase + transcript })
             }
             .toolbar {
                 ToolbarItemGroup(placement: .topBarLeading) {
@@ -232,12 +249,20 @@ struct ConciergeChatView: View {
                 if speech.isRecording {
                     _ = await speech.finish()
                 } else {
+                    var names: [String] = []
                     if let people = try? await api.fetchPeople() {
-                        speech.setContextualStrings(people.map(\.name))
+                        names.append(contentsOf: people.map(\.name))
                     }
+                    if let lists = try? await api.fetchLists() {
+                        names.append(contentsOf: lists.map(\.name))
+                    }
+                    speech.setContextualStrings(names)
                     micBase = draft.isEmpty ? "" : draft.trimmingCharacters(in: .whitespaces) + " "
                     inputFocused = false
-                    await speech.start { transcript in draft = micBase + transcript }
+                    draftFromVoice = true
+                    await speech.start(detectSilence: true, onSilence: {
+                        Task { _ = await speech.finish() }
+                    }, onUpdate: { transcript in draft = micBase + transcript })
                 }
             }
         } label: {
@@ -262,8 +287,10 @@ struct ConciergeChatView: View {
             draft = micBase + final
         }
         let text = draft
+        let source: ConciergeMessageSource = draftFromVoice ? .voice : .text
         draft = ""
-        await viewModel.send(text, api: api)
+        draftFromVoice = false
+        await viewModel.send(text, api: api, source: source)
     }
 
     private func scrollToBottom(_ proxy: ScrollViewProxy) {

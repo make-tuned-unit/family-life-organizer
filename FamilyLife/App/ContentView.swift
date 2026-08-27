@@ -310,12 +310,19 @@ struct MainTabView: View {
         }
         .onChange(of: conciergeLaunch.requestID) {
             if conciergeLaunch.requestID != 0 {
+                showingChat = false
                 loadedTabs.insert(.concierge)
                 switchTab(to: .concierge)
             }
         }
         .task {
+            // Keep the server's Concierge opt-in in sync so the daily brief
+            // lands on the feed even if this device enabled it before the flag existed.
+            try? await api.setConciergeEnabled(aiConciergeEnabled)
             await pollUnread()
+        }
+        .onChange(of: aiConciergeEnabled) {
+            Task { try? await api.setConciergeEnabled(aiConciergeEnabled) }
         }
     }
 
@@ -443,10 +450,7 @@ struct MainTabView: View {
 
         for rivalry in active {
             let isStairs = rivalry.challengeType == .stairs
-            let authorized = isStairs
-                ? await healthKit.requestFlightsAuthorization()
-                : await healthKit.requestStepAuthorization()
-            guard authorized else { continue }
+            guard healthKit.hasUserGrantedRead else { continue }
 
             let startDate = ISO8601DateFormatter.flexible.date(from: rivalry.start_date)
                 ?? DateFormatter.isoDate.date(from: rivalry.start_date)

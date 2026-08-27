@@ -2,7 +2,7 @@
 
 **Maintained live.** This is the single source of truth for what's left before
 App Store submission. Update the checkboxes as items land. Last updated
-2026-07-11.
+2026-08-27.
 
 Legend: ✅ done · ⏳ deferred (needs a human / external action) · 🔜 code-ready, needs a build/deploy step.
 
@@ -10,24 +10,25 @@ Legend: ✅ done · ⏳ deferred (needs a human / external action) · 🔜 code-
 
 ## 1. App Store acceptance (submission blockers)
 
-- ✅ **In-app account deletion** (Guideline 5.1.1(v)) — `POST /api/account/delete` + Settings → Account → Delete Account. Covered by `test/account-deletion.test.js`.
-- ✅ **AI data-sharing consent** (5.1.2(i)) — Cook and receipt scanning both show a first-use disclosure before sending data to Anthropic.
-- ✅ **Privacy manifest** (`PrivacyInfo.xcprivacy`) — valid data types, `Linked=true`, `CA92.1` reason; no unused required-reason APIs.
-- ✅ **Permission usage strings** accurate (location, HealthKit read-only, speech "when supported", camera, photos, notifications).
-- ✅ **In-app Privacy Policy & Terms links** (Settings → About).
-- ✅ **HealthKit** — removed unused clinical-records entitlement + write usage string (app only reads steps/flights).
+- ✅ **In-app account deletion** (Guideline 5.1.1(v)) — password re-auth *or* a fresh Sign in with Apple identity token. Apple-only accounts never had a password they could type. Covered by `test/account-deletion.test.js` and `test/apple-signin.test.js`.
+- ✅ **AI data-sharing consent** (5.1.2(i)) — Cook, receipt scanning, **and Concierge chat** show a first-use disclosure before sending data to Anthropic.
+- ✅ **UGC report** (Guideline 1.2) — in-app Report on DMs and household feed posts → `POST /api/content/report`. Covered by `test/content-report.test.js`.
+- ✅ **Privacy manifest** (`PrivacyInfo.xcprivacy`) — includes Name, Email, Phone Number, Physical Address, User ID, Fitness, Precise Location, Photos, Messages, Other User Content, Other Financial Info, Purchase History. `Linked=true`, tracking=false, `CA92.1`.
+- ✅ **Permission usage strings** accurate (location, HealthKit read-only steps+flights, on-device speech, camera, photos, notifications, calendar read/write/share).
+- ✅ **In-app Privacy Policy & Terms links** (Settings → About, paywall, signup/login footer).
+- ✅ **Paywall 3.1.2** — auto-renew legal copy plus Privacy / Terms links and Restore Purchases.
+- ✅ **HealthKit** — no write usage string; `requestAuthorization` only after an explicit Connect Health tap, not on launch or a poll.
+- ✅ **iPhone-only** (`TARGETED_DEVICE_FAMILY = 1`).
 - ⏳ **Fill the App Privacy "nutrition label"** in App Store Connect. Answers are pre-written in `docs/APP_PRIVACY_LABEL.md` — copy them into the form. All types **Linked = Yes, Tracking = No**.
-- ⏳ **Screenshots + App Store metadata** (description, keywords, support URL, category). Marketing copy lives in `website/` for reference.
-- ⏳ **Age rating questionnaire** — likely 4+ (no objectionable content); confirm the messaging/UGC answers.
+- ⏳ **Screenshots + App Store metadata** (description, keywords, support URL `https://kinrows.com/support.html`, category). Marketing copy lives in `website/` for reference.
+- ⏳ **Age rating questionnaire** — likely 4+ (no objectionable content); confirm the messaging/UGC answers (report + block exists).
 - ⏳ **Export compliance** — uses standard HTTPS/TLS only; answer "uses exempt encryption" in App Store Connect.
 
 ## 2. Build & release pipeline
 
-- ✅ Code compiles under **Xcode 16.2** (Intel dev machine) — `glassEffect` compiler-guarded.
-- ⏳ **Build & upload requires Xcode 26 / iOS 26 SDK** (Apple mandate since Apr 2026). This Intel Mac cannot run Xcode 26.
-  - **Action:** set up **Xcode Cloud** (App Store Connect → Xcode Cloud) with an Archive workflow on `main`, Xcode "Latest Release", delivering to TestFlight. Enable auto-increment build number.
-  - Alternative: archive from any Apple-Silicon Mac.
-- ⏳ First real-device / TestFlight pass exercising: login → silent re-login, **account deletion**, receipt-scan consent, cooking mode, and **notification taps** (each type deep-links correctly).
+- ✅ Code compiles under **Xcode 26.6** (iOS 26.5 SDK present on this Mac) — `glassEffect` compiler-guarded for older toolchains.
+- ⏳ **Archive & upload to TestFlight** from Xcode 26 (Apple's iOS 26 SDK mandate). Paid Apps agreement + the four IAP products must exist in App Store Connect first or the binary review will fail Guideline 2.1.
+- ⏳ First real-device / TestFlight pass exercising: Sign in with Apple **and** password login → silent re-login, **account deletion** (both re-auth paths), Concierge first-use disclosure, receipt-scan consent, cooking mode, Report on a DM, and **notification taps**.
 - 🔜 Bump marketing version for the first public build (currently developing at 1.0).
 
 ## 3. Security (human-owned)
@@ -46,7 +47,7 @@ Legend: ✅ done · ⏳ deferred (needs a human / external action) · 🔜 code-
 - ✅ Location presence sharing **opt-in** (off by default); trip-ETA location only while a trip is active.
 - ✅ No third-party analytics/ads/crash SDKs; on-device-first AI; transient receipt images; PII removed from server logs.
 - ⏳ **Reconcile `website/privacy.html`** — DONE for the two known contradictions (GPS collection, receipt images, removed false "usage data" claim). **Re-review the whole policy** end-to-end against the shipped App Privacy label before launch, and have it counsel-reviewed if possible.
-- ⏳ **Data-export endpoint** — the policy offers "export a copy of your data." Not yet built (`GET /api/account/export`). Either build it or soften the policy to "by request" until then.
+- ✅ **Data export** — policy offers a copy by emailing `kinrows@atlasatlantic.co` (no in-app download yet). In-app account deletion is the App Store requirement.
 - ⏳ Consider **APNs payload minimization** — pushes currently carry message/coverage/child-name text in the visible alert (Apple can read payloads). A Notification Service Extension fetching content post-delivery would be the privacy-max move (deferred; not a blocker).
 
 ## 5. Infrastructure / ops

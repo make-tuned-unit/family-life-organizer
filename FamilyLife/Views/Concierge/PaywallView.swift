@@ -161,10 +161,16 @@ struct PaywallView: View {
                     .multilineTextAlignment(.center)
             }
 
-            Text("Auto-renewing subscription. Cancel anytime in Settings.")
+            Text("Payment will be charged to your Apple ID account at confirmation of purchase. The subscription automatically renews unless you cancel at least 24 hours before the end of the current period. Your account will be charged for renewal within 24 hours prior to the end of the current period. You can manage and cancel your subscriptions in your App Store account settings after purchase.")
                 .font(.flCaption2)
                 .foregroundStyle(WarmPalette.ink3)
                 .multilineTextAlignment(.center)
+
+            HStack(spacing: 16) {
+                Link("Privacy Policy", destination: AppConfig.privacyPolicyURL)
+                Link("Terms of Use", destination: AppConfig.termsOfUseURL)
+            }
+            .font(.flCaption.weight(.medium))
         }
     }
 }

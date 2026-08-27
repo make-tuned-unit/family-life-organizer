@@ -63,6 +63,7 @@ struct FamilyAddressesView: View {
         .task {
             await load()
         }
+        .onConciergeDataChange { await load() }
     }
 
     private func load() async {

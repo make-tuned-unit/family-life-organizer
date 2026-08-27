@@ -138,6 +138,7 @@ struct RivalriesView: View {
         .task {
             await loadAll()
         }
+        .onConciergeDataChange { await loadAll() }
     }
 
     private func loadAll() async {

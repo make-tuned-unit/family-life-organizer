@@ -4,8 +4,9 @@ import UIKit
 @Observable
 final class APIService {
     static let unauthorizedNotification = Notification.Name("APIServiceUnauthorizedNotification")
-    /// Published after the concierge has finished successful writes. Screens
-    /// subscribe to this instead of holding stale, independently fetched data.
+    /// Published after each successful concierge write (and again when a turn
+    /// finishes). Screens subscribe so calendar, lists, home, etc. never sit on
+    /// stale data while the agent is working.
     static let conciergeDataDidChange = Notification.Name("APIServiceConciergeDataDidChange")
 
     @MainActor
@@ -110,6 +111,11 @@ final class APIService {
         let email: String?
         let email_verified: Bool
         let two_factor_enabled: Bool
+        let has_password: Bool?
+        let apple_linked: Bool?
+
+        var hasPassword: Bool { has_password ?? true }
+        var appleLinked: Bool { apple_linked ?? false }
     }
 
     func fetchSecurityStatus() async throws -> SecurityStatus {
@@ -492,9 +498,13 @@ final class APIService {
         try await get("/api/subscription/status")
     }
 
-    func sendConciergeMessage(_ message: String, conversationId: Int?) async throws -> ConciergeChatResponse {
+    func sendConciergeMessage(
+        _ message: String,
+        conversationId: Int?,
+        source: ConciergeMessageSource = .text
+    ) async throws -> ConciergeChatResponse {
         guard cloudAIEnabled else { throw APIError.cloudAIDisabled }
-        var body: [String: Any] = ["message": message]
+        var body: [String: Any] = ["message": message, "source": source.rawValue]
         if let conversationId { body["conversation_id"] = conversationId }
         // Tool-calling loop can take a while — generous timeout.
         return try await post("/api/concierge/chat", body: body, timeout: 60)
@@ -502,16 +512,23 @@ final class APIService {
 
     enum ConciergeStreamEvent {
         case delta(String)
+        case action(ConciergeAction)
         case done(ConciergeChatResponse)
     }
 
-    /// Streaming concierge chat over SSE. Yields `.delta` tokens as they arrive
-    /// and a final `.done` with the authoritative reply + actions. The producer
+    /// Streaming concierge chat over SSE. Yields `.delta` tokens as they arrive,
+    /// `.action` as each write lands (so screens can refresh immediately), and a
+    /// final `.done` with the authoritative reply + actions. The producer
     /// runs off the main actor; consume the stream wherever you update UI.
-    func conciergeMessageStream(_ message: String, conversationId: Int?) -> AsyncThrowingStream<ConciergeStreamEvent, Error> {
+    func conciergeMessageStream(
+        _ message: String,
+        conversationId: Int?,
+        source: ConciergeMessageSource = .text
+    ) -> AsyncThrowingStream<ConciergeStreamEvent, Error> {
         let base = baseURL
         let session = self.session
         let enabled = cloudAIEnabled
+        let sourceValue = source.rawValue
         return AsyncThrowingStream { continuation in
             let task = Task.detached {
                 do {
@@ -522,7 +539,7 @@ final class APIService {
                     request.setValue("application/json", forHTTPHeaderField: "Content-Type")
                     request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
                     request.timeoutInterval = 120
-                    var body: [String: Any] = ["message": message]
+                    var body: [String: Any] = ["message": message, "source": sourceValue]
                     if let conversationId { body["conversation_id"] = conversationId }
                     request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
@@ -546,6 +563,10 @@ final class APIService {
                                 if let obj = try? JSONDecoder().decode([String: String].self, from: data),
                                    let t = obj["text"] {
                                     continuation.yield(.delta(t))
+                                }
+                            case "action":
+                                if let action = try? JSONDecoder().decode(ConciergeAction.self, from: data) {
+                                    continuation.yield(.action(action))
                                 }
                             case "done":
                                 if let r = try? JSONDecoder().decode(ConciergeChatResponse.self, from: data) {
@@ -1016,6 +1037,17 @@ final class APIService {
         try await post("/api/groups/join", body: ["invite_code": inviteCode])
     }
 
+    struct HouseholdInviteResponse: Codable {
+        let success: Bool
+        let sent: [String]?
+    }
+
+    /// Email the household invite code to family members. Server sends one
+    /// message per address with the code and how to join.
+    func inviteToHousehold(emails: [String]) async throws -> HouseholdInviteResponse {
+        try await post("/api/household/invite", body: ["emails": emails])
+    }
+
     func registerDeviceToken(_ token: String) async throws {
         let _: SuccessResponse = try await post("/api/auth/device-token", body: ["token": token])
     }
@@ -1355,13 +1387,31 @@ final class APIService {
         let _: SuccessResponse = try await put("/api/users/me/avatar", body: ["image": base64])
     }
 
-    /// Permanently delete the signed-in account. Re-auth with the password.
-    func deleteAccount(currentPassword: String) async throws {
-        let _: SuccessResponse = try await post("/api/account/delete", body: ["current_password": currentPassword])
+    /// Permanently delete the signed-in account. Re-auth with the password
+    /// and/or a fresh Sign in with Apple identity token.
+    func deleteAccount(currentPassword: String? = nil, identityToken: String? = nil, nonce: String? = nil) async throws {
+        var body: [String: Any] = [:]
+        if let currentPassword, !currentPassword.isEmpty { body["current_password"] = currentPassword }
+        if let identityToken, !identityToken.isEmpty { body["identity_token"] = identityToken }
+        if let nonce, !nonce.isEmpty { body["nonce"] = nonce }
+        let _: SuccessResponse = try await post("/api/account/delete", body: body)
+    }
+
+    func reportContent(type: String, refId: Int, reason: String) async throws {
+        let _: SuccessResponse = try await post("/api/content/report", body: [
+            "content_type": type,
+            "ref_id": refId,
+            "reason": reason,
+        ])
     }
 
     func updateName(_ name: String) async throws {
         let _: SuccessResponse = try await put("/api/users/me/name", body: ["name": name])
+    }
+
+    /// Sync the on-device Concierge opt-in so the server can post the daily brief to the feed.
+    func setConciergeEnabled(_ enabled: Bool) async throws {
+        let _: SuccessResponse = try await put("/api/users/me/concierge", body: ["enabled": enabled])
     }
 
     struct ChangePasswordResponse: Codable {

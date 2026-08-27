@@ -17,6 +17,8 @@ struct AppleSignInButton: View {
     var label: SignInWithAppleButton.Label = .signIn
     var inviteCode: String? = nil
     var householdName: String? = nil
+    /// When set, the identity token is handed to the caller instead of signing in.
+    var onIdentity: ((String, String) -> Void)? = nil
     var onError: (String) -> Void
 
     @Environment(AuthService.self) private var auth
@@ -58,6 +60,13 @@ struct AppleSignInButton: View {
             }
             isWorking = true
             defer { isWorking = false }
+            if !credential.user.isEmpty {
+                auth.rememberAppleUserID(credential.user)
+            }
+            if let onIdentity {
+                onIdentity(identityToken, rawNonce)
+                return
+            }
             let name: String? = {
                 guard let fullName = credential.fullName else { return nil }
                 let formatted = PersonNameComponentsFormatter().string(from: fullName)
@@ -78,6 +87,23 @@ struct AppleSignInButton: View {
                 onError("Apple sign-in didn’t complete. Try again or use email.")
             }
         }
+    }
+}
+
+struct LegalConsentFooter: View {
+    var body: some View {
+        VStack(spacing: 6) {
+            Text("By continuing you agree to the Terms of Use and Privacy Policy. You must be 18 or older.")
+                .font(.flCaption2)
+                .foregroundStyle(WarmPalette.ink3)
+                .multilineTextAlignment(.center)
+            HStack(spacing: 16) {
+                Link("Terms of Use", destination: AppConfig.termsOfUseURL)
+                Link("Privacy Policy", destination: AppConfig.privacyPolicyURL)
+            }
+            .font(.flCaption.weight(.medium))
+        }
+        .padding(.horizontal, 24)
     }
 }
 

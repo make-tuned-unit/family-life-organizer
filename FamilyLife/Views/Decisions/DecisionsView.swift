@@ -79,6 +79,7 @@ struct DecisionsView: View {
         }
         .inlineError(error) { error = nil }
         .task { await loadDecisions() }
+        .onConciergeDataChange { await loadDecisions() }
         .sheet(item: $sendToDecision) { decision in
             SendToSheet(quotedItem: QuotedItem(
                 type: "decision",

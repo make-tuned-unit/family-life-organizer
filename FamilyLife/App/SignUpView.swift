@@ -68,6 +68,9 @@ struct SignUpView: View {
                             .padding(.top, 16)
                             .padding(.horizontal, 24)
                     }
+
+                    LegalConsentFooter()
+                        .padding(.top, 20)
                 }
                 .padding(.bottom, 40)
             }

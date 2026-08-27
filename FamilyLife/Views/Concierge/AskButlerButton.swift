@@ -11,16 +11,20 @@ final class ConciergeLaunch {
     private(set) var requestID = 0
     private(set) var pendingPrompt: String?
     private(set) var pendingAutoListen = false
+    private(set) var pendingAutoSend = false
 
     struct Request {
         let prompt: String?
         let autoListen: Bool
+        let autoSend: Bool
     }
 
-    /// Open the concierge chat seeded with `prompt`.
-    func ask(_ prompt: String) {
+    /// Open the concierge chat seeded with `prompt`. When `autoSend` is true the
+    /// chat submits immediately (used when handing a family-chat bubble over).
+    func ask(_ prompt: String, autoSend: Bool = false) {
         pendingPrompt = prompt
         pendingAutoListen = false
+        pendingAutoSend = autoSend
         requestID += 1
     }
 
@@ -28,15 +32,17 @@ final class ConciergeLaunch {
     func listen() {
         pendingPrompt = nil
         pendingAutoListen = true
+        pendingAutoSend = false
         requestID += 1
     }
 
     /// Read and clear the pending request.
     func consume() -> Request? {
         guard requestID != 0 else { return nil }
-        let request = Request(prompt: pendingPrompt, autoListen: pendingAutoListen)
+        let request = Request(prompt: pendingPrompt, autoListen: pendingAutoListen, autoSend: pendingAutoSend)
         pendingPrompt = nil
         pendingAutoListen = false
+        pendingAutoSend = false
         requestID = 0
         return request
     }
@@ -70,9 +76,14 @@ final class PushToTalkController {
     func prewarm(api: APIService) {
         guard phase == .idle else { return }
         Task {
+            var names: [String] = []
             if let people = try? await api.fetchPeople() {
-                recognizer.setContextualStrings(people.map(\.name))
+                names.append(contentsOf: people.map(\.name))
             }
+            if let lists = try? await api.fetchLists() {
+                names.append(contentsOf: lists.map(\.name))
+            }
+            recognizer.setContextualStrings(names)
             await recognizer.prewarm()
         }
     }
@@ -132,17 +143,27 @@ final class PushToTalkController {
     private func send(_ text: String, api: APIService) async {
         do {
             var completedResponse: ConciergeChatResponse?
-            for try await event in api.conciergeMessageStream(text, conversationId: conversationId) {
-                if case .done(let response) = event {
+            var liveActions: [ConciergeAction] = []
+            for try await event in api.conciergeMessageStream(text, conversationId: conversationId, source: .voice) {
+                switch event {
+                case .delta:
+                    break
+                case .action(let action):
+                    liveActions.append(action)
+                    APIService.publishConciergeActions([action])
+                    banner = "Task complete — \(action.summary)"
+                case .done(let response):
                     conversationId = response.conversationId
                     completedResponse = response
                 }
             }
             guard let response = completedResponse else { throw APIError.invalidResponse }
-            APIService.publishConciergeActions(response.actions)
-            if let action = response.actions.first {
+            if liveActions.isEmpty {
+                APIService.publishConciergeActions(response.actions)
+            }
+            if let action = (liveActions.isEmpty ? response.actions : liveActions).last {
                 banner = "Task complete — \(action.summary)"
-            } else {
+            } else if liveActions.isEmpty {
                 banner = response.reply
             }
             completedSends += 1
@@ -184,6 +205,7 @@ struct ConciergeLauncherButton: View {
                 DragGesture(minimumDistance: 0)
                     .onChanged { _ in
                         guard pressStart == nil else { return }
+                        guard AIConsentManager.hasConciergeConsent else { return }
                         let start = Date()
                         pressStart = start
                         // Warm the mic immediately so a hold starts capturing fast.
@@ -198,6 +220,12 @@ struct ConciergeLauncherButton: View {
                         }
                     }
                     .onEnded { _ in
+                        if !AIConsentManager.hasConciergeConsent {
+                            pressStart = nil
+                            listening = false
+                            onOpen()
+                            return
+                        }
                         let held = listening
                         pressStart = nil
                         listening = false
@@ -322,7 +350,7 @@ struct ConciergeIntroView: View {
                     Text("AI Concierge")
                         .font(.flScreenTitle)
                         .foregroundStyle(WarmPalette.ink1)
-                    Text("A warm daily brief of what needs you across the family, plus a chat that can look things up and add to your calendar, lists, and budget.")
+                    Text("A warm daily brief of what needs you across the family, posted to the Feed each morning, plus a chat that can look things up and add to your calendar, lists, and budget.")
                         .font(.flSubheadline)
                         .foregroundStyle(WarmPalette.ink3)
                 }

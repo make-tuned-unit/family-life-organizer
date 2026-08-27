@@ -103,6 +103,7 @@ struct NotesView: View {
         }
         .task { await store.load(api: api) }
         .refreshable { await store.load(api: api) }
+        .onConciergeDataChange { await store.load(api: api) }
     }
 
     private var emptyState: some View {

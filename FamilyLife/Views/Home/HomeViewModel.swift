@@ -247,6 +247,7 @@ final class HomeViewModel {
             case "event":             TabAccent.calendar.color
             case "rivalry":           AccentTheme.saffron.color
             case "decision", "poll":  TabAccent.decisions.color
+            case "brief":             AccentTheme.saffron.color
             default:                  AccentTheme.ocean.color
             }
         default:         WarmPalette.ink3

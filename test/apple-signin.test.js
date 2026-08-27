@@ -211,3 +211,77 @@ test('apple sign-in links a verified-email password account instead of minting a
   assert.equal(res.body.user.username, 'link_me');
   assert.equal(res.body.user.name, 'Linkable');
 });
+
+function makeClient() {
+  let cookie = '';
+  return async (method, pathname, body) => {
+    const res = await fetch(BASE + pathname, {
+      method,
+      headers: { 'Content-Type': 'application/json', ...(cookie ? { Cookie: cookie } : {}) },
+      body: body ? JSON.stringify(body) : undefined,
+      redirect: 'manual',
+    });
+    const sc = res.headers.get('set-cookie');
+    if (sc) cookie = sc.split(';')[0];
+    let json = null; try { json = await res.json(); } catch {}
+    return { status: res.status, body: json };
+  };
+}
+
+test('apple-only security payload has no password and is apple-linked', async () => {
+  const c = makeClient();
+  const nonce = 'nonce-sec-status';
+  const signin = await c('POST', '/api/auth/apple', {
+    identity_token: appleToken({ sub: 'apple-sub-sec', nonce, email: 'sec@privaterelay.appleid.com' }),
+    nonce,
+    name: 'Sec Apple',
+  });
+  assert.equal(signin.status, 200, JSON.stringify(signin.body));
+  const sec = await c('GET', '/api/account/security');
+  assert.equal(sec.status, 200, JSON.stringify(sec.body));
+  assert.equal(sec.body.has_password, false);
+  assert.equal(sec.body.apple_linked, true);
+});
+
+test('apple-only delete rejects a password guess and a wrong Apple sub', async () => {
+  const c = makeClient();
+  const nonce = 'nonce-del-guard';
+  const signin = await c('POST', '/api/auth/apple', {
+    identity_token: appleToken({ sub: 'apple-sub-del-guard', nonce, email: 'delguard@example.com' }),
+    nonce,
+    name: 'Del Guard',
+  });
+  assert.equal(signin.status, 200);
+
+  const pw = await c('POST', '/api/account/delete', { current_password: 'password123' });
+  assert.equal(pw.status, 401);
+  assert.match(pw.body.error, /Sign in with Apple/i);
+  assert.equal((await c('GET', '/api/auth/me')).status, 200, 'session lives after password guess');
+
+  const wrongNonce = 'nonce-wrong-sub';
+  const wrong = await c('POST', '/api/account/delete', {
+    identity_token: appleToken({ sub: 'apple-sub-someone-else', nonce: wrongNonce }),
+    nonce: wrongNonce,
+  });
+  assert.equal(wrong.status, 401);
+  assert.equal((await c('GET', '/api/auth/me')).status, 200, 'session lives after wrong Apple token');
+});
+
+test('apple-only delete succeeds with a matching identity token', async () => {
+  const c = makeClient();
+  const createNonce = 'nonce-del-ok-create';
+  const signin = await c('POST', '/api/auth/apple', {
+    identity_token: appleToken({ sub: 'apple-sub-del-ok', nonce: createNonce, email: 'delok@example.com' }),
+    nonce: createNonce,
+    name: 'Del Ok',
+  });
+  assert.equal(signin.status, 200);
+
+  const delNonce = 'nonce-del-ok-confirm';
+  const del = await c('POST', '/api/account/delete', {
+    identity_token: appleToken({ sub: 'apple-sub-del-ok', nonce: delNonce }),
+    nonce: delNonce,
+  });
+  assert.equal(del.status, 200, JSON.stringify(del.body));
+  assert.equal((await c('GET', '/api/auth/me')).status, 401);
+});

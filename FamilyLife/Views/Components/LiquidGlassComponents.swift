@@ -600,6 +600,14 @@ extension View {
             }
         }
     }
+
+    /// Reload this screen whenever the concierge writes household data, including
+    /// mid-turn as each tool call lands — not only after the reply finishes.
+    func onConciergeDataChange(_ action: @escaping () async -> Void) -> some View {
+        onReceive(NotificationCenter.default.publisher(for: APIService.conciergeDataDidChange)) { _ in
+            Task { await action() }
+        }
+    }
 }
 
 // MARK: - Empty State

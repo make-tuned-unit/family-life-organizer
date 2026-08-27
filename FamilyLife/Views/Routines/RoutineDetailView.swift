@@ -158,6 +158,7 @@ struct RoutineDetailView: View {
         .inlineError(errorMessage) { errorMessage = nil }
         .task { await load() }
         .refreshable { await load() }
+        .onConciergeDataChange { await load() }
     }
 
     // MARK: - Sharing

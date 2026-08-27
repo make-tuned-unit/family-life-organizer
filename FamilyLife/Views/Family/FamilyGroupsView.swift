@@ -832,6 +832,7 @@ struct FeedPostCard: View {
         case "decision": ("chart.bar", "Decision", TabAccent.decisions.color)
         case "rivalry": ("flag.2.crossed", "Challenge", AccentTheme.rose.color)
         case "poll": ("chart.bar", "Poll", AccentTheme.sage.color)
+        case "brief": ("sparkles", "Brief", AccentTheme.saffron.color)
         default: ("text.bubble", "Post", WarmPalette.ink3)
         }
         HStack(spacing: 4) {

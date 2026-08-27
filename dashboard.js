@@ -32,7 +32,7 @@ const FamilyDB = require('./database');
 const jobs = require('./services/jobs');
 const ai = require('./services/anthropic');
 const { buildSnapshot } = require('./services/conciergeContext');
-const { generateBrief } = require('./services/conciergeBrief');
+const { generateBrief, runDailyBriefSweep } = require('./services/conciergeBrief');
 const { handleChat, handleChatStream } = require('./services/conciergeChat');
 const subscription = require('./services/subscription');
 const stripeBilling = require('./services/stripe');
@@ -42,6 +42,7 @@ const { announceRivalryCompletion } = require('./services/rivalryAnnounce');
 const { createRateLimiter } = require('./services/rateLimit');
 const email = require('./services/email');
 const { runOnboardingEmailSweep } = require('./services/onboardingEmail');
+const householdInvite = require('./services/householdInvite');
 const appleSignIn = require('./services/appleSignIn');
 const crypto = require('crypto');
 
@@ -124,6 +125,7 @@ const clientIp = (req) => req.ip || 'unknown';
 // adds ~250ms/attempt server-side on top).
 const loginLimiter = createRateLimiter({ windowMs: 60000, max: 20, keyFn: clientIp });
 const registerLimiter = createRateLimiter({ windowMs: 60 * 60 * 1000, max: 5, keyFn: clientIp });
+const reportLimiter = createRateLimiter({ windowMs: 60 * 60 * 1000, max: 20, keyFn: req => req.session?.user?.id ?? clientIp(req) });
 
 // Regenerate the session to a fresh id and persist the authenticated user on it.
 // Prevents session fixation (an attacker-planted pre-auth session id surviving login).
@@ -362,6 +364,8 @@ app.get('/privacy', serveWebsiteHtml('privacy.html'));
 app.get('/privacy.html', serveWebsiteHtml('privacy.html'));
 app.get('/terms', serveWebsiteHtml('terms.html'));
 app.get('/terms.html', serveWebsiteHtml('terms.html'));
+app.get('/support', serveWebsiteHtml('support.html'));
+app.get('/support.html', serveWebsiteHtml('support.html'));
 app.get('/developers', serveWebsiteHtml('developers.html'));
 app.get('/developers.html', serveWebsiteHtml('developers.html'));
 app.get('/compare', serveWebsiteHtml('compare.html'));
@@ -938,6 +942,7 @@ app.post('/api/auth/apple', loginLimiter, async (req, res) => {
         email: claims.email,
         apple_user_id: claims.sub,
         email_verified: !!(claims.email && claims.emailVerified),
+        password_login: 0,
       });
       user = { id: created.id, username: created.username, name: created.name, avatar: null };
       household = await assignHousehold(db, user, {
@@ -1152,16 +1157,96 @@ app.post('/api/auth/logout', async (req, res) => {
 
 // Change the authenticated user's password. Requires the current password.
 // Permanently delete the signed-in user's account and personal data.
-// Re-authentication (current password) is required — irreversible.
+// Re-authentication is required — password and/or a fresh Sign in with Apple
+// identity token (Guideline 5.1.1(v); Apple-only accounts have no password).
 app.post('/api/account/delete', requireAuth, loginLimiter, async (req, res) => {
   const db = new FamilyDB();
   try {
     const user = await db.getUserById(req.session.user.id);
     const full = user && await db.getUserByUsername(user.username);
-    const valid = await bcrypt.compare(String(req.body.current_password || ''), full?.password_hash || DUMMY_BCRYPT_HASH);
-    if (!valid) return res.status(401).json({ error: 'Password is incorrect' });
+    if (!full) return res.status(401).json({ error: 'Not authenticated' });
+
+    const hasPassword = full.password_login !== 0 && full.password_login !== '0';
+    const appleLinked = !!full.apple_user_id;
+    let passwordOk = false;
+    let appleOk = false;
+
+    if (hasPassword && req.body.current_password) {
+      passwordOk = await bcrypt.compare(String(req.body.current_password), full.password_hash || DUMMY_BCRYPT_HASH);
+    } else if (hasPassword) {
+      // Keep a dummy compare on the password path so timing doesn't advertise
+      // whether this account has a password when the client omitted one.
+      await bcrypt.compare('', full.password_hash || DUMMY_BCRYPT_HASH);
+    }
+
+    if (appleLinked && req.body.identity_token) {
+      try {
+        const claims = await appleSignIn.verifyIdentityToken(req.body.identity_token, {
+          nonce: req.body.nonce,
+        });
+        appleOk = claims.sub === full.apple_user_id;
+      } catch {
+        appleOk = false;
+      }
+    }
+
+    if (!passwordOk && !appleOk) {
+      const hint = appleLinked && !hasPassword
+        ? 'Sign in with Apple to confirm'
+        : 'Password is incorrect';
+      return res.status(401).json({ error: hint });
+    }
+
     await db.deleteUserAccount(req.session.user.id);
     req.session.destroy(() => res.json({ success: true }));
+  } catch (err) {
+    sendServerError(res, err);
+  } finally {
+    db.close();
+  }
+});
+
+// Report household UGC (Guideline 1.2). The reporter must already be able to
+// see the target — DMs they sent or received, or a feed post in a group they
+// belong to. Does not attach the original body to the operator email.
+app.post('/api/content/report', requireAuth, reportLimiter, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const userId = req.session.user.id;
+    const type = String(req.body.content_type || req.body.type || '').trim();
+    const refId = parseInt(req.body.ref_id, 10);
+    const reason = String(req.body.reason || '').trim().slice(0, 200);
+    if (!['message', 'feed'].includes(type) || !Number.isInteger(refId) || refId < 1) {
+      return res.status(400).json({ error: 'Nothing to report' });
+    }
+    if (!reason) return res.status(400).json({ error: 'Please choose a reason' });
+
+    if (type === 'message') {
+      const row = await dbGet(db, 'SELECT sender_id, recipient_id FROM direct_messages WHERE id = ?', [refId]);
+      if (!row) return res.status(404).json({ error: 'Not found' });
+      if (row.sender_id !== userId && row.recipient_id !== userId) {
+        return res.status(403).json({ error: 'Forbidden' });
+      }
+    } else {
+      const post = await dbGet(db, 'SELECT group_id FROM feed_posts WHERE id = ?', [refId]);
+      if (!post) return res.status(404).json({ error: 'Not found' });
+      if (post.group_id == null || !(await db.isGroupMember(post.group_id, userId))) {
+        return res.status(403).json({ error: 'Forbidden' });
+      }
+    }
+
+    await dbRun(db, 'INSERT INTO content_reports (reporter_id, content_type, ref_id, reason) VALUES (?, ?, ?, ?)',
+      [userId, type, refId, reason]);
+
+    const to = process.env.REPORTS_TO || 'kinrows@atlasatlantic.co';
+    email.sendEmail({
+      to,
+      subject: `Kinrows content report (${type} #${refId})`,
+      text: `Reporter user id ${userId} reported ${type} ${refId}. Reason: ${reason}`,
+      html: `<p>Reporter user id ${userId} reported <code>${type}</code> ${refId}.</p><p>Reason: ${email.escapeHtml(reason)}</p>`,
+    }).catch(() => {});
+
+    res.json({ success: true });
   } catch (err) {
     sendServerError(res, err);
   } finally {
@@ -1209,6 +1294,8 @@ app.get('/api/account/security', requireAuth, async (req, res) => {
       email: user?.email || null,
       email_verified: !!user?.email_verified,
       two_factor_enabled: !!user?.two_factor_enabled,
+      has_password: user?.password_login !== 0 && user?.password_login !== '0',
+      apple_linked: !!user?.apple_user_id,
     });
   } catch (err) {
     sendServerError(res, err);
@@ -1281,6 +1368,11 @@ app.post('/api/auth/device-token', requireAuth, async (req, res) => {
 
 // ── Public marketing waitlist (kinrows.com) ──────────────────────────────────
 const waitlistLimiter = createRateLimiter({ windowMs: 60000, max: 8, keyFn: clientIp });
+const householdInviteLimiter = createRateLimiter({
+  windowMs: 60 * 60 * 1000,
+  max: 10,
+  keyFn: req => req.session?.user?.id ?? clientIp(req),
+});
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 app.post('/api/waitlist', waitlistLimiter, async (req, res) => {
@@ -1504,6 +1596,23 @@ app.put('/api/users/me/name', requireAuth, async (req, res) => {
     });
     if (req.session.user) req.session.user.name = name;
     res.json({ success: true, name });
+  } catch (err) {
+    sendServerError(res, err);
+  } finally {
+    db.close();
+  }
+});
+
+// Opt in/out of the AI Concierge. The daily brief is posted to the household
+// feed for opted-in members; the iOS toggle is the source of truth.
+app.put('/api/users/me/concierge', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const userId = req.session.user?.id;
+    if (!userId) return res.status(401).json({ error: 'Not authenticated' });
+    const enabled = !!(req.body && req.body.enabled);
+    await db.setConciergeEnabled(userId, enabled);
+    res.json({ success: true, enabled });
   } catch (err) {
     sendServerError(res, err);
   } finally {
@@ -3998,12 +4107,13 @@ app.post('/api/concierge/chat', requireAuth, conciergeLimiter, conciergeChatDail
   try {
     const message = (req.body.message || '').trim();
     if (!message) return res.status(400).json({ error: 'message required' });
-    if (message.length > 4000) return res.status(400).json({ error: 'message too long' });
+    if (message.length > 8000) return res.status(400).json({ error: 'message too long' });
     const result = await handleChat(db, {
       userId: req.session.user.id,
       userName: req.session.user.name,
       message,
       conversationId: req.body.conversation_id || null,
+      source: req.body.source || 'text',
     });
     res.json(result);
   } catch (err) {
@@ -4024,7 +4134,7 @@ app.post('/api/concierge/chat/stream', requireAuth, conciergeLimiter, conciergeC
   try {
     const message = (req.body.message || '').trim();
     if (!message) return res.status(400).json({ error: 'message required' });
-    if (message.length > 4000) return res.status(400).json({ error: 'message too long' });
+    if (message.length > 8000) return res.status(400).json({ error: 'message too long' });
 
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
@@ -4032,7 +4142,10 @@ app.post('/api/concierge/chat/stream', requireAuth, conciergeLimiter, conciergeC
     res.setHeader('X-Accel-Buffering', 'no'); // disable proxy buffering so deltas flush
     if (res.flushHeaders) res.flushHeaders();
 
-    const send = (event, data) => res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+    const send = (event, data) => {
+      res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+      if (typeof res.flush === 'function') res.flush();
+    };
 
     try {
       const result = await handleChatStream(db, {
@@ -4040,7 +4153,11 @@ app.post('/api/concierge/chat/stream', requireAuth, conciergeLimiter, conciergeC
         userName: req.session.user.name,
         message,
         conversationId: req.body.conversation_id || null,
-      }, { onText: (t) => send('delta', { text: t }) });
+        source: req.body.source || 'text',
+      }, {
+        onText: (t) => send('delta', { text: t }),
+        onAction: (action) => send('action', action),
+      });
       send('done', result);
     } catch (err) {
       send('error', { error: err.status ? err.message : 'Something went wrong.' });
@@ -5490,6 +5607,45 @@ app.post('/api/groups', requireAuth, async (req, res) => {
     const group = await db.createGroup({ ...req.body, created_by: userId });
     await db.addGroupMember(group.id, { user_id: userId, role: 'admin', added_by: userId });
     res.json({ success: true, id: group.id, invite_code: group.invite_code });
+  } catch (err) {
+    sendServerError(res, err);
+  } finally {
+    db.close();
+  }
+});
+
+// Founder (or any household member) emails the invite code to family.
+// Specific path before /api/households/merge. Rate-limited; no user enumeration.
+app.post('/api/household/invite', requireAuth, householdInviteLimiter, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const userId = req.session.user?.id;
+    let emails;
+    try {
+      emails = householdInvite.parseEmails(req.body?.emails ?? req.body?.email);
+    } catch (err) {
+      return res.status(err.status || 400).json({ error: err.message });
+    }
+    const hid = await db.getUserHouseholdId(userId);
+    if (!hid) return res.status(403).json({ error: 'Join a household first' });
+    const group = await db.getGroupById(hid);
+    if (!group?.invite_code) return res.status(400).json({ error: 'This household has no invite code yet' });
+    if (!householdInvite.isEmailEnabled()) {
+      return res.status(503).json({
+        error: "Email isn't set up on this server yet. Copy the code and send it yourself.",
+      });
+    }
+    const inviter = req.session.user?.name || 'Your family';
+    const result = await householdInvite.sendHouseholdInvites({
+      inviterName: inviter,
+      householdName: group.name,
+      inviteCode: group.invite_code,
+      emails,
+    });
+    if (result.sent.length === 0) {
+      return res.status(502).json({ error: "We couldn't send the invite just now. Try again, or copy the code.", ...result });
+    }
+    res.json({ success: true, ...result });
   } catch (err) {
     sendServerError(res, err);
   } finally {
@@ -7659,6 +7815,7 @@ initializeDatabase().then(() => {
     console.log('AI features:', process.env.ANTHROPIC_API_KEY ? 'ENABLED' : 'DISABLED (no ANTHROPIC_API_KEY)');
     console.log('Stripe billing:', stripeBilling.isConfigured() ? 'ENABLED' : 'DISABLED (no STRIPE_SECRET_KEY)');
     startProactiveNudges();
+    startDailyBriefs();
     startNightlyBackups();
     startOnboardingEmails();
     jobs.startWorker();
@@ -7754,4 +7911,30 @@ function startProactiveNudges() {
   };
   const handle = setInterval(runIfDaytime, SWEEP_MS);
   handle.unref(); // don't keep the process alive solely for the sweep
+}
+
+// Daily concierge brief → household feed. Same waking-hours window as nudges;
+// one post per household per local day (dedupe lives in the sweep).
+function startDailyBriefs() {
+  const SWEEP_MS = 60 * 60 * 1000; // hourly
+  let running = false;
+  const runIfDaytime = async () => {
+    const hour = new Date().getHours(); // server TZ (America/Halifax)
+    if (hour < 8 || hour >= 21) return;
+    if (running) return;
+    running = true;
+    const db = new FamilyDB();
+    try {
+      const summary = await runDailyBriefSweep(db);
+      if (summary.posted) console.log('Daily briefs posted:', JSON.stringify(summary));
+    } catch (err) {
+      console.error('Daily brief sweep error:', err.message);
+    } finally {
+      db.close();
+      running = false;
+    }
+  };
+  runIfDaytime();
+  const handle = setInterval(runIfDaytime, SWEEP_MS);
+  handle.unref();
 }

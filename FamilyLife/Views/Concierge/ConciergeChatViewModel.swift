@@ -40,7 +40,7 @@ final class ConciergeChatViewModel {
         }
     }
 
-    func send(_ text: String, api: APIService) async {
+    func send(_ text: String, api: APIService, source: ConciergeMessageSource = .text) async {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, !isSending else { return }
 
@@ -48,12 +48,14 @@ final class ConciergeChatViewModel {
         isSending = true
         errorMessage = nil
 
-        // Stream the reply: create the assistant bubble on the first token, fill
-        // it as deltas arrive, then reconcile to the authoritative reply on done.
+        // Stream the reply: create the assistant bubble on the first token or
+        // action, fill it as deltas arrive, then reconcile to the authoritative
+        // reply on done. Each write is published immediately so other tabs refresh.
         var assistantIndex: Int?
         var streamed = ""
+        var liveActions: [ConciergeAction] = []
         do {
-            for try await event in api.conciergeMessageStream(trimmed, conversationId: conversationId) {
+            for try await event in api.conciergeMessageStream(trimmed, conversationId: conversationId, source: source) {
                 switch event {
                 case .delta(let token):
                     streamed += token
@@ -61,8 +63,17 @@ final class ConciergeChatViewModel {
                         messages[i].text = streamed
                     } else {
                         assistantIndex = messages.count
-                        messages.append(Message(role: .assistant, text: streamed))
+                        messages.append(Message(role: .assistant, text: streamed, actions: liveActions))
                     }
+                case .action(let action):
+                    liveActions.append(action)
+                    if let i = assistantIndex, messages.indices.contains(i) {
+                        messages[i].actions = liveActions
+                    } else {
+                        assistantIndex = messages.count
+                        messages.append(Message(role: .assistant, text: streamed, actions: liveActions))
+                    }
+                    APIService.publishConciergeActions([action])
                 case .done(let response):
                     conversationId = response.conversationId
                     if let i = assistantIndex, messages.indices.contains(i) {
@@ -71,12 +82,14 @@ final class ConciergeChatViewModel {
                     } else {
                         messages.append(Message(role: .assistant, text: response.reply, actions: response.actions))
                     }
-                    APIService.publishConciergeActions(response.actions)
+                    if liveActions.isEmpty {
+                        APIService.publishConciergeActions(response.actions)
+                    }
                 }
             }
         } catch {
             // Drop an empty placeholder; keep any partial text and surface the error.
-            if let i = assistantIndex, messages.indices.contains(i), messages[i].text.isEmpty {
+            if let i = assistantIndex, messages.indices.contains(i), messages[i].text.isEmpty, messages[i].actions.isEmpty {
                 messages.remove(at: i)
             }
             errorMessage = error.localizedDescription
