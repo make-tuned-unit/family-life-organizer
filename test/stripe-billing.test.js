@@ -354,6 +354,7 @@ test('Checkout Session payload includes conversion fields and session_id success
   assert.equal(params.line_items[0].price, 'price_lite_m');
   assert.equal(params.subscription_data.metadata.kinrows_group_id, '4');
   assert.equal(params.managed_payments.enabled, false);
+  assert.equal(params.metadata.kinrows_source, undefined);
 
   const cad = stripe.buildCheckoutParams({
     price: 'price_lite_m',
@@ -375,4 +376,68 @@ test('Checkout Session payload includes conversion fields and session_id success
     currency: 'gbp',
   });
   assert.equal(gbp.currency, undefined);
+
+  const app = stripe.buildCheckoutParams({
+    price: 'price_lite_m',
+    productId: 'com.kinrows.app.concierge.lite.monthly',
+    userId: 9,
+    groupId: 4,
+    successUrl: 'https://kinrows.com/open/subscribed?session_id={CHECKOUT_SESSION_ID}',
+    cancelUrl: 'https://kinrows.com/open/subscribe-canceled',
+    source: 'app',
+  });
+  assert.equal(app.metadata.kinrows_source, 'app');
+  assert.match(app.custom_text.after_submit.message, /Returning you to Kinrows/);
+});
+
+test('app-first Checkout return URLs bounce into kinrows:// not the website login', () => {
+  const web = stripe.checkoutReturnUrls('https://kinrows.com', 'web');
+  assert.match(web.successUrl, /subscribe\.html\?success=1/);
+  assert.match(web.cancelUrl, /subscribe\.html\?canceled=1/);
+
+  const app = stripe.checkoutReturnUrls('https://kinrows.com/', 'app');
+  assert.equal(app.successUrl, 'https://kinrows.com/open/subscribed?session_id={CHECKOUT_SESSION_ID}');
+  assert.equal(app.cancelUrl, 'https://kinrows.com/open/subscribe-canceled');
+});
+
+test('app return pages are public and deep-link into the iPhone app', async () => {
+  const ok = await fetch(BASE + '/open/subscribed?session_id=cs_live_abc123XYZ');
+  assert.equal(ok.status, 200);
+  const html = await ok.text();
+  assert.match(html, /kinrows:\/\/subscribed\?session_id=cs_live_abc123XYZ/);
+  assert.match(html, /Open Kinrows/);
+  assert.match(html, /window\.location\.replace/);
+  assert.match(ok.headers.get('cache-control') || '', /no-store/i);
+
+  const evil = await fetch(BASE + '/open/subscribed?session_id=' + encodeURIComponent('"><script>alert(1)</script>'));
+  const evilHtml = await evil.text();
+  assert.equal(evil.status, 200);
+  assert.ok(!evilHtml.includes('<script>alert'));
+  assert.match(evilHtml, /kinrows:\/\/subscribed"/);
+
+  const cancel = await fetch(BASE + '/open/subscribe-canceled');
+  assert.equal(cancel.status, 200);
+  const cancelHtml = await cancel.text();
+  assert.match(cancelHtml, /kinrows:\/\/subscribe-canceled/);
+  assert.match(cancelHtml, /Nothing was charged/);
+});
+
+test('Apple App Site Association is served as JSON for Universal Links', async () => {
+  const res = await fetch(BASE + '/.well-known/apple-app-site-association');
+  assert.equal(res.status, 200);
+  assert.match(res.headers.get('content-type') || '', /json/i);
+  const body = await res.json();
+  const detail = body.applinks.details[0];
+  assert.equal(detail.appID, 'Z58XSBM78S.com.kinrows.app');
+  assert.ok(detail.paths.includes('/open/*'));
+
+  const alias = await fetch(BASE + '/apple-app-site-association');
+  assert.equal(alias.status, 200);
+  assert.equal((await alias.json()).applinks.details[0].appID, 'Z58XSBM78S.com.kinrows.app');
+});
+
+test('subscribe.html offers an Open Kinrows deep link after web checkout', async () => {
+  const html = await (await fetch(BASE + '/subscribe.html')).text();
+  assert.match(html, /href="kinrows:\/\/subscribed"/);
+  assert.match(html, /id="sub-open-app"/);
 });

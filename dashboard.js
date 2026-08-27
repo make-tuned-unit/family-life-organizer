@@ -406,6 +406,22 @@ app.get('/.well-known/apple-developer-merchantid-domain-association', (req, res)
   });
 });
 
+// Universal Links for the app-first Checkout return. Must be JSON, no
+// redirect, no sendFile — Express treats `.well-known` as a hidden path.
+function sendAppleAppSiteAssociation(req, res) {
+  const file = path.join(__dirname, 'website', '.well-known', 'apple-app-site-association');
+  fs.readFile(file, (err, buf) => {
+    if (err) return res.status(404).end();
+    res.set({
+      'Content-Type': 'application/json',
+      'Cache-Control': 'public, max-age=86400',
+    });
+    res.send(buf);
+  });
+}
+app.get('/.well-known/apple-app-site-association', sendAppleAppSiteAssociation);
+app.get('/apple-app-site-association', sendAppleAppSiteAssociation);
+
 app.get('/', serveWebsiteHtml('index.html'));
 app.get('/about', serveWebsiteHtml('index.html')); // /about also serves index.html for SPA routing
 app.get('/privacy', serveWebsiteHtml('privacy.html'));
@@ -418,6 +434,84 @@ app.get('/compare', serveWebsiteHtml('compare.html'));
 app.get('/compare.html', serveWebsiteHtml('compare.html'));
 app.get('/subscribe', serveWebsiteHtml('subscribe.html'));
 app.get('/subscribe.html', serveWebsiteHtml('subscribe.html'));
+
+// Public bounce pages after Stripe Checkout when the purchase started in the
+// iPhone app. Safari does not share the app cookie jar, so these must NOT
+// require auth — they only redirect into kinrows://. The app then confirms
+// the session with its own login.
+function isStripeCheckoutSessionId(id) {
+  return /^cs_(test|live)_[A-Za-z0-9]+$/.test(String(id || ''));
+}
+
+function sendAppReturnPage(res, { title, message, button, schemeUrl, auto }) {
+  const href = htmlEsc(schemeUrl);
+  const jsUrl = JSON.stringify(schemeUrl);
+  res.set({
+    'Content-Type': 'text/html; charset=utf-8',
+    'Cache-Control': 'no-store',
+    'Content-Security-Policy': PAGE_CSP,
+  });
+  res.send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<meta name="robots" content="noindex"/>
+<title>${htmlEsc(title)} · Kinrows</title>
+${auto ? `<meta http-equiv="refresh" content="0;url=${href}"/>` : ''}
+<style>
+  :root { --cream:#fdf5e0; --ink:#2a1f1a; --muted:#7a6353; --saffron:#d99e3a; --card:#fef8ea; }
+  * { box-sizing:border-box; }
+  body { margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,sans-serif;
+    background:var(--cream); color:var(--ink); padding:32px 20px; }
+  .card { max-width:420px; width:100%; background:var(--card); border-radius:28px;
+    padding:36px 28px; box-shadow:0 10px 30px rgba(120,74,46,.10); text-align:center; }
+  .eyebrow { font-size:12px; letter-spacing:.14em; text-transform:uppercase; color:var(--saffron);
+    font-weight:600; margin-bottom:10px; }
+  h1 { font-size:28px; line-height:1.2; margin:0 0 10px; font-weight:600; }
+  p { margin:0 0 24px; color:var(--muted); line-height:1.5; }
+  a.btn { display:inline-block; background:var(--saffron); color:#fff; text-decoration:none;
+    font-weight:600; padding:14px 22px; border-radius:22px; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <p class="eyebrow">Kinrows</p>
+    <h1>${htmlEsc(title)}</h1>
+    <p>${htmlEsc(message)}</p>
+    <a class="btn" href="${href}">${htmlEsc(button)}</a>
+  </div>
+  ${auto ? `<script>window.location.replace(${jsUrl});</script>` : ''}
+</body>
+</html>`);
+}
+
+app.get('/open/subscribed', (req, res) => {
+  const raw = String(req.query.session_id || '');
+  const sessionId = isStripeCheckoutSessionId(raw) ? raw : '';
+  const schemeUrl = sessionId
+    ? `kinrows://subscribed?session_id=${encodeURIComponent(sessionId)}`
+    : 'kinrows://subscribed';
+  sendAppReturnPage(res, {
+    title: 'Concierge is ready',
+    message: 'Return to Kinrows — we will unlock Concierge for your household.',
+    button: 'Open Kinrows',
+    schemeUrl,
+    auto: true,
+  });
+});
+
+app.get('/open/subscribe-canceled', (_req, res) => {
+  sendAppReturnPage(res, {
+    title: 'Checkout canceled',
+    message: 'Nothing was charged. Open Kinrows to pick a plan when you are ready.',
+    button: 'Return to Kinrows',
+    schemeUrl: 'kinrows://subscribe-canceled',
+    auto: true,
+  });
+});
+
 app.get('/best-chore-app-for-families', serveWebsiteHtml('best-chore-app-for-families.html'));
 app.get('/best-chore-app-for-families.html', serveWebsiteHtml('best-chore-app-for-families.html'));
 app.get('/best-family-calendar-app', serveWebsiteHtml('best-family-calendar-app.html'));
@@ -3944,15 +4038,18 @@ app.post('/api/subscription/checkout', requireAuth, async (req, res) => {
     let customerId = null;
     try { customerId = await subscription.stripeCustomerIdForGroup(db, groupId); } catch { /* first purchase */ }
     const base = publicBaseUrl();
+    const fromApp = String(req.body?.source || '').toLowerCase() === 'app';
+    const { successUrl, cancelUrl } = stripeBilling.checkoutReturnUrls(base, fromApp ? 'app' : 'web');
     const session = await stripeBilling.createCheckoutSession({
       productId,
       userId,
       groupId,
       customerId,
       customerEmail: (!customerId && user?.email) ? user.email : null,
-      successUrl: `${base}/subscribe.html?success=1&session_id={CHECKOUT_SESSION_ID}`,
-      cancelUrl: `${base}/subscribe.html?canceled=1`,
+      successUrl,
+      cancelUrl,
       currency: req.body?.currency,
+      source: fromApp ? 'app' : 'web',
     });
     res.json({ url: session.url, id: session.id });
   } catch (err) {

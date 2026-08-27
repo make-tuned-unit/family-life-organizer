@@ -1,0 +1,14 @@
+{
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appID": "Z58XSBM78S.com.kinrows.app",
+        "paths": ["/open/*"],
+        "components": [
+          { "/": "/open/*" }
+        ]
+      }
+    ]
+  }
+}

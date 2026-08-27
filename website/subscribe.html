@@ -78,6 +78,9 @@
   <section class="legal-body">
     <div class="sub-wrap">
       <div id="sub-banner" class="sub-banner" hidden role="status"></div>
+      <p id="sub-open-app-wrap" hidden>
+        <a id="sub-open-app" class="btn btn-primary" href="kinrows://subscribed">Open Kinrows</a>
+      </p>
 
       <div id="sub-account" class="sub-account">
         <p class="sub-account-copy">Sign in with the same Kinrows account you use on iPhone, then pick a plan. Accounts are created in the app.</p>
@@ -197,6 +200,17 @@
     banner.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   };
   if (qs.get('canceled')) showBanner('Checkout was canceled. Nothing was charged.', 'info');
+
+  const paintOpenApp = (sessionId) => {
+    const wrap = document.getElementById('sub-open-app-wrap');
+    const a = document.getElementById('sub-open-app');
+    if (!wrap || !a) return;
+    const sid = sessionId || '';
+    a.href = /^cs_(test|live)_[A-Za-z0-9]+$/.test(sid)
+      ? 'kinrows://subscribed?session_id=' + encodeURIComponent(sid)
+      : 'kinrows://subscribed';
+    wrap.hidden = false;
+  };
 
   let period = 'yearly';
   let catalogCurrency = 'cad';
@@ -371,6 +385,7 @@
         const chats = status.chats_per_day || (status.tier === 'lite' ? 10 : 40);
         const label = status.tier === 'lite' ? 'Lite' : 'Premium';
         showBanner(`You are on ${label} — up to ${chats} chats a day for the household. Open Kinrows on your iPhone. A confirmation email is on its way.`, 'success');
+        paintOpenApp(sessionId);
         return;
       }
       await new Promise((r) => setTimeout(r, 1500));
@@ -379,7 +394,10 @@
       ? 'Payment received. If Concierge is not unlocked yet, wait a moment and refresh — or open the iPhone app.'
       : 'Sign in with your Kinrows account to confirm Concierge is unlocked.', 'info');
   };
-  if (qs.get('success')) confirmCheckout(qs.get('session_id'));
+  if (qs.get('success')) {
+    paintOpenApp(qs.get('session_id'));
+    confirmCheckout(qs.get('session_id'));
+  }
 
   const askToSignIn = (productId) => {
     pendingProductId = productId || null;

@@ -123,6 +123,7 @@ Still human:
 3. Optionally revoke leftover comp entitlements and set a Railway `healthcheckPath` of `/healthz` (currently unset on the service).
 4. Compile touched Swift in Xcode before submit (`swiftc` was not on the audit machine).
 5. First live web Checkout purchase (Lite + Premium) after this cutover — confirm entitlement + Customer Portal.
+6. Enable **Associated Domains** on App ID `com.kinrows.app` (team `Z58XSBM78S`) so Universal Links for `/open/*` sign; the `kinrows://` custom scheme works without it. Walk the app-first path once: Subscribe in the iPhone app → Safari Checkout + Apple Pay → auto-return → Concierge unlocked.
 
 ### Stripe live cutover (2026-08-26, later the same day)
 
@@ -151,6 +152,7 @@ they cannot collide with StoreKit original transaction ids.
   key with Checkout / Billing / Webhooks / Customers once this is proven on test keys.
 - Tests: `test/stripe-billing.test.js`, `test/billing-email.test.js`, `test/rate-limit.test.js`.
 - **Funnel (2026-08-27):** hosted Checkout with promo codes, auto locale, household copy, `{CHECKOUT_SESSION_ID}` success URL that the subscribe page confirms before celebrating. Customer Portal is created with plan-switch + cancel-at-period-end. Kinrows emails (via Resend) fire on checkout completed, payment failed, and cancellation — Stripe still sends receipts. Lite = **10** chats/day, Premium = **40**, enforced after the premium gate so unpaid callers get 402 not a burned quota; 429 names the tier and suggests upgrade on Lite. Duplicate Stripe events are logged and not re-emailed. **Local currency:** CAD/USD/EUR stickers via Price `currency_options` (same numbers); Adaptive Pricing for everywhere else. **Apple Pay / Google Pay:** Checkout `billing_address_collection=required`; live payment-method domains `kinrows.com` + `www.kinrows.com` (`apple_pay=active`); association file at `/.well-known/apple-developer-merchantid-domain-association`.
+- **App-first purchase (2026-08-27):** iPhone paywall Subscribe calls `POST /api/subscription/checkout` with `source=app` using the app session (Safari never sees the password). Success/cancel URLs are public `/open/subscribed` and `/open/subscribe-canceled`, which bounce into `kinrows://` (and Universal Links via `/.well-known/apple-app-site-association`, appID `Z58XSBM78S.com.kinrows.app`, paths `/open/*`). The app confirms `GET /api/subscription/checkout/session` and refreshes household status on foreground if the user switches back without tapping Open Kinrows. Return pages are unauthenticated on purpose — they must not call billing APIs from Safari. Enable **Associated Domains** on App ID `com.kinrows.app` so Universal Links sign; the custom scheme works without it.
 
 ## 2026-08-26 — Pre-signup onboarding + Sign in with Apple
 

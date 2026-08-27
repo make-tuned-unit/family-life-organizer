@@ -492,6 +492,22 @@ final class APIService {
         try await get("/api/subscription/status")
     }
 
+    func fetchSubscriptionCatalog(currency: String? = nil) async throws -> SubscriptionCatalog {
+        var params: [String: String] = [:]
+        if let currency { params["currency"] = currency }
+        return try await get("/api/subscription/catalog", queryParams: params)
+    }
+
+    func createCheckoutSession(productId: String, currency: String? = nil, source: String = "app") async throws -> CheckoutSessionResponse {
+        var body: [String: Any] = ["product_id": productId, "source": source]
+        if let currency { body["currency"] = currency }
+        return try await post("/api/subscription/checkout", body: body)
+    }
+
+    func confirmCheckoutSession(_ sessionId: String) async throws -> CheckoutConfirmResponse {
+        try await get("/api/subscription/checkout/session", queryParams: ["session_id": sessionId])
+    }
+
     func sendConciergeMessage(_ message: String, conversationId: Int?) async throws -> ConciergeChatResponse {
         guard cloudAIEnabled else { throw APIError.cloudAIDisabled }
         var body: [String: Any] = ["message": message]
