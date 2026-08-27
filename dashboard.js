@@ -44,6 +44,7 @@ const { announceRivalryCompletion } = require('./services/rivalryAnnounce');
 const { createRateLimiter } = require('./services/rateLimit');
 const email = require('./services/email');
 const billingEmail = require('./services/billingEmail');
+const permagent = require('./services/permagent');
 const { runOnboardingEmailSweep } = require('./services/onboardingEmail');
 const householdInvite = require('./services/householdInvite');
 const appleSignIn = require('./services/appleSignIn');
@@ -586,9 +587,10 @@ app.get('/open/subscribed', (req, res) => {
     schemeUrl,
     auto: true,
   });
+  permagent.trackSale(null, 'sale_return_success', { via: 'app' }, { path: '/open/subscribed', req });
 });
 
-app.get('/open/subscribe-canceled', (_req, res) => {
+app.get('/open/subscribe-canceled', (req, res) => {
   sendAppReturnPage(res, {
     title: 'Checkout canceled',
     message: 'Nothing was charged. Open Kinrows to pick a plan when you are ready.',
@@ -596,6 +598,7 @@ app.get('/open/subscribe-canceled', (_req, res) => {
     schemeUrl: 'kinrows://subscribe-canceled',
     auto: true,
   });
+  permagent.trackSale(null, 'sale_return_canceled', { via: 'app' }, { path: '/open/subscribe-canceled', req });
 });
 
 app.get('/best-chore-app-for-families', serveWebsiteHtml('best-chore-app-for-families.html'));
@@ -4186,6 +4189,11 @@ app.post('/api/subscription/verify', requireAuth, async (req, res) => {
     if (!signed) return res.status(400).json({ error: 'signed_transaction required' });
     const status = await subscription.verifyAndStore(db, req.session.user.id, signed);
     _householdEntitlementCache.delete(req.session.user.id); // reflect new/upgraded tier immediately
+    permagent.trackSale(db, 'sale_storekit_verified', {
+      ...permagent.planBits(status.product_id),
+      premium: !!status.premium,
+      source: 'app',
+    }, { path: '/api/subscription/verify', req });
     res.json(status);
   } catch (err) {
     // Log the real reason server-side; keep the client message opaque.
@@ -4203,6 +4211,13 @@ app.post('/api/subscription/notifications', async (req, res) => {
     const signedPayload = req.body.signedPayload;
     if (!signedPayload) return res.status(400).json({ error: 'signedPayload required' });
     const result = await subscription.verifyAndApplyNotification(db, signedPayload);
+    if (result?.applied) {
+      permagent.trackSale(db, 'sale_storekit_notification', {
+        type: result.type || undefined,
+        status: result.status || undefined,
+        source: 'app',
+      }, { path: '/api/subscription/notifications', req });
+    }
     res.json(result);
   } catch (err) {
     // Apple is the caller; log details server-side, respond opaquely.
@@ -4246,23 +4261,32 @@ app.get('/api/subscription/catalog', (req, res) => {
 // household so the webhook can't attach the entitlement anywhere else.
 app.post('/api/subscription/checkout', requireAuth, async (req, res) => {
   const productId = String(req.body?.product_id || '');
+  const fromApp = String(req.body?.source || '').toLowerCase() === 'app';
+  const source = fromApp ? 'app' : 'web';
   if (!subscription.CATALOG.some((p) => p.product_id === productId)) {
     return res.status(400).json({ error: 'Unknown plan' });
   }
   if (!stripeBilling.isConfigured()) {
+    permagent.trackSale(null, 'sale_checkout_blocked', {
+      ...permagent.planBits(productId), reason: 'unconfigured', source,
+    }, { path: '/api/subscription/checkout', req });
     return res.status(503).json({ error: 'Web billing is not configured' });
   }
   const db = new FamilyDB();
   try {
     const userId = req.session.user.id;
     const groupId = await db.getUserHouseholdId(userId);
-    if (!groupId) return res.status(400).json({ error: 'Join a household before subscribing' });
+    if (!groupId) {
+      permagent.trackSale(db, 'sale_checkout_blocked', {
+        ...permagent.planBits(productId), reason: 'no_household', source,
+      }, { path: '/api/subscription/checkout', req });
+      return res.status(400).json({ error: 'Join a household before subscribing' });
+    }
     const user = await db.getUserById(userId);
     let customerId = null;
     try { customerId = await subscription.stripeCustomerIdForGroup(db, groupId); } catch { /* first purchase */ }
     const base = publicBaseUrl();
-    const fromApp = String(req.body?.source || '').toLowerCase() === 'app';
-    const { successUrl, cancelUrl } = stripeBilling.checkoutReturnUrls(base, fromApp ? 'app' : 'web');
+    const { successUrl, cancelUrl } = stripeBilling.checkoutReturnUrls(base, source);
     const session = await stripeBilling.createCheckoutSession({
       productId,
       userId,
@@ -4272,12 +4296,20 @@ app.post('/api/subscription/checkout', requireAuth, async (req, res) => {
       successUrl,
       cancelUrl,
       currency: req.body?.currency,
-      source: fromApp ? 'app' : 'web',
+      source,
     });
+    permagent.trackSale(db, 'sale_checkout_start', {
+      ...permagent.planBits(productId),
+      source,
+      currency: req.body?.currency || undefined,
+    }, { path: '/api/subscription/checkout', req });
     res.json({ url: session.url, id: session.id });
   } catch (err) {
     if (err.status === 400) return res.status(400).json({ error: err.message });
     console.error('[subscription/checkout]', err && err.stack ? err.stack : err);
+    permagent.trackSale(null, 'sale_checkout_blocked', {
+      ...permagent.planBits(productId), reason: 'stripe_error', source,
+    }, { path: '/api/subscription/checkout', req });
     res.status(502).json({ error: 'Could not start checkout' });
   } finally {
     db.close();
@@ -4346,6 +4378,7 @@ app.post('/api/subscription/portal', requireAuth, async (req, res) => {
       customerId,
       returnUrl: `${publicBaseUrl()}/subscribe.html`,
     });
+    permagent.trackSale(db, 'sale_portal_open', { source: 'web' }, { path: '/api/subscription/portal', req });
     res.json({ url: session.url });
   } catch (err) {
     console.error('[subscription/portal]', err && err.stack ? err.stack : err);
@@ -4371,6 +4404,12 @@ app.post('/api/subscription/stripe', async (req, res) => {
     const result = await subscription.applyStripeEvent(db, event);
     _householdEntitlementCache.clear();
     const fresh = event.id ? await db.insertStripeEvent(event.id, event.type) : true;
+    if (fresh) {
+      const sale = permagent.stripeSaleEvent(event, result);
+      if (sale && (result.applied || sale.name === 'sale_payment_failed')) {
+        permagent.trackSale(db, sale.name, sale.properties, { path: sale.path, req });
+      }
+    }
     if (result.applied && fresh) {
       try {
         await billingEmail.notifyStripeEvent(db, event, result);

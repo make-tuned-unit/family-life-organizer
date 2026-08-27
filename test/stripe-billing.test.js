@@ -72,6 +72,8 @@ before(async () => {
       STRIPE_SECRET_KEY: '',
       STRIPE_WEBHOOK_SECRET: WHSEC,
       STRIPE_ALLOW_TEST: '1',
+      PERMAGENT_ANALYTICS_KEY: 'test-drain-key-stripe',
+      PERMAGENT_ANALYTICS_SALT: 'test-salt',
     },
     stdio: 'ignore',
   });
@@ -139,6 +141,9 @@ test('subscribe.html inline scripts parse and sign-in sits above the plans', asy
     if (/type\s*=\s*"application\/ld\+json"/i.test(attrs)) continue;
     assert.doesNotThrow(() => new vm.Script(body), body.slice(0, 80));
   }
+  assert.match(html, /sale_plan_click/);
+  assert.match(html, /sale_checkout_redirect/);
+  assert.match(html, /sale_return_success/);
 });
 
 test('Apple Pay domain association file is served', async () => {
@@ -227,6 +232,19 @@ test('signed webhook unlocks the household; unsigned is refused', async () => {
   assert.equal(again.status, 200);
   const dup = await again.json();
   assert.equal(dup.duplicate, true);
+
+  let updatedCount = 0;
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < 2000) {
+    const drain = await fetch(BASE + '/api/permagent-analytics/drain?since=0&limit=1000', {
+      headers: { 'x-permagent-key': 'test-drain-key-stripe' },
+    });
+    const env = await drain.json();
+    updatedCount = (env.events || []).filter((ev) => ev.name === 'sale_subscription_updated').length;
+    if (updatedCount >= 1) break;
+    await new Promise(r => setTimeout(r, 50));
+  }
+  assert.equal(updatedCount, 1, 'webhook writes sale_subscription_updated once (duplicates ignored)');
 });
 
 test('applyStripeSubscription refuses an unbound event and maps cancellation', async () => {
@@ -440,4 +458,39 @@ test('subscribe.html offers an Open Kinrows deep link after web checkout', async
   const html = await (await fetch(BASE + '/subscribe.html')).text();
   assert.match(html, /href="kinrows:\/\/subscribed"/);
   assert.match(html, /id="sub-open-app"/);
+});
+
+test('app return pages and blocked checkout record Permagent sale events', async () => {
+  await fetch(BASE + '/open/subscribed?session_id=cs_live_abc123XYZ');
+  await fetch(BASE + '/open/subscribe-canceled');
+  const ada = makeClient();
+  await ada('POST', '/api/auth/register', { username: 'sale_ada', password: 'password123', name: 'Ada Sale' });
+  await ada('POST', '/api/subscription/checkout', {
+    product_id: 'com.kinrows.app.concierge.premium.yearly',
+    source: 'app',
+  });
+
+  const startedAt = Date.now();
+  let names = [];
+  let events = [];
+  while (Date.now() - startedAt < 2000) {
+    const drain = await fetch(BASE + '/api/permagent-analytics/drain?since=0&limit=1000', {
+      headers: { 'x-permagent-key': 'test-drain-key-stripe' },
+    });
+    const env = await drain.json();
+    events = env.events || [];
+    names = events.filter((ev) => ev.kind === 'event').map((ev) => ev.name);
+    if (names.includes('sale_return_success') && names.includes('sale_return_canceled')
+        && names.includes('sale_checkout_blocked')) break;
+    await new Promise(r => setTimeout(r, 50));
+  }
+  assert.ok(names.includes('sale_return_success'), names.join(','));
+  assert.ok(names.includes('sale_return_canceled'), names.join(','));
+  assert.ok(names.includes('sale_checkout_blocked'), names.join(','));
+  const blocked = events.find((ev) => ev.name === 'sale_checkout_blocked' && ev.properties?.source === 'app');
+  assert.ok(blocked, 'app checkout blocked event');
+  assert.equal(blocked.properties.reason, 'unconfigured');
+  assert.equal(blocked.properties.tier, 'premium');
+  const ret = events.find((ev) => ev.name === 'sale_return_success' && ev.properties?.via === 'app');
+  assert.ok(ret, 'app return success event');
 });
