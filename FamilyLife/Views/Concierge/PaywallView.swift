@@ -174,7 +174,7 @@ struct PaywallView: View {
                 }
             }
             .buttonStyle(.flCTA(fill: recommended ? accent : AccentTheme.sage.color))
-            .disabled(subscription.isPurchasing)
+            .disabled(subscription.isPurchasing || subscription.pendingWebCheckout)
 
             if let storeProduct {
                 Button("Subscribe with Apple") {
@@ -182,7 +182,7 @@ struct PaywallView: View {
                 }
                 .font(.flCaption)
                 .foregroundStyle(WarmPalette.ink3)
-                .disabled(subscription.isPurchasing)
+                .disabled(subscription.isPurchasing || subscription.pendingWebCheckout)
             }
         }
         .padding(DesignTokens.Spacing.cardPadding)
