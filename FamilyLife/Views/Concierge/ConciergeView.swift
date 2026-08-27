@@ -69,6 +69,9 @@ struct ConciergeView: View {
                 }
             )
         }
+        .onReceive(NotificationCenter.default.publisher(for: .kinrowsSubscriptionActivated)) { _ in
+            showingPaywall = false
+        }
         .task {
             if case .idle = viewModel.state { await viewModel.load(api: api) }
             handleLaunchRequest()

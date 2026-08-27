@@ -148,14 +148,32 @@ function currencyOptionsForAmount(cents) {
   };
 }
 
+// App-first Checkout returns to public /open/* pages that bounce into
+// kinrows:// so Safari never has to share the app's cookie jar.
+function checkoutReturnUrls(base, source) {
+  const root = String(base || '').replace(/\/$/, '');
+  if (String(source || '').toLowerCase() === 'app') {
+    return {
+      successUrl: `${root}/open/subscribed?session_id={CHECKOUT_SESSION_ID}`,
+      cancelUrl: `${root}/open/subscribe-canceled`,
+    };
+  }
+  return {
+    successUrl: `${root}/subscribe.html?success=1&session_id={CHECKOUT_SESSION_ID}`,
+    cancelUrl: `${root}/subscribe.html?canceled=1`,
+  };
+}
+
 function buildCheckoutParams({
-  price, productId, userId, groupId, customerId, customerEmail, successUrl, cancelUrl, currency,
+  price, productId, userId, groupId, customerId, customerEmail, successUrl, cancelUrl, currency, source,
 }) {
   const meta = {
     kinrows_user_id: String(userId),
     kinrows_group_id: String(groupId),
     kinrows_product_id: productId,
   };
+  const fromApp = String(source || '').toLowerCase() === 'app';
+  if (fromApp) meta.kinrows_source = 'app';
   const params = {
     mode: 'subscription',
     line_items: [{ price, quantity: 1 }],
@@ -175,7 +193,11 @@ function buildCheckoutParams({
     adaptive_pricing: { enabled: true },
     custom_text: {
       submit: { message: 'Concierge unlocks for everyone in your household — not just you.' },
-      after_submit: { message: 'Open Kinrows on your iPhone. Your household is covered.' },
+      after_submit: {
+        message: fromApp
+          ? 'Returning you to Kinrows. Concierge unlocks as soon as the app opens.'
+          : 'Open Kinrows on your iPhone. Your household is covered.',
+      },
     },
     integration_identifier: `kinrowsweb${randomSuffix()}`,
     // Managed Payments + automatic_tax stay off until Stripe Tax is registered.
@@ -193,12 +215,12 @@ function buildCheckoutParams({
 }
 
 async function createCheckoutSession({
-  productId, userId, groupId, customerId, customerEmail, successUrl, cancelUrl, currency,
+  productId, userId, groupId, customerId, customerEmail, successUrl, cancelUrl, currency, source,
 }) {
   const price = await priceIdForProduct(productId);
   if (!price) throw Object.assign(new Error('Unknown or unpriced product'), { status: 400 });
   const params = buildCheckoutParams({
-    price, productId, userId, groupId, customerId, customerEmail, successUrl, cancelUrl, currency,
+    price, productId, userId, groupId, customerId, customerEmail, successUrl, cancelUrl, currency, source,
   });
   try {
     return await stripeRequest('POST', '/checkout/sessions', params);
@@ -345,6 +367,7 @@ module.exports = {
   environmentFromLivemode,
   allowTestStripe,
   createCheckoutSession,
+  checkoutReturnUrls,
   buildCheckoutParams,
   currencyOptionsForAmount,
   createPortalSession,
