@@ -111,6 +111,29 @@
         </article>
       </div>
 
+      <ul class="sub-trust">
+        <li>Secured by Stripe Checkout</li>
+        <li>Promo codes welcome</li>
+        <li>Cancel anytime, keep access until period end</li>
+        <li>One plan covers the whole household</li>
+      </ul>
+
+      <div class="sub-faq">
+        <h2>Before you subscribe</h2>
+        <details open>
+          <summary>What's the difference between Lite and Premium?</summary>
+          <p>Every feature is in both. Lite is 10 Concierge chats a day for the household; Premium is 40. The daily brief stays free either way.</p>
+        </details>
+        <details>
+          <summary>Can I switch or cancel later?</summary>
+          <p>Yes. Use Manage billing on this page — upgrade, downgrade, or cancel at period end. iPhone purchases stay in Apple Settings; web purchases stay here.</p>
+        </details>
+        <details>
+          <summary>Who is billed, and who gets Concierge?</summary>
+          <p>One person checks out. Everyone in the household gets the chats. You'll get a Kinrows confirmation plus Stripe's receipt.</p>
+        </details>
+      </div>
+
       <div id="sub-account" class="sub-account">
         <p class="sub-account-copy">Sign in with your Kinrows account to continue. Accounts are created in the iPhone app.</p>
         <form id="sub-login" class="sub-login" novalidate>
@@ -167,10 +190,10 @@
     banner.dataset.kind = kind || 'info';
     banner.textContent = text;
   };
-  if (qs.get('success')) showBanner('You're all set. Open Kinrows on your iPhone — Concierge is unlocked for the household.', 'success');
   if (qs.get('canceled')) showBanner('Checkout was canceled. Nothing was charged.', 'info');
 
   let period = 'yearly';
+  const money = (cents) => '$' + (cents / 100).toFixed(2);
   const setPeriod = (next) => {
     period = next;
     document.querySelectorAll('.period-btn').forEach((b) => b.classList.toggle('is-on', b.dataset.period === next));
@@ -180,6 +203,30 @@
     });
   };
   document.querySelectorAll('.period-btn').forEach((b) => b.addEventListener('click', () => setPeriod(b.dataset.period)));
+
+  fetch('/api/subscription/catalog', { credentials: 'include' }).then((r) => r.json()).then((cat) => {
+    if (!cat || !Array.isArray(cat.plans)) return;
+    const byId = Object.fromEntries(cat.plans.map((p) => [p.product_id, p]));
+    document.querySelectorAll('.sub-card').forEach((card) => {
+      const buy = card.querySelector('.sub-buy');
+      if (!buy) return;
+      const monthly = byId[buy.dataset.monthly];
+      const yearly = byId[buy.dataset.yearly];
+      const priceEl = card.querySelector('.sub-price');
+      if (monthly && yearly && priceEl) {
+        priceEl.dataset.monthly = money(monthly.amount_cents);
+        priceEl.dataset.yearly = money(yearly.amount_cents);
+        const chats = yearly.chats || monthly.chats;
+        const blurb = card.querySelector('.sub-blurb');
+        if (blurb && chats) blurb.textContent = `Up to ${chats} concierge chats a day.`;
+      }
+      if (cat.stripe === false) {
+        buy.disabled = true;
+        buy.textContent = 'Web billing unavailable';
+      }
+    });
+    setPeriod(period);
+  }).catch(() => {});
 
   const json = async (method, path, body) => {
     const res = await fetch(path, {
@@ -205,7 +252,11 @@
     loginForm.hidden = true;
     signedIn.hidden = false;
     const bits = [`Signed in as ${user.name || user.username}.`];
-    if (status && status.premium) bits.push(`This household is on ${status.tier === 'lite' ? 'Lite' : 'Premium'}.`);
+    if (status && status.premium) {
+      const label = status.tier === 'lite' ? 'Lite' : 'Premium';
+      const chats = status.chats_per_day || (status.tier === 'lite' ? 10 : 40);
+      bits.push(`This household is on ${label} (${chats} chats/day).`);
+    }
     signedIn.innerHTML = bits.join(' ');
     if (status && status.stripe_managed) {
       const btn = document.createElement('button');
@@ -232,6 +283,33 @@
   };
 
   refreshMe();
+
+  const confirmCheckout = async (sessionId) => {
+    showBanner('Confirming your subscription…', 'info');
+    for (let i = 0; i < 12; i++) {
+      await refreshMe();
+      let status = null;
+      if (sessionId && me) {
+        const r = await json('GET', '/api/subscription/checkout/session?session_id=' + encodeURIComponent(sessionId));
+        if (r.status === 200) status = r.data;
+      }
+      if (!status && me) {
+        const st = await json('GET', '/api/subscription/status');
+        status = st.data;
+      }
+      if (status && status.premium) {
+        const chats = status.chats_per_day || (status.tier === 'lite' ? 10 : 40);
+        const label = status.tier === 'lite' ? 'Lite' : 'Premium';
+        showBanner(`You're on ${label} — up to ${chats} chats a day for the household. Open Kinrows on your iPhone. A confirmation email is on its way.`, 'success');
+        return;
+      }
+      await new Promise((r) => setTimeout(r, 1500));
+    }
+    showBanner(me
+      ? 'Payment received. If Concierge is not unlocked yet, wait a moment and refresh — or open the iPhone app.'
+      : 'Sign in with your Kinrows account to confirm Concierge is unlocked.', 'info');
+  };
+  if (qs.get('success')) confirmCheckout(qs.get('session_id'));
 
   loginForm.addEventListener('submit', async (e) => {
     e.preventDefault();

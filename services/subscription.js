@@ -35,6 +35,20 @@ const CATALOG = [
   { product_id: 'com.kinrows.app.concierge.premium.yearly',  tier: 'premium', period: 'yearly',  amount_cents: 9999, chats: 40 },
 ];
 
+// Daily concierge-chat allowance per household. Lite and Premium share every
+// feature; they differ only by this cap (enforced in dashboard.js).
+const TIER_DAILY_CAP = { lite: 10, premium: 40 };
+
+function chatsForTier(tier) {
+  return TIER_DAILY_CAP[tier] || 0;
+}
+
+function chatsForProduct(productId) {
+  const row = CATALOG.find((p) => p.product_id === productId);
+  if (row) return row.chats;
+  return chatsForTier(tierForProduct(productId));
+}
+
 // Product used for comped (non-billed) entitlements — grants the premium tier.
 const COMP_PRODUCT_ID = 'com.kinrows.app.concierge.premium.monthly';
 // Back-compat export for any caller still referencing a single product id.
@@ -191,13 +205,15 @@ async function getStatus(db, userId) {
   const groupId = await db.getUserHouseholdId(userId);
   const sub = await db.getActiveSubscriptionForGroup(groupId);
   const stripeManaged = !!(sub && stripe.isStripeTxn(sub.original_transaction_id));
+  const tier = sub ? tierForProduct(sub.product_id) : null;
   return {
     premium: !!sub,
-    tier: sub ? tierForProduct(sub.product_id) : null,
+    tier,
     product_id: sub ? sub.product_id : null,
     expires_at: sub ? sub.expires_at : null,
     source: sub ? (stripeManaged ? 'stripe' : (String(sub.environment || '').startsWith('Comp') ? 'comp' : 'apple')) : null,
     stripe_managed: stripeManaged,
+    chats_per_day: sub ? chatsForProduct(sub.product_id) : 0,
   };
 }
 
@@ -247,7 +263,16 @@ async function applyStripeSubscription(db, stripeSub, extras = {}) {
     status,
   });
 
-  return { applied: true, status, groupId, userId, productId, originalTransactionId };
+  return {
+    applied: true,
+    status,
+    groupId,
+    userId,
+    productId,
+    originalTransactionId,
+    tier: tierForProduct(productId),
+    expiresAt,
+  };
 }
 
 async function applyStripeEvent(db, event) {
@@ -255,7 +280,7 @@ async function applyStripeEvent(db, event) {
   const obj = event?.data?.object;
   if (!type || !obj) return { applied: false, reason: 'malformed' };
 
-  if (type === 'checkout.session.completed') {
+  if (type === 'checkout.session.completed' || type === 'checkout.session.async_payment_succeeded') {
     if (obj.mode && obj.mode !== 'subscription') return { applied: false, reason: 'not_subscription' };
     const subRef = obj.subscription;
     if (!subRef) return { applied: false, reason: 'no_subscription' };
@@ -294,5 +319,5 @@ module.exports = {
   verifyAndStore, verifyAndApplyNotification, getStatus, isHouseholdPremium, getHouseholdTier,
   tierForProduct, grantCompForGroup, revokeCompForGroup, ensureCompPremium,
   applyStripeSubscription, applyStripeEvent, stripeCustomerIdForGroup,
-  PRODUCTS, PRODUCT_ID, BUNDLE_ID, CATALOG,
+  PRODUCTS, PRODUCT_ID, BUNDLE_ID, CATALOG, TIER_DAILY_CAP, chatsForTier, chatsForProduct,
 };

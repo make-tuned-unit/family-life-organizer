@@ -94,7 +94,11 @@ test('catalog is public and lists the four Concierge plans', async () => {
   const body = await res.json();
   assert.equal(body.stripe, false);
   assert.equal(body.plans.length, 4);
+  assert.equal(body.caps.lite, 10);
+  assert.equal(body.caps.premium, 40);
   assert.ok(body.plans.every(p => p.product_id.startsWith('com.kinrows.app.concierge.')));
+  assert.equal(body.plans.find(p => p.tier === 'lite').chats, 10);
+  assert.equal(body.plans.find(p => p.tier === 'premium').chats, 40);
 });
 
 test('checkout requires auth, a known plan, and a configured Stripe key', async () => {
@@ -162,6 +166,19 @@ test('signed webhook unlocks the household; unsigned is refused', async () => {
   assert.equal(after.body.tier, 'lite');
   assert.equal(after.body.source, 'stripe');
   assert.equal(after.body.stripe_managed, true);
+  assert.equal(after.body.chats_per_day, 10);
+
+  const again = await fetch(BASE + '/api/subscription/stripe', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Stripe-Signature': stripe.signWebhookPayload(raw, WHSEC),
+    },
+    body: raw,
+  });
+  assert.equal(again.status, 200);
+  const dup = await again.json();
+  assert.equal(dup.duplicate, true);
 });
 
 test('applyStripeSubscription refuses an unbound event and maps cancellation', async () => {
@@ -217,4 +234,71 @@ test('applyStripeSubscription refuses an unbound event and maps cancellation', a
 
   db.close();
   fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test('active household picks premium over a later-expiring lite row', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fl-stripe-tier-'));
+  process.env.FAMILY_DB_DIR = dir;
+  delete require.cache[require.resolve('../database.js')];
+  const FamilyDB = require('../database.js');
+  const db = new FamilyDB();
+  await db.initSchema();
+  await new Promise(r => setTimeout(r, 400));
+
+  const u = await new Promise((resolve, reject) => {
+    db.db.run("INSERT INTO users (username, name, password_hash) VALUES ('c_tier', 'T', 'x')", function (err) {
+      err ? reject(err) : resolve(this.lastID);
+    });
+  });
+  const g = await new Promise((resolve, reject) => {
+    db.db.run("INSERT INTO groups (name, group_type, invite_code, created_by) VALUES ('G', 'household', 'TIEROK1', ?)", [u], function (err) {
+      err ? reject(err) : resolve(this.lastID);
+    });
+  });
+  await new Promise((resolve, reject) => {
+    db.db.run('INSERT INTO group_members (group_id, user_id, role) VALUES (?, ?, ?)', [g, u, 'admin'], (err) => err ? reject(err) : resolve());
+  });
+
+  const far = new Date(Date.now() + 90 * 24 * 3600 * 1000).toISOString().slice(0, 19).replace('T', ' ');
+  const near = new Date(Date.now() + 10 * 24 * 3600 * 1000).toISOString().slice(0, 19).replace('T', ' ');
+  await db.upsertSubscription({
+    group_id: g, user_id: u,
+    product_id: 'com.kinrows.app.concierge.lite.yearly',
+    original_transaction_id: 'stripe:sub_lite_later',
+    expires_at: far, environment: 'StripeTest', status: 'active',
+  });
+  await db.upsertSubscription({
+    group_id: g, user_id: u,
+    product_id: 'com.kinrows.app.concierge.premium.monthly',
+    original_transaction_id: 'stripe:sub_prem_sooner',
+    expires_at: near, environment: 'StripeTest', status: 'active',
+  });
+
+  const status = await subscription.getStatus(db, u);
+  assert.equal(status.tier, 'premium');
+  assert.equal(status.chats_per_day, 40);
+
+  db.close();
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test('Checkout Session payload includes conversion fields and session_id success url', () => {
+  const params = stripe.buildCheckoutParams({
+    price: 'price_lite_m',
+    productId: 'com.kinrows.app.concierge.lite.monthly',
+    userId: 9,
+    groupId: 4,
+    customerEmail: 'ada@example.com',
+    successUrl: 'https://kinrows.com/subscribe.html?success=1&session_id={CHECKOUT_SESSION_ID}',
+    cancelUrl: 'https://kinrows.com/subscribe.html?canceled=1',
+  });
+  assert.equal(params.mode, 'subscription');
+  assert.equal(params.allow_promotion_codes, true);
+  assert.equal(params.locale, 'auto');
+  assert.equal(params.customer_email, 'ada@example.com');
+  assert.match(params.success_url, /session_id=\{CHECKOUT_SESSION_ID\}/);
+  assert.match(params.custom_text.submit.message, /household/);
+  assert.equal(params.line_items[0].price, 'price_lite_m');
+  assert.equal(params.subscription_data.metadata.kinrows_group_id, '4');
+  assert.equal(params.managed_payments.enabled, false);
 });

@@ -4580,12 +4580,26 @@ class FamilyDB {
   getActiveSubscriptionForGroup(groupId) {
     return new Promise((resolve, reject) => {
       if (!groupId) return resolve(null); // never treat the NULL-group bucket as entitled
-      this.db.get(
+      this.db.all(
         `SELECT * FROM subscriptions
-         WHERE group_id = ? AND status = 'active' AND expires_at > CURRENT_TIMESTAMP
-         ORDER BY expires_at DESC LIMIT 1`,
+         WHERE group_id = ? AND status = 'active' AND expires_at > CURRENT_TIMESTAMP`,
         [groupId],
-        (err, row) => err ? reject(err) : resolve(row || null)
+        (err, rows) => {
+          if (err) return reject(err);
+          if (!rows || !rows.length) return resolve(null);
+          const rank = (productId) => {
+            const id = String(productId || '');
+            if (id.includes('.premium.') || /\.concierge\.monthly$/.test(id)) return 2;
+            if (id.includes('.lite.')) return 1;
+            return 0;
+          };
+          rows.sort((a, b) => {
+            const d = rank(b.product_id) - rank(a.product_id);
+            if (d) return d;
+            return String(b.expires_at || '').localeCompare(String(a.expires_at || ''));
+          });
+          resolve(rows[0]);
+        }
       );
     });
   }
@@ -4623,6 +4637,21 @@ class FamilyDB {
          ORDER BY updated_at DESC LIMIT 1`,
         [groupId],
         (err, row) => err ? reject(err) : resolve(row || null)
+      );
+    });
+  }
+
+  // Returns true when this Stripe event id is new (INSERT), false on retry.
+  insertStripeEvent(id, type) {
+    return new Promise((resolve, reject) => {
+      if (!id) return resolve(true);
+      this.db.run(
+        'INSERT OR IGNORE INTO stripe_event_log (id, type) VALUES (?, ?)',
+        [String(id), String(type || '')],
+        function (err) {
+          if (err) reject(err);
+          else resolve(this.changes > 0);
+        }
       );
     });
   }

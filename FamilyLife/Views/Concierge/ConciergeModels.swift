@@ -32,12 +32,18 @@ struct SubscriptionStatus: Codable {
     let tier: String?        // "premium" | "lite" | nil
     let productId: String?
     let expiresAt: String?
+    let source: String?
+    let stripeManaged: Bool?
+    let chatsPerDay: Int?
 
     enum CodingKeys: String, CodingKey {
         case premium
         case tier
         case productId = "product_id"
         case expiresAt = "expires_at"
+        case source
+        case stripeManaged = "stripe_managed"
+        case chatsPerDay = "chats_per_day"
     }
 }
 

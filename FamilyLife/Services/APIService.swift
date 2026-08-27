@@ -576,7 +576,25 @@ final class APIService {
                         NotificationCenter.default.post(name: Self.unauthorizedNotification, object: nil)
                         throw APIError.unauthorized
                     }
-                    guard (200...299).contains(http.statusCode) else { throw APIError.serverError(http.statusCode) }
+                    guard (200...299).contains(http.statusCode) else {
+                        var raw = ""
+                        for try await line in bytes.lines {
+                            raw += line
+                            if raw.count > 2000 { break }
+                        }
+                        if let data = raw.data(using: .utf8),
+                           let body = try? JSONDecoder().decode(ServerErrorBody.self, from: data),
+                           let message = body.error, !message.isEmpty {
+                            throw APIError.serverMessage(http.statusCode, message)
+                        }
+                        if http.statusCode == 429 {
+                            throw APIError.serverMessage(429, "You've used today's concierge chats. Try again tomorrow.")
+                        }
+                        if http.statusCode == 402 {
+                            throw APIError.serverMessage(402, "Concierge chat needs a Lite or Premium plan.")
+                        }
+                        throw APIError.serverError(http.statusCode)
+                    }
 
                     var pendingEvent = ""
                     for try await line in bytes.lines {
