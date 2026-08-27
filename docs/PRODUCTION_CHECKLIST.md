@@ -43,7 +43,7 @@ Legend: ✅ done · ⏳ deferred (needs a human / external action) · 🔜 code-
 - ⏳ **Email 2FA is OFF in production** (Railway CLI 2026-08-26: `AUTH_2FA_ENABLED` is present but empty; `AUTH_2FA_ECHO_CODE` unset). Code path verified (`test/two-factor.test.js`). Enable only after every TestFlight user has the 2FA UI; `RESEND_API_KEY` is already set.
 - ⏳ **Encrypt DB backups** — nightly `VACUUM INTO` snapshots are unencrypted on the same persistent disk (14-day retention). Consider app-level encryption (age/libsodium, key in env) or an encrypted off-disk destination. P2; not a submit blocker.
 - ✅ **`npm audit` re-run 2026-08-26.** Highs/critical are build-only under `sqlite3 → node-gyp` (`tar`, `ip-address`, `brace-expansion`). Not imported by the server. Do not `npm audit fix --force` (breaking sqlite3 major). Recheck only if a **runtime** advisory appears.
-- ✅ Rotating device-token auth, household authorization guards, parameterized SQL, money coercion, LIKE-injection escaping, cross-household tests, pre-launch isolation tests (`test/prelaunch-security.test.js`). `npm test` = 159 cases.
+- ✅ Rotating device-token auth, household authorization guards, parameterized SQL, money coercion, LIKE-injection escaping, cross-household tests, pre-launch isolation tests (`test/prelaunch-security.test.js`). `npm test` = 160 cases.
 
 ## 4. Privacy posture (leader-grade)
 
@@ -70,7 +70,7 @@ Legend: ✅ done · ⏳ deferred (needs a human / external action) · 🔜 code-
 - ⏳ Notification upgrades from the audit: trip pushes to the *household* (not the traveler's own device), rivalry score-update spam throttle, in-context banner suppression (don't notify a DM while that chat is open), `INSendMessageIntent` communication notifications with sender avatars, quick-action categories (reply/approve/check-off). Deep-linking + threading + time-sensitive levels are ✅ done.
 - ✅ Concierge `complete_rivalry` now posts the feed celebration + win/loss pushes (parity with the UI button).
 - ✅ **Waitlist referral program** (2026-07-11) — each signup gets a shareable `?ref=` code; referring friends moves you up the queue (rank by referrals then signup id). Post-signup card shows position + copy/share link + referral count. `/api/waitlist` returns standing; `/api/waitlist/status` refreshes it. Covered by `test/waitlist-referral.test.js` (5 tests). The higher-leverage conversion lever from the UX research, now built.
-- ⏳ iOS unit/UI test target (backend `npm test` is 159 cases; the app has none).
+- ⏳ iOS unit/UI test target (backend `npm test` is 160 cases; the app has none).
 - ⏳ Widgets / Live Activities (coverage "who has the kids now", active-trip next stop) — flagged by UI/UX research.
 - ⏳ **Avatar cache invalidation** (from bug sweep, low) — `ProfileImageCache.loadFromHousehold` guards on `images[userId] == nil`, so another member's *new* profile photo isn't picked up until app relaunch/logout even though `fetchGroupMembers` returns fresh base64. Fix: overwrite the cached image when the inline base64 differs, or add an avatar version/hash to the me/group-members payload and refetch on change.
 - ⏳ **Coverage deep-link precision** (from bug sweep, low) — `handleDeepLink` maps `coverage`/`coverage_request`/`coverage_confirmed` to the combined list and ignores `ref_id`, so a helper tapping "X needs your help" lands on the list rather than the specific request. Recoverable, but thread `pendingRefId` into the coverage view to scroll to the referenced request.
