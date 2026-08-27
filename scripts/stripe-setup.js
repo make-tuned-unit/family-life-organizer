@@ -55,6 +55,7 @@ const WEBHOOK_URL = (process.env.APP_API_URL || 'https://family-life-organizer-p
   .replace(/\/$/, '') + '/api/subscription/stripe';
 const WEBHOOK_EVENTS = [
   'checkout.session.completed',
+  'checkout.session.async_payment_succeeded',
   'customer.subscription.updated',
   'customer.subscription.deleted',
   'invoice.paid',

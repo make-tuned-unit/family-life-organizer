@@ -41,6 +41,7 @@ const { runProactiveSweep } = require('./services/conciergeNudge');
 const { announceRivalryCompletion } = require('./services/rivalryAnnounce');
 const { createRateLimiter } = require('./services/rateLimit');
 const email = require('./services/email');
+const billingEmail = require('./services/billingEmail');
 const { runOnboardingEmailSweep } = require('./services/onboardingEmail');
 const appleSignIn = require('./services/appleSignIn');
 const crypto = require('crypto');
@@ -74,13 +75,13 @@ const conciergeLimiter = createRateLimiter({ windowMs: 60000, max: 30, keyFn: re
 // the cap bounds the household's combined spend, not each member's). Lite = 10/day,
 // Premium = 40/day. Null tier (no active sub) defaults to the lite cap, but
 // requirePremium blocks those callers anyway, so it's only a backstop.
-const TIER_DAILY_CAP = { premium: 40, lite: 10 };
+const TIER_DAILY_CAP = subscription.TIER_DAILY_CAP;
 
 // Resolve {household key, tier} for a request, memoized briefly to avoid a DB hit on
 // every call (household membership and tier change rarely). Falls back to a per-user
 // key if the household can't be resolved. Cache is invalidated on subscription verify.
 const _householdEntitlementCache = new Map(); // userId -> { gid, tier, ts }
-const HOUSEHOLD_KEY_TTL_MS = 5 * 60 * 1000;
+const HOUSEHOLD_KEY_TTL_MS = 60 * 1000;
 async function resolveHouseholdEntitlement(req) {
   const uid = req.session?.user?.id;
   if (!uid) return { key: clientIp(req), tier: null };
@@ -103,11 +104,31 @@ async function resolveHouseholdEntitlement(req) {
 async function householdRateKey(req) { return (await resolveHouseholdEntitlement(req)).key; }
 async function householdDailyMax(req) {
   const { tier } = await resolveHouseholdEntitlement(req); // second call this request hits the cache
-  return TIER_DAILY_CAP[tier] ?? TIER_DAILY_CAP.lite;
+  return subscription.chatsForTier(tier) || TIER_DAILY_CAP.lite;
 }
 
 // Tier-aware daily cap, bounded per HOUSEHOLD (was a flat 200/user = ~6000/mo, dangerous).
-const conciergeChatDailyLimiter = createRateLimiter({ windowMs: 24 * 60 * 60 * 1000, keyFn: householdRateKey, maxFn: householdDailyMax });
+const conciergeChatDailyLimiter = createRateLimiter({
+  windowMs: 24 * 60 * 60 * 1000,
+  keyFn: householdRateKey,
+  maxFn: householdDailyMax,
+  extraFn: async (req, { limit, retryAfter }) => {
+    const { tier } = await resolveHouseholdEntitlement(req);
+    const t = tier || 'lite';
+    const upgrade = t === 'lite';
+    return {
+      code: 'daily_cap',
+      tier: t,
+      limit,
+      chats: limit,
+      upgrade,
+      error: upgrade
+        ? `You've used today's ${limit} Lite chats. Upgrade to Premium for ${TIER_DAILY_CAP.premium} a day, or try again tomorrow.`
+        : `You've used today's ${limit} Premium chats. Try again tomorrow.`,
+      retry_after: retryAfter,
+    };
+  },
+});
 
 // Daily cap for the other Anthropic-calling endpoints (cook suggestions,
 // receipt vision scans). Generous for real use, but stops an authenticated
@@ -3876,6 +3897,7 @@ app.get('/api/subscription/catalog', (req, res) => {
   res.json({
     stripe: stripeBilling.isConfigured(),
     plans: subscription.CATALOG,
+    caps: subscription.TIER_DAILY_CAP,
   });
 });
 
@@ -3904,7 +3926,7 @@ app.post('/api/subscription/checkout', requireAuth, async (req, res) => {
       groupId,
       customerId,
       customerEmail: (!customerId && user?.email) ? user.email : null,
-      successUrl: `${base}/subscribe.html?success=1`,
+      successUrl: `${base}/subscribe.html?success=1&session_id={CHECKOUT_SESSION_ID}`,
       cancelUrl: `${base}/subscribe.html?canceled=1`,
     });
     res.json({ url: session.url, id: session.id });
@@ -3912,6 +3934,53 @@ app.post('/api/subscription/checkout', requireAuth, async (req, res) => {
     if (err.status === 400) return res.status(400).json({ error: err.message });
     console.error('[subscription/checkout]', err && err.stack ? err.stack : err);
     res.status(502).json({ error: 'Could not start checkout' });
+  } finally {
+    db.close();
+  }
+});
+
+// Confirm a Checkout return (success_url includes {CHECKOUT_SESSION_ID}).
+// The webhook is authoritative; this lets the page wait until entitlement lands
+// and covers a delayed webhook by applying the session's subscription once.
+app.get('/api/subscription/checkout/session', requireAuth, async (req, res) => {
+  const sessionId = String(req.query.session_id || '');
+  if (!/^cs_(test|live)_[A-Za-z0-9]+$/.test(sessionId)) {
+    return res.status(400).json({ error: 'Invalid session' });
+  }
+  if (!stripeBilling.isConfigured()) {
+    return res.status(503).json({ error: 'Web billing is not configured' });
+  }
+  const db = new FamilyDB();
+  try {
+    const userId = req.session.user.id;
+    const groupId = await db.getUserHouseholdId(userId);
+    if (!groupId) return res.status(400).json({ error: 'No household' });
+    const session = await stripeBilling.retrieveCheckoutSession(sessionId);
+    const boundGroup = Number(session.client_reference_id || session.metadata?.kinrows_group_id);
+    if (boundGroup !== Number(groupId)) {
+      return res.status(403).json({ error: 'Session does not belong to this household' });
+    }
+    const paid = session.status === 'complete' || session.payment_status === 'paid';
+    if (paid && session.subscription) {
+      const subRef = session.subscription;
+      const stripeSub = typeof subRef === 'object' ? subRef : await stripeBilling.retrieveSubscription(subRef);
+      await subscription.applyStripeSubscription(db, stripeSub, {
+        groupId,
+        userId: Number(session.metadata?.kinrows_user_id) || userId,
+        productId: session.metadata?.kinrows_product_id,
+      });
+      _householdEntitlementCache.clear();
+    }
+    const status = await subscription.getStatus(db, userId);
+    res.json({
+      session_status: session.status,
+      payment_status: session.payment_status,
+      ...status,
+    });
+  } catch (err) {
+    if (err.status === 404) return res.status(404).json({ error: 'Unknown session' });
+    console.error('[subscription/checkout/session]', err && err.stack ? err.stack : err);
+    res.status(502).json({ error: 'Could not confirm checkout' });
   } finally {
     db.close();
   }
@@ -3956,7 +4025,15 @@ app.post('/api/subscription/stripe', async (req, res) => {
   try {
     const result = await subscription.applyStripeEvent(db, event);
     _householdEntitlementCache.clear();
-    res.json(result);
+    const fresh = event.id ? await db.insertStripeEvent(event.id, event.type) : true;
+    if (result.applied && fresh) {
+      try {
+        await billingEmail.notifyStripeEvent(db, event, result);
+      } catch (err) {
+        console.error('[subscription/stripe] email', err && err.message ? err.message : err);
+      }
+    }
+    res.json(fresh ? result : { ...result, duplicate: true });
   } catch (err) {
     console.error('[subscription/stripe]', err && err.stack ? err.stack : err);
     res.status(400).json({ error: 'Event rejected' });
@@ -4090,7 +4167,7 @@ app.delete('/v1/mcp', (req, res) => res.status(204).end());
 app.use('/v1', (req, res) => res.status(404).json({ error: 'Not found' }));
 
 // Concierge - conversational chat with tool-calling (premium)
-app.post('/api/concierge/chat', requireAuth, conciergeLimiter, conciergeChatDailyLimiter, requirePremium, async (req, res) => {
+app.post('/api/concierge/chat', requireAuth, conciergeLimiter, requirePremium, conciergeChatDailyLimiter, async (req, res) => {
   const db = new FamilyDB();
   try {
     const message = (req.body.message || '').trim();
@@ -4116,7 +4193,7 @@ app.post('/api/concierge/chat', requireAuth, conciergeLimiter, conciergeChatDail
 // is streamed token-by-token. The non-streaming endpoint above stays as a
 // fallback. Gating runs before any SSE bytes; once streaming starts, errors are
 // delivered as `error` events.
-app.post('/api/concierge/chat/stream', requireAuth, conciergeLimiter, conciergeChatDailyLimiter, requirePremium, async (req, res) => {
+app.post('/api/concierge/chat/stream', requireAuth, conciergeLimiter, requirePremium, conciergeChatDailyLimiter, async (req, res) => {
   const db = new FamilyDB();
   try {
     const message = (req.body.message || '').trim();

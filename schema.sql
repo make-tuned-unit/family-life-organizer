@@ -839,6 +839,13 @@ CREATE TABLE IF NOT EXISTS subscriptions (
 
 CREATE INDEX IF NOT EXISTS idx_subscriptions_group ON subscriptions(group_id);
 
+-- Stripe webhook idempotency: one row per event.id so retries don't re-email.
+CREATE TABLE IF NOT EXISTS stripe_event_log (
+    id TEXT PRIMARY KEY,
+    type TEXT NOT NULL,
+    processed_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Concierge proactive nudges (throttle/dedup log)
 CREATE TABLE IF NOT EXISTS concierge_nudges (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

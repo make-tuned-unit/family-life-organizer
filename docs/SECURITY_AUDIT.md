@@ -50,7 +50,7 @@ App Store 5.1.x.
 | P2 | `website/privacy.html` / App Privacy label stale (Render, no analytics, no SIWA/Resend/BYO) | Policy last-updated 2026-08-26; label host is Railway; Stripe + SIWA listed |
 
 Tests: `test/prelaunch-security.test.js` + SIWA delete case in `test/apple-signin.test.js`.
-`npm test` — 150 passing.
+`npm test` — 156 passing.
 
 ### Wave 2 — remaining surfaces (verified, no extra P0/P1)
 
@@ -149,7 +149,8 @@ they cannot collide with StoreKit original transaction ids.
   `STOREKIT_ALLOW_SANDBOX`).
 - Secret and restricted keys live in env only (`.env` gitignored). Prefer a restricted
   key with Checkout / Billing / Webhooks / Customers once this is proven on test keys.
-- Tests: `test/stripe-billing.test.js`.
+- Tests: `test/stripe-billing.test.js`, `test/billing-email.test.js`, `test/rate-limit.test.js`.
+- **Funnel (2026-08-27):** hosted Checkout with promo codes, auto locale, household copy, `{CHECKOUT_SESSION_ID}` success URL that the subscribe page confirms before celebrating. Customer Portal is created with plan-switch + cancel-at-period-end. Kinrows emails (via Resend) fire on checkout completed, payment failed, and cancellation — Stripe still sends receipts. Lite = **10** chats/day, Premium = **40**, enforced after the premium gate so unpaid callers get 402 not a burned quota; 429 names the tier and suggests upgrade on Lite. Duplicate Stripe events are logged and not re-emailed.
 
 ## 2026-08-26 — Pre-signup onboarding + Sign in with Apple
 
