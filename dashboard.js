@@ -474,6 +474,22 @@ function serveWebsiteHtml(filePath) {
 }
 
 // Explicit routes for website HTML files (must come BEFORE express.static)
+// Apple Pay domain verification (Payment Request / Checkout wallets).
+// Served as octet-stream with no extra Content-Disposition — Apple is picky.
+app.get('/.well-known/apple-developer-merchantid-domain-association', (req, res) => {
+  const file = path.join(__dirname, 'website', '.well-known', 'apple-developer-merchantid-domain-association');
+  fs.readFile(file, (err, buf) => {
+    if (err) return res.status(404).end();
+    // Apple rejects extra Content-Disposition; send's default ignores
+    // `.well-known` as a hidden path, so read + send the bytes ourselves.
+    res.set({
+      'Content-Type': 'application/octet-stream',
+      'Cache-Control': 'public, max-age=86400',
+    });
+    res.send(buf);
+  });
+});
+
 app.get('/', serveWebsiteHtml('index.html'));
 app.get('/about', serveWebsiteHtml('index.html')); // /about also serves index.html for SPA routing
 app.get('/privacy', serveWebsiteHtml('privacy.html'));
@@ -4117,9 +4133,17 @@ app.get('/api/subscription/status', requireAuth, async (req, res) => {
 
 // Public Concierge plan list (no secrets). Used by the website subscribe page.
 app.get('/api/subscription/catalog', (req, res) => {
+  const currency = subscription.presentmentCurrencyFromHints({
+    country: req.get('cf-ipcountry') || req.get('x-vercel-ip-country')
+      || req.get('cloudfront-viewer-country') || req.get('x-country-code'),
+    acceptLanguage: req.get('accept-language'),
+    explicit: req.query.currency,
+  });
   res.json({
     stripe: stripeBilling.isConfigured(),
-    plans: subscription.CATALOG,
+    currency,
+    currencies: subscription.PRESENTMENT,
+    plans: subscription.catalogForCurrency(currency),
     caps: subscription.TIER_DAILY_CAP,
   });
 });
@@ -4151,6 +4175,7 @@ app.post('/api/subscription/checkout', requireAuth, async (req, res) => {
       customerEmail: (!customerId && user?.email) ? user.email : null,
       successUrl: `${base}/subscribe.html?success=1&session_id={CHECKOUT_SESSION_ID}`,
       cancelUrl: `${base}/subscribe.html?canceled=1`,
+      currency: req.body?.currency,
     });
     res.json({ url: session.url, id: session.id });
   } catch (err) {

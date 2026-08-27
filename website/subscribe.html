@@ -112,8 +112,8 @@
       </div>
 
       <ul class="sub-trust">
-        <li>Secured by Stripe Checkout</li>
-        <li>Promo codes welcome</li>
+        <li>Apple Pay, Google Pay, and cards via Stripe</li>
+        <li>Charged in your local currency</li>
         <li>Cancel anytime, keep access until period end</li>
         <li>One plan covers the whole household</li>
       </ul>
@@ -129,8 +129,12 @@
           <p>Yes. Use Manage billing on this page — upgrade, downgrade, or cancel at period end. iPhone purchases stay in Apple Settings; web purchases stay here.</p>
         </details>
         <details>
-          <summary>Who is billed, and who gets Concierge?</summary>
-          <p>One person checks out. Everyone in the household gets the chats. You'll get a Kinrows confirmation plus Stripe's receipt.</p>
+          <summary>What currency will I be charged in?</summary>
+          <p>Canadians pay in CAD, Americans in USD, and customers in the euro area in euros — the same sticker you see here. Everywhere else, Stripe Checkout charges in your local currency.</p>
+        </details>
+        <details>
+          <summary>Can I pay with Apple Pay?</summary>
+          <p>Yes. On iPhone, iPad, and Mac (Safari, with a card in Wallet) Stripe Checkout shows Apple Pay. Google Pay and cards are there too. You'll be charged in your local currency.</p>
         </details>
       </div>
 
@@ -150,7 +154,7 @@
       </div>
 
       <p class="sub-fine">
-        Billed securely by Stripe. Cancel anytime from this page (Manage billing) or your Stripe receipt.
+        Billed securely by Stripe in your local currency — Apple Pay, Google Pay, or card. Cancel anytime from this page (Manage billing) or your Stripe receipt.
         iPhone purchases stay on the App Store. See <a href="terms.html#subscriptions">Terms</a>
         and <a href="privacy.html">Privacy</a>.
       </p>
@@ -193,7 +197,17 @@
   if (qs.get('canceled')) showBanner('Checkout was canceled. Nothing was charged.', 'info');
 
   let period = 'yearly';
-  const money = (cents) => '$' + (cents / 100).toFixed(2);
+  let catalogCurrency = 'cad';
+  const money = (cents, code) => {
+    try {
+      return new Intl.NumberFormat(undefined, {
+        style: 'currency',
+        currency: String(code || catalogCurrency || 'CAD').toUpperCase(),
+      }).format(Number(cents) / 100);
+    } catch {
+      return '$' + (Number(cents) / 100).toFixed(2);
+    }
+  };
   const setPeriod = (next) => {
     period = next;
     document.querySelectorAll('.period-btn').forEach((b) => b.classList.toggle('is-on', b.dataset.period === next));
@@ -206,6 +220,7 @@
 
   fetch('/api/subscription/catalog', { credentials: 'include' }).then((r) => r.json()).then((cat) => {
     if (!cat || !Array.isArray(cat.plans)) return;
+    if (cat.currency) catalogCurrency = String(cat.currency).toLowerCase();
     const byId = Object.fromEntries(cat.plans.map((p) => [p.product_id, p]));
     document.querySelectorAll('.sub-card').forEach((card) => {
       const buy = card.querySelector('.sub-buy');
@@ -214,8 +229,9 @@
       const yearly = byId[buy.dataset.yearly];
       const priceEl = card.querySelector('.sub-price');
       if (monthly && yearly && priceEl) {
-        priceEl.dataset.monthly = money(monthly.amount_cents);
-        priceEl.dataset.yearly = money(yearly.amount_cents);
+        const cur = monthly.currency || catalogCurrency;
+        priceEl.dataset.monthly = money(monthly.amount_cents, cur);
+        priceEl.dataset.yearly = money(yearly.amount_cents, cur);
         const chats = yearly.chats || monthly.chats;
         const blurb = card.querySelector('.sub-blurb');
         if (blurb && chats) blurb.textContent = `Up to ${chats} concierge chats a day.`;
@@ -363,7 +379,10 @@
       }
       btn.disabled = true;
       try {
-        const r = await json('POST', '/api/subscription/checkout', { product_id: btn.dataset[period] });
+        const r = await json('POST', '/api/subscription/checkout', {
+          product_id: btn.dataset[period],
+          currency: catalogCurrency,
+        });
         if (r.data && r.data.url) { location.href = r.data.url; return; }
         showBanner((r.data && r.data.error) || 'Could not start checkout.', 'error');
       } finally {
