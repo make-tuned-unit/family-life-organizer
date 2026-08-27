@@ -140,8 +140,8 @@ struct ChatSheet: View {
                 case .dm(let partnerId, let name):
                     ConversationView(partnerId: partnerId, partnerName: name)
                         .id(partnerId)
-                case .group(let groupId, _):
-                    GroupChatView(groupId: groupId)
+                case .group(let groupId, let name):
+                    GroupChatView(groupId: groupId, groupName: name)
                         .id(groupId)
                 case nil:
                     Spacer()
@@ -223,8 +223,12 @@ struct ChatSheet: View {
 
 struct GroupChatView: View {
     let groupId: Int
+    var groupName: String = "Group"
     @Environment(APIService.self) private var api
     @Environment(AuthService.self) private var auth
+    @Environment(ConciergeLaunch.self) private var launch
+    @Environment(\.dismiss) private var dismiss
+    @AppStorage("aiConciergeEnabled") private var aiConciergeEnabled = false
 
     @State private var posts: [APIService.FeedPostResponse] = []
     @State private var newMessage = ""
@@ -235,6 +239,7 @@ struct GroupChatView: View {
     @State private var openDecisions: [DecisionResponse] = []
     @State private var fullscreenImage: UIImage?
     @State private var sendError: String?
+    @State private var reportError: String?
 
     private var canSend: Bool {
         !newMessage.trimmingCharacters(in: .whitespaces).isEmpty || pendingImageData != nil
@@ -274,9 +279,15 @@ struct GroupChatView: View {
                 ScrollView {
                     LazyVStack(spacing: 8) {
                         ForEach(posts.reversed()) { post in
-                            GroupMessageBubble(post: post, isOwn: post.author_name == auth.currentUser?.name) { image in
-                                fullscreenImage = image
-                            }
+                            GroupMessageBubble(
+                                post: post,
+                                isOwn: post.author_name == auth.currentUser?.name,
+                                onImageTap: { image in fullscreenImage = image },
+                                onAskConcierge: captureHandler(for: post),
+                                onReport: post.author_name == auth.currentUser?.name ? nil : {
+                                    Task { await reportPost(post) }
+                                }
+                            )
                             .id(post.id)
                         }
                     }
@@ -359,6 +370,7 @@ struct GroupChatView: View {
             .background(.ultraThinMaterial)
         }
         .inlineError(sendError) { sendError = nil }
+        .inlineError(reportError) { reportError = nil }
         .sheet(isPresented: $showingNewDecision) {
             NewDecisionView(preselectedGroupId: groupId) {
                 await loadDecisions()
@@ -386,10 +398,49 @@ struct GroupChatView: View {
         }
     }
 
+    private func captureHandler(for post: APIService.FeedPostResponse) -> (() -> Void)? {
+        guard aiConciergeEnabled else { return nil }
+        let text = (post.body ?? post.title ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty, text != "Shared a photo" else { return nil }
+        return { askConcierge(about: post) }
+    }
+
+    private func askConcierge(about post: APIService.FeedPostResponse) {
+        let text = (post.body ?? post.title ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        let surrounding = ChatConciergeHandoff.surrounding(
+            around: post.id,
+            newestFirst: posts.map { ($0.id, $0.author_name ?? "Someone", ($0.body ?? $0.title ?? "")) }
+        )
+        let prompt = ChatConciergeHandoff.prompt(
+            tappedText: text,
+            senderName: post.author_name ?? "Someone",
+            threadName: groupName,
+            timestamp: post.created_at,
+            surrounding: surrounding
+        )
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        dismiss()
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(200))
+            launch.ask(prompt, autoSend: true)
+        }
+    }
+
+    private func reportPost(_ post: APIService.FeedPostResponse) async {
+        do {
+            try await api.reportContent(type: "feed", refId: post.id, reason: "objectionable")
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+        } catch {
+            guard !error.isCancellation else { return }
+            reportError = "Couldn't send that report. Try again."
+        }
+    }
+
     private func loadPosts() async {
         // Never wipe the visible thread because one background poll failed.
         if let fetched = try? await api.fetchFeed(groupId: groupId) {
-            posts = fetched
+            // The daily brief lives on the Home feed, not in the family chat thread.
+            posts = fetched.filter { $0.post_type != "brief" }
         }
     }
 
@@ -549,6 +600,8 @@ struct GroupMessageBubble: View {
     let post: APIService.FeedPostResponse
     let isOwn: Bool
     var onImageTap: ((UIImage) -> Void)?
+    var onAskConcierge: (() -> Void)?
+    var onReport: (() -> Void)?
 
     var body: some View {
         HStack {
@@ -579,15 +632,30 @@ struct GroupMessageBubble: View {
                 }
 
                 if let body = post.body, !body.isEmpty, body != "Shared a photo" {
-                    Text(body)
-                        .font(.flSubheadline)
-                        .foregroundStyle(isOwn ? .white : WarmPalette.ink1)
+                    if let onAskConcierge {
+                        Button(action: onAskConcierge) {
+                            Text(body)
+                                .font(.flSubheadline)
+                                .foregroundStyle(isOwn ? .white : WarmPalette.ink1)
+                        }
+                        .buttonStyle(.plain)
+                    } else {
+                        Text(body)
+                            .font(.flSubheadline)
+                            .foregroundStyle(isOwn ? .white : WarmPalette.ink1)
+                    }
                 }
 
                 if let date = post.created_at {
-                    Text(relativeTime(date))
-                        .font(.flCaption2)
-                        .foregroundStyle(isOwn ? .white.opacity(0.7) : WarmPalette.ink4)
+                    HStack(spacing: 4) {
+                        if onAskConcierge != nil {
+                            Image(systemName: "sparkles")
+                                .font(.system(size: 9, weight: .semibold))
+                        }
+                        Text(relativeTime(date))
+                    }
+                    .font(.flCaption2)
+                    .foregroundStyle(isOwn ? .white.opacity(0.7) : WarmPalette.ink4)
                 }
             }
             .padding(.horizontal, 12)
@@ -596,8 +664,10 @@ struct GroupMessageBubble: View {
                 isOwn ? AnyShapeStyle(TabAccent.home.color) : AnyShapeStyle(WarmPalette.cardSurface),
                 in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.tile)
             )
+            .messageActionsMenu(onAsk: onAskConcierge, onReport: onReport)
             if !isOwn { Spacer(minLength: 60) }
         }
+        .accessibilityHint(onAskConcierge == nil ? "" : "Tap to ask your concierge to capture plans from this message")
     }
 
     private func relativeTime(_ dateStr: String) -> String {
@@ -612,4 +682,5 @@ struct GroupMessageBubble: View {
         .environment(AuthService())
         .environment(HouseholdService())
         .environment(ProfileImageCache())
+        .environment(ConciergeLaunch())
 }

@@ -17,6 +17,9 @@ struct HouseholdView: View {
     @State private var householdMembers: [APIService.GroupMemberResponse] = []
     @State private var error: String?
     @State private var copiedCode = false
+    @State private var inviteEmails = ""
+    @State private var sendingInvite = false
+    @State private var inviteSent = false
 
     /// Members of the household group only (not wider family groups)
     private var otherHouseholdMembers: [APIService.GroupMemberResponse] {
@@ -110,6 +113,32 @@ struct HouseholdView: View {
         pendingName = ""
     }
 
+    private func sendInviteEmails() async {
+        let parts = inviteEmails
+            .split { $0 == "," || $0 == ";" || $0.isWhitespace }
+            .map(String.init)
+            .filter { $0.contains("@") }
+        guard !parts.isEmpty else {
+            error = "Enter an email address"
+            return
+        }
+        sendingInvite = true
+        error = nil
+        do {
+            _ = try await api.inviteToHousehold(emails: parts)
+            inviteSent = true
+            inviteEmails = ""
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            try? await Task.sleep(for: .seconds(2))
+            inviteSent = false
+        } catch APIError.serverMessage(_, let message) {
+            error = message
+        } catch {
+            self.error = error.localizedDescription
+        }
+        sendingInvite = false
+    }
+
     // MARK: - Name
 
     @ViewBuilder
@@ -181,10 +210,35 @@ struct HouseholdView: View {
                     Label("Send invite to partner", systemImage: "message.fill")
                         .foregroundStyle(TabAccent.home.color)
                 }
+
+                TextField("Partner's email", text: $inviteEmails)
+                    .font(.flBody)
+                    .textContentType(.emailAddress)
+                    .keyboardType(.emailAddress)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .submitLabel(.send)
+                    .onSubmit { Task { await sendInviteEmails() } }
+
+                Button {
+                    Task { await sendInviteEmails() }
+                } label: {
+                    if sendingInvite {
+                        ProgressView()
+                    } else if inviteSent {
+                        Label("Invite sent", systemImage: "checkmark.circle.fill")
+                            .foregroundStyle(WarmPalette.good)
+                    } else {
+                        Label("Email an invite", systemImage: "envelope.fill")
+                            .foregroundStyle(TabAccent.home.color)
+                    }
+                }
+                .disabled(inviteEmails.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || sendingInvite)
+                .accessibilityHint("Sends the household invite code by email")
             } header: {
                 Text("Invite")
             } footer: {
-                Text("Tap the code to copy it, or send it directly via text.")
+                Text("Type an email and we'll send them the code. You can also copy it or share via text. Comma-separate to invite more than one person.")
             }
         }
 

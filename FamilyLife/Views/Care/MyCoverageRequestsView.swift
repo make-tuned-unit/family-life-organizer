@@ -85,6 +85,7 @@ struct MyCoverageRequestsView: View {
         }
         .refreshable { await loadAll() }
         .task { await loadAll() }
+        .onConciergeDataChange { await loadAll() }
         .sheet(item: $selectedDetail) { detail in
             NavigationStack {
                 CoverageDetailSheet(detail: detail) {

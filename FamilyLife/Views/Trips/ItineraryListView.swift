@@ -76,6 +76,7 @@ struct ItineraryListView: View {
         }
         .refreshable { await loadAll() }
         .task { await loadAll() }
+        .onConciergeDataChange { await loadAll() }
         .inlineError(error) { error = nil }
     }
 

@@ -92,6 +92,11 @@ struct ExpensesView: View {
         .onChange(of: viewModel.displayedMonth) {
             Task { await viewModel.loadAll(api: api) }
         }
+        .onConciergeDataChange {
+            await viewModel.loadAll(api: api)
+            await projectStore.loadAll(api: api)
+            await recurringStore.load(api: api)
+        }
     }
 
     // MARK: - Projects Preview

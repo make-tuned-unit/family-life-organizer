@@ -173,7 +173,7 @@ struct RivalryDetailView: View {
 
                 if currentRivalry.status == RivalryStatus.active.rawValue {
                     // HealthKit auto-sync for steps/stairs challenges
-                    if currentRivalry.challengeType.isHealthKitSynced && healthSteps == nil {
+                    if currentRivalry.challengeType.isHealthKitSynced && healthSteps == nil && healthKit.hasUserGrantedRead {
                         HStack {
                             ProgressView()
                                 .controlSize(.small)
@@ -184,6 +184,22 @@ struct RivalryDetailView: View {
                         .frame(maxWidth: .infinity)
                         .padding(DesignTokens.Spacing.cardPadding)
                         .flCard(tint: AccentTheme.ocean.color)
+                        .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
+                    }
+
+                    if currentRivalry.challengeType.isHealthKitSynced && !healthKit.hasUserGrantedRead {
+                        Button {
+                            Task {
+                                await fetchHealthData()
+                                if healthKit.hasUserGrantedRead {
+                                    await syncDailyTotalsFromHealth()
+                                }
+                            }
+                        } label: {
+                            Label("Connect Apple Health", systemImage: "heart.fill")
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.flPrimary(tint: AccentTheme.ocean.color))
                         .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
                     }
 
@@ -293,10 +309,9 @@ struct RivalryDetailView: View {
         .inlineError(error) { error = nil }
         .task {
             await loadEntries()
-            if currentRivalry.challengeType.isHealthKitSynced && !hasAutoSynced {
+            if currentRivalry.challengeType.isHealthKitSynced && !hasAutoSynced && healthKit.hasUserGrantedRead {
                 hasAutoSynced = true
                 await fetchHealthData()
-                // Auto-sync per-day totals from HealthKit without requiring manual tap
                 await syncDailyTotalsFromHealth()
             }
             // Auto-complete expired rivalries

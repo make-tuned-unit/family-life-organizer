@@ -442,6 +442,7 @@ CREATE TABLE IF NOT EXISTS users (
     name TEXT NOT NULL,
     email TEXT,
     apple_user_id TEXT UNIQUE,             -- Sign in with Apple `sub`; null for password accounts
+    password_login INTEGER DEFAULT 1,      -- 0 = Apple-only (no password the user knows)
     phone TEXT,
     avatar TEXT,
     profile_image TEXT,
@@ -456,6 +457,7 @@ CREATE TABLE IF NOT EXISTS users (
     two_factor_enabled INTEGER DEFAULT 0,
     email_opt_out INTEGER DEFAULT 0,     -- 1 = no product/onboarding email (2FA codes still send)
     unsubscribe_token TEXT,              -- random token for one-click unsubscribe links
+    concierge_enabled INTEGER DEFAULT 0, -- 1 = user opted into the AI Concierge (daily brief on the feed)
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -545,7 +547,7 @@ CREATE TABLE IF NOT EXISTS feed_posts (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     group_id INTEGER NOT NULL,
     author_id INTEGER NOT NULL,
-    post_type TEXT NOT NULL DEFAULT 'text', -- text | photo | link | event | decision | rivalry | poll
+    post_type TEXT NOT NULL DEFAULT 'text', -- text | photo | link | event | decision | rivalry | poll | brief
     title TEXT,
     body TEXT,
     link_url TEXT,
@@ -725,6 +727,18 @@ CREATE TABLE IF NOT EXISTS direct_messages (
 );
 
 CREATE INDEX IF NOT EXISTS idx_dm_conversation ON direct_messages(sender_id, recipient_id, id DESC);
+
+-- In-app reports of household UGC (Guideline 1.2). Rows are operator-facing;
+-- the reporter must already be able to see the target.
+CREATE TABLE IF NOT EXISTS content_reports (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    reporter_id INTEGER NOT NULL,
+    content_type TEXT NOT NULL,            -- message | feed
+    ref_id INTEGER NOT NULL,
+    reason TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (reporter_id) REFERENCES users(id)
+);
 
 -- Seed budget categories (last so any failure doesn't block table creation)
 INSERT OR IGNORE INTO budget_categories (name, monthly_limit, color)

@@ -71,6 +71,7 @@ struct RoutinesView: View {
         }
         .task { await load() }
         .refreshable { await load() }
+        .onConciergeDataChange { await load() }
     }
 
     private func load() async {

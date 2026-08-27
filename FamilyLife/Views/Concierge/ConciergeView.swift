@@ -12,8 +12,11 @@ struct ConciergeView: View {
     @State private var viewModel = ConciergeViewModel()
     @State private var showingChat = false
     @State private var showingPaywall = false
+    @State private var showingAIDisclosure = false
     @State private var chatPrompt: String?
     @State private var chatAutoListen = false
+    @State private var chatAutoSend = false
+    @State private var pendingLaunch: ConciergeLaunch.Request?
     @AppStorage("cloudAIEnabled") private var cloudAIEnabled = true
 
     var body: some View {
@@ -46,16 +49,32 @@ struct ConciergeView: View {
             }
         }
         .sheet(isPresented: $showingChat) {
-            ConciergeChatView(initialPrompt: chatPrompt, autoListen: chatAutoListen)
+            ConciergeChatView(initialPrompt: chatPrompt, autoListen: chatAutoListen, autoSend: chatAutoSend)
         }
         .sheet(isPresented: $showingPaywall) {
             PaywallView()
+        }
+        .sheet(isPresented: $showingAIDisclosure) {
+            AIDisclosureView(
+                title: "Chat with your concierge",
+                detail: "The concierge sends the household context it needs — calendar, lists, messages you ask about — to **Claude by Anthropic** so it can answer and take actions for you.",
+                sentDescription: "Relevant household information and your question are sent to Anthropic's API",
+                onAccept: {
+                    AIConsentManager.grantConcierge()
+                    showingAIDisclosure = false
+                    openChat()
+                },
+                onDecline: {
+                    showingAIDisclosure = false
+                }
+            )
         }
         .task {
             if case .idle = viewModel.state { await viewModel.load(api: api) }
             handleLaunchRequest()
         }
         .onChange(of: launch.requestID) { handleLaunchRequest() }
+        .onConciergeDataChange { await viewModel.load(api: api) }
     }
 
     // Open the chat (premium) or paywall in response to an Ask-the-butler request.
@@ -63,15 +82,34 @@ struct ConciergeView: View {
         guard let request = launch.consume() else { return }
         guard cloudAIEnabled else { return }   // chat sends data; respect the privacy toggle
         guard subscription.isPremium else { showingPaywall = true; return }
-        if showingChat {
-            // A chat is already open — dismiss and re-present seeded with the new request.
-            showingChat = false
-            chatPrompt = request.prompt
-            chatAutoListen = request.autoListen
-            Task { @MainActor in showingChat = true }
-        } else {
-            chatPrompt = request.prompt
-            chatAutoListen = request.autoListen
+        if !AIConsentManager.hasConciergeConsent {
+            pendingLaunch = request
+            showingAIDisclosure = true
+            return
+        }
+        presentChat(request)
+    }
+
+    private func openChat() {
+        if let request = pendingLaunch {
+            pendingLaunch = nil
+            presentChat(request)
+            return
+        }
+        chatPrompt = nil
+        chatAutoListen = false
+        chatAutoSend = false
+        showingChat = true
+    }
+
+    private func presentChat(_ request: ConciergeLaunch.Request) {
+        chatPrompt = request.prompt
+        chatAutoListen = request.autoListen
+        chatAutoSend = request.autoSend
+        let delay: Duration = showingChat || request.autoSend ? .milliseconds(400) : .milliseconds(50)
+        showingChat = false
+        Task { @MainActor in
+            try? await Task.sleep(for: delay)
             showingChat = true
         }
     }
@@ -79,7 +117,12 @@ struct ConciergeView: View {
     private var askBar: some View {
         Button {
             if !cloudAIEnabled { return }
-            if subscription.isPremium { chatPrompt = nil; showingChat = true } else { showingPaywall = true }
+            if !subscription.isPremium { showingPaywall = true; return }
+            if !AIConsentManager.hasConciergeConsent { showingAIDisclosure = true; return }
+            chatPrompt = nil
+            chatAutoListen = false
+            chatAutoSend = false
+            showingChat = true
         } label: {
             HStack(spacing: 10) {
                 Image(systemName: "sparkles")

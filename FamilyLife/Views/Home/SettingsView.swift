@@ -13,8 +13,6 @@ struct SettingsView: View {
 
     @State private var showingLogoutConfirm = false
     @State private var showingDeleteAccount = false
-    @State private var deletePassword = ""
-    @State private var isDeletingAccount = false
     @State private var deleteError: String?
     @State private var notificationsEnabled = false
     @State private var showingHousehold = false
@@ -30,6 +28,7 @@ struct SettingsView: View {
     @AppStorage("sharePresenceEnabled") private var sharePresenceEnabled = false
     @AppStorage(AppleCalendarSyncMode.storageKey) private var calendarSyncMode: AppleCalendarSyncMode = .off
     @State private var showingWelcomeTour = false
+    @State private var security: APIService.SecurityStatus?
 
     /// Never-asked and refused are different situations with different fixes,
     /// so they must not both read "Disabled".
@@ -250,9 +249,11 @@ struct SettingsView: View {
             }
 
             Section("Account") {
-                NavigationLink { ChangePasswordView() } label: {
-                    Label("Change Password", systemImage: "lock.fill")
-                        .foregroundStyle(TabAccent.home.color)
+                if security?.hasPassword != false {
+                    NavigationLink { ChangePasswordView() } label: {
+                        Label("Change Password", systemImage: "lock.fill")
+                            .foregroundStyle(TabAccent.home.color)
+                    }
                 }
                 NavigationLink { SecurityView() } label: {
                     Label("Security & 2FA", systemImage: "lock.shield.fill")
@@ -356,11 +357,11 @@ struct SettingsView: View {
                     Text(AppConfig.appVersion)
                         .foregroundStyle(WarmPalette.ink3)
                 }
-                Link(destination: URL(string: "https://kinrows.com/privacy.html")!) {
+                Link(destination: AppConfig.privacyPolicyURL) {
                     Label("Privacy Policy", systemImage: "hand.raised")
                         .foregroundStyle(TabAccent.home.color)
                 }
-                Link(destination: URL(string: "https://kinrows.com/terms.html")!) {
+                Link(destination: AppConfig.termsOfUseURL) {
                     Label("Terms of Use", systemImage: "doc.text")
                         .foregroundStyle(TabAccent.home.color)
                 }
@@ -424,16 +425,18 @@ struct SettingsView: View {
                 dismiss()
             }
         }
-        .alert("Delete Account", isPresented: $showingDeleteAccount) {
-            SecureField("Your password", text: $deletePassword)
-            Button("Cancel", role: .cancel) { deletePassword = "" }
-            Button("Delete Forever", role: .destructive) {
-                let password = deletePassword
-                deletePassword = ""
-                Task { await deleteAccount(password: password) }
-            }
-        } message: {
-            Text("This permanently deletes your account and your personal data (messages, concierge history, contacts). Shared household data stays with the family. This can't be undone. Enter your password to confirm.")
+        .sheet(isPresented: $showingDeleteAccount) {
+            DeleteAccountSheet(
+                hasPassword: security?.hasPassword ?? true,
+                appleLinked: security?.appleLinked ?? false,
+                onDeleted: {
+                    auth.logout()
+                    dismiss()
+                },
+                onError: { deleteError = $0 }
+            )
+            .environment(api)
+            .environment(auth)
         }
         .inlineError(deleteError) { deleteError = nil }
         .alert("Edit Name", isPresented: $showingNameEdit) {
@@ -461,30 +464,105 @@ struct SettingsView: View {
         .task {
             let settings = await UNUserNotificationCenter.current().notificationSettings()
             notificationsEnabled = settings.authorizationStatus == .authorized
+            security = try? await api.fetchSecurityStatus()
         }
     }
+}
 
-    private func deleteAccount(password: String) async {
-        guard !password.isEmpty else {
-            deleteError = "Enter your password to confirm."
-            return
+// MARK: - Delete account
+
+private struct DeleteAccountSheet: View {
+    let hasPassword: Bool
+    let appleLinked: Bool
+    let onDeleted: () -> Void
+    let onError: (String) -> Void
+
+    @Environment(APIService.self) private var api
+    @Environment(\.dismiss) private var dismiss
+    @State private var password = ""
+    @State private var appleError: String?
+    @State private var isWorking = false
+
+    var body: some View {
+        NavigationStack {
+            VStack(alignment: .leading, spacing: 20) {
+                Text("This permanently deletes your account and your personal data (messages, concierge history, contacts). Shared household data stays with the family. This can't be undone.")
+                    .font(.flSubheadline)
+                    .foregroundStyle(WarmPalette.ink2)
+
+                if hasPassword {
+                    SecureField("Your password", text: $password)
+                        .textContentType(.password)
+                        .padding(16)
+                        .flGlassSurface(tint: .white.opacity(0.03), strokeOpacity: 0.08, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.small))
+                    Button {
+                        Task { await delete(password: password) }
+                    } label: {
+                        if isWorking { ProgressView() } else { Text("Delete Forever") }
+                    }
+                    .buttonStyle(.flCTA(fill: WarmPalette.bad))
+                    .disabled(isWorking || password.isEmpty)
+                }
+
+                if appleLinked {
+                    if hasPassword {
+                        Text("or confirm with Apple")
+                            .font(.flCaption)
+                            .foregroundStyle(WarmPalette.ink3)
+                            .frame(maxWidth: .infinity)
+                    }
+                    AppleSignInButton(label: .signIn, onIdentity: { token, nonce in
+                        Task { await delete(identityToken: token, nonce: nonce) }
+                    }, onError: { appleError = $0 })
+                    .disabled(isWorking)
+                }
+
+                if let appleError {
+                    Text(appleError)
+                        .font(.flCaption)
+                        .foregroundStyle(WarmPalette.bad)
+                }
+
+                Spacer()
+            }
+            .padding(24)
+            .background { AmbientBackground(style: .settings) }
+            .navigationTitle("Delete Account")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                        .foregroundStyle(WarmPalette.ink2)
+                }
+            }
         }
-        isDeletingAccount = true
+        .presentationDetents([.medium, .large])
+    }
+
+    private func delete(password: String? = nil, identityToken: String? = nil, nonce: String? = nil) async {
+        isWorking = true
+        appleError = nil
         do {
-            try await api.deleteAccount(currentPassword: password)
-            // Server erased everything + destroyed the session; clear local state.
-            auth.logout()
+            try await api.deleteAccount(currentPassword: password, identityToken: identityToken, nonce: nonce)
             dismiss()
+            onDeleted()
         } catch {
-            guard !error.isCancellation else { return }
-            isDeletingAccount = false
-            deleteError = error.localizedDescription
+            isWorking = false
+            let message = error.localizedDescription
+            onError(message)
+            appleError = message
             UINotificationFeedbackGenerator().notificationOccurred(.error)
         }
     }
 }
 
 #Preview {
+    DeleteAccountSheet(hasPassword: true, appleLinked: true, onDeleted: {}, onError: { _ in })
+        .environment(APIService())
+        .environment(AuthService())
+}
+
+#Preview("Settings") {
     NavigationStack {
         SettingsView()
     }

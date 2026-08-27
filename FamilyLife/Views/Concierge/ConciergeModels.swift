@@ -41,6 +41,14 @@ struct SubscriptionStatus: Codable {
     }
 }
 
+/// How the user composed a concierge turn. Voice and chat-extract get a
+/// more action-oriented system prompt on the server.
+enum ConciergeMessageSource: String {
+    case text
+    case voice
+    case chatExtract = "chat_extract"
+}
+
 /// Response from `POST /api/concierge/chat`.
 struct ConciergeChatResponse: Codable {
     let conversationId: Int

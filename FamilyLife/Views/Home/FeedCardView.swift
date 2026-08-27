@@ -11,6 +11,7 @@ struct FeedCard: View {
     var onMilestoneTap: ((Int) -> Void)?
     var onDecisionTap: ((Int) -> Void)?
     var onKeyDateTap: ((Int?) -> Void)?
+    var onConciergeTap: (() -> Void)?
 
     @Environment(APIService.self) private var api
     @Environment(AuthService.self) private var auth
@@ -112,6 +113,15 @@ struct FeedCard: View {
             Button { showingSendTo = true } label: {
                 Label("Send to...", systemImage: "arrowshape.turn.up.right")
             }
+            if prepared.isPost, item.ref_id > 0 {
+                Button(role: .destructive) {
+                    Task {
+                        try? await api.reportContent(type: "feed", refId: item.ref_id, reason: "objectionable")
+                    }
+                } label: {
+                    Label("Report", systemImage: "exclamationmark.bubble")
+                }
+            }
         }
         .sheet(isPresented: $showingSendTo) {
             SendToSheet(quotedItem: QuotedItem(
@@ -128,6 +138,7 @@ struct FeedCard: View {
     // The post represents the group/household itself (a bare "Family" event,
     // a group decision) rather than an individual — show the group's image.
     private var groupAuthored: Bool {
+        if item.status == "brief" { return true }
         guard let gid = item.group_id, gid > 0 else { return false }
         guard let author = item.author, !author.isEmpty else { return true }
         if author.localizedCaseInsensitiveCompare("Family") == .orderedSame { return true }
@@ -542,6 +553,7 @@ struct FeedCard: View {
             case "milestone": onMilestoneTap?(item.linkTargetId)
             case "event": onEventTap?(item.linkTargetId)
             case "rivalry": onRivalryTap?(item.linkTargetId)
+            case "brief": onConciergeTap?()
             default: toggleExpanded()
             }
         case "comment", "reaction":
@@ -564,7 +576,7 @@ struct FeedCard: View {
     private var navigates: Bool {
         switch item.feed_type {
         case "event", "rivalry", "coverage", "decision", "key_date": true
-        case "post": ["routine", "milestone", "event", "rivalry"].contains(item.status ?? "")
+        case "post": ["routine", "milestone", "event", "rivalry", "brief"].contains(item.status ?? "")
         default: false
         }
     }
@@ -668,6 +680,7 @@ struct FeedCard: View {
             case "link": "link"
             case "milestone": "sparkles"
             case "routine": "repeat"
+            case "brief": "sparkles"
             default: "text.bubble"
             }
         default: "bell"
@@ -708,6 +721,7 @@ struct FeedCard: View {
             case "milestone": "Milestone"
             case "routine": "Routine"
             case "note": "Note"
+            case "brief": "Brief"
             default: "Post"
             }
         default: "Update"

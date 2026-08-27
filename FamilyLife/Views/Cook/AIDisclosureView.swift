@@ -109,6 +109,16 @@ enum AIConsentManager {
     static func grantReceipt() {
         UserDefaults.standard.set(true, forKey: receiptKey)
     }
+
+    private static let conciergeKey = "ai_concierge_chat_consent_granted"
+
+    static var hasConciergeConsent: Bool {
+        UserDefaults.standard.bool(forKey: conciergeKey)
+    }
+
+    static func grantConcierge() {
+        UserDefaults.standard.set(true, forKey: conciergeKey)
+    }
 }
 
 #Preview {

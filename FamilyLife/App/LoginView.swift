@@ -91,7 +91,10 @@ struct LoginView: View {
                     .font(.flSubheadline)
                 }
                 .padding(.top, 16)
-                .padding(.bottom, 40)
+
+                LegalConsentFooter()
+                    .padding(.top, 20)
+                    .padding(.bottom, 40)
             }
         }
         .background { AmbientBackground(style: .home) }

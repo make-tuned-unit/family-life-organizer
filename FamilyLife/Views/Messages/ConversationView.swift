@@ -1,6 +1,76 @@
 import SwiftUI
 import PhotosUI
 
+/// Builds the concierge prompt when a user taps a family-chat bubble so the
+/// agent can turn that message (plus nearby thread context) into events, to-dos,
+/// list items, tasks, and routines.
+enum ChatConciergeHandoff {
+    struct Line {
+        let sender: String
+        let text: String
+    }
+
+    /// `newestFirst` matches DM and group-feed ordering (index 0 = latest).
+    static func surrounding(
+        around id: Int,
+        newestFirst: [(id: Int, sender: String, text: String)]
+    ) -> [Line] {
+        guard let idx = newestFirst.firstIndex(where: { $0.id == id }) else { return [] }
+        let earlier = newestFirst.dropFirst(idx + 1).prefix(4).reversed()
+        let later = newestFirst.prefix(idx).suffix(2).reversed()
+        return (Array(earlier) + Array(later)).compactMap { row in
+            let text = row.text.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !text.isEmpty, text != "Sent a photo", text != "Shared a photo" else { return nil }
+            return Line(sender: row.sender, text: String(text.prefix(280)))
+        }
+    }
+
+    static func prompt(
+        tappedText: String,
+        senderName: String,
+        threadName: String,
+        timestamp: String?,
+        surrounding: [Line]
+    ) -> String {
+        var body = """
+        Please review this message from \(senderName) in our chat with \(threadName) and turn anything actionable into calendar events, to-dos, list items, tasks, or routines. Create them now using your tools.
+
+        The message:
+        "\(tappedText.trimmingCharacters(in: .whitespacesAndNewlines).prefix(800))"
+        """
+        if let timestamp, !timestamp.isEmpty {
+            body += "\n(sent \(timestamp))"
+        }
+        if !surrounding.isEmpty {
+            let context = surrounding.map { "- \($0.sender): \($0.text)" }.joined(separator: "\n")
+            body += "\n\nNearby messages for context:\n\(context)"
+        }
+        return String(body.prefix(7500))
+    }
+}
+
+extension View {
+    @ViewBuilder
+    func messageActionsMenu(onAsk: (() -> Void)?, onReport: (() -> Void)?) -> some View {
+        if onAsk == nil && onReport == nil {
+            self
+        } else {
+            self.contextMenu {
+                if let onAsk {
+                    Button(action: onAsk) {
+                        Label("Ask Concierge to capture this", systemImage: "sparkles")
+                    }
+                }
+                if let onReport {
+                    Button(role: .destructive, action: onReport) {
+                        Label("Report", systemImage: "exclamationmark.bubble")
+                    }
+                }
+            }
+        }
+    }
+}
+
 struct ConversationView: View {
     let partnerId: Int
     let partnerName: String
@@ -10,6 +80,9 @@ struct ConversationView: View {
     @Environment(AuthService.self) private var auth
     @Environment(ProfileImageCache.self) private var profileCache
     @Environment(MessageCache.self) private var messageCache
+    @Environment(ConciergeLaunch.self) private var launch
+    @Environment(\.dismiss) private var dismiss
+    @AppStorage("aiConciergeEnabled") private var aiConciergeEnabled = false
 
     @State private var newMessage = ""
     @State private var isSending = false
@@ -23,6 +96,7 @@ struct ConversationView: View {
     @State private var isLoadingOlder = false
     @State private var reachedOldEnd = false
     @State private var sendError: String?
+    @State private var reportError: String?
     private let messagePageSize = 50
 
     private var messages: [APIService.DirectMessageResponse] {
@@ -72,7 +146,11 @@ struct ConversationView: View {
                                 message: msg,
                                 partnerId: partnerId,
                                 isOwn: msg.sender_id == auth.currentUser?.id,
-                                onImageTap: { image in fullscreenImage = image }
+                                onImageTap: { image in fullscreenImage = image },
+                                onAskConcierge: captureHandler(for: msg),
+                                onReport: msg.sender_id == auth.currentUser?.id ? nil : {
+                                    Task { await reportMessage(msg) }
+                                }
                             )
                             .id(msg.id)
                             .onAppear {
@@ -180,6 +258,7 @@ struct ConversationView: View {
         }
         .background { AmbientBackground(style: .home) }
         .inlineError(sendError) { sendError = nil }
+        .inlineError(reportError) { reportError = nil }
         .navigationTitle(partnerName)
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $showingNewDecision) {
@@ -271,6 +350,33 @@ struct ConversationView: View {
         return expiresDate <= now
     }
 
+    private func captureHandler(for message: APIService.DirectMessageResponse) -> (() -> Void)? {
+        guard aiConciergeEnabled else { return nil }
+        let text = message.text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty, text != "Sent a photo" else { return nil }
+        return { askConcierge(about: message) }
+    }
+
+    private func askConcierge(about message: APIService.DirectMessageResponse) {
+        let surrounding = ChatConciergeHandoff.surrounding(
+            around: message.id,
+            newestFirst: messages.map { ($0.id, $0.sender_name ?? partnerName, $0.text) }
+        )
+        let prompt = ChatConciergeHandoff.prompt(
+            tappedText: message.text,
+            senderName: message.sender_name ?? (message.sender_id == auth.currentUser?.id ? "Me" : partnerName),
+            threadName: partnerName,
+            timestamp: message.created_at,
+            surrounding: surrounding
+        )
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        dismiss()
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(200))
+            launch.ask(prompt, autoSend: true)
+        }
+    }
+
     private func send() {
         let text = newMessage.trimmingCharacters(in: .whitespaces)
         guard !text.isEmpty || pendingImageData != nil else { return }
@@ -327,6 +433,18 @@ struct ConversationView: View {
             isSending = false
         }
     }
+
+    private func reportMessage(_ msg: APIService.DirectMessageResponse) async {
+        do {
+            try await api.reportContent(type: "message", refId: msg.id, reason: "objectionable")
+            reportError = nil
+            sendError = nil
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+        } catch {
+            guard !error.isCancellation else { return }
+            reportError = "Couldn't send that report. Try again."
+        }
+    }
 }
 
 // MARK: - Message Bubble
@@ -336,6 +454,8 @@ struct MessageBubble: View {
     let partnerId: Int
     let isOwn: Bool
     var onImageTap: ((UIImage) -> Void)?
+    var onAskConcierge: (() -> Void)?
+    var onReport: (() -> Void)?
 
     @Environment(APIService.self) private var api
     @Environment(MessageCache.self) private var messageCache
@@ -382,15 +502,30 @@ struct MessageBubble: View {
                 }
 
                 if message.text != "Sent a photo" || (message.has_image != 1 && message.image_data == nil) {
-                    Text(message.text)
-                        .font(.flSubheadline)
-                        .foregroundStyle(isOwn ? .white : WarmPalette.ink1)
+                    if let onAskConcierge {
+                        Button(action: onAskConcierge) {
+                            Text(message.text)
+                                .font(.flSubheadline)
+                                .foregroundStyle(isOwn ? .white : WarmPalette.ink1)
+                        }
+                        .buttonStyle(.plain)
+                    } else {
+                        Text(message.text)
+                            .font(.flSubheadline)
+                            .foregroundStyle(isOwn ? .white : WarmPalette.ink1)
+                    }
                 }
 
                 if let date = message.created_at {
-                    Text(relativeTime(date))
-                        .font(.flCaption2)
-                        .foregroundStyle(isOwn ? .white.opacity(0.7) : WarmPalette.ink4)
+                    HStack(spacing: 4) {
+                        if onAskConcierge != nil {
+                            Image(systemName: "sparkles")
+                                .font(.system(size: 9, weight: .semibold))
+                        }
+                        Text(relativeTime(date))
+                    }
+                    .font(.flCaption2)
+                    .foregroundStyle(isOwn ? .white.opacity(0.7) : WarmPalette.ink4)
                 }
             }
             .padding(.horizontal, 12)
@@ -399,9 +534,11 @@ struct MessageBubble: View {
                 isOwn ? AnyShapeStyle(TabAccent.home.color) : AnyShapeStyle(WarmPalette.cardSurface),
                 in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.tile)
             )
+            .messageActionsMenu(onAsk: onAskConcierge, onReport: onReport)
 
             if !isOwn { Spacer(minLength: 60) }
         }
+        .accessibilityHint(onAskConcierge == nil ? "" : "Tap to ask your concierge to capture plans from this message")
     }
 
     private func relativeTime(_ dateStr: String) -> String {
@@ -458,4 +595,5 @@ struct ImagePreviewView: View {
     .environment(AuthService())
     .environment(ProfileImageCache())
     .environment(MessageCache())
+    .environment(ConciergeLaunch())
 }

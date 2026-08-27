@@ -63,6 +63,7 @@ struct FamilyListsView: View {
         }
         .refreshable { await loadLists() }
         .task { await loadLists() }
+        .onConciergeDataChange { await loadLists() }
         .onChange(of: pendingListName) {
             if let name = pendingListName {
                 Task { await navigateToList(named: name) }
@@ -311,6 +312,7 @@ struct ListDetailSection: View {
             }
         }
         .task(id: list.id) { await loadItems() }
+        .onConciergeDataChange { await loadItems() }
     }
 
     // MARK: - Flat List with Drag Reorder
@@ -975,6 +977,7 @@ struct TasksDetailSection: View {
             .flMinimizesTabBar()
         }
         .task { await loadTasks() }
+        .onConciergeDataChange { await loadTasks() }
     }
 
     private func taskRow(_ task: TaskResponse) -> some View {

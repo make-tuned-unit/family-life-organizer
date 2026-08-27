@@ -1,6 +1,7 @@
 import Foundation
 import UIKit
 import Security
+import AuthenticationServices
 
 @MainActor
 @Observable
@@ -283,6 +284,23 @@ final class AuthService {
         }
     }
 
+    func rememberAppleUserID(_ userID: String) {
+        UserDefaults.standard.set(userID, forKey: "apple_credential_user")
+    }
+
+    /// If the user revoked Kinrows in Apple ID settings, drop the local session.
+    func checkAppleCredentialState() async {
+        guard let userID = UserDefaults.standard.string(forKey: "apple_credential_user"), !userID.isEmpty else { return }
+        do {
+            let state = try await ASAuthorizationAppleIDProvider().credentialState(forUserID: userID)
+            if state == .revoked || state == .notFound {
+                logout()
+            }
+        } catch {
+            // Network / provider errors are not a revoke.
+        }
+    }
+
     func logout() {
         // Invalidate any in-flight silent re-login so it can't resurrect the
         // session by saving a freshly-rotated token after we've torn down.
@@ -301,6 +319,7 @@ final class AuthService {
         UserDefaults.standard.removeObject(forKey: "auth_user_id")
         UserDefaults.standard.removeObject(forKey: "household_invite_code")
         UserDefaults.standard.removeObject(forKey: "hasDismissedFirstWeekCard")
+        UserDefaults.standard.removeObject(forKey: "apple_credential_user")
         // Per-account notification watermarks — a fresh account must not
         // inherit (or re-fire against) the previous account's history.
         UserDefaults.standard.removeObject(forKey: "notified_dm_ids")

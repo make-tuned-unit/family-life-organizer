@@ -235,7 +235,19 @@ class FamilyDB {
           WHERE note = 'Synced from Apple Health'`, () => {});
         this.db.run('ALTER TABLE users ADD COLUMN apple_user_id TEXT', () => {});
         this.db.run('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_apple_user_id ON users(apple_user_id) WHERE apple_user_id IS NOT NULL', () => {});
+        this.db.run('ALTER TABLE users ADD COLUMN password_login INTEGER DEFAULT 1', () => {});
+        this.db.run(`UPDATE users SET password_login = 0 WHERE apple_user_id IS NOT NULL AND username LIKE 'apple_%'`, () => {});
+        this.db.run(`CREATE TABLE IF NOT EXISTS content_reports (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            reporter_id INTEGER NOT NULL,
+            content_type TEXT NOT NULL,
+            ref_id INTEGER NOT NULL,
+            reason TEXT NOT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (reporter_id) REFERENCES users(id)
+        )`, () => {});
         this.db.run('CREATE INDEX IF NOT EXISTS idx_jobs_drain ON jobs(status, available_at, id)', () => {});
+        this.db.run('ALTER TABLE users ADD COLUMN concierge_enabled INTEGER DEFAULT 0', () => {});
         this.db.run('ALTER TABLE users ADD COLUMN last_location_at DATETIME', (err) => {
           if (err) console.error('Migration error:', err.message);
           // budget_categories: rebuild to drop the global UNIQUE(name) so each
@@ -2591,7 +2603,7 @@ class FamilyDB {
   createUser(user) {
     return new Promise((resolve, reject) => {
       this.db.run(
-        'INSERT INTO users (username, password_hash, name, email, phone, avatar, apple_user_id, email_verified) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        'INSERT INTO users (username, password_hash, name, email, phone, avatar, apple_user_id, email_verified, password_login) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
         [
           user.username,
           user.password_hash,
@@ -2601,6 +2613,7 @@ class FamilyDB {
           user.avatar || null,
           user.apple_user_id || null,
           user.email_verified ? 1 : 0,
+          user.password_login === 0 ? 0 : 1,
         ],
         function(err) {
           if (err) reject(err);
@@ -2652,7 +2665,7 @@ class FamilyDB {
 
   updateUserPassword(userId, passwordHash) {
     return new Promise((resolve, reject) => {
-      this.db.run('UPDATE users SET password_hash = ? WHERE id = ?', [passwordHash, userId],
+      this.db.run('UPDATE users SET password_hash = ?, password_login = 1 WHERE id = ?', [passwordHash, userId],
         function(err) { err ? reject(err) : resolve({ changed: this.changes }); });
     });
   }
@@ -2729,6 +2742,55 @@ class FamilyDB {
         if (err) reject(err);
         else resolve(row || null);
       });
+    });
+  }
+
+  // Opt-in for the AI Concierge. Drives the daily brief landing on the
+  // household feed; the iOS toggle is the source of truth and is synced here.
+  setConciergeEnabled(userId, enabled) {
+    return new Promise((resolve, reject) => {
+      this.db.run(
+        'UPDATE users SET concierge_enabled = ? WHERE id = ?',
+        [enabled ? 1 : 0, userId],
+        (err) => err ? reject(err) : resolve({ ok: true })
+      );
+    });
+  }
+
+  // Households with at least one member who opted into the Concierge, plus a
+  // representative enabled member to author the feed post (FK on author_id).
+  getConciergeEnabledHouseholds() {
+    return new Promise((resolve, reject) => {
+      this.db.all(
+        `SELECT g.id AS group_id, g.name AS group_name,
+                (SELECT u.id FROM group_members gm JOIN users u ON u.id = gm.user_id
+                 WHERE gm.group_id = g.id AND COALESCE(u.concierge_enabled, 0) = 1
+                 ORDER BY u.id LIMIT 1) AS user_id,
+                (SELECT u.name FROM group_members gm JOIN users u ON u.id = gm.user_id
+                 WHERE gm.group_id = g.id AND COALESCE(u.concierge_enabled, 0) = 1
+                 ORDER BY u.id LIMIT 1) AS user_name
+         FROM groups g
+         WHERE g.group_type = 'household'
+           AND EXISTS (
+             SELECT 1 FROM group_members gm JOIN users u ON u.id = gm.user_id
+             WHERE gm.group_id = g.id AND COALESCE(u.concierge_enabled, 0) = 1
+           )`,
+        [],
+        (err, rows) => err ? reject(err) : resolve(rows || [])
+      );
+    });
+  }
+
+  hasBriefPostOnDate(groupId, dateISO) {
+    return new Promise((resolve, reject) => {
+      this.db.get(
+        `SELECT 1 AS ok FROM feed_posts
+         WHERE group_id = ? AND post_type = 'brief'
+           AND date(created_at, 'localtime') = ?
+         LIMIT 1`,
+        [groupId, dateISO],
+        (err, row) => err ? reject(err) : resolve(!!row)
+      );
     });
   }
 
@@ -3292,7 +3354,9 @@ class FamilyDB {
     const all = (sql, p) => new Promise((res, rej) => this.db.all(sql, p, (e, rows) => e ? rej(e) : res(rows || [])));
     return (async () => {
       let sql = `
-        SELECT fp.*, u.name as author_name, u.avatar as author_avatar
+        SELECT fp.*,
+          CASE WHEN fp.post_type = 'brief' THEN 'Concierge' ELSE u.name END as author_name,
+          u.avatar as author_avatar
         FROM feed_posts fp
         JOIN users u ON u.id = fp.author_id
         WHERE fp.group_id = ?
@@ -3541,7 +3605,9 @@ class FamilyDB {
           AND r.group_id IN (${myGroups})` : ''}
         UNION ALL
         SELECT 'post' as feed_type, fp.id as ref_id, fp.title, fp.body,
-          COALESCE(u.name, u.username, 'Family') as author, fp.post_type as status,
+          CASE WHEN fp.post_type = 'brief' THEN 'Concierge'
+               ELSE COALESCE(u.name, u.username, 'Family') END as author,
+          fp.post_type as status,
           fp.created_at,
           (SELECT COUNT(*) FROM feed_reactions WHERE post_id = fp.id) as reaction_count,
           (SELECT COUNT(*) FROM feed_comments WHERE post_id = fp.id) as comment_count,

@@ -4,7 +4,7 @@
 //   - `summary`: a warm butler-voiced paragraph (AI, with a plain fallback)
 
 const ai = require('./anthropic');
-const { daysUntil } = require('./conciergeContext');
+const { buildSnapshot, daysUntil } = require('./conciergeContext');
 
 // Build the ordered action cards straight from the snapshot. Always runs,
 // with or without an API key — this is the trustworthy core of the brief.
@@ -121,14 +121,19 @@ function sanitizeName(name) {
 }
 
 // Warm butler-voiced summary via Claude, falling back to the deterministic line.
-async function generateSummary(s, userName) {
+// household=true addresses the family as a whole (feed post), not one person.
+async function generateSummary(s, userName, { household = false } = {}) {
   if (!ai.isAIEnabled()) return fallbackSummary(s);
   try {
     const safeName = sanitizeName(userName);
+    const who = household ? `the ${safeName} household` : safeName;
+    const greeting = household
+      ? `e.g. "Here's the day for ${safeName}."`
+      : `e.g. "Here's your evening, ${safeName}."`;
     const facts = JSON.stringify(minimizedFacts(s));
     const text = await ai.callClaude({
       maxTokens: 220,
-      system: `You are a warm, concise family life concierge for ${safeName}. Format the reply as: ONE short friendly preamble sentence on the first line (no bullet, e.g. "Here's your evening, ${safeName}."), then 3-5 bullet points in priority order. Rules: each bullet on its own line starting with "• "; keep each bullet to ~8 words, scannable; plain text only (no markdown, no bold, no headers). If nothing needs attention, write a single warm sentence with no bullets. GROUNDING: only reference items that appear in the snapshot JSON. Never invent people, names, meetings, events, dates, or times that are not in the data — if the snapshot is sparse, say less rather than filling it in.`,
+      system: `You are a warm, concise family life concierge for ${who}. Format the reply as: ONE short friendly preamble sentence on the first line (no bullet, ${greeting}), then 3-5 bullet points in priority order. Rules: each bullet on its own line starting with "• "; keep each bullet to ~8 words, scannable; plain text only (no markdown, no bold, no headers). If nothing needs attention, write a single warm sentence with no bullets. GROUNDING: only reference items that appear in the snapshot JSON. Never invent people, names, meetings, events, dates, or times that are not in the data — if the snapshot is sparse, say less rather than filling it in.`,
       messages: [{ role: 'user', content: `Today's snapshot:\n${facts}` }],
     });
     return text.trim();
@@ -141,10 +146,10 @@ async function generateSummary(s, userName) {
 // skipAI=true returns the deterministic summary only and makes NO cloud call —
 // used when the client will summarize on-device (or the user disabled cloud AI),
 // so household data never reaches Anthropic for the brief.
-async function generateBrief(snapshot, userName, { skipAI = false } = {}) {
+async function generateBrief(snapshot, userName, { skipAI = false, household = false } = {}) {
   const cards = buildCards(snapshot);                       // deterministic, instant
   const summary = skipAI ? fallbackSummary(snapshot)
-                         : await generateSummary(snapshot, userName);
+                         : await generateSummary(snapshot, userName, { household });
   return {
     date: snapshot.date,
     summary,
@@ -154,4 +159,42 @@ async function generateBrief(snapshot, userName, { skipAI = false } = {}) {
   };
 }
 
-module.exports = { generateBrief, buildCards, fallbackSummary };
+function briefTitle(dateISO) {
+  const d = new Date(String(dateISO).slice(0, 10) + 'T12:00:00');
+  if (isNaN(d)) return "Today's brief";
+  const weekday = d.toLocaleDateString('en-US', { weekday: 'long' });
+  return `${weekday}'s brief`;
+}
+
+// Post today's brief to the household feed for every family that has Concierge
+// opted in. Safe to call repeatedly — one post per household per local day.
+async function runDailyBriefSweep(db) {
+  const summary = { groups: 0, posted: 0, skipped: 0 };
+  const households = await db.getConciergeEnabledHouseholds();
+  summary.groups = households.length;
+
+  for (const h of households) {
+    if (!h.user_id) { summary.skipped++; continue; }
+    try {
+      const snapshot = await buildSnapshot(db, h.user_id);
+      if (await db.hasBriefPostOnDate(h.group_id, snapshot.date)) {
+        summary.skipped++;
+        continue;
+      }
+      const brief = await generateBrief(snapshot, h.group_name || 'the family', { household: true });
+      await db.addFeedPost({
+        group_id: h.group_id,
+        author_id: h.user_id,
+        post_type: 'brief',
+        title: briefTitle(snapshot.date),
+        body: brief.summary,
+      });
+      summary.posted++;
+    } catch (err) {
+      console.error(`[concierge] brief post failed for group ${h.group_id}:`, err.message);
+    }
+  }
+  return summary;
+}
+
+module.exports = { generateBrief, buildCards, fallbackSummary, briefTitle, runDailyBriefSweep };

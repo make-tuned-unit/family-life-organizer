@@ -60,6 +60,7 @@ struct PantryView: View {
         .inlineError(viewModel.error) { viewModel.error = nil }
         .refreshable { await viewModel.load(api: api) }
         .task { await viewModel.load(api: api) }
+        .onConciergeDataChange { await viewModel.load(api: api) }
     }
 
     // MARK: - Header

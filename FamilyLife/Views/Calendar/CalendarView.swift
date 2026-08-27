@@ -146,6 +146,9 @@ struct CalendarView: View {
         .onChange(of: calendarService.storeVersion) {
             Task { await viewModel.loadExternalEvents(calendarService: calendarService) }
         }
+        .onConciergeDataChange {
+            await viewModel.loadMonth(api: api, calendarService: calendarService)
+        }
     }
 
     // MARK: - Owner Filter (Everyone / Just me / per-person)

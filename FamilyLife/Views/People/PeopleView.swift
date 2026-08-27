@@ -82,9 +82,7 @@ struct PeopleView: View {
             AssignKeyDateSheet(event: ev, people: people) { await load() }
         }
         .task { await load() }
-        .onReceive(NotificationCenter.default.publisher(for: APIService.conciergeDataDidChange)) { _ in
-            Task { await load() }
-        }
+        .onConciergeDataChange { await load() }
     }
 
     /// Key dates with no person attached (e.g. "Dating anniversary", or one the

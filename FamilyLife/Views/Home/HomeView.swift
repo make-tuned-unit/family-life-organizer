@@ -78,11 +78,9 @@ struct HomeView: View {
             await loadOnThisDay()
         }
         .task { await loadOnThisDay() }
-        .onReceive(NotificationCenter.default.publisher(for: APIService.conciergeDataDidChange)) { _ in
-            Task {
-                await viewModel.loadAll(api: api, userName: auth.currentUser?.name, username: auth.currentUser?.username)
-                await loadOnThisDay()
-            }
+        .onConciergeDataChange {
+            await viewModel.loadAll(api: api, userName: auth.currentUser?.name, username: auth.currentUser?.username)
+            await loadOnThisDay()
         }
         .background { AmbientBackground(style: .home) }
         .navigationBarTitleDisplayMode(.inline)
@@ -418,6 +416,12 @@ struct HomeView: View {
                         message: Text("I set up our family organizer. Use this code to join: \(householdInviteCode)")
                     ) {
                         Label("Invite with \(householdInviteCode)", systemImage: "square.and.arrow.up")
+                            .font(.flSubheadline.weight(.semibold))
+                            .foregroundStyle(AccentTheme.sage.color)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    NavigationLink { HouseholdView() } label: {
+                        Label("Email an invite", systemImage: "envelope.fill")
                             .font(.flSubheadline.weight(.semibold))
                             .foregroundStyle(AccentTheme.sage.color)
                             .frame(maxWidth: .infinity, alignment: .leading)
@@ -924,6 +928,7 @@ struct HomeView: View {
                     onRoutineTap: { routineId in selectedFeedRoutine = FeedRoutineTarget(id: routineId) },
                     onMilestoneTap: { personId in Task { await openFeedPerson(id: personId) } },
                     onDecisionTap: { decisionId in Task { await openFeedDecision(id: decisionId) } },
+                    onConciergeTap: { selectedTab = .concierge },
                     onKeyDateTap: { personId in
                         // Unattached (household-wide) dates live in People → Household dates.
                         if let personId { Task { await openFeedPerson(id: personId) } } else { showingPeople = true }

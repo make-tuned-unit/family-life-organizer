@@ -113,6 +113,7 @@ struct PersonGiftListView: View {
         .task {
             await loadIdeas()
         }
+        .onConciergeDataChange { await loadIdeas() }
     }
 
     private func loadIdeas() async {

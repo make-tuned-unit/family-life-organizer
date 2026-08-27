@@ -110,6 +110,7 @@ struct TripsView: View {
             await viewModel.loadAll(api: api)
             await syncTrackingIfNeeded()
         }
+        .onConciergeDataChange { await viewModel.loadAll(api: api) }
         .onChange(of: viewModel.activeTrip?.id) {
             Task { await syncTrackingIfNeeded() }
         }

@@ -2,6 +2,7 @@ import SwiftUI
 import UIKit
 import CoreLocation
 import BackgroundTasks
+import AuthenticationServices
 
 @Observable
 class DeepLinkRouter {
@@ -146,13 +147,12 @@ struct FamilyLifeApp: App {
                         if let userId = authService.currentUser?.id {
                             messageCache.preload(api: apiService, userId: userId)
                         }
-                        // Request permission + register for remote notifications
-                        let granted = await NotificationService.shared.ensurePermissionIfNeeded()
-                        if granted {
+                        if await NotificationService.shared.isAuthorized() {
                             await MainActor.run {
                                 UIApplication.shared.registerForRemoteNotifications()
                             }
                         }
+                        await authService.checkAppleCredentialState()
                         await calendarService.syncToHousehold(api: apiService)
                     }
                 }
@@ -175,6 +175,9 @@ struct FamilyLifeApp: App {
                         profileImageCache.clear()
                         householdService.clear()
                     }
+                }
+                .onReceive(NotificationCenter.default.publisher(for: ASAuthorizationAppleIDProvider.credentialRevokedNotification)) { _ in
+                    authService.logout()
                 }
                 .onReceive(NotificationCenter.default.publisher(for: APIService.unauthorizedNotification)) { _ in
                     Task {
