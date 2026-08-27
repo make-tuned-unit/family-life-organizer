@@ -193,13 +193,31 @@
   const qs = new URLSearchParams(location.search);
   const banner = document.getElementById('sub-banner');
   const account = document.getElementById('sub-account');
+  const track = (name, props) => {
+    const run = () => {
+      if (window.permagent && typeof window.permagent.event === 'function') {
+        window.permagent.event(name, props || {});
+        return true;
+      }
+      return false;
+    };
+    if (run()) return;
+    let n = 0;
+    const t = setInterval(() => {
+      n += 1;
+      if (run() || n > 40) clearInterval(t);
+    }, 50);
+  };
   const showBanner = (text, kind) => {
     banner.hidden = false;
     banner.dataset.kind = kind || 'info';
     banner.textContent = text;
     banner.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   };
-  if (qs.get('canceled')) showBanner('Checkout was canceled. Nothing was charged.', 'info');
+  if (qs.get('canceled')) {
+    showBanner('Checkout was canceled. Nothing was charged.', 'info');
+    track('sale_return_canceled', { via: 'web' });
+  }
 
   const paintOpenApp = (sessionId) => {
     const wrap = document.getElementById('sub-open-app-wrap');
@@ -250,7 +268,10 @@
       el.querySelector('.sub-per').textContent = next === 'yearly' ? ' /year' : ' /month';
     });
   };
-  document.querySelectorAll('.period-btn').forEach((b) => b.addEventListener('click', () => setPeriod(b.dataset.period)));
+  document.querySelectorAll('.period-btn').forEach((b) => b.addEventListener('click', () => {
+    setPeriod(b.dataset.period);
+    track('sale_period_select', { period: b.dataset.period });
+  }));
 
   fetch('/api/subscription/catalog', { credentials: 'include' }).then((r) => r.json()).then((cat) => {
     if (!cat || !Array.isArray(cat.plans)) return;
@@ -313,6 +334,7 @@
       btn.className = 'btn btn-ghost';
       btn.textContent = 'Manage billing';
       btn.addEventListener('click', async () => {
+        track('sale_portal_click', { source: 'web' });
         try {
           const r = await json('POST', '/api/subscription/portal');
           if (r.data && r.data.url) { location.href = r.data.url; return; }
@@ -339,6 +361,7 @@
       showBanner('Taking you to checkout…', 'info');
     }
     try {
+      track('sale_checkout_redirect', { product_id: productId, source: 'web', currency: catalogCurrency });
       const r = await json('POST', '/api/subscription/checkout', {
         product_id: productId,
         currency: catalogCurrency,
@@ -386,6 +409,7 @@
         const label = status.tier === 'lite' ? 'Lite' : 'Premium';
         showBanner(`You are on ${label} — up to ${chats} chats a day for the household. Open Kinrows on your iPhone. A confirmation email is on its way.`, 'success');
         paintOpenApp(sessionId);
+        track('sale_return_success', { via: 'web', tier: status.tier || '', premium: true });
         return;
       }
       await new Promise((r) => setTimeout(r, 1500));
@@ -396,11 +420,13 @@
   };
   if (qs.get('success')) {
     paintOpenApp(qs.get('session_id'));
+    track('sale_checkout_return', { via: 'web' });
     confirmCheckout(qs.get('session_id'));
   }
 
   const askToSignIn = (productId) => {
     pendingProductId = productId || null;
+    track('sale_signin_required', { product_id: productId || '' });
     account.classList.add('is-needed');
     showBanner('Sign in with your Kinrows account, then we will take you to checkout.', 'info');
     account.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -430,7 +456,7 @@
             : `Enter the code we sent to ${r.data.email_hint || 'your email'}.`;
           return;
         }
-        if (r.data && r.data.success) { await refreshMe(); return; }
+        if (r.data && r.data.success) { track('sale_signin_success'); await refreshMe(); return; }
         throw new Error((r.data && r.data.error) || 'Could not sign in');
       }
       if (twoFaStatus === 'enroll_email' && email) {
@@ -444,6 +470,7 @@
       const r = await json('POST', '/api/auth/login/verify', { challenge, code });
       if (r.status >= 400) throw new Error((r.data && r.data.error) || 'Incorrect code');
       challenge = null;
+      track('sale_signin_success');
       await refreshMe();
     } catch (err) {
       loginErr.hidden = false;
@@ -454,6 +481,7 @@
   buyButtons().forEach((btn) => {
     btn.addEventListener('click', async () => {
       const productId = btn.dataset[period];
+      track('sale_plan_click', { product_id: productId || '', period: period });
       if (!me) {
         askToSignIn(productId);
         return;
@@ -461,6 +489,10 @@
       await startCheckout(productId, btn);
     });
   });
+  const openApp = document.getElementById('sub-open-app');
+  if (openApp) {
+    openApp.addEventListener('click', () => track('sale_open_app', { via: 'web' }));
+  }
 })();
 </script>
 </body>
