@@ -136,8 +136,20 @@ function randomSuffix(n = 8) {
   return s;
 }
 
+// Same sticker in CAD / USD / EUR. The Price's native currency is USD; these
+// options make Checkout charge Canadians in CAD and Eurozone customers in EUR
+// without Adaptive Pricing's conversion markup. Adaptive Pricing still covers
+// everywhere else (GBP, AUD, …).
+function currencyOptionsForAmount(cents) {
+  const n = Number(cents);
+  return {
+    cad: { unit_amount: n },
+    eur: { unit_amount: n },
+  };
+}
+
 function buildCheckoutParams({
-  price, productId, userId, groupId, customerId, customerEmail, successUrl, cancelUrl,
+  price, productId, userId, groupId, customerId, customerEmail, successUrl, cancelUrl, currency,
 }) {
   const meta = {
     kinrows_user_id: String(userId),
@@ -156,8 +168,11 @@ function buildCheckoutParams({
       description: 'Kinrows Concierge — one plan for the whole household',
     },
     allow_promotion_codes: true,
-    billing_address_collection: 'auto',
+    // Required (not 'auto') so Apple Pay / Google Pay can see a billing
+    // country and show the wallet button on hosted Checkout.
+    billing_address_collection: 'required',
     locale: 'auto',
+    adaptive_pricing: { enabled: true },
     custom_text: {
       submit: { message: 'Concierge unlocks for everyone in your household — not just you.' },
       after_submit: { message: 'Open Kinrows on your iPhone. Your household is covered.' },
@@ -172,17 +187,31 @@ function buildCheckoutParams({
   } else if (customerEmail) {
     params.customer_email = customerEmail;
   }
+  const cur = String(currency || '').toLowerCase();
+  if (cur === 'cad' || cur === 'usd' || cur === 'eur') params.currency = cur;
   return params;
 }
 
 async function createCheckoutSession({
-  productId, userId, groupId, customerId, customerEmail, successUrl, cancelUrl,
+  productId, userId, groupId, customerId, customerEmail, successUrl, cancelUrl, currency,
 }) {
   const price = await priceIdForProduct(productId);
   if (!price) throw Object.assign(new Error('Unknown or unpriced product'), { status: 400 });
-  return stripeRequest('POST', '/checkout/sessions', buildCheckoutParams({
-    price, productId, userId, groupId, customerId, customerEmail, successUrl, cancelUrl,
-  }));
+  const params = buildCheckoutParams({
+    price, productId, userId, groupId, customerId, customerEmail, successUrl, cancelUrl, currency,
+  });
+  try {
+    return await stripeRequest('POST', '/checkout/sessions', params);
+  } catch (err) {
+    // Adaptive Pricing can be Dashboard-gated; still charge local CAD/USD/EUR via
+    // Price currency_options even if this flag is refused.
+    const msg = String(err && err.message || '');
+    if (params.adaptive_pricing && /adaptive.?pricing/i.test(msg)) {
+      delete params.adaptive_pricing;
+      return stripeRequest('POST', '/checkout/sessions', params);
+    }
+    throw err;
+  }
 }
 
 let _portalConfigId = null;
@@ -317,6 +346,7 @@ module.exports = {
   allowTestStripe,
   createCheckoutSession,
   buildCheckoutParams,
+  currencyOptionsForAmount,
   createPortalSession,
   retrieveCheckoutSession,
   retrieveSubscription,

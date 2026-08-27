@@ -114,6 +114,7 @@ async function ensureProduct(spec) {
         product: product.id,
         currency: 'usd',
         unit_amount: p.unit_amount,
+        currency_options: stripe.currencyOptionsForAmount(p.unit_amount),
         recurring: { interval: p.interval },
         lookup_key: p.productId,
         nickname: `${spec.tier} ${p.interval}ly`,
@@ -122,10 +123,53 @@ async function ensureProduct(spec) {
       console.log(`  created price ${p.productId} (${price.id})`);
     } else {
       console.log(`  reusing price ${p.productId} (${price.id})`);
+      try {
+        await stripe.stripeRequest('POST', `/prices/${price.id}`, {
+          currency_options: stripe.currencyOptionsForAmount(p.unit_amount),
+        });
+        console.log(`  set CAD/EUR presentment on ${p.productId}`);
+      } catch (err) {
+        console.error(`  currency_options skipped for ${p.productId}:`, err.message);
+      }
     }
     priceIds[p.productId] = price.id;
   }
   return priceIds;
+}
+
+function applePayDomains() {
+  const hosts = new Set(['kinrows.com', 'www.kinrows.com']);
+  try {
+    const u = new URL((process.env.SITE_URL || 'https://kinrows.com').replace(/\/$/, ''));
+    if (u.hostname && u.hostname !== 'localhost') hosts.add(u.hostname);
+  } catch { /* ignore */ }
+  return [...hosts];
+}
+
+async function ensurePaymentMethodDomains() {
+  const hosts = applePayDomains();
+  let existing = [];
+  try {
+    const list = await stripe.stripeRequest('GET', '/payment_method_domains', { limit: 100 });
+    existing = list.data || [];
+  } catch (err) {
+    console.error('payment method domains list skipped:', err.message);
+    return;
+  }
+  const have = new Set(existing.map((d) => d.domain_name));
+  for (const domain_name of hosts) {
+    const row = existing.find((d) => d.domain_name === domain_name);
+    if (have.has(domain_name) && row) {
+      console.log(`reusing payment method domain ${row.id} (${domain_name}) apple_pay=${row.apple_pay?.status || '?'}`);
+      continue;
+    }
+    try {
+      const created = await stripe.stripeRequest('POST', '/payment_method_domains', { domain_name });
+      console.log(`registered payment method domain ${created.id} (${domain_name}) apple_pay=${created.apple_pay?.status || '?'}`);
+    } catch (err) {
+      console.error(`payment method domain ${domain_name} skipped:`, err.message);
+    }
+  }
 }
 
 async function ensureWebhook() {
@@ -152,6 +196,11 @@ async function main() {
   }
   const priceIds = {};
   for (const spec of CATALOG) Object.assign(priceIds, await ensureProduct(spec));
+  try {
+    await ensurePaymentMethodDomains();
+  } catch (err) {
+    console.error('Apple Pay domain registration skipped:', err.message);
+  }
   let webhookSecret = null;
   try {
     webhookSecret = await ensureWebhook();

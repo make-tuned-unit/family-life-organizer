@@ -93,12 +93,43 @@ test('catalog is public and lists the four Concierge plans', async () => {
   assert.equal(res.status, 200);
   const body = await res.json();
   assert.equal(body.stripe, false);
+  assert.equal(body.currency, 'cad');
   assert.equal(body.plans.length, 4);
   assert.equal(body.caps.lite, 10);
   assert.equal(body.caps.premium, 40);
   assert.ok(body.plans.every(p => p.product_id.startsWith('com.kinrows.app.concierge.')));
+  assert.ok(body.plans.every(p => p.currency === 'cad'));
   assert.equal(body.plans.find(p => p.tier === 'lite').chats, 10);
   assert.equal(body.plans.find(p => p.tier === 'premium').chats, 40);
+});
+
+test('presentment currency follows country, Accept-Language, then CAD', () => {
+  assert.equal(subscription.presentmentCurrencyFromHints({ country: 'CA' }), 'cad');
+  assert.equal(subscription.presentmentCurrencyFromHints({ country: 'US' }), 'usd');
+  assert.equal(subscription.presentmentCurrencyFromHints({ country: 'FR' }), 'eur');
+  assert.equal(subscription.presentmentCurrencyFromHints({ country: 'GB' }), 'cad');
+  assert.equal(subscription.presentmentCurrencyFromHints({ acceptLanguage: 'en-US,en;q=0.9' }), 'usd');
+  assert.equal(subscription.presentmentCurrencyFromHints({ explicit: 'eur', country: 'US' }), 'eur');
+  assert.equal(subscription.presentmentCurrencyFromHints({}), 'cad');
+});
+
+test('catalog honors ?currency= and geo country headers', async () => {
+  const eur = await fetch(BASE + '/api/subscription/catalog?currency=eur');
+  assert.equal(eur.status, 200);
+  const eurBody = await eur.json();
+  assert.equal(eurBody.currency, 'eur');
+  assert.ok(eurBody.plans.every(p => p.currency === 'eur'));
+
+  const us = await fetch(BASE + '/api/subscription/catalog', { headers: { 'CF-IPCountry': 'US' } });
+  assert.equal((await us.json()).currency, 'usd');
+});
+
+test('Apple Pay domain association file is served', async () => {
+  const res = await fetch(BASE + '/.well-known/apple-developer-merchantid-domain-association');
+  assert.equal(res.status, 200);
+  const body = await res.text();
+  assert.ok(body.length > 100);
+  assert.match(res.headers.get('content-type') || '', /octet-stream|text\/plain/i);
 });
 
 test('checkout requires auth, a known plan, and a configured Stripe key', async () => {
@@ -295,10 +326,36 @@ test('Checkout Session payload includes conversion fields and session_id success
   assert.equal(params.mode, 'subscription');
   assert.equal(params.allow_promotion_codes, true);
   assert.equal(params.locale, 'auto');
+  assert.equal(params.billing_address_collection, 'required');
+  assert.equal(params.adaptive_pricing.enabled, true);
+  assert.equal(params.currency, undefined);
+  assert.equal(params.excluded_payment_method_types, undefined);
+  assert.equal(params.payment_method_types, undefined);
   assert.equal(params.customer_email, 'ada@example.com');
   assert.match(params.success_url, /session_id=\{CHECKOUT_SESSION_ID\}/);
   assert.match(params.custom_text.submit.message, /household/);
   assert.equal(params.line_items[0].price, 'price_lite_m');
   assert.equal(params.subscription_data.metadata.kinrows_group_id, '4');
   assert.equal(params.managed_payments.enabled, false);
+
+  const cad = stripe.buildCheckoutParams({
+    price: 'price_lite_m',
+    productId: 'com.kinrows.app.concierge.lite.monthly',
+    userId: 9,
+    groupId: 4,
+    successUrl: 'https://kinrows.com/subscribe.html?success=1',
+    cancelUrl: 'https://kinrows.com/subscribe.html?canceled=1',
+    currency: 'cad',
+  });
+  assert.equal(cad.currency, 'cad');
+  const gbp = stripe.buildCheckoutParams({
+    price: 'price_lite_m',
+    productId: 'com.kinrows.app.concierge.lite.monthly',
+    userId: 9,
+    groupId: 4,
+    successUrl: 'https://kinrows.com/subscribe.html?success=1',
+    cancelUrl: 'https://kinrows.com/subscribe.html?canceled=1',
+    currency: 'gbp',
+  });
+  assert.equal(gbp.currency, undefined);
 });
