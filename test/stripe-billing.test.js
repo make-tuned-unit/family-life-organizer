@@ -124,6 +124,23 @@ test('catalog honors ?currency= and geo country headers', async () => {
   assert.equal((await us.json()).currency, 'usd');
 });
 
+test('subscribe.html inline scripts parse and sign-in sits above the plans', async () => {
+  const html = await (await fetch(BASE + '/subscribe.html')).text();
+  assert.match(html, /class="btn btn-primary sub-buy"/);
+  assert.ok(html.indexOf('id="sub-account"') < html.indexOf('class="sub-grid"'));
+  assert.match(html, /Sign in to subscribe/);
+  assert.ok(!html.includes("showBanner('You're"));
+  const vm = require('node:vm');
+  const scripts = [...html.matchAll(/<script(?![^>]*\bsrc=)([^>]*)>([\s\S]*?)<\/script>/g)];
+  assert.ok(scripts.length >= 2);
+  for (const m of scripts) {
+    const attrs = m[1] || '';
+    const body = m[2] || '';
+    if (/type\s*=\s*"application\/ld\+json"/i.test(attrs)) continue;
+    assert.doesNotThrow(() => new vm.Script(body), body.slice(0, 80));
+  }
+});
+
 test('Apple Pay domain association file is served', async () => {
   const res = await fetch(BASE + '/.well-known/apple-developer-merchantid-domain-association');
   assert.equal(res.status, 200);

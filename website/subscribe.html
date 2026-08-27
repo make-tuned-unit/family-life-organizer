@@ -77,7 +77,22 @@
 
   <section class="legal-body">
     <div class="sub-wrap">
-      <div id="sub-banner" class="sub-banner" hidden></div>
+      <div id="sub-banner" class="sub-banner" hidden role="status"></div>
+
+      <div id="sub-account" class="sub-account">
+        <p class="sub-account-copy">Sign in with the same Kinrows account you use on iPhone, then pick a plan. Accounts are created in the app.</p>
+        <form id="sub-login" class="sub-login" novalidate>
+          <label>Username<input type="text" name="username" autocomplete="username" required></label>
+          <label>Password<input type="password" name="password" autocomplete="current-password" required></label>
+          <div id="sub-2fa" hidden>
+            <label>Email <span class="sub-hint">(first time only)</span><input type="email" name="email" autocomplete="email"></label>
+            <label>Code<input type="text" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6"></label>
+          </div>
+          <button type="submit" class="btn btn-primary">Sign in</button>
+          <p id="sub-login-error" class="sub-error" hidden></p>
+        </form>
+        <p id="sub-signed-in" class="sub-signed-in" hidden></p>
+      </div>
 
       <div class="period-switch" role="tablist" aria-label="Billing period">
         <button type="button" class="period-btn" data-period="monthly" role="tab">Monthly</button>
@@ -138,21 +153,6 @@
         </details>
       </div>
 
-      <div id="sub-account" class="sub-account">
-        <p class="sub-account-copy">Sign in with your Kinrows account to continue. Accounts are created in the iPhone app.</p>
-        <form id="sub-login" class="sub-login" novalidate>
-          <label>Username<input type="text" name="username" autocomplete="username" required></label>
-          <label>Password<input type="password" name="password" autocomplete="current-password" required></label>
-          <div id="sub-2fa" hidden>
-            <label>Email <span class="sub-hint">(first time only)</span><input type="email" name="email" autocomplete="email"></label>
-            <label>Code<input type="text" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6"></label>
-          </div>
-          <button type="submit" class="btn btn-primary">Sign in</button>
-          <p id="sub-login-error" class="sub-error" hidden></p>
-        </form>
-        <p id="sub-signed-in" class="sub-signed-in" hidden></p>
-      </div>
-
       <p class="sub-fine">
         Billed securely by Stripe in your local currency — Apple Pay, Google Pay, or card. Cancel anytime from this page (Manage billing) or your Stripe receipt.
         iPhone purchases stay on the App Store. See <a href="terms.html#subscriptions">Terms</a>
@@ -189,15 +189,23 @@
 (function () {
   const qs = new URLSearchParams(location.search);
   const banner = document.getElementById('sub-banner');
+  const account = document.getElementById('sub-account');
   const showBanner = (text, kind) => {
     banner.hidden = false;
     banner.dataset.kind = kind || 'info';
     banner.textContent = text;
+    banner.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   };
   if (qs.get('canceled')) showBanner('Checkout was canceled. Nothing was charged.', 'info');
 
   let period = 'yearly';
   let catalogCurrency = 'cad';
+  let billingAvailable = true;
+  let pendingProductId = null;
+  let me = null;
+  const buyButtons = () => Array.from(document.querySelectorAll('.sub-buy'));
+  buyButtons().forEach((btn) => { if (!btn.dataset.label) btn.dataset.label = btn.textContent.trim(); });
+
   const money = (cents, code) => {
     try {
       return new Intl.NumberFormat(undefined, {
@@ -207,6 +215,18 @@
     } catch {
       return '$' + (Number(cents) / 100).toFixed(2);
     }
+  };
+  const paintBuyButtons = () => {
+    buyButtons().forEach((btn) => {
+      const label = btn.dataset.label || 'Subscribe';
+      if (!billingAvailable) {
+        btn.disabled = true;
+        btn.textContent = 'Web billing unavailable';
+        return;
+      }
+      btn.disabled = false;
+      btn.textContent = me ? label : 'Sign in to subscribe';
+    });
   };
   const setPeriod = (next) => {
     period = next;
@@ -221,6 +241,7 @@
   fetch('/api/subscription/catalog', { credentials: 'include' }).then((r) => r.json()).then((cat) => {
     if (!cat || !Array.isArray(cat.plans)) return;
     if (cat.currency) catalogCurrency = String(cat.currency).toLowerCase();
+    billingAvailable = cat.stripe !== false;
     const byId = Object.fromEntries(cat.plans.map((p) => [p.product_id, p]));
     document.querySelectorAll('.sub-card').forEach((card) => {
       const buy = card.querySelector('.sub-buy');
@@ -236,12 +257,9 @@
         const blurb = card.querySelector('.sub-blurb');
         if (blurb && chats) blurb.textContent = `Up to ${chats} concierge chats a day.`;
       }
-      if (cat.stripe === false) {
-        buy.disabled = true;
-        buy.textContent = 'Web billing unavailable';
-      }
     });
     setPeriod(period);
+    paintBuyButtons();
   }).catch(() => {});
 
   const json = async (method, path, body) => {
@@ -262,11 +280,12 @@
   const loginErr = document.getElementById('sub-login-error');
   let challenge = null;
   let twoFaStatus = null;
-  let me = null;
+  paintBuyButtons();
 
   const showSignedIn = (user, status) => {
     loginForm.hidden = true;
     signedIn.hidden = false;
+    account.classList.remove('is-needed');
     const bits = [`Signed in as ${user.name || user.username}.`];
     if (status && status.premium) {
       const label = status.tier === 'lite' ? 'Lite' : 'Premium';
@@ -280,12 +299,42 @@
       btn.className = 'btn btn-ghost';
       btn.textContent = 'Manage billing';
       btn.addEventListener('click', async () => {
-        const r = await json('POST', '/api/subscription/portal');
-        if (r.data && r.data.url) location.href = r.data.url;
-        else showBanner((r.data && r.data.error) || 'Could not open billing portal.', 'error');
+        try {
+          const r = await json('POST', '/api/subscription/portal');
+          if (r.data && r.data.url) { location.href = r.data.url; return; }
+          showBanner((r.data && r.data.error) || 'Could not open billing portal.', 'error');
+        } catch (err) {
+          showBanner((err && err.message) || 'Could not open billing portal.', 'error');
+        }
       });
       signedIn.appendChild(document.createTextNode(' '));
       signedIn.appendChild(btn);
+    }
+    paintBuyButtons();
+  };
+
+  const startCheckout = async (productId, btn) => {
+    if (!productId) {
+      showBanner('Pick a plan to continue.', 'error');
+      return;
+    }
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = 'Taking you to checkout…';
+    } else {
+      showBanner('Taking you to checkout…', 'info');
+    }
+    try {
+      const r = await json('POST', '/api/subscription/checkout', {
+        product_id: productId,
+        currency: catalogCurrency,
+      });
+      if (r.data && r.data.url) { location.href = r.data.url; return; }
+      showBanner((r.data && r.data.error) || 'Could not start checkout.', 'error');
+    } catch (err) {
+      showBanner((err && err.message) || 'Could not start checkout.', 'error');
+    } finally {
+      paintBuyButtons();
     }
   };
 
@@ -295,6 +344,11 @@
     me = r.data.user;
     const st = await json('GET', '/api/subscription/status');
     showSignedIn(r.data.user, st.data);
+    if (pendingProductId) {
+      const id = pendingProductId;
+      pendingProductId = null;
+      await startCheckout(id, null);
+    }
     return r.data.user;
   };
 
@@ -316,7 +370,7 @@
       if (status && status.premium) {
         const chats = status.chats_per_day || (status.tier === 'lite' ? 10 : 40);
         const label = status.tier === 'lite' ? 'Lite' : 'Premium';
-        showBanner(`You're on ${label} — up to ${chats} chats a day for the household. Open Kinrows on your iPhone. A confirmation email is on its way.`, 'success');
+        showBanner(`You are on ${label} — up to ${chats} chats a day for the household. Open Kinrows on your iPhone. A confirmation email is on its way.`, 'success');
         return;
       }
       await new Promise((r) => setTimeout(r, 1500));
@@ -326,6 +380,15 @@
       : 'Sign in with your Kinrows account to confirm Concierge is unlocked.', 'info');
   };
   if (qs.get('success')) confirmCheckout(qs.get('session_id'));
+
+  const askToSignIn = (productId) => {
+    pendingProductId = productId || null;
+    account.classList.add('is-needed');
+    showBanner('Sign in with your Kinrows account, then we will take you to checkout.', 'info');
+    account.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    const user = loginForm.querySelector('[name="username"]');
+    if (user) user.focus();
+  };
 
   loginForm.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -370,24 +433,14 @@
     }
   });
 
-  document.querySelectorAll('.sub-buy').forEach((btn) => {
+  buyButtons().forEach((btn) => {
     btn.addEventListener('click', async () => {
+      const productId = btn.dataset[period];
       if (!me) {
-        showBanner('Sign in with your Kinrows account first, then pick a plan.', 'info');
-        loginForm.querySelector('[name="username"]').focus();
+        askToSignIn(productId);
         return;
       }
-      btn.disabled = true;
-      try {
-        const r = await json('POST', '/api/subscription/checkout', {
-          product_id: btn.dataset[period],
-          currency: catalogCurrency,
-        });
-        if (r.data && r.data.url) { location.href = r.data.url; return; }
-        showBanner((r.data && r.data.error) || 'Could not start checkout.', 'error');
-      } finally {
-        btn.disabled = false;
-      }
+      await startCheckout(productId, btn);
     });
   });
 })();
