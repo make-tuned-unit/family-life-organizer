@@ -126,6 +126,9 @@ struct ChatSheet: View {
                                 .frame(width: 60)
                             }
                             .buttonStyle(.plain)
+                            .onAppear {
+                                profileCache.fetchIfNeeded(userId: partnerId, api: api)
+                            }
                         }
                     }
                     .padding(.horizontal, 16)
@@ -172,10 +175,14 @@ struct ChatSheet: View {
             }
             .task {
                 conversations = (try? await api.fetchConversations()) ?? []
+                for convo in conversations where (convo.has_avatar ?? 0) == 1 {
+                    profileCache.fetchIfNeeded(userId: convo.partner_id, api: api)
+                }
                 // Only multi-person family/clan groups get a group chat. A
                 // household is just the two parents — they chat via DM, which
                 // already lists household members below.
                 groups = ((try? await api.fetchGroups()) ?? []).filter { $0.group_type != "household" }
+                profileCache.loadFromGroups(groups, api: api)
                 if selectedThread == nil {
                     if let initial = initialThread {
                         selectedThread = initial

@@ -22,6 +22,8 @@ final class APIService {
     var baseURL: String
 
     private let session: URLSession
+    @ObservationIgnored private let inflightLock = NSLock()
+    @ObservationIgnored private var inflightGets: [String: Task<Data, Error>] = [:]
 
     // Single source of truth is AppConfig.apiBaseURL. The UserDefaults
     // override ("server_url") is honored in DEBUG only — in a release build a
@@ -39,7 +41,8 @@ final class APIService {
         let config = URLSessionConfiguration.default
         config.httpCookieAcceptPolicy = .always
         config.httpCookieStorage = .shared
-        config.timeoutIntervalForRequest = 20
+        config.waitsForConnectivity = true
+        config.timeoutIntervalForRequest = 8
         config.timeoutIntervalForResource = 60  // ceiling; AI-backed calls (concierge brief) can run long
         self.session = URLSession(configuration: config)
     }
@@ -190,6 +193,27 @@ final class APIService {
 
     func fetchDashboard() async throws -> DashboardData {
         try await get("/api/data")
+    }
+
+    /// Cold-launch Home payload — one GET instead of nine.
+    struct HomeBootstrap: Codable {
+        let summary: DailySummary?
+        let groceries: [GroceryResponse]
+        let tasks: [TaskResponse]
+        let appointments_today: [AppointmentResponse]
+        let next_appointment: AppointmentResponse?
+        let week_event_count: Int
+        let month_event_count: Int
+        let feed: [ActivityItem]
+        let trips: [TripResponse]
+        let sleep: [SleepNowSummary]
+        let chores: [ChoresTodaySummary]
+        let presence: [PresenceMember]
+        let groups: [GroupResponse]
+    }
+
+    func fetchHome() async throws -> HomeBootstrap {
+        try await get("/api/home")
     }
 
     // MARK: - Tasks
@@ -1002,7 +1026,8 @@ final class APIService {
         var member_count: Int?
         var created_by: Int?
         var created_at: String?
-        var profile_image: String?  // base64 — set via default so the memberwise init stays callable
+        var has_avatar: Int? = nil
+        var profile_image: String?  // legacy inline blob; list endpoints no longer send it
             = nil
     }
 
@@ -1015,6 +1040,7 @@ final class APIService {
         var user_name: String?
         var username: String?
         var user_avatar: String?
+        var has_avatar: Int?
         var profile_image: String?
         var contact_name: String?
         var relationship: String?
@@ -1315,6 +1341,7 @@ final class APIService {
         let id: Int
         var partner_id: Int
         var partner_name: String
+        var has_avatar: Int?
         var partner_image: String?
         var text: String
         var unread_count: Int
@@ -1742,9 +1769,51 @@ final class APIService {
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
         if let timeout { request.timeoutInterval = timeout }
-        let (data, response) = try await session.data(for: request)
-        try checkResponse(response, data: data)
+        let data = try await coalescedGET(url.absoluteString, request: request)
         return try JSONDecoder().decode(T.self, from: data)
+    }
+
+    /// Identical in-flight GETs share one URLSession task so launch fan-out
+    /// (conversations / groups / activity fetched from several .task blocks)
+    /// hits the network once.
+    private func coalescedGET(_ key: String, request: URLRequest) async throws -> Data {
+        inflightLock.lock()
+        if let existing = inflightGets[key] {
+            inflightLock.unlock()
+            return try await existing.value
+        }
+        let task = Task<Data, Error> {
+            defer {
+                self.inflightLock.lock()
+                self.inflightGets[key] = nil
+                self.inflightLock.unlock()
+            }
+            let (data, response) = try await self.performGET(request)
+            try self.checkResponse(response, data: data)
+            return data
+        }
+        inflightGets[key] = task
+        inflightLock.unlock()
+        return try await task.value
+    }
+
+    /// One retry on a dropped cellular GET. Never used for POST/PUT/DELETE —
+    /// those may have already committed on the server.
+    private func performGET(_ request: URLRequest) async throws -> (Data, URLResponse) {
+        do {
+            return try await session.data(for: request)
+        } catch {
+            guard !Task.isCancelled, Self.isRetryableGETFailure(error) else { throw error }
+            return try await session.data(for: request)
+        }
+    }
+
+    private static func isRetryableGETFailure(_ error: Error) -> Bool {
+        guard let urlError = error as? URLError else { return false }
+        switch urlError.code {
+        case .timedOut, .networkConnectionLost: return true
+        default: return false
+        }
     }
 
     private func post<T: Decodable>(_ path: String, body: Any, timeout: TimeInterval? = nil) async throws -> T {

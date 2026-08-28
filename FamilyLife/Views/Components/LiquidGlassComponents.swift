@@ -129,6 +129,7 @@ struct GroupAvatar: View {
     let groupId: Int
     let name: String
     var size: CGFloat = 32
+    var hasAvatar: Bool = true
     @Environment(APIService.self) private var api
     @Environment(ProfileImageCache.self) private var profileCache
 
@@ -144,7 +145,7 @@ struct GroupAvatar: View {
                 FamilyAvatar(initial: String(name.prefix(1)).uppercased(), size: size)
             }
         }
-        .onAppear { profileCache.fetchGroupIfNeeded(groupId: groupId, api: api) }
+        .onAppear { if hasAvatar { profileCache.fetchGroupIfNeeded(groupId: groupId, api: api) } }
     }
 }
 

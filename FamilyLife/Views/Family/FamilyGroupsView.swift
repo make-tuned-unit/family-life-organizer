@@ -76,7 +76,7 @@ struct FamilyGroupsView: View {
         isLoading = true
         do {
             groups = try await api.fetchGroups()
-            profileCache.loadFromGroups(groups)
+            profileCache.loadFromGroups(groups, api: api)
             // Load household members to separate them from wider family
             if let hhGroup = groups.first(where: { $0.group_type == "household" }) {
                 let members = (try? await api.fetchGroupMembers(groupId: hhGroup.id)) ?? []
@@ -103,7 +103,7 @@ struct FamilyGroupsView: View {
             Button { selectedGroup = hh } label: {
                 VStack(alignment: .leading, spacing: 8) {
                     HStack(spacing: 12) {
-                        GroupAvatar(groupId: hh.id, name: hh.name, size: 36)
+                        GroupAvatar(groupId: hh.id, name: hh.name, size: 36, hasAvatar: (hh.has_avatar ?? 0) == 1)
                         VStack(alignment: .leading, spacing: 2) {
                             Text(hh.name)
                                 .font(.flHeadline)
@@ -205,7 +205,7 @@ struct GroupRow: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            GroupAvatar(groupId: group.id, name: group.name, size: 32)
+            GroupAvatar(groupId: group.id, name: group.name, size: 32, hasAvatar: (group.has_avatar ?? 0) == 1)
             VStack(alignment: .leading, spacing: 2) {
                 Text(group.name)
                     .font(.flSubheadline.weight(.semibold))
@@ -491,12 +491,7 @@ struct GroupDetailView: View {
         guard groupImage == nil else { return }
         if let cached = profileCache.groupImage(for: group.id) {
             groupImage = cached
-        } else if let base64 = group.profile_image,
-                  let data = Data(base64Encoded: base64),
-                  let img = UIImage(data: data) {
-            groupImage = img
-            profileCache.setGroupImage(img, for: group.id)
-        } else {
+        } else if (group.has_avatar ?? 0) == 1 {
             profileCache.fetchGroupIfNeeded(groupId: group.id, api: api)
         }
     }

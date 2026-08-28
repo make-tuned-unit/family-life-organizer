@@ -1,5 +1,6 @@
 import CoreLocation
 import HealthKit
+import Network
 import SwiftUI
 
 enum MainTab: Hashable, CaseIterable {
@@ -342,39 +343,17 @@ struct MainTabView: View {
     private func pollUnread() async {
         var locationReportCounter = 0
         var stepSyncCounter = 18  // trigger on the second poll cycle, not the first
-        var isFirstPoll = true
         // Don't wipe delivered notifications on launch — that erased the user's
         // Notification Center history, including unread coverage/trip alerts
         // they hadn't acted on. Only clear stale PENDING (future) calendar ones.
         NotificationService.shared.removeStalePendingCalendarNotifications()
+        // New-message banners come from APNs (type=message) plus MessageCache.preload
+        // on launch — this loop only refreshes the tab badge.
+        let pathMonitor = NWPathMonitor()
+        pathMonitor.start(queue: DispatchQueue(label: "kinrows.poll-path"))
+        defer { pathMonitor.cancel() }
         while !Task.isCancelled {
-            // Update badge count
             unreadCount = (try? await api.fetchUnreadMessageCount()) ?? 0
-
-            // Fire local notifications for new messages (skip first poll to avoid flood on relaunch)
-            if await NotificationService.shared.isAuthorized() {
-                if isFirstPoll {
-                    // Catch up watermarks without firing notifications
-                    if let convos = try? await api.fetchConversations() {
-                        NotificationService.shared.syncWatermark(convos)
-                    }
-                    if let feed = try? await api.fetchActivity() {
-                        NotificationService.shared.syncFeedWatermark(feed)
-                    }
-                    isFirstPoll = false
-                } else {
-                    if let convos = try? await api.fetchConversations() {
-                        NotificationService.shared.checkForNewMessages(convos, currentUserId: auth.currentUser?.id)
-                    }
-                    let currentUser = auth.currentUser?.name ?? ""
-                    if let feed = try? await api.fetchActivity() {
-                        NotificationService.shared.checkForNewFeedItems(
-                            feed,
-                            currentUser: currentUser
-                        )
-                    }
-                }
-            }
 
             // Report location every ~5 minutes (every 20th poll cycle) — ONLY
             // if the user explicitly opted into household presence sharing.
@@ -398,7 +377,9 @@ struct MainTabView: View {
 
             await syncActiveTripTracking()
 
-            try? await Task.sleep(for: .seconds(15))
+            let path = pathMonitor.currentPath
+            let interval: Double = (path.isExpensive || path.isConstrained) ? 45 : 15
+            try? await Task.sleep(for: .seconds(interval))
         }
     }
 

@@ -57,6 +57,7 @@ final class HouseholdService {
         guard contactsResult != nil || groupsResult != nil else { return }
         let contacts = contactsResult ?? []
         let groups = groupsResult ?? []
+        profileCache?.loadFromGroups(groups, api: api)
 
             // Cache the household group for invite code display
             householdGroup = groups.first { $0.group_type == "household" }
@@ -74,7 +75,7 @@ final class HouseholdService {
             for group in groups {
                 let isHouseholdGroup = group.group_type == "household"
                 if let groupMembers = try? await api.fetchGroupMembers(groupId: group.id) {
-                    profileCache?.loadFromHousehold(groupMembers)
+                    profileCache?.loadFromHousehold(groupMembers, api: api)
 
                     for member in groupMembers {
                         let name = member.displayName

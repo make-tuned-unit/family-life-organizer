@@ -2838,8 +2838,10 @@ class FamilyDB {
   getGroupsByUser(userId) {
     return new Promise((resolve, reject) => {
       this.db.all(`
-        SELECT g.*, gm.role,
-          (SELECT COUNT(*) FROM group_members WHERE group_id = g.id) as member_count
+        SELECT g.id, g.name, g.group_type, g.description, g.invite_code,
+          g.created_by, g.created_at, gm.role,
+          (SELECT COUNT(*) FROM group_members WHERE group_id = g.id) as member_count,
+          CASE WHEN g.profile_image IS NOT NULL AND g.profile_image != '' THEN 1 ELSE 0 END as has_avatar
         FROM groups g
         JOIN group_members gm ON gm.group_id = g.id AND gm.user_id = ?
         ORDER BY g.group_type, g.name
@@ -2907,7 +2909,8 @@ class FamilyDB {
     return new Promise((resolve, reject) => {
       this.db.all(`
         SELECT gm.*,
-          u.name as user_name, u.username, u.avatar as user_avatar, u.profile_image,
+          u.name as user_name, u.username, u.avatar as user_avatar,
+          CASE WHEN u.profile_image IS NOT NULL AND u.profile_image != '' THEN 1 ELSE 0 END as has_avatar,
           c.name as contact_name, c.relationship, c.avatar_initial, c.phone as contact_phone
         FROM group_members gm
         LEFT JOIN users u ON u.id = gm.user_id
@@ -4161,7 +4164,11 @@ class FamilyDB {
   getConversations(userId) {
     return new Promise((resolve, reject) => {
       this.db.all(`
-        SELECT dm.*, u.name as partner_name, u.profile_image as partner_image,
+        SELECT dm.id, dm.sender_id, dm.recipient_id, dm.text, dm.reference_type,
+          dm.reference_id, dm.reference_title, dm.read_at, dm.created_at,
+          CASE WHEN dm.image_data IS NOT NULL THEN 1 ELSE 0 END as has_image,
+          u.name as partner_name,
+          CASE WHEN u.profile_image IS NOT NULL AND u.profile_image != '' THEN 1 ELSE 0 END as has_avatar,
           CASE WHEN dm.sender_id = ? THEN dm.recipient_id ELSE dm.sender_id END as partner_id,
           (SELECT COUNT(*) FROM direct_messages dm2
            WHERE dm2.sender_id = CASE WHEN dm.sender_id = ? THEN dm.recipient_id ELSE dm.sender_id END

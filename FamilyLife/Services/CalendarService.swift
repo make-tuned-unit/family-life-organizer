@@ -52,6 +52,8 @@ final class CalendarService {
     /// re-syncs to the household so the backend reflects the change.
     private(set) var storeVersion = 0
     @ObservationIgnored private var storeChangeObserver: (any NSObjectProtocol)?
+    @ObservationIgnored private var lastSyncFingerprint: String?
+    @ObservationIgnored private var syncDebounceTask: Task<Void, Never>?
 
     private let store = EKEventStore()
 
@@ -319,6 +321,7 @@ final class CalendarService {
 
     /// Uploads the user's selected calendars to the household for a rolling window
     /// (1 month back → 3 months ahead). No-op unless sharing is on and granted.
+    /// Skips the POST when the window hash matches the last successful upload.
     func syncToHousehold(api: APIService) async {
         guard shareEnabled, access == .granted,
               shareAllCalendars || !sharedCalendarIDs.isEmpty else { return }
@@ -328,9 +331,32 @@ final class CalendarService {
         let end = cal.date(byAdding: .month, value: 3, to: cal.startOfDay(for: now)) ?? now
         let events = await collectEventsForSync(from: start, to: end)
         let fmt = Self.syncDateFormatter
+        let windowStart = fmt.string(from: start)
+        let windowEnd = fmt.string(from: end)
+        let fingerprint = Self.fingerprint(events: events, windowStart: windowStart, windowEnd: windowEnd)
+        if fingerprint == lastSyncFingerprint { return }
         try? await api.syncCalendarEvents(events: events,
-                                          windowStart: fmt.string(from: start),
-                                          windowEnd: fmt.string(from: end))
+                                          windowStart: windowStart,
+                                          windowEnd: windowEnd)
+        lastSyncFingerprint = fingerprint
+    }
+
+    /// Coalesce EventKit change storms (~2s) so a burst of store notifications
+    /// does not POST the same 4-month snapshot repeatedly.
+    func debounceSyncToHousehold(api: APIService) {
+        syncDebounceTask?.cancel()
+        syncDebounceTask = Task { @MainActor in
+            try? await Task.sleep(for: .seconds(2))
+            guard !Task.isCancelled else { return }
+            await syncToHousehold(api: api)
+        }
+    }
+
+    private static func fingerprint(events: [[String: Any]], windowStart: String, windowEnd: String) -> String {
+        let rows = events.map { e in
+            "\(e["external_id"] ?? "")|\(e["starts_at"] ?? "")|\(e["ends_at"] ?? "")|\(e["title"] ?? "")"
+        }.sorted().joined(separator: "\n")
+        return "\(windowStart)|\(windowEnd)|\(rows)"
     }
 
     /// Reads events from the shared calendars and builds the JSON payload off-main.

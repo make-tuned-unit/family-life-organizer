@@ -45,6 +45,7 @@ const { runOnboardingEmailSweep } = require('./services/onboardingEmail');
 const householdInvite = require('./services/householdInvite');
 const appleSignIn = require('./services/appleSignIn');
 const crypto = require('crypto');
+const zlib = require('zlib');
 
 const IS_PROD = process.env.NODE_ENV === 'production';
 
@@ -252,6 +253,31 @@ app.use(helmet({
   // The server-rendered /login and /app pages set their own CSP (PAGE_CSP).
   contentSecurityPolicy: false,
 }));
+
+// Gzip JSON API bodies when the client asks. Uses Node zlib (no extra
+// package). SSE and HTML use res.write/res.send, not res.json, so they stay
+// uncompressed. URLSession already sends Accept-Encoding: gzip and inflates.
+function gzipJson(req, res, next) {
+  if (!/\bgzip\b/i.test(String(req.headers['accept-encoding'] || ''))) return next();
+  const originalJson = res.json.bind(res);
+  res.json = (body) => {
+    if (res.headersSent) return originalJson(body);
+    let payload;
+    try { payload = JSON.stringify(body); } catch { return originalJson(body); }
+    try {
+      const buf = zlib.gzipSync(Buffer.from(payload));
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      res.setHeader('Content-Encoding', 'gzip');
+      res.setHeader('Vary', 'Accept-Encoding');
+      res.setHeader('Content-Length', String(buf.length));
+      return res.end(buf);
+    } catch {
+      return originalJson(body);
+    }
+  };
+  next();
+}
+app.use(gzipJson);
 
 // CSP for the server-rendered pages. Their markup relies on inline <script>/
 // <style>/handlers, so 'unsafe-inline' stays — but external script loading,
@@ -2892,6 +2918,41 @@ app.get('/api/data', requireAuth, async (req, res) => {
   }
 });
 
+// Appointments in [dateFrom, dateTo], with recurrence expanded the same way
+// GET /api/appointments does. Used by that list route and by GET /api/home so
+// Home does not issue three appointment queries.
+async function appointmentsInRange(db, userId, { dateFrom, dateTo, person } = {}) {
+  const filters = {};
+  if (dateFrom) filters.date_from = dateFrom;
+  if (dateTo) filters.date_to = dateTo;
+  if (person) filters.person = person;
+  const appointments = await db.getAppointments(filters, userId);
+
+  if (!filters.date_from && !filters.date_to) return appointments;
+
+  const rangeStart = filters.date_from ? new Date(filters.date_from + 'T00:00:00') : new Date('2020-01-01');
+  const rangeEnd = filters.date_to ? new Date(filters.date_to + 'T23:59:59') : new Date('2030-12-31');
+  const recurring = await db.getRecurringAppointments(userId);
+  const existingDates = new Set(appointments.map(a => `${a.id}-${a.appointment_date}`));
+  for (const appt of recurring) {
+    const originDate = new Date(appt.appointment_date + 'T12:00:00Z');
+    const endDate = appt.recurrence_end ? new Date(appt.recurrence_end + 'T23:59:59Z') : null;
+    const occurrences = expandRecurrence(appt.recurrence_rule, originDate, rangeStart, new Date(rangeEnd.getTime() + 86400000), endDate);
+    for (const date of occurrences) {
+      const dateStr = date.toISOString().slice(0, 10);
+      if (filters.date_from && dateStr < filters.date_from) continue;
+      if (filters.date_to && dateStr > filters.date_to) continue;
+      const key = `${appt.id}-${dateStr}`;
+      if (!existingDates.has(key)) {
+        appointments.push({ ...appt, appointment_date: dateStr, _recurring_source: appt.id });
+        existingDates.add(key);
+      }
+    }
+  }
+  appointments.sort((a, b) => (a.appointment_date + (a.appointment_time || '')).localeCompare(b.appointment_date + (b.appointment_time || '')));
+  return appointments;
+}
+
 app.post('/api/appointments', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
@@ -2949,36 +3010,11 @@ app.get('/api/tasks', requireAuth, async (req, res) => {
 app.get('/api/appointments', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
-    const filters = {};
-    if (req.query.date_from) filters.date_from = req.query.date_from;
-    if (req.query.date_to) filters.date_to = req.query.date_to;
-    if (req.query.person) filters.person = req.query.person;
-    const appointments = await db.getAppointments(filters, req.session.user.id);
-
-    // Expand recurring events into the queried date range
-    if (filters.date_from || filters.date_to) {
-      const rangeStart = filters.date_from ? new Date(filters.date_from + 'T00:00:00') : new Date('2020-01-01');
-      const rangeEnd = filters.date_to ? new Date(filters.date_to + 'T23:59:59') : new Date('2030-12-31');
-      const recurring = await db.getRecurringAppointments(req.session.user.id);
-      const existingDates = new Set(appointments.map(a => `${a.id}-${a.appointment_date}`));
-      for (const appt of recurring) {
-        const originDate = new Date(appt.appointment_date + 'T12:00:00Z');
-        const endDate = appt.recurrence_end ? new Date(appt.recurrence_end + 'T23:59:59Z') : null;
-        const occurrences = expandRecurrence(appt.recurrence_rule, originDate, rangeStart, new Date(rangeEnd.getTime() + 86400000), endDate);
-        for (const date of occurrences) {
-          const dateStr = date.toISOString().slice(0, 10);
-          if (filters.date_from && dateStr < filters.date_from) continue;
-          if (filters.date_to && dateStr > filters.date_to) continue;
-          const key = `${appt.id}-${dateStr}`;
-          if (!existingDates.has(key)) {
-            appointments.push({ ...appt, appointment_date: dateStr, _recurring_source: appt.id });
-            existingDates.add(key);
-          }
-        }
-      }
-      appointments.sort((a, b) => (a.appointment_date + (a.appointment_time || '')).localeCompare(b.appointment_date + (b.appointment_time || '')));
-    }
-
+    const appointments = await appointmentsInRange(db, req.session.user.id, {
+      dateFrom: req.query.date_from,
+      dateTo: req.query.date_to,
+      person: req.query.person,
+    });
     res.json(appointments);
   } catch (err) {
     sendServerError(res, err);
@@ -6298,111 +6334,178 @@ async function resolveSubjectBirthdate(db, routine, callerId) {
 
 // Today's chores for Home: each chores routine the caller can see, with the
 // slots still open today and this week's earnings — so ticking off "fed the
-// dog" is one tap from the front page. MUST stay above `/api/routines/:id`.
+// dog" is one tap from the front page. Shared with GET /api/home.
+async function choresTodayForUser(db, userId) {
+  const groupId = await db.getUserHouseholdId(userId);
+  if (!groupId) return [];
+  const routines = (await db.getRoutines(groupId, userId))
+    .filter(r => r.active !== 0 && r.routine_type === 'chores')
+    .slice(0, 4);
+  const entriesBy = await db.getRoutineEntriesForIds(routines.map(r => r.id), { limitPer: 1000 });
+  const out = [];
+  for (const routine of routines) {
+    const entries = entriesBy.get(routine.id) || [];
+    const birthdate = await resolveSubjectBirthdate(db, routine, userId);
+    const summary = chores.compute(entries, routine.config, { today: todayLocal(), birthdate });
+    const todayCol = summary.chores.map(c => {
+      const d = c.days.find(x => x.today);
+      return { id: c.id, title: c.title, icon: c.icon, applies: !!d?.applies, slots: d ? d.slots : [] };
+    }).filter(c => c.applies);
+    out.push({
+      routine_id: routine.id,
+      name: routine.name,
+      subject_name: routine.subject_name,
+      color: routine.color,
+      today: summary.today,
+      chores: todayCol,
+      open_slots: todayCol.reduce((n, c) => n + c.slots.filter(s => !s.done).length, 0),
+      total_slots: todayCol.reduce((n, c) => n + c.slots.length, 0),
+      streak_days: summary.streak_days,
+      lifetime_done: summary.lifetime_done,
+      week_total: summary.earnings.total,
+      currency: summary.earnings.currency,
+    });
+  }
+  return out;
+}
+
+// MUST stay above `/api/routines/:id`.
 app.get('/api/routines/chores-today', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
-    const userId = req.session.user?.id;
-    const groupId = await db.getUserHouseholdId(userId);
-    if (!groupId) return res.json([]);
-    const routines = (await db.getRoutines(groupId, userId))
-      .filter(r => r.active !== 0 && r.routine_type === 'chores')
-      .slice(0, 4);
-    const entriesBy = await db.getRoutineEntriesForIds(routines.map(r => r.id), { limitPer: 1000 });
-    const out = [];
-    for (const routine of routines) {
-      const entries = entriesBy.get(routine.id) || [];
-      const birthdate = await resolveSubjectBirthdate(db, routine, userId);
-      const summary = chores.compute(entries, routine.config, { today: todayLocal(), birthdate });
-      const todayCol = summary.chores.map(c => {
-        const d = c.days.find(x => x.today);
-        return { id: c.id, title: c.title, icon: c.icon, applies: !!d?.applies, slots: d ? d.slots : [] };
-      }).filter(c => c.applies);
-      out.push({
-        routine_id: routine.id,
-        name: routine.name,
-        subject_name: routine.subject_name,
-        color: routine.color,
-        today: summary.today,
-        chores: todayCol,
-        open_slots: todayCol.reduce((n, c) => n + c.slots.filter(s => !s.done).length, 0),
-        total_slots: todayCol.reduce((n, c) => n + c.slots.length, 0),
-        streak_days: summary.streak_days,
-        lifetime_done: summary.lifetime_done,
-        week_total: summary.earnings.total,
-        currency: summary.earnings.currency,
-      });
-    }
-    res.json(out);
+    res.json(await choresTodayForUser(db, req.session.user?.id));
   } catch (err) { sendServerError(res, err); }
   finally { db.close(); }
 });
 
 // The live sleep picture for Home: for each sleep routine the caller can see,
 // whether they are asleep or awake right now, how long it has been, and when
-// the next sleep is likely due. Deliberately its own small endpoint rather than
-// "fetch every routine, then fetch every detail" — Home renders this above the
-// fold on every launch.
-//
+// the next sleep is likely due. Shared with GET /api/home.
+async function sleepNowForUser(db, userId) {
+  const groupId = await db.getUserHouseholdId(userId);
+  if (!groupId) return [];
+  const routines = (await db.getRoutines(groupId, userId))
+    .filter(r => r.active !== 0 && ['baby_sleep', 'sleep_training'].includes(r.routine_type))
+    // Home has room for a couple of these; more than that belongs in Routines.
+    .slice(0, 4);
+
+  const ids = routines.map(r => r.id);
+  const [entriesBy, openBy] = await Promise.all([
+    db.getRoutineEntriesForIds(ids, { limitPer: 120 }),
+    db.getOpenSleepEntriesForIds(ids),
+  ]);
+  const out = [];
+  for (const routine of routines) {
+    const entries = entriesBy.get(routine.id) || [];
+    const birthdate = await resolveSubjectBirthdate(db, routine, userId);
+
+    // A sleep in progress wins: the useful line then is "asleep 40m", and the
+    // next-sleep prediction is meaningless until they wake.
+    const open = openBy.get(routine.id) || null;
+    let openValue = null;
+    if (open) { try { openValue = JSON.parse(open.value || 'null'); } catch { openValue = null; } }
+    const asleepSince = openValue?.sleep_start || null;
+
+    const nextSleep = asleepSince ? null : sleepStats.nextSleepWindow(entries, { birthdate });
+    const stats = sleepStats.compute(entries, { birthdate, today: todayLocal() });
+
+    out.push({
+      routine_id: routine.id,
+      name: routine.name,
+      subject_name: routine.subject_name,
+      routine_type: routine.routine_type,
+      color: routine.color,
+      state: asleepSince ? 'asleep' : 'awake',
+      // Which kind of sleep is running, so the bar can say "napping" rather
+      // than the wrong one of the two at 8pm.
+      asleep_kind: asleepSince ? open.entry_type : null,
+      asleep_since: asleepSince,
+      // Null when there is no finished sleep to measure from — the client must
+      // then say nothing rather than count from an invented moment.
+      awake_since: nextSleep ? nextSleep.last_wake_at : null,
+      last_sleep_type: nextSleep ? nextSleep.last_sleep_type : null,
+      next_sleep: nextSleep,
+      bedtime_prep: sleepStats.bedtimePrep(stats),
+      last_night_minutes: stats.totals.last_night_minutes,
+      // Only surfaced when it is a real observation rather than a zero from
+      // an unlogged night.
+      avg_wakings: stats.totals.avg_wakings,
+    });
+  }
+  return out;
+}
+
 // MUST stay above `/api/routines/:id` — "sleep-now" would otherwise be read as
 // a routine id.
 app.get('/api/routines/sleep-now', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
-    const userId = req.session.user?.id;
-    const groupId = await db.getUserHouseholdId(userId);
-    if (!groupId) return res.json([]);
-    const routines = (await db.getRoutines(groupId, userId))
-      .filter(r => r.active !== 0 && ['baby_sleep', 'sleep_training'].includes(r.routine_type))
-      // Home has room for a couple of these; more than that belongs in Routines.
-      .slice(0, 4);
-
-    const ids = routines.map(r => r.id);
-    const [entriesBy, openBy] = await Promise.all([
-      db.getRoutineEntriesForIds(ids, { limitPer: 120 }),
-      db.getOpenSleepEntriesForIds(ids),
-    ]);
-    const out = [];
-    for (const routine of routines) {
-      const entries = entriesBy.get(routine.id) || [];
-      const birthdate = await resolveSubjectBirthdate(db, routine, userId);
-
-      // A sleep in progress wins: the useful line then is "asleep 40m", and the
-      // next-sleep prediction is meaningless until they wake.
-      const open = openBy.get(routine.id) || null;
-      let openValue = null;
-      if (open) { try { openValue = JSON.parse(open.value || 'null'); } catch { openValue = null; } }
-      const asleepSince = openValue?.sleep_start || null;
-
-      const nextSleep = asleepSince ? null : sleepStats.nextSleepWindow(entries, { birthdate });
-      const stats = sleepStats.compute(entries, { birthdate, today: todayLocal() });
-
-      out.push({
-        routine_id: routine.id,
-        name: routine.name,
-        subject_name: routine.subject_name,
-        routine_type: routine.routine_type,
-        color: routine.color,
-        state: asleepSince ? 'asleep' : 'awake',
-        // Which kind of sleep is running, so the bar can say "napping" rather
-        // than the wrong one of the two at 8pm.
-        asleep_kind: asleepSince ? open.entry_type : null,
-        asleep_since: asleepSince,
-        // Null when there is no finished sleep to measure from — the client must
-        // then say nothing rather than count from an invented moment.
-        awake_since: nextSleep ? nextSleep.last_wake_at : null,
-        last_sleep_type: nextSleep ? nextSleep.last_sleep_type : null,
-        next_sleep: nextSleep,
-        bedtime_prep: sleepStats.bedtimePrep(stats),
-        last_night_minutes: stats.totals.last_night_minutes,
-        // Only surfaced when it is a real observation rather than a zero from
-        // an unlogged night.
-        avg_wakings: stats.totals.avg_wakings,
-      });
-    }
-    res.json(out);
+    res.json(await sleepNowForUser(db, req.session.user?.id));
   } catch (err) { sendServerError(res, err); }
   finally { db.close(); }
+});
+
+// Cold-launch bootstrap for Home: one round trip instead of nine GETs.
+// Same household / owner scoping as the per-resource routes it replaces.
+// No base64. Register this exact path BEFORE any `/api/home/:param` sibling.
+app.get('/api/home', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const userId = req.session.user?.id;
+    const today = todayLocal();
+    const weekEnd = fromLocalDate(7);
+    const monthEnd = fromLocalDate(30);
+    const householdId = await db.getUserHouseholdId(userId);
+    const feedLimit = clampLimit(req.query.limit, 20, 50);
+
+    const [
+      summary,
+      groceries,
+      tasks,
+      monthAppointments,
+      feed,
+      trips,
+      sleep,
+      chores,
+      presence,
+      groups,
+    ] = await Promise.all([
+      db.getDailySummary(userId),
+      db.getGroceries('needed', userId),
+      db.getTasks({ status: 'active' }, userId),
+      appointmentsInRange(db, userId, { dateFrom: today, dateTo: monthEnd }),
+      db.getActivityFeed(feedLimit, userId),
+      householdId ? db.getTrips({ status: 'active' }, householdId) : Promise.resolve([]),
+      sleepNowForUser(db, userId),
+      choresTodayForUser(db, userId),
+      db.getHouseholdPresence(userId),
+      db.getGroupsByUser(userId),
+    ]);
+
+    const appointmentsToday = monthAppointments.filter(a => a.appointment_date === today);
+    const weekEventCount = monthAppointments.filter(a => a.appointment_date >= today && a.appointment_date <= weekEnd).length;
+    const nextAppointment = monthAppointments.find(a => a.appointment_date > today) || null;
+
+    res.json({
+      summary,
+      groceries,
+      tasks,
+      appointments_today: appointmentsToday,
+      next_appointment: nextAppointment,
+      week_event_count: weekEventCount,
+      month_event_count: monthAppointments.length,
+      feed,
+      trips,
+      sleep,
+      chores,
+      presence,
+      groups,
+    });
+  } catch (err) {
+    sendServerError(res, err);
+  } finally {
+    db.close();
+  }
 });
 
 app.get('/api/routines/:id', requireAuth, async (req, res) => {

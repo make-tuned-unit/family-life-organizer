@@ -143,6 +143,9 @@ struct FamilyLifeApp: App {
                     }
                     if authService.isAuthenticated {
                         subscriptionService.start(api: apiService)
+                        if let userId = authService.currentUser?.id {
+                            profileImageCache.setOwner(userId)
+                        }
                         await householdService.reload(api: apiService, profileCache: profileImageCache, currentUserId: authService.currentUser?.id)
                         if let userId = authService.currentUser?.id {
                             messageCache.preload(api: apiService, userId: userId)
@@ -153,13 +156,16 @@ struct FamilyLifeApp: App {
                             }
                         }
                         await authService.checkAppleCredentialState()
-                        await calendarService.syncToHousehold(api: apiService)
+                        Task { await calendarService.syncToHousehold(api: apiService) }
                     }
                 }
                 .onChange(of: authService.isAuthenticated) { _, isAuthenticated in
                     if isAuthenticated {
                         subscriptionService.start(api: apiService)
                         Task {
+                            if let userId = authService.currentUser?.id {
+                                profileImageCache.setOwner(userId)
+                            }
                             await householdService.reload(api: apiService, profileCache: profileImageCache, currentUserId: authService.currentUser?.id)
                             // Re-register for push on login
                             if await NotificationService.shared.isAuthorized() {
@@ -202,7 +208,7 @@ struct FamilyLifeApp: App {
                 // (and any stale tombstones from a partial read heal themselves).
                 .onChange(of: calendarService.storeVersion) {
                     guard authService.isAuthenticated else { return }
-                    Task { await calendarService.syncToHousehold(api: apiService) }
+                    calendarService.debounceSyncToHousehold(api: apiService)
                 }
                 .preferredColorScheme(.light)
         }

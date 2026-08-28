@@ -31,6 +31,8 @@ final class HomeViewModel {
     /// Today's chore slots per child, for the Home chore bar. Empty unless the
     /// household keeps a chores routine.
     var choresToday: [ChoresTodaySummary] = []
+    var groups: [APIService.GroupResponse] = []
+    var presenceMembers: [APIService.PresenceMember] = []
     var isLoading = false
     var error: String?
     var visibleFeedCount = 15
@@ -48,70 +50,41 @@ final class HomeViewModel {
         error = nil
         clearStaleDismissals()
 
-        // Cache dismissed IDs once instead of reading UserDefaults per appointment
         let dismissed = dismissedHeroIds
-
-        var firstError: String?
-        async let d = Self.safeFetch { try await api.fetchDashboard() }
-        async let t = Self.safeFetch { try await api.fetchTasks(status: "active") }
-        async let a = Self.safeFetch { try await api.fetchAppointments(dateFrom: Self.todayString(), dateTo: Self.todayString()) }
-        async let aWeek = Self.safeFetch { try await api.fetchAppointments(dateFrom: Self.todayString(), dateTo: Self.dateString(daysFromNow: 7)) }
-        async let aMonth = Self.safeFetch { try await api.fetchAppointments(dateFrom: Self.todayString(), dateTo: Self.dateString(daysFromNow: 30)) }
-        async let f = Self.safeFetch { try await api.fetchActivity() }
-        async let tr = Self.safeFetch { try await api.fetchTrips(status: "active") }
-        async let sn = Self.safeFetch { try await api.fetchSleepNow() }
-        async let ch = Self.safeFetch { try await api.fetchChoresToday() }
-
-        let (dashboard, tasks, appointments, weekAppts, monthAppts, feed, trips, sleep, chores) = await (d, t, a, aWeek, aMonth, f, tr, sn, ch)
-
-        // Batch apply — single re-render
-        if let data = dashboard.value {
-            summary = data.summary
-            groceries = data.groceries
-        } else if let e = dashboard.error { firstError = firstError ?? e }
-
-        if let tasks = tasks.value { activeTasks = tasks }
-        else if let e = tasks.error { firstError = firstError ?? e }
-
-        if let appointments = appointments.value {
-            let now = Date()
-            todayAppointments = appointments
-                .filter { appt in
-                    guard let timeStr = appt.appointment_time,
-                          let eventTime = Self.todayDate(from: timeStr) else { return true }
-                    return now < eventTime.addingTimeInterval(30 * 60)
-                }
-                .filter { !dismissed.contains($0.id) }
-                .sorted { ($0.appointment_time ?? "") < ($1.appointment_time ?? "") }
-        } else if let e = appointments.error { firstError = firstError ?? e }
-
-        weekEventCount = weekAppts.value?.count ?? 0
-        monthEventCount = monthAppts.value?.count ?? 0
-
-        // When no events today, surface the next upcoming event from the month
-        if todayAppointments.isEmpty {
-            let today = Self.todayString()
-            let allUpcoming = (monthAppts.value ?? weekAppts.value ?? [])
-                .filter { $0.appointment_date > today }
-                .sorted { ($0.appointment_date, $0.appointment_time ?? "") < ($1.appointment_date, $1.appointment_time ?? "") }
-            nextAppointment = allUpcoming.first
-        } else {
-            nextAppointment = nil
+        let result = await Self.safeFetch { try await api.fetchHome() }
+        if let home = result.value {
+            applyBootstrap(home, dismissed: dismissed)
+        } else if let e = result.error {
+            error = e
         }
-
-        if let feed = feed.value { activityFeed = Self.prepareFeed(feed, currentUserName: currentUserName, currentUsername: currentUsername) }
-        else if let e = feed.error { firstError = firstError ?? e }
-
-        if let trips = trips.value { activeTrips = trips }
-
-        // A missing sleep routine is not an error worth showing — the bar just
-        // doesn't appear. Only replace what we have on a successful fetch, so a
-        // dropped request doesn't blank a bar that was correct a moment ago.
-        if let sleep = sleep.value { sleepNow = sleep }
-        if let chores = chores.value { choresToday = chores }
-
-        error = firstError
         isLoading = false
+    }
+
+    private func applyBootstrap(_ home: APIService.HomeBootstrap, dismissed: Set<Int>) {
+        summary = home.summary
+        groceries = home.groceries
+        activeTasks = home.tasks
+        groups = home.groups
+        presenceMembers = home.presence
+
+        let now = Date()
+        todayAppointments = home.appointments_today
+            .filter { appt in
+                guard let timeStr = appt.appointment_time,
+                      let eventTime = Self.todayDate(from: timeStr) else { return true }
+                return now < eventTime.addingTimeInterval(30 * 60)
+            }
+            .filter { !dismissed.contains($0.id) }
+            .sorted { ($0.appointment_time ?? "") < ($1.appointment_time ?? "") }
+
+        weekEventCount = home.week_event_count
+        monthEventCount = home.month_event_count
+        nextAppointment = todayAppointments.isEmpty ? home.next_appointment : nil
+
+        activityFeed = Self.prepareFeed(home.feed, currentUserName: currentUserName, currentUsername: currentUsername)
+        activeTrips = home.trips
+        sleepNow = home.sleep
+        choresToday = home.chores
     }
 
     func reloadTrips(api: APIService) async {
@@ -385,9 +358,5 @@ final class HomeViewModel {
 
     private static func todayString() -> String {
         DateFormatter.isoDate.string(from: Date())
-    }
-
-    static func dateString(daysFromNow days: Int) -> String {
-        DateFormatter.isoDate.string(from: Calendar.current.date(byAdding: .day, value: days, to: Date())!)
     }
 }

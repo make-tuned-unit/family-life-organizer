@@ -13,13 +13,11 @@ struct HomeView: View {
     @State private var showingNewPost = false
     @State private var showingSettings = false
     @State private var onThisDay: [MilestoneResponse] = []
-    @State private var presenceMembers: [APIService.PresenceMember] = []
     @State private var eventRange = 0 // 0=today, 1=week, 2=month
     enum FeedFilter: Equatable {
         case all, forYou, group(Int)
     }
     @State private var feedFilter: FeedFilter = .all
-    @State private var userGroups: [APIService.GroupResponse] = []
     @State private var showingFeedFilter = false
     @State private var selectedFeedEvent: AppointmentResponse?
     @State private var selectedFeedRivalry: RivalryResponse?
@@ -239,18 +237,8 @@ struct HomeView: View {
         }
         .task {
             await viewModel.loadAll(api: api, userName: auth.currentUser?.name, username: auth.currentUser?.username)
-            userGroups = (try? await api.fetchGroups()) ?? []
-            presenceMembers = (try? await api.fetchHouseholdPresence()) ?? []
             checkFeedNotifications()
-            await checkMessageNotifications()
             await pollLiveHomeData()
-        }
-        .onChange(of: selectedTab) {
-            if selectedTab == .home {
-                Task {
-                    await viewModel.loadAll(api: api, userName: auth.currentUser?.name, username: auth.currentUser?.username)
-                }
-            }
         }
     }
 
@@ -266,20 +254,14 @@ struct HomeView: View {
         }
     }
 
-    private func checkMessageNotifications() async {
-        do {
-            let convos = try await api.fetchConversations()
-            guard await NotificationService.shared.isAuthorized() else { return }
-            NotificationService.shared.checkForNewMessages(convos, currentUserId: auth.currentUser?.id)
-        } catch {}
-    }
-
     private func pollLiveHomeData() async {
         while !Task.isCancelled {
             try? await Task.sleep(for: .seconds(15))
             await viewModel.reloadTrips(api: api)
             await viewModel.reloadSleepNow(api: api)
-            presenceMembers = (try? await api.fetchHouseholdPresence()) ?? presenceMembers
+            if let presence = try? await api.fetchHouseholdPresence() {
+                viewModel.presenceMembers = presence
+            }
         }
     }
 
@@ -436,7 +418,7 @@ struct HomeView: View {
     }
 
     private var currentLocationLabel: String {
-        let me = presenceMembers.first { $0.id == auth.currentUser?.id }
+        let me = viewModel.presenceMembers.first { $0.id == auth.currentUser?.id }
         return me?.last_location_name ?? "Home"
     }
 
@@ -467,7 +449,7 @@ struct HomeView: View {
             return ("car.fill", "\(trip.traveler.capitalized) is on the way to \(trip.destination).")
         }
 
-        let othersAway = presenceMembers.filter { member in
+        let othersAway = viewModel.presenceMembers.filter { member in
             member.id != auth.currentUser?.id
             && member.last_location_name != nil
             && member.last_location_name != "Home"
@@ -837,7 +819,7 @@ struct HomeView: View {
         switch feedFilter {
         case .all: "All"
         case .forYou: "For You"
-        case .group(let id): userGroups.first { $0.id == id }?.name ?? "Group"
+        case .group(let id): viewModel.groups.first { $0.id == id }?.name ?? "Group"
         }
     }
 
@@ -853,7 +835,7 @@ struct HomeView: View {
 
     /// All groups the user belongs to (for feed filter dropdown)
     private var feedGroups: [(id: Int, name: String)] {
-        userGroups.map { (id: $0.id, name: $0.name) }.sorted { $0.name < $1.name }
+        viewModel.groups.map { (id: $0.id, name: $0.name) }.sorted { $0.name < $1.name }
     }
 
     private var filteredFeed: [PreparedFeedItem] {
