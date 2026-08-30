@@ -14,7 +14,26 @@ enum AppleNonce {
 
 /// Official Sign in with Apple control, sized to match `.flCTA`.
 struct AppleSignInButton: View {
-    var label: SignInWithAppleButton.Label = .signIn
+    enum Label {
+        case signIn
+        case signUp
+
+        var appleLabel: SignInWithAppleButton.Label {
+            switch self {
+            case .signIn: .signIn
+            case .signUp: .signUp
+            }
+        }
+
+        var accessibilityText: String {
+            switch self {
+            case .signIn: "Sign in with Apple"
+            case .signUp: "Sign up with Apple"
+            }
+        }
+    }
+
+    var label: Label = .signIn
     var inviteCode: String? = nil
     var householdName: String? = nil
     /// When set, the identity token is handed to the caller instead of signing in.
@@ -26,7 +45,7 @@ struct AppleSignInButton: View {
     @State private var isWorking = false
 
     var body: some View {
-        SignInWithAppleButton(label) { request in
+        SignInWithAppleButton(label.appleLabel) { request in
             rawNonce = AppleNonce.random()
             request.requestedScopes = [.fullName, .email]
             request.nonce = AppleNonce.sha256(rawNonce)
@@ -38,7 +57,7 @@ struct AppleSignInButton: View {
         .frame(height: 52)
         .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
         .disabled(isWorking)
-        .accessibilityLabel(label == .signUp ? "Sign up with Apple" : "Sign in with Apple")
+        .accessibilityLabel(Text(verbatim: label.accessibilityText))
     }
 
     @MainActor

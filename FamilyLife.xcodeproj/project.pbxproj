@@ -861,7 +861,7 @@
 				CODE_SIGN_ENTITLEMENTS = FamilyLife/FamilyLifeDebug.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 237;
+				CURRENT_PROJECT_VERSION = 238;
 				DEVELOPMENT_ASSET_PATHS = "";
 				DEVELOPMENT_TEAM = Z58XSBM78S;
 				ENABLE_PREVIEWS = YES;
@@ -872,6 +872,7 @@
 				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "Kinrows reads your device calendars (including those synced from Google) to show them with your family schedule, can add Kinrows events to your iPhone calendar, and — only if you turn sharing on — sends the calendars you pick to your household.";
 				INFOPLIST_KEY_NSCameraUsageDescription = "Kinrows uses your camera to scan receipts.";
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "Kinrows reads your step count and flights climbed to score fitness rivalries you join and to show daily activity on your dashboard.";
+				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Kinrows accesses HealthKit only to read your step count and flights climbed for fitness rivalries and does not write data to HealthKit.";
 				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "Kinrows can keep sharing your trip location in the background until you arrive or cancel the trip.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Kinrows uses your location during active trips to share your ETA, and (only if you turn it on) to show your approximate place on your family's presence row.";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Kinrows uses the microphone so you can talk to your Concierge instead of typing.";
@@ -905,7 +906,7 @@
 				CODE_SIGN_ENTITLEMENTS = FamilyLife/FamilyLife.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 237;
+				CURRENT_PROJECT_VERSION = 238;
 				DEVELOPMENT_ASSET_PATHS = "";
 				DEVELOPMENT_TEAM = Z58XSBM78S;
 				ENABLE_PREVIEWS = YES;
@@ -916,6 +917,7 @@
 				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "Kinrows reads your device calendars (including those synced from Google) to show them with your family schedule, can add Kinrows events to your iPhone calendar, and — only if you turn sharing on — sends the calendars you pick to your household.";
 				INFOPLIST_KEY_NSCameraUsageDescription = "Kinrows uses your camera to scan receipts.";
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "Kinrows reads your step count and flights climbed to score fitness rivalries you join and to show daily activity on your dashboard.";
+				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Kinrows accesses HealthKit only to read your step count and flights climbed for fitness rivalries and does not write data to HealthKit.";
 				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "Kinrows can keep sharing your trip location in the background until you arrive or cancel the trip.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Kinrows uses your location during active trips to share your ETA, and (only if you turn it on) to show your approximate place on your family's presence row.";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Kinrows uses the microphone so you can talk to your Concierge instead of typing.";

@@ -910,11 +910,11 @@ struct HomeView: View {
                     onRoutineTap: { routineId in selectedFeedRoutine = FeedRoutineTarget(id: routineId) },
                     onMilestoneTap: { personId in Task { await openFeedPerson(id: personId) } },
                     onDecisionTap: { decisionId in Task { await openFeedDecision(id: decisionId) } },
-                    onConciergeTap: { selectedTab = .concierge },
                     onKeyDateTap: { personId in
                         // Unattached (household-wide) dates live in People → Household dates.
                         if let personId { Task { await openFeedPerson(id: personId) } } else { showingPeople = true }
-                    }
+                    },
+                    onConciergeTap: { selectedTab = .concierge }
                 )
                 .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
                 .padding(.bottom, 10)

@@ -1779,26 +1779,28 @@ final class APIService {
     /// (conversations / groups / activity fetched from several .task blocks)
     /// hits the network once.
     private func coalescedGET(_ key: String, request: URLRequest) async throws -> Data {
-        inflightLock.lock()
-        if let existing = inflightGets[key] {
-            inflightLock.unlock()
-            return try await existing.value
-        }
-        let task = Task<Data, Error> {
-            defer {
-                self.inflightLock.lock()
-                self.inflightGets[key] = nil
-                self.inflightLock.unlock()
+        let task: Task<Data, Error> = inflightLock.withLock {
+            if let existing = inflightGets[key] {
+                return existing
             }
-            let (data, response) = try await self.performGET(request)
-            try self.checkResponse(response, data: data)
-            if let http = response as? HTTPURLResponse, http.statusCode == 304, data.isEmpty {
-                throw APIError.notModified
+
+            let task = Task<Data, Error> {
+                defer {
+                    self.inflightLock.withLock {
+                        self.inflightGets[key] = nil
+                    }
+                }
+                let (data, response) = try await self.performGET(request)
+                try self.checkResponse(response, data: data)
+                if let http = response as? HTTPURLResponse, http.statusCode == 304, data.isEmpty {
+                    throw APIError.notModified
+                }
+                return data
             }
-            return data
+            inflightGets[key] = task
+            return task
         }
-        inflightGets[key] = task
-        inflightLock.unlock()
+
         return try await task.value
     }
 
