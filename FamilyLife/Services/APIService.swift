@@ -426,7 +426,9 @@ final class APIService {
         guard cloudAIEnabled else { throw APIError.cloudAIDisabled }
         let base64 = imageData.base64EncodedString()
         let body: [String: Any] = ["image": base64]
-        return try await post("/api/receipts/scan", body: body)
+        // Vision calls can take longer than the normal 8-second request budget,
+        // especially on a large library image or a cold AI service.
+        return try await post("/api/receipts/scan", body: body, timeout: 60)
     }
 
     @discardableResult
@@ -1790,6 +1792,9 @@ final class APIService {
             }
             let (data, response) = try await self.performGET(request)
             try self.checkResponse(response, data: data)
+            if let http = response as? HTTPURLResponse, http.statusCode == 304, data.isEmpty {
+                throw APIError.notModified
+            }
             return data
         }
         inflightGets[key] = task
@@ -1856,6 +1861,7 @@ final class APIService {
             NotificationCenter.default.post(name: Self.unauthorizedNotification, object: nil)
             throw APIError.unauthorized
         }
+        if http.statusCode == 304 { return }
         guard (200...299).contains(http.statusCode) else {
             // Surface the server's own {error: "..."} message when it sent one —
             // "You can only add your own contacts" beats "Server error (403)".
@@ -1878,6 +1884,7 @@ enum APIError: LocalizedError {
     case serverMessage(Int, String)
     case cloudAIDisabled
     case streamError(String)
+    case notModified
 
     var errorDescription: String? {
         switch self {
@@ -1887,6 +1894,7 @@ enum APIError: LocalizedError {
         case .serverMessage(_, let message): message
         case .cloudAIDisabled: "Cloud AI is off. Turn it on in Settings → Privacy to use this feature."
         case .streamError(let msg): msg
+        case .notModified: "Not modified"
         }
     }
 }
@@ -1895,5 +1903,10 @@ extension Error {
     /// True for both Swift CancellationError and URLSession cancellation
     var isCancellation: Bool {
         self is CancellationError || (self as? URLError)?.code == .cancelled
+    }
+
+    var isNotModified: Bool {
+        if case .notModified = self as? APIError { return true }
+        return false
     }
 }

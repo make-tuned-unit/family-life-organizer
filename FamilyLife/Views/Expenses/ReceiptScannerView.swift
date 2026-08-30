@@ -152,6 +152,9 @@ struct ReceiptScannerView: View {
                 )
             }
         }
+        // Match the sheet's outer presentation surface to the scanner content;
+        // otherwise the system's default white surface appears as side strips.
+        .presentationBackground { AmbientBackground(style: .expenses) }
     }
 
     // MARK: - Source Picker
@@ -436,9 +439,17 @@ struct ReceiptScannerView: View {
         guard let selectedPhoto else { return }
         Task {
             guard let data = try? await selectedPhoto.loadTransferable(type: Data.self) else { return }
-            imageData = data
-            scanImage(data)
+            // PhotosPicker can return HEIC/PNG data. Normalize library photos
+            // to JPEG so the server/vision provider receive a stable contract.
+            let scanData = normalizedScanImageData(data) ?? data
+            imageData = scanData
+            scanImage(scanData)
         }
+    }
+
+    private func normalizedScanImageData(_ data: Data) -> Data? {
+        guard let image = UIImage(data: data) else { return nil }
+        return image.jpegData(compressionQuality: 0.85)
     }
 
     private func scanImage(_ data: Data) {
@@ -473,7 +484,10 @@ struct ReceiptScannerView: View {
                 selectedCategory = category
                 UINotificationFeedbackGenerator().notificationOccurred(.success)
             } catch {
-                self.error = "Could not scan receipt. Try adding manually."
+                let detail = error.localizedDescription
+                self.error = detail == "Server error (503)" || detail.localizedCaseInsensitiveContains("temporarily unavailable")
+                    ? "Receipt scanning is temporarily unavailable. Try adding manually."
+                    : "Could not scan receipt: \(detail)"
                 UINotificationFeedbackGenerator().notificationOccurred(.error)
             }
             isScanning = false

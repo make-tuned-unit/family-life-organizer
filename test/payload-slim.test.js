@@ -199,3 +199,15 @@ test('JSON GETs gzip when the client asks; uncompressed when they do not', async
   const inflated = zlib.gunzipSync(gz.body).toString('utf8');
   assert.deepEqual(JSON.parse(inflated), parsed);
 });
+
+test('receipt scan rejects a missing image before invoking the AI provider', async () => {
+  const c = makeClient();
+  const reg = await c('POST', '/api/auth/register', {
+    username: 'slim_scan', password: 'password123', name: 'Scan User',
+  });
+  assert.equal(reg.status, 200);
+
+  const response = await c('POST', '/api/receipts/scan', {});
+  assert.equal(response.status, 400);
+  assert.equal(response.body.error, 'Receipt image is required');
+});

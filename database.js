@@ -3353,7 +3353,7 @@ class FamilyDB {
     });
   }
 
-  getFeedPosts(groupId, { limit = 50, before_id } = {}) {
+  getFeedPosts(groupId, { limit = 50, before_id, after_id } = {}) {
     const all = (sql, p) => new Promise((res, rej) => this.db.all(sql, p, (e, rows) => e ? rej(e) : res(rows || [])));
     return (async () => {
       let sql = `
@@ -3365,7 +3365,10 @@ class FamilyDB {
         WHERE fp.group_id = ?
       `;
       const params = [groupId];
-      if (before_id) {
+      if (after_id) {
+        sql += ' AND fp.id > ?';
+        params.push(after_id);
+      } else if (before_id) {
         sql += ' AND fp.id < ?';
         params.push(before_id);
       }
@@ -4185,7 +4188,7 @@ class FamilyDB {
     });
   }
 
-  getMessages(userId, partnerId, { limit = 50, before_id } = {}) {
+  getMessages(userId, partnerId, { limit = 50, before_id, after_id } = {}) {
     return new Promise((resolve, reject) => {
       let sql = `
         SELECT dm.id, dm.sender_id, dm.recipient_id, dm.text, dm.reference_type,
@@ -4197,7 +4200,8 @@ class FamilyDB {
         WHERE ((dm.sender_id = ? AND dm.recipient_id = ?) OR (dm.sender_id = ? AND dm.recipient_id = ?))
       `;
       const params = [userId, partnerId, partnerId, userId];
-      if (before_id) { sql += ' AND dm.id < ?'; params.push(before_id); }
+      if (after_id) { sql += ' AND dm.id > ?'; params.push(after_id); }
+      else if (before_id) { sql += ' AND dm.id < ?'; params.push(before_id); }
       sql += ' ORDER BY dm.id DESC LIMIT ?';
       params.push(limit);
       this.db.all(sql, params, (err, rows) => err ? reject(err) : resolve(rows || []));

@@ -279,6 +279,60 @@ function gzipJson(req, res, next) {
 }
 app.use(gzipJson);
 
+// Weak ETag for read-mostly GETs. Hash includes userId so a cached 304 cannot
+// be an oracle across accounts. Cache-Control is private + no-cache: store,
+// but always revalidate. Auth routes must not use this.
+function sendCachedJson(req, res, userId, body) {
+  const payload = JSON.stringify(body);
+  const etag = `W/"${crypto.createHash('sha1').update(`${userId}\n${payload}`).digest('hex').slice(0, 16)}"`;
+  res.setHeader('ETag', etag);
+  res.setHeader('Cache-Control', 'private, no-cache');
+  const inm = String(req.headers['if-none-match'] || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (inm.includes(etag)) {
+    res.status(304).end();
+    return;
+  }
+  res.json(body);
+}
+
+function decodeStoredImage(stored) {
+  if (stored == null || stored === '') return null;
+  let s = String(stored).trim();
+  const marker = 'base64,';
+  const idx = s.indexOf(marker);
+  if (idx !== -1) s = s.slice(idx + marker.length);
+  const buf = Buffer.from(s, 'base64');
+  return buf.length ? buf : null;
+}
+
+function wantsBinaryImage(req) {
+  if (String(req.query.format || '') === 'json') return false;
+  const accept = String(req.headers.accept || '');
+  if (/\bimage\/(jpeg|jpg|png|\*)\b/i.test(accept)) return true;
+  if (/\bapplication\/json\b/i.test(accept) && !/\bimage\//i.test(accept)) return false;
+  return true;
+}
+
+function sendStoredImage(req, res, stored, jsonKey = 'image') {
+  if (stored == null || stored === '') return false;
+  if (!wantsBinaryImage(req)) {
+    res.setHeader('Cache-Control', 'private, no-cache');
+    res.json({ [jsonKey]: stored });
+    return true;
+  }
+  const buf = decodeStoredImage(stored);
+  if (!buf) return false;
+  const isJpeg = buf[0] === 0xff && buf[1] === 0xd8;
+  res.setHeader('Content-Type', isJpeg ? 'image/jpeg' : 'image/png');
+  res.setHeader('Cache-Control', 'private, no-cache');
+  res.setHeader('Content-Length', String(buf.length));
+  res.end(buf);
+  return true;
+}
+
 // CSP for the server-rendered pages. Their markup relies on inline <script>/
 // <style>/handlers, so 'unsafe-inline' stays — but external script loading,
 // fetch/XHR exfiltration, and remote image beacons are all blocked, which
@@ -1658,7 +1712,7 @@ app.get('/api/users/:id/avatar', requireAuth, async (req, res) => {
       db.db.get('SELECT profile_image FROM users WHERE id = ?', [targetId], (err, row) => err ? reject(err) : resolve(row));
     });
     if (!row?.profile_image) return res.status(404).json({ error: 'No avatar' });
-    res.json({ image: row.profile_image });
+    if (!sendStoredImage(req, res, row.profile_image)) return res.status(404).json({ error: 'No avatar' });
   } catch (err) {
     sendServerError(res, err);
   } finally {
@@ -1694,7 +1748,7 @@ app.get('/api/groups/:id/avatar', requireAuth, async (req, res) => {
     }
     const image = await db.getGroupAvatar(req.params.id);
     if (!image) return res.status(404).json({ error: 'No avatar' });
-    res.json({ image });
+    if (!sendStoredImage(req, res, image)) return res.status(404).json({ error: 'No avatar' });
   } catch (err) {
     sendServerError(res, err);
   } finally {
@@ -3166,7 +3220,7 @@ app.get('/api/appointments/:year/:month', requireAuth, async (req, res) => {
     }
 
     appointments.sort((a, b) => (a.appointment_date + (a.appointment_time || '')).localeCompare(b.appointment_date + (b.appointment_time || '')));
-    res.json(appointments);
+    sendCachedJson(req, res, userId, appointments);
   } catch (err) {
     sendServerError(res, err);
   } finally {
@@ -3574,6 +3628,10 @@ app.post('/api/receipts/scan', requireAuth, conciergeLimiter, aiDailyLimiter, as
   try {
     const { image } = req.body;
 
+    if (typeof image !== 'string' || image.length === 0) {
+      return res.status(400).json({ error: 'Receipt image is required' });
+    }
+
     if (!process.env.ANTHROPIC_API_KEY) {
       // Mock scan result when no API key
       res.json({
@@ -3593,12 +3651,22 @@ app.post('/api/receipts/scan', requireAuth, conciergeLimiter, aiDailyLimiter, as
       return;
     }
 
+    // The iOS client normalizes library photos to JPEG, but keep this endpoint
+    // correct for other clients too: Anthropic rejects a declared media type
+    // that does not match the uploaded bytes (HEIC is not supported).
+    const imageData = image.replace(/^data:image\/[a-z0-9.+-]+;base64,/i, '');
+    const bytes = Buffer.from(imageData, 'base64');
+    let mediaType = 'image/jpeg';
+    if (bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47) mediaType = 'image/png';
+    else if (bytes[0] === 0x47 && bytes[1] === 0x49 && bytes[2] === 0x46) mediaType = 'image/gif';
+    else if (bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46 && bytes.slice(8, 12).toString('ascii') === 'WEBP') mediaType = 'image/webp';
+
     const text = await ai.callClaude({
       maxTokens: 1500,
       messages: [{
         role: 'user',
         content: [
-          { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: image } },
+          { type: 'image', source: { type: 'base64', media_type: mediaType, data: imageData } },
           { type: 'text', text: 'Extract receipt data. Use Kids for children\'s clothing, shoes, school supplies, toys, activities, and child-specific purchases. Return ONLY valid JSON: {"merchant":"store name","date":"YYYY-MM-DD","total":0.00,"category":"Groceries|Dining Out|Gas/Transport|Household|Health|Pets|Entertainment|Kids|Other","items":[{"name":"item","price":0.00,"quantity":"1"}]}' }
         ]
       }]
@@ -3607,6 +3675,11 @@ app.post('/api/receipts/scan', requireAuth, conciergeLimiter, aiDailyLimiter, as
     receipt.category = normalizeReceiptCategory(receipt);
     res.json(receipt);
   } catch (err) {
+    const message = String(err?.message || '');
+    if (/credit balance|plans? & billing|rate.?limit|overloaded/i.test(message)) {
+      console.error('[receipt-scan] upstream unavailable:', message);
+      return res.status(503).json({ error: 'Receipt scanning is temporarily unavailable. Please try again later or add the receipt manually.' });
+    }
     sendServerError(res, err);
   }
 });
@@ -5961,7 +6034,8 @@ app.get('/api/groups/:id/feed', requireAuth, async (req, res) => {
     }
     const posts = await db.getFeedPosts(req.params.id, {
       limit: clampLimit(req.query.limit, 50),
-      before_id: req.query.before_id ? parseInt(req.query.before_id) : undefined
+      before_id: req.query.before_id ? parseInt(req.query.before_id) : undefined,
+      after_id: req.query.after_id ? parseInt(req.query.after_id) : undefined,
     });
     res.json(posts);
   } catch (err) {
@@ -6008,7 +6082,8 @@ app.get('/api/feed/:id/photo', requireAuth, async (req, res) => {
   try {
     if (!(await requireFeedPostMember(db, req.params.id, req, res))) return;
     const row = await dbGet(db, 'SELECT photo_url FROM feed_posts WHERE id = ?', [req.params.id]);
-    res.json({ photo_url: row?.photo_url || null });
+    if (!row?.photo_url) return res.status(404).json({ error: 'No image' });
+    if (!sendStoredImage(req, res, row.photo_url, 'photo_url')) return res.status(404).json({ error: 'No image' });
   } catch (err) {
     sendServerError(res, err);
   } finally {
@@ -6486,7 +6561,7 @@ app.get('/api/home', requireAuth, async (req, res) => {
     const weekEventCount = monthAppointments.filter(a => a.appointment_date >= today && a.appointment_date <= weekEnd).length;
     const nextAppointment = monthAppointments.find(a => a.appointment_date > today) || null;
 
-    res.json({
+    sendCachedJson(req, res, userId, {
       summary,
       groceries,
       tasks,
@@ -6957,7 +7032,7 @@ app.get('/api/messages/unread-count', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
     const count = await db.getUnreadCount(req.session.user.id);
-    res.json({ count });
+    sendCachedJson(req, res, req.session.user.id, { count });
   } catch (err) { sendServerError(res, err); }
   finally { db.close(); }
 });
@@ -6976,7 +7051,8 @@ app.get('/api/messages/:partnerId', requireAuth, async (req, res) => {
   try {
     const messages = await db.getMessages(req.session.user.id, parseInt(req.params.partnerId), {
       limit: clampLimit(req.query.limit, 50),
-      before_id: req.query.before_id ? parseInt(req.query.before_id) : undefined
+      before_id: req.query.before_id ? parseInt(req.query.before_id) : undefined,
+      after_id: req.query.after_id ? parseInt(req.query.after_id) : undefined,
     });
     res.json(messages);
   } catch (err) { sendServerError(res, err); }
@@ -6988,7 +7064,7 @@ app.get('/api/messages/:partnerId/:messageId/image', requireAuth, async (req, re
   try {
     const image = await db.getMessageImage(parseInt(req.params.messageId), req.session.user?.id);
     if (!image) return res.status(404).json({ error: 'No image' });
-    res.json({ image });
+    if (!sendStoredImage(req, res, image)) return res.status(404).json({ error: 'No image' });
   } catch (err) { sendServerError(res, err); }
   finally { db.close(); }
 });
@@ -7046,7 +7122,7 @@ app.get('/api/activity', requireAuth, async (req, res) => {
   try {
     const userId = req.session.user?.id;
     const feed = await db.getActivityFeed(clampLimit(req.query.limit, 20), userId);
-    res.json(feed);
+    sendCachedJson(req, res, userId, feed);
   } catch (err) {
     sendServerError(res, err);
   } finally {
@@ -7111,7 +7187,7 @@ app.get('/api/lists', requireAuth, async (req, res) => {
   try {
     const userId = req.session.user?.id;
     const lists = await db.getLists(userId);
-    res.json(lists);
+    sendCachedJson(req, res, userId, lists);
   } catch (err) {
     sendServerError(res, err);
   } finally {
