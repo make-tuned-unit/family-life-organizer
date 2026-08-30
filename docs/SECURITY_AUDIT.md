@@ -43,6 +43,8 @@ they cannot collide with StoreKit original transaction ids.
 New bearer-key surface (`/v1/*`, `services/developerApi.js`, full reference in `docs/DEVELOPER_API.md`):
 
 - Keys: `kr_live_` + 256-bit random; SHA-256 at rest (`api_keys.key_hash`), plaintext shown once; `ON DELETE CASCADE` with the user. 10 active per user.
+- Remote MCP OAuth: dynamic public-client registration; authorization code with mandatory S256 PKCE; exact HTTPS/loopback redirect matching; ten-minute single-use codes; one-hour opaque access tokens; rotating refresh tokens; all credentials SHA-256 hashed at rest.
+- MCP DNS-rebinding defense: untrusted `Host`/browser `Origin` values are rejected before bearer authentication. Tool audit rows exclude request and response payloads.
 - Minting (`POST /api/developer/keys`) is `requireAuth + requirePremium`; revoke is session-auth only (lapsed subscribers can still clean up).
 - `requireApiKey` re-checks the household subscription on **every** `/v1` request (402 on lapse, 401 on revoke) — no entitlement caching on this path.
 - Every tool call is built with the key owner's `userId`/`groupId` and goes through `conciergeTools.run`, so the existing per-handler household guards apply unchanged. Cross-household test in `test/developer-api.test.js`.
@@ -199,7 +201,7 @@ code no longer uses them, but the exposed values are still in past commits.
 
 ## Residual / deferred (documented, lower risk)
 
-- **Dependency advisories** (`npm audit`): remaining highs are **not server-reachable** —
+- **Dependency advisories** (`npm audit`): the remaining advisories are **not server-reachable** —
   all in the `sqlite3 → node-gyp → tar/@tootallnate` build-time toolchain. Removed the
   dead `nodemailer`/`check-email.js` and the `imap-simple` email chain entirely.
   Follow-up: revisit a tested `sqlite3` major bump (or migrate to `better-sqlite3`).

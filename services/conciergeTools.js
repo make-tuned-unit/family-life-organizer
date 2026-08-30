@@ -3244,4 +3244,39 @@ function isReadOnly(name, input) {
   return !!handler && READ_HANDLER_RE.test(handler);
 }
 
-module.exports = { definitions, run, isReadOnly, TOOLS };
+// Machine-readable metadata for protocol adapters. Grouped tools deliberately
+// stay conservative: if any action can write or delete, the domain tool is
+// advertised that way. At call time the selected action is resolved exactly.
+function operationMetadata(name, input = {}) {
+  const group = GROUP_TOOLS.get(name);
+  const handlerName = group ? group._actions[input?.action] : (BY_NAME.has(name) ? name : null);
+  const handler = handlerName ? BY_NAME.get(handlerName) : null;
+  return {
+    exists: !!(group || handler),
+    handlerName,
+    readOnly: !!handlerName && READ_HANDLER_RE.test(handlerName),
+    destructive: !!handlerName && /^(delete_|cancel_)/.test(handlerName),
+  };
+}
+
+function mcpDefinitions() {
+  return definitions().map(def => {
+    const group = GROUP_TOOLS.get(def.name);
+    const handlers = group
+      ? Object.values(group._actions).map(name => BY_NAME.get(name))
+      : [BY_NAME.get(def.name)];
+    const readOnly = handlers.every(handler => handler && !handler.write);
+    const destructive = handlers.some(handler => handler && /^(delete_|cancel_)/.test(handler.name));
+    return {
+      ...def,
+      annotations: {
+        readOnlyHint: readOnly,
+        destructiveHint: destructive,
+        idempotentHint: readOnly,
+        openWorldHint: def.name === 'send_message' || def.name === 'coverage',
+      },
+    };
+  });
+}
+
+module.exports = { definitions, mcpDefinitions, operationMetadata, run, isReadOnly, TOOLS };

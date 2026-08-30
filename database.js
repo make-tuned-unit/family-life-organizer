@@ -249,7 +249,12 @@ class FamilyDB {
         this.db.run('CREATE INDEX IF NOT EXISTS idx_jobs_drain ON jobs(status, available_at, id)', () => {});
         this.db.run('ALTER TABLE users ADD COLUMN concierge_enabled INTEGER DEFAULT 0', () => {});
         this.db.run('ALTER TABLE users ADD COLUMN last_location_at DATETIME', (err) => {
-          if (err) console.error('Migration error:', err.message);
+          // Fresh databases already get this column from schema.sql. Treat the
+          // idempotent duplicate-column result as success while still surfacing
+          // genuine migration failures.
+          if (err && !/duplicate column name/i.test(err.message)) {
+            console.error('Migration error:', err.message);
+          }
           // budget_categories: rebuild to drop the global UNIQUE(name) so each
           // household can have its own same-named categories (e.g. "Groceries").
           // Must finish before resolve so the backfill sees the new column.

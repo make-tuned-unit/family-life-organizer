@@ -1,6 +1,6 @@
 # Kinrows Developer API — bring your own agent
 
-The Developer API lets a paid household plug **its own AI agent** into Kinrows. Whatever you run — Claude, ChatGPT, a Cursor/Claude Code session, a cron'd script, a home-grown bot — can read and manage the household exactly the way the built-in Concierge does: add tasks, edit lists, log expenses, move appointments, start polls, send family messages, log baby sleep, and so on (100+ actions across ~22 domain tools).
+The Developer API lets a paid household plug **its own AI agent** into Kinrows. Whatever you run — Claude, ChatGPT, a Cursor/Claude Code session, a cron'd script, a home-grown bot — can read and manage the household exactly the way the built-in Concierge does: 117 operations exposed through 23 focused domain tools.
 
 The public, user-facing version of this page is at **https://kinrows.com/developers.html**. This file is the engineering reference.
 
@@ -40,7 +40,7 @@ Authorization: Bearer kr_live_…
 | `GET` | `/v1/snapshot` | The household digest the Concierge daily brief is built from (today's tasks, appointments, open polls, pantry expiring, budget, trips, kids' chores open today (`choresToday`), …). Feed it to your agent as context. |
 | `GET` | `/v1/tools` | Tool catalog. Default is Anthropic shape (`name`, `description`, `input_schema`). `?format=openai` returns `{type:"function", function:{name, description, parameters}}`. Pass straight into your model's `tools` parameter. |
 | `POST` | `/v1/tools/:name` | Call a tool. Body is the tool's input, e.g. `{"action":"add","title":"Book dentist"}`. `200 {result}` · `400 {error}` (bad action / missing fields / handler error) · `403` (read-only key attempting a write). |
-| `POST` | `/v1/mcp` | **MCP server** (Streamable HTTP, stateless JSON-RPC 2.0). Supports `initialize`, `ping`, `tools/list`, `tools/call`; notifications get `202`; batches supported. `GET` → `405`, `DELETE` → `204`. |
+| `POST` | `/v1/mcp` | Full MCP Streamable HTTP server. The official SDK serves modern `2026-07-28` and stateless 2025-era clients from one registry. |
 
 Error statuses across `/v1`: `401` missing/invalid/revoked key · `402` no active subscription · `429` rate limited · `404` unknown route.
 
@@ -112,6 +112,38 @@ curl -s https://kinrows.com/v1/tools/routines \
 }
 ```
 
+Hosts with OAuth support only need the URL. Kinrows publishes protected-resource and authorization-server metadata, dynamically registers public clients, and uses authorization code + mandatory S256 PKCE:
+
+```json
+{
+  "mcpServers": {
+    "kinrows": { "url": "https://kinrows.com/v1/mcp" }
+  }
+}
+```
+
+The browser consent screen grants `kinrows:read` and, when requested, `kinrows:write`. Access tokens last one hour; refresh tokens rotate. Manual `kr_live_…` bearer headers remain supported for hosts without OAuth.
+
+### 3.3 MCP capabilities
+
+- **Tools:** all 23 consolidated Concierge tools, JSON Schema input validation, read/destructive/open-world annotations, a structured `{result: …}` alongside text fallback, and read/write scope enforcement.
+- **Destructive confirmation:** `delete` and `cancel` actions return `confirmation_required` unless the MCP caller retries with `confirm: true` after user approval. REST behavior is unchanged.
+- **Resources:** `kinrows://account/me`, `kinrows://household/snapshot`, `kinrows://developer/audit`, and `kinrows://household/snapshot/{section}`.
+- **Prompts:** `morning-brief`, `plan-week`, `household-check-in`, `trip-readiness`, and `chores-review`.
+- **Compatibility:** old clients that omit `Accept` retain the previous single-JSON response shape; spec-aware clients receive normal Streamable HTTP framing.
+- **Audit:** tool name, action, transport, read/write classification, outcome, and duration are retained. Tool inputs/results are deliberately not copied into the audit log.
+
+OAuth discovery endpoints:
+
+| Method | Path | Purpose |
+|---|---|---|
+| `GET` | `/.well-known/oauth-protected-resource/v1/mcp` | RFC 9728 protected-resource metadata. |
+| `GET` | `/.well-known/oauth-authorization-server` | Authorization-server metadata. |
+| `POST` | `/oauth/register` | Dynamic registration for public MCP clients. |
+| `GET/POST` | `/oauth/authorize` | Signed-in user consent and authorization-code issuance. |
+| `POST` | `/oauth/token` | Authorization-code exchange and rotating refresh. |
+| `POST` | `/oauth/revoke` | Access/refresh token revocation. |
+
 **Anthropic Messages API, hand-rolled loop:**
 
 ```js
@@ -138,7 +170,9 @@ for (;;) {
 
 - Keys are opaque 256-bit random values, hashed (SHA-256) at rest in `api_keys.key_hash`; only `key_prefix` (first 16 chars) is displayed afterwards.
 - The bearer middleware (`requireApiKey` in `dashboard.js`) re-checks the household's subscription on **every** request and stamps `last_used_at`.
+- OAuth authorization codes are single-use, expire after ten minutes, and are bound to the client, exact redirect URI, and S256 PKCE challenge. Access and refresh tokens are opaque and SHA-256 hashed at rest.
 - The rate limiter buckets on a hash of the bearer, never the raw key, so a guessed/bad key cannot collide with a real key's bucket.
+- MCP rejects untrusted `Host` and browser `Origin` values before authentication to prevent DNS rebinding. Production aliases must be explicit in `KINROWS_ALLOWED_HOSTS`; `KINROWS_PUBLIC_URL` controls discovery URLs behind a proxy.
 - `/v1` never touches the cookie session; a key cannot be used to log in, change the password/email, or delete the account — those routes live only under `/api` with session auth.
 - Deleting the account cascades `api_keys` (FK `ON DELETE CASCADE`).
 - Tool calls run with `ctx.source = 'developer_api'` should any handler ever need to distinguish agent traffic.
@@ -146,9 +180,12 @@ for (;;) {
 ## 5. Code map
 
 - `schema.sql` — `api_keys` table.
-- `services/developerApi.js` — key mint/list/revoke, bearer auth, scope check, catalog formats, MCP JSON-RPC.
+- `services/developerApi.js` — key mint/list/revoke, bearer auth, scope checks, catalog formats, and privacy-minimal audit records.
+- `services/mcpServer.js` — official SDK registry, transport compatibility, tools/resources/prompts, structured results, and confirmations.
+- `services/oauthServer.js` — OAuth discovery, client registration, authorization code + PKCE, token refresh, and revocation.
 - `services/conciergeTools.js` — `isReadOnly(name, input)` export.
 - `dashboard.js` — `/api/developer/keys*`, `app.use('/v1', developerLimiter, requireApiKey)`, `/v1/*` routes, `/developers` website route.
 - `FamilyLife/Views/Home/DeveloperAPIView.swift` + `APIService.fetch/create/revokeDeveloperKey` — Settings → Account → Developer API.
-- `test/developer-api.test.js` — 7 tests (port 3988).
+- `test/developer-api.test.js`, `test/mcp-modern.test.js`, `test/mcp-oauth.test.js`, `test/mcp-load.test.js` — legacy, modern SDK, OAuth, and bounded-concurrency coverage.
+- `npm run test:mcp:conformance` — official conformance smoke sweep for initialize, ping, and capability listings.
 - `website/developers.html` — public docs.

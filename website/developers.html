@@ -110,7 +110,7 @@
         <ul>
           <li>Open the app → <strong>Settings → Account → Developer API</strong> → <strong>Create key</strong>. Copy it — it is shown once.</li>
           <li>Send it as <code>Authorization: Bearer kr_live_…</code> to the <code>/v1</code> endpoints below, or point any MCP-capable agent at <code>/v1/mcp</code>.</li>
-          <li>Your agent gets the <strong>exact same 100+ actions</strong> our Concierge uses — tasks, lists, calendar, budget, pantry, polls, trips, messages, baby sleep, and more.</li>
+          <li>Your agent gets <strong>23 focused MCP tools covering all 117 Concierge actions</strong> — tasks, lists, calendar, budget, pantry, polls, trips, messages, baby sleep, and more.</li>
           <li>A key only ever acts on <strong>your</strong> household. Choose <strong>read-only</strong> if you just want your agent to see, not touch.</li>
           <li>Revoke a key any time; lapsed subscriptions switch keys off instantly.</li>
         </ul>
@@ -151,7 +151,7 @@
               <tr><td><code>GET</code></td><td><code>/v1/snapshot</code></td><td>A digest of the household right now (today's tasks and appointments, open polls, expiring pantry items, budget, live trips, kids' chores still open today…). Ideal context to hand your model before it acts.</td></tr>
               <tr><td><code>GET</code></td><td><code>/v1/tools</code></td><td>The tool catalog as JSON-schema definitions. Anthropic shape by default; add <code>?format=openai</code> for OpenAI function-calling shape.</td></tr>
               <tr><td><code>POST</code></td><td><code>/v1/tools/{name}</code></td><td>Call one tool. The body is the tool's input, e.g. <code>{"action":"add","title":"Book dentist"}</code>.</td></tr>
-              <tr><td><code>POST</code></td><td><code>/v1/mcp</code></td><td>A Model Context Protocol server (Streamable HTTP). Supports <code>initialize</code>, <code>tools/list</code>, <code>tools/call</code>, <code>ping</code>.</td></tr>
+              <tr><td><code>POST</code></td><td><code>/v1/mcp</code></td><td>Full Model Context Protocol server: tools, resources, prompts, structured results, and modern OAuth connection.</td></tr>
             </tbody>
           </table></div>
         </section>
@@ -179,7 +179,13 @@
 
         <section id="mcp">
           <h2><span class="h-num">4</span>Connect via MCP</h2>
-          <p>If your agent host speaks MCP (Claude Desktop, Claude Code, Cursor, ChatGPT connectors and many others), this is the one-line setup:</p>
+          <p>If your agent host supports MCP OAuth, give it just the URL. Kinrows will open a secure browser consent screen:</p>
+<pre><code>{
+  "mcpServers": {
+    "kinrows": { "url": "https://kinrows.com/v1/mcp" }
+  }
+}</code></pre>
+          <p>For hosts that need a manual bearer header, create a key in Settings and use:</p>
 <pre><code>{
   "mcpServers": {
     "kinrows": {
@@ -188,7 +194,21 @@
     }
   }
 }</code></pre>
-          <p>The server is stateless — no session IDs to manage — and your model will see every Kinrows tool immediately.</p>
+          <p>OAuth clients can request <code>kinrows:read</code> or <code>kinrows:read kinrows:write</code>. Kinrows uses authorization code flow with S256 PKCE, short-lived access tokens, rotating refresh tokens, and standard protected-resource discovery. Manual keys use the read-only or read/write scope selected when the key is created.</p>
+
+          <h3>What the MCP server exposes</h3>
+          <div class="tbl-wrap"><table>
+            <thead><tr><th>Capability</th><th>Available through Kinrows MCP</th></tr></thead>
+            <tbody>
+              <tr><td>Tools</td><td>23 model-friendly tools covering all 117 internal Concierge actions. Related operations are grouped behind a required <code>action</code> field.</td></tr>
+              <tr><td>Resources</td><td><code>kinrows://account/me</code>, <code>kinrows://household/snapshot</code>, <code>kinrows://developer/audit</code>, and <code>kinrows://household/snapshot/{section}</code>.</td></tr>
+              <tr><td>Prompts</td><td><code>morning-brief</code>, <code>plan-week</code>, <code>household-check-in</code>, <code>trip-readiness</code>, and <code>chores-review</code>.</td></tr>
+              <tr><td>Results</td><td>Every tool returns human-readable content plus structured JSON in <code>structuredContent.result</code>.</td></tr>
+              <tr><td>Safety</td><td>Read-only credentials cannot write. Delete and cancel actions require <code>confirm: true</code> before the underlying action runs.</td></tr>
+            </tbody>
+          </table></div>
+
+          <p>The server supports the current MCP protocol and older stateless clients. Household resources are private and should not be cached across users. Every call rechecks the credential, household boundary, scope, and active Concierge entitlement; the private activity audit stores operation metadata and outcomes, never household inputs or results.</p>
         </section>
 
         <section id="rest">
@@ -251,6 +271,8 @@ for (;;) {
           <ul>
             <li>A key is bound to one person and one household. It cannot see or touch any other household — the same database-level isolation that protects every Kinrows family applies to every API call.</li>
             <li>Keys are 256-bit random values, stored only as a hash. Revoke from the app at any time; it takes effect immediately.</li>
+            <li>OAuth clients use authorization code + S256 PKCE. Access and rotating refresh tokens are opaque, hashed at rest, and revocable.</li>
+            <li>The agent audit records which tool/action ran and its outcome, never a copy of the household input or result.</li>
             <li>A key can never log in, change your password or email, or delete your account. Those stay behind sign-in and two-factor in the app.</li>
             <li>Whatever your agent does with your data happens on <em>your</em> model and <em>your</em> provider under <em>your</em> terms. Kinrows still never sells data or uses it to train AI.</li>
             <li>Treat the key like a password. Anyone holding it can act as you inside your household.</li>

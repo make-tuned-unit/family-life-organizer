@@ -159,7 +159,7 @@ test('keys are scoped to their owner household (no cross-household leakage)', as
   assert.ok(!JSON.stringify(list.body).includes('Book dentist'), "bob's key must not see ada's tasks");
 });
 
-test('MCP endpoint: initialize, tools/list, tools/call, notifications, bad method', async () => {
+test('MCP endpoint: legacy clients get tools, structured calls, resources, prompts, notifications, and batches', async () => {
   const c = bearer(adaKey);
   const init = await c('POST', '/v1/mcp', { jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-03-26', capabilities: {}, clientInfo: { name: 't', version: '0' } } });
   assert.equal(init.status, 200);
@@ -175,15 +175,33 @@ test('MCP endpoint: initialize, tools/list, tools/call, notifications, bad metho
   const call = await c('POST', '/v1/mcp', { jsonrpc: '2.0', id: 3, method: 'tools/call', params: { name: 'tasks', arguments: { action: 'list' } } });
   assert.equal(call.body.result.isError, false);
   assert.ok(call.body.result.content[0].text.includes('Book dentist'));
+  assert.ok(call.body.result.structuredContent.result, 'tool result is also machine-readable');
 
   const ro = await bearer(adaReadKey)('POST', '/v1/mcp', { jsonrpc: '2.0', id: 4, method: 'tools/call', params: { name: 'tasks', arguments: { action: 'add', title: 'nope' } } });
   assert.equal(ro.body.result.isError, true);
 
-  const bad = await c('POST', '/v1/mcp', { jsonrpc: '2.0', id: 5, method: 'resources/list' });
-  assert.equal(bad.body.error.code, -32601);
+  const resources = await c('POST', '/v1/mcp', { jsonrpc: '2.0', id: 5, method: 'resources/list' });
+  assert.ok(resources.body.result.resources.some(r => r.uri === 'kinrows://household/snapshot'));
+  const snapshot = await c('POST', '/v1/mcp', { jsonrpc: '2.0', id: 8, method: 'resources/read', params: { uri: 'kinrows://household/snapshot' } });
+  assert.equal(snapshot.body.result.contents[0].mimeType, 'application/json');
+  assert.ok(JSON.parse(snapshot.body.result.contents[0].text).counts);
+
+  const prompts = await c('POST', '/v1/mcp', { jsonrpc: '2.0', id: 9, method: 'prompts/list' });
+  assert.ok(prompts.body.result.prompts.some(p => p.name === 'plan-week'));
+  const prompt = await c('POST', '/v1/mcp', { jsonrpc: '2.0', id: 10, method: 'prompts/get', params: { name: 'plan-week', arguments: {} } });
+  assert.match(prompt.body.result.messages[0].content.text, /kinrows:\/\/household\/snapshot/i);
+
+  const needsConfirm = await c('POST', '/v1/mcp', { jsonrpc: '2.0', id: 11, method: 'tools/call', params: { name: 'tasks', arguments: { action: 'delete', task_id: 999 } } });
+  assert.equal(needsConfirm.body.result.isError, true);
+  assert.equal(needsConfirm.body.result.structuredContent.result.confirmation_required, true);
 
   const batch = await c('POST', '/v1/mcp', [{ jsonrpc: '2.0', id: 6, method: 'ping' }, { jsonrpc: '2.0', id: 7, method: 'ping' }]);
   assert.equal(batch.body.length, 2);
+
+  const audit = await c('POST', '/v1/mcp', { jsonrpc: '2.0', id: 12, method: 'resources/read', params: { uri: 'kinrows://developer/audit' } });
+  const events = JSON.parse(audit.body.result.contents[0].text).events;
+  assert.ok(events.some(e => e.transport === 'mcp' && e.status === 'confirmation_required'));
+  assert.ok(events.some(e => e.transport === 'rest' && e.tool_name === 'tasks'));
 });
 
 test('revoking a key and lapsing the subscription both cut access', async () => {

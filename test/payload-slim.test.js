@@ -166,7 +166,7 @@ test('conversations, groups, and members omit image blobs and expose has_avatar'
   assert.equal(thread.has_avatar, 0);
   assert.equal(thread.has_image, 1, 'latest message was a photo but blob is not inlined');
 
-  const avatar = await a('GET', `/api/users/${aId}/avatar`);
+  const avatar = await a('GET', `/api/users/${aId}/avatar?format=json`);
   assert.equal(avatar.status, 200);
   assert.equal(avatar.body.image, JPEG_B64, 'dedicated avatar GET still returns the image');
 

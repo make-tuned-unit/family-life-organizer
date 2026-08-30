@@ -37,6 +37,8 @@ const { handleChat, handleChatStream } = require('./services/conciergeChat');
 const subscription = require('./services/subscription');
 const stripeBilling = require('./services/stripe');
 const developerApi = require('./services/developerApi');
+const mcpServer = require('./services/mcpServer');
+const oauthServer = require('./services/oauthServer');
 const { runProactiveSweep } = require('./services/conciergeNudge');
 const { announceRivalryCompletion } = require('./services/rivalryAnnounce');
 const { createRateLimiter } = require('./services/rateLimit');
@@ -489,6 +491,19 @@ function requireAuth(req, res, next) {
       res.redirect('/login');
     }
   }
+}
+
+function safeReturnTo(value, fallback = '/app') {
+  const target = String(value || '');
+  return target.startsWith('/') && !target.startsWith('//') && !/[\\\r\n]/.test(target) && target.length <= 2000
+    ? target
+    : fallback;
+}
+
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, ch => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+  })[ch]);
 }
 
 // Log the real error server-side; return an opaque 500 to the client so SQL/
@@ -1758,6 +1773,8 @@ app.get('/api/groups/:id/avatar', requireAuth, async (req, res) => {
 
 // Login page - Modern Design
 app.get('/login', (req, res) => {
+  const returnTo = safeReturnTo(req.query.return_to, '/app');
+  const oauthLogin = returnTo.startsWith('/oauth/authorize');
   res.set('Content-Security-Policy', PAGE_CSP);
   res.send(`<!DOCTYPE html>
 <html lang="en">
@@ -1950,7 +1967,11 @@ app.get('/login', (req, res) => {
     </div>
     ${req.query.error ? '<div class="error">Incorrect password. Please try again.</div>' : ''}
     <form method="POST" action="/login">
-      <div class="user-selector">
+      <input type="hidden" name="return_to" value="${escapeHtml(returnTo)}">
+      ${oauthLogin ? `<div class="password-section">
+        <label class="selector-label" for="oauth-username">Kinrows username</label>
+        <input id="oauth-username" type="text" name="username" class="password-input" autocomplete="username" required>
+      </div>` : `<div class="user-selector">
         <label class="selector-label">Who's signing in?</label>
         <div class="user-options">
           <label class="user-option">
@@ -1968,7 +1989,7 @@ app.get('/login', (req, res) => {
             </div>
           </label>
         </div>
-      </div>
+      </div>`}
       <div class="password-section">
         <input type="password" name="password" class="password-input" placeholder="Enter your password" required>
       </div>
@@ -1995,12 +2016,12 @@ app.post('/login', loginLimiter, async (req, res) => {
         return res.status(403).send('For your security, sign in from the Kinrows app. Two-factor authentication is required.');
       }
       await establishSession(req, { username: dbUser.username, name: dbUser.name, avatar: dbUser.avatar, id: dbUser.id });
-      return res.redirect('/app');
+      return res.redirect(safeReturnTo(req.body.return_to, '/app'));
     }
 
-    res.redirect('/login?error=1');
+    res.redirect(`/login?error=1&return_to=${encodeURIComponent(safeReturnTo(req.body.return_to, '/app'))}`);
   } catch (err) {
-    res.redirect('/login?error=1');
+    res.redirect(`/login?error=1&return_to=${encodeURIComponent(safeReturnTo(req.body?.return_to, '/app'))}`);
   } finally {
     db.close();
   }
@@ -4093,6 +4114,97 @@ app.post('/api/subscription/stripe', async (req, res) => {
 // surface below authenticates with the minted key instead. See
 // docs/DEVELOPER_API.md and services/developerApi.js.
 
+// OAuth discovery for MCP hosts. The path-specific RFC 9728 location is the
+// canonical one; the root alias helps clients that only probe the default.
+app.get(['/.well-known/oauth-protected-resource', '/.well-known/oauth-protected-resource/v1/mcp'], (req, res) => {
+  res.set('Cache-Control', 'public, max-age=300');
+  res.json(oauthServer.protectedResourceMetadata(req));
+});
+app.get('/.well-known/oauth-authorization-server', (req, res) => {
+  res.set('Cache-Control', 'public, max-age=300');
+  res.json(oauthServer.authorizationServerMetadata(req));
+});
+
+// RFC 7591 dynamic registration for public MCP clients. Redirect URIs are
+// constrained to HTTPS or loopback HTTP and exact-matched during authorization.
+app.post('/oauth/register', loginLimiter, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const client = await oauthServer.registerClient(db, req.body || {});
+    res.status(201).set('Cache-Control', 'no-store').json(client);
+  } catch (err) {
+    res.status(400).json({ error: 'invalid_client_metadata', error_description: err.message });
+  } finally { db.close(); }
+});
+
+app.get('/oauth/authorize', async (req, res) => {
+  if (!req.session.user) {
+    return res.redirect(`/login?return_to=${encodeURIComponent(safeReturnTo(req.originalUrl, '/oauth/authorize'))}`);
+  }
+  const db = new FamilyDB();
+  try {
+    const request = await oauthServer.authorizationRequest(db, req.session.user.id, req.query || {});
+    const nonce = crypto.randomBytes(24).toString('base64url');
+    req.session.oauthConsent = { nonce, params: req.query, userId: req.session.user.id };
+    res.set('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'");
+    res.set('Cache-Control', 'no-store');
+    res.send(`<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+      <title>Connect ${escapeHtml(request.client.client_name)} to Kinrows</title>
+      <style>body{font:16px system-ui;background:#f4f3ff;color:#201d36;display:grid;place-items:center;min-height:100vh;margin:0}.card{background:#fff;border-radius:20px;padding:32px;max-width:520px;box-shadow:0 14px 50px #30206022}h1{font-size:24px}li{margin:10px 0}.actions{display:flex;gap:12px;margin-top:24px}button{border:0;border-radius:10px;padding:12px 18px;font-weight:700;cursor:pointer}.allow{background:#6554c0;color:#fff}.deny{background:#eceaf5}</style>
+      </head><body><main class="card"><h1>Connect ${escapeHtml(request.client.client_name)}?</h1>
+      <p>This agent will act as <strong>${escapeHtml(req.session.user.name)}</strong> in your Kinrows household.</p>
+      <ul>${request.scopes.includes('kinrows:read') ? '<li>Read household data</li>' : ''}${request.scopes.includes('kinrows:write') ? '<li>Add and change household data</li>' : ''}</ul>
+      <p>Delete and cancel operations still require explicit confirmation.</p>
+      <form method="post" action="/oauth/authorize"><input type="hidden" name="nonce" value="${escapeHtml(nonce)}"><div class="actions"><button class="allow" name="decision" value="allow">Allow</button><button class="deny" name="decision" value="deny">Deny</button></div></form>
+      </main></body></html>`);
+  } catch (err) {
+    res.status(400).set('Cache-Control', 'no-store').send(`Authorization request rejected: ${escapeHtml(err.message)}`);
+  } finally { db.close(); }
+});
+
+app.post('/oauth/authorize', async (req, res) => {
+  const pending = req.session.oauthConsent;
+  delete req.session.oauthConsent;
+  if (!req.session.user || !pending || pending.userId !== req.session.user.id || pending.nonce !== req.body.nonce) {
+    return res.status(400).send('Authorization request expired. Start the connection again.');
+  }
+  const db = new FamilyDB();
+  try {
+    const request = await oauthServer.authorizationRequest(db, req.session.user.id, pending.params || {});
+    const redirect = new URL(request.redirectUri);
+    if (request.state) redirect.searchParams.set('state', request.state);
+    redirect.searchParams.set('iss', oauthServer.requestOrigin(req));
+    if (req.body.decision !== 'allow') {
+      redirect.searchParams.set('error', 'access_denied');
+      return res.redirect(redirect.href);
+    }
+    redirect.searchParams.set('code', await oauthServer.issueAuthorizationCode(db, req.session.user.id, request));
+    res.redirect(redirect.href);
+  } catch (err) {
+    res.status(400).send(`Authorization request rejected: ${escapeHtml(err.message)}`);
+  } finally { db.close(); }
+});
+
+app.post('/oauth/token', loginLimiter, async (req, res) => {
+  const db = new FamilyDB();
+  res.set('Cache-Control', 'no-store');
+  res.set('Pragma', 'no-cache');
+  try {
+    const result = await oauthServer.token(db, req.body || {});
+    const { tokenId: _tokenId, ...wire } = result;
+    res.json(wire);
+  } catch (err) {
+    res.status(400).json({ error: err.oauth || 'invalid_request', error_description: err.message });
+  } finally { db.close(); }
+});
+
+app.post('/oauth/revoke', async (req, res) => {
+  const db = new FamilyDB();
+  try { await oauthServer.revoke(db, req.body?.token); res.status(200).end(); }
+  catch (err) { sendServerError(res, err); }
+  finally { db.close(); }
+});
+
 app.get('/api/developer/keys', requireAuth, requirePremium, async (req, res) => {
   const db = new FamilyDB();
   try {
@@ -4144,7 +4256,8 @@ async function requireApiKey(req, res, next) {
     next();
   } catch (err) {
     if (err.status) {
-      res.set('WWW-Authenticate', 'Bearer realm="kinrows"');
+      const metadata = `${oauthServer.requestOrigin(req)}/.well-known/oauth-protected-resource/v1/mcp`;
+      res.set('WWW-Authenticate', `Bearer realm="kinrows", resource_metadata="${metadata}"`);
       return res.status(err.status).json({ error: err.message });
     }
     sendServerError(res, err);
@@ -4161,6 +4274,31 @@ const developerLimiter = createRateLimiter({
   },
 });
 
+function validateMcpHostAndOrigin(req, res, next) {
+  const configured = String(process.env.KINROWS_ALLOWED_HOSTS || '')
+    .split(',').map(value => value.trim().toLowerCase()).filter(Boolean);
+  const publicHost = (() => {
+    try { return new URL(process.env.KINROWS_PUBLIC_URL || '').hostname.toLowerCase(); } catch { return ''; }
+  })();
+  const allowed = new Set(['kinrows.com', 'www.kinrows.com', 'localhost', '127.0.0.1', '::1', publicHost, ...configured].filter(Boolean));
+  let host;
+  try { host = new URL(`http://${req.get('host')}`).hostname.toLowerCase(); }
+  catch { return res.status(400).json({ error: 'Invalid Host header' }); }
+  if (!allowed.has(host)) return res.status(421).json({ error: 'Misdirected request' });
+
+  const origin = req.get('origin');
+  if (origin) {
+    let originHost;
+    try { originHost = new URL(origin).hostname.toLowerCase(); }
+    catch { return res.status(403).json({ error: 'Invalid Origin header' }); }
+    if (!allowed.has(originHost) || originHost !== host) {
+      return res.status(403).json({ error: 'Origin is not allowed' });
+    }
+  }
+  next();
+}
+
+app.use('/v1/mcp', validateMcpHostAndOrigin);
 app.use('/v1', developerLimiter, requireApiKey);
 
 app.get('/v1/me', async (req, res) => {
@@ -4189,21 +4327,14 @@ app.post('/v1/tools/:name', async (req, res) => {
   } catch (err) { sendServerError(res, err); }
 });
 
-// MCP Streamable HTTP endpoint (stateless). Accepts a single JSON-RPC message
-// or a batch; notifications get 202 with no body.
-app.post('/v1/mcp', async (req, res) => {
-  try {
-    const body = req.body;
-    const batch = Array.isArray(body);
-    const msgs = batch ? body : [body];
-    const replies = [];
-    for (const m of msgs) {
-      const r = await developerApi.handleMcp(req.devDb, req.apiKeyAuth, m);
-      if (r) replies.push(r);
-    }
-    if (!replies.length) return res.status(202).end();
-    res.json(batch ? replies : replies[0]);
-  } catch (err) { sendServerError(res, err); }
+// Official MCP SDK transport. One registry serves modern 2026-07-28 clients
+// and the stateless 2025 protocol family, keeping existing agent configs valid.
+app.post('/v1/mcp', (req, res, next) => {
+  if (process.env.MCP_ENABLED === '0') {
+    res.set('Retry-After', '300');
+    return res.status(503).json({ error: 'Kinrows MCP is temporarily unavailable; the REST Developer API remains available.' });
+  }
+  return mcpServer.expressHandler(req, res, next);
 });
 app.get('/v1/mcp', (req, res) => res.status(405).json({ error: 'This MCP server is stateless; use POST.' }));
 app.delete('/v1/mcp', (req, res) => res.status(204).end());

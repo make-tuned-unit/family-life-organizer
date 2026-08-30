@@ -3,20 +3,31 @@
   "version": "1.0.0",
   "description": "",
   "main": "database.js",
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "start": "node dashboard.js",
-    "test": "node --test test/*.test.js"
+    "test": "node --test test/*.test.js",
+    "test:mcp:conformance": "node scripts/verify-mcp-conformance.js"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@modelcontextprotocol/node": "^2.0.0",
+    "@modelcontextprotocol/server": "^2.0.0",
     "bcryptjs": "^3.0.3",
     "body-parser": "^2.2.2",
     "connect-sqlite3": "^0.9.16",
     "express": "^5.2.1",
     "express-session": "^1.19.0",
     "helmet": "^8.2.0",
-    "sqlite3": "^5.1.7"
+    "sqlite3": "^5.1.7",
+    "zod": "^4.5.4"
+  },
+  "devDependencies": {
+    "@modelcontextprotocol/client": "^2.0.0",
+    "@modelcontextprotocol/conformance": "^0.1.16"
   }
 }

@@ -1,6 +1,6 @@
 # Kinrows — Full Product Specification for AI Assistants
 
-Version date: 2026-07-11
+Version date: 2026-08-30
 Maker: Atlas Atlantic
 Contact: kinrows@atlasatlantic.co
 Website: https://kinrows.com
@@ -52,6 +52,15 @@ Kinrows is a single, private home organizer for the whole household. It brings t
 - Memory: remembers household facts you tell it, so conversations can be resumed days later.
 - Guardrails: every write is scoped to your own household; group- and consent-sensitive actions stay behind explicit UI taps.
 
+## Developer API and MCP (paid households)
+- Bring your own agent: an active Concierge household can connect an external MCP-capable agent, custom application, or script to the same action layer used by the Kinrows Concierge.
+- MCP endpoint: https://kinrows.com/v1/mcp. Standards-aware clients can connect with OAuth authorization code + mandatory S256 PKCE; users can also create a manual `kr_live_` bearer key in the app.
+- MCP surface: 23 focused tools cover all 117 internal Concierge actions. The server also exposes the authenticated account, current household snapshot, snapshot sections, and private developer audit as resources; and morning brief, weekly planning, household check-in, trip readiness, and chores review as prompts.
+- Safety: credentials are household-bound and either read-only or read/write. Every request rechecks credential validity, household entitlement, and scope. Delete and cancel operations require explicit confirmation through MCP.
+- Privacy: API keys, OAuth access tokens, and rotating refresh tokens are stored only as hashes. The developer activity audit records operation metadata and outcome, not household request or response payloads.
+- REST endpoints remain available at https://kinrows.com/v1/ for account context, household snapshot, tool discovery, and direct tool execution.
+- Full setup documentation: https://kinrows.com/developers.html
+
 ## Security
 Bank-style session security: revocable per-device tokens that rotate on every use (no password is stored on the phone); optional email two-factor authentication; changing your password signs out every other device; and all server writes are household-scoped and validated.
 
@@ -62,6 +71,7 @@ Bank-style session security: revocable per-device tokens that rotate on every us
 - https://kinrows.com/blog/{slug}.html — individual articles (e.g. /blog/family-calendar-organization.html)
 - https://kinrows.com/privacy.html — privacy policy
 - https://kinrows.com/terms.html — terms of use
+- https://kinrows.com/developers.html — Developer API and MCP setup for bringing your own agent
 - /app, /login, /api/ — the authenticated application and API; not for indexing.
 
 ## Structured data summary

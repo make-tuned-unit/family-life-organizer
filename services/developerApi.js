@@ -4,7 +4,7 @@
 // required). The key then authenticates the `/v1/*` surface, which exposes the
 // exact same tool catalog the built-in Concierge drives, in two shapes:
 //   • plain REST   — GET /v1/tools, POST /v1/tools/:name
-//   • MCP          — POST /v1/mcp (Streamable HTTP, JSON-RPC 2.0, stateless)
+//   • MCP          — POST /v1/mcp (official SDK; modern + stateless legacy)
 // so it works with Claude / ChatGPT / Cursor style agents out of the box and
 // with hand-rolled agents alike.
 //
@@ -19,12 +19,12 @@ const crypto = require('crypto');
 const tools = require('./conciergeTools');
 const subscription = require('./subscription');
 const jobs = require('./jobs');
+const oauthServer = require('./oauthServer');
 const { buildSnapshot, todayISO, nowTimeHM } = require('./conciergeContext');
 
 const KEY_PREFIX = 'kr_live_';
 const MAX_ACTIVE_KEYS = 10;
 const SCOPES = new Set(['read', 'write']);
-const MCP_PROTOCOL_VERSION = '2025-03-26';
 
 function hashKey(key) {
   return crypto.createHash('sha256').update(String(key)).digest('hex');
@@ -89,31 +89,42 @@ async function revokeKey(db, userId, keyId) {
 
 // ── Bearer auth for /v1 ─────────────────────────────────────────────────────
 
-// Resolves a bearer key to { userId, groupId, scope, keyId, keyName, tier }.
+// Resolves an API key or OAuth access token to a household-bound principal.
 // Throws { status, message } on any failure so the middleware can answer
 // uniformly. Also stamps last_used_at (fire-and-forget).
 async function authenticateKey(db, authorization) {
   const m = /^Bearer\s+(\S+)$/i.exec(authorization || '');
-  if (!m || !m[1].startsWith(KEY_PREFIX)) {
-    const err = new Error('Missing or malformed API key. Send `Authorization: Bearer kr_live_…`.');
+  if (!m) {
+    const err = new Error('Missing bearer credential. Send `Authorization: Bearer …`.');
     err.status = 401; throw err;
   }
-  const row = await dbGet(db, 'SELECT * FROM api_keys WHERE key_hash = ?', [hashKey(m[1])]);
-  if (!row || row.revoked) {
-    const err = new Error('Invalid or revoked API key.');
+  let principal;
+  if (m[1].startsWith(KEY_PREFIX)) {
+    const row = await dbGet(db, 'SELECT * FROM api_keys WHERE key_hash = ?', [hashKey(m[1])]);
+    if (row && !row.revoked) {
+      principal = {
+        userId: row.user_id, scope: row.scope, keyId: row.id,
+        oauthTokenId: null, keyName: row.name, authKind: 'api_key',
+      };
+      dbRun(db, 'UPDATE api_keys SET last_used_at = CURRENT_TIMESTAMP WHERE id = ?', [row.id]).catch(() => {});
+    }
+  } else {
+    principal = await oauthServer.authenticateAccessToken(db, m[1]);
+  }
+  if (!principal) {
+    const err = new Error('Invalid, expired, or revoked bearer credential.');
     err.status = 401; throw err;
   }
-  const premium = await subscription.isHouseholdPremium(db, row.user_id);
+  const premium = await subscription.isHouseholdPremium(db, principal.userId);
   if (!premium) {
     const err = new Error('The Developer API requires an active Concierge subscription for this household.');
     err.status = 402; throw err;
   }
   const [groupId, tier] = await Promise.all([
-    db.getUserHouseholdId(row.user_id),
-    subscription.getHouseholdTier(db, row.user_id),
+    db.getUserHouseholdId(principal.userId),
+    subscription.getHouseholdTier(db, principal.userId),
   ]);
-  dbRun(db, 'UPDATE api_keys SET last_used_at = CURRENT_TIMESTAMP WHERE id = ?', [row.id]).catch(() => {});
-  return { userId: row.user_id, groupId, scope: row.scope, keyId: row.id, keyName: row.name, tier };
+  return { ...principal, groupId, tier };
 }
 
 // Build the same ctx the Concierge hands to tool handlers.
@@ -134,13 +145,39 @@ async function buildToolContext(db, auth) {
 // Run one tool call under the key's scope. Returns { result } (never throws for
 // tool-level errors; scope violations are surfaced as a result error so both
 // REST and MCP callers see the same shape).
-async function callTool(db, auth, name, input) {
+async function recordToolAudit(db, auth, {
+  transport = 'rest', name, input = {}, status, durationMs = 0, errorCode = null,
+}) {
+  const meta = tools.operationMetadata(name, input);
+  await dbRun(db, `INSERT INTO developer_api_audit
+    (api_key_id, oauth_token_id, user_id, group_id, transport, tool_name, action, is_write, status, duration_ms, error_code)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
+    auth.keyId, auth.oauthTokenId, auth.userId, auth.groupId, transport, String(name || '').slice(0, 80),
+    input?.action == null ? null : String(input.action).slice(0, 80), meta.readOnly ? 0 : 1,
+    status, Math.max(0, Math.round(durationMs)), errorCode,
+  ]);
+}
+
+async function callTool(db, auth, name, input, { transport = 'rest' } = {}) {
+  const started = Date.now();
   input = input && typeof input === 'object' ? input : {};
   if (auth.scope === 'read' && !tools.isReadOnly(name, input)) {
+    await recordToolAudit(db, auth, {
+      transport, name, input, status: 'forbidden', durationMs: Date.now() - started,
+      errorCode: 'read_only_scope',
+    }).catch(() => {});
     return { result: { error: `This API key is read-only; "${name}"${input.action ? ` (${input.action})` : ''} would modify data. Create a write-scoped key to allow this.` }, forbidden: true };
   }
   const ctx = await buildToolContext(db, auth);
-  return tools.run(name, ctx, input);
+  const out = await tools.run(name, ctx, input);
+  const payload = out?.result ?? out;
+  await recordToolAudit(db, auth, {
+    transport, name, input,
+    status: payload && typeof payload === 'object' && payload.error ? 'error' : 'ok',
+    durationMs: Date.now() - started,
+    errorCode: payload && typeof payload === 'object' && payload.error ? 'tool_error' : null,
+  }).catch(() => {});
+  return out;
 }
 
 // Catalog in Anthropic shape (name/description/input_schema) or OpenAI shape.
@@ -169,57 +206,16 @@ async function snapshot(db, auth) {
   return buildSnapshot(db, auth.userId);
 }
 
-// ── MCP (Streamable HTTP, stateless) ────────────────────────────────────────
-// Implements just enough of the Model Context Protocol for hosts to list and
-// call tools: initialize, ping, tools/list, tools/call. Notifications get 202.
-
-function rpcError(id, code, message) {
-  return { jsonrpc: '2.0', id: id ?? null, error: { code, message } };
-}
-function rpcResult(id, result) {
-  return { jsonrpc: '2.0', id, result };
-}
-
-async function handleMcp(db, auth, message) {
-  if (!message || message.jsonrpc !== '2.0' || typeof message.method !== 'string') {
-    return rpcError(message?.id, -32600, 'Invalid Request');
-  }
-  const { id, method, params = {} } = message;
-  const isNotification = id === undefined || id === null;
-  if (isNotification) return null; // notifications/initialized etc. — nothing to send
-
-  switch (method) {
-    case 'initialize':
-      return rpcResult(id, {
-        protocolVersion: MCP_PROTOCOL_VERSION,
-        capabilities: { tools: { listChanged: false } },
-        serverInfo: { name: 'kinrows', version: '1.0.0' },
-        instructions: `You are connected to the Kinrows household of ${auth.keyName ? `"${auth.keyName}"` : 'this user'}. Every tool acts on that household only. Today is ${todayISO()}.`,
-      });
-    case 'ping':
-      return rpcResult(id, {});
-    case 'tools/list':
-      return rpcResult(id, {
-        tools: tools.definitions().map(d => ({ name: d.name, description: d.description, inputSchema: d.input_schema })),
-      });
-    case 'tools/call': {
-      const name = params?.name;
-      if (typeof name !== 'string') return rpcError(id, -32602, 'params.name is required');
-      const out = await callTool(db, auth, name, params.arguments || {});
-      const payload = out?.result ?? out;
-      const isError = !!(payload && typeof payload === 'object' && payload.error);
-      return rpcResult(id, {
-        content: [{ type: 'text', text: typeof payload === 'string' ? payload : JSON.stringify(payload) }],
-        isError,
-      });
-    }
-    default:
-      return rpcError(id, -32601, `Method not found: ${method}`);
-  }
+async function auditLog(db, auth, limit = 50) {
+  const safeLimit = Math.min(100, Math.max(1, Number.parseInt(limit, 10) || 50));
+  return dbAll(db, `SELECT id, transport, tool_name, action, is_write, status,
+      duration_ms, error_code, created_at
+    FROM developer_api_audit WHERE user_id = ?
+    ORDER BY id DESC LIMIT ?`, [auth.userId, safeLimit]);
 }
 
 module.exports = {
-  KEY_PREFIX, MAX_ACTIVE_KEYS, MCP_PROTOCOL_VERSION,
+  KEY_PREFIX, MAX_ACTIVE_KEYS,
   listKeys, createKey, revokeKey,
-  authenticateKey, callTool, catalog, whoami, snapshot, handleMcp,
+  authenticateKey, callTool, recordToolAudit, catalog, whoami, snapshot, auditLog,
 };

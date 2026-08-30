@@ -990,6 +990,71 @@ CREATE TABLE IF NOT EXISTS api_keys (
 );
 CREATE INDEX IF NOT EXISTS idx_api_keys_user ON api_keys(user_id);
 
+-- OAuth 2.1 authorization-code + PKCE support for remote MCP clients. Clients
+-- are public (no embedded secret); access/refresh/code plaintext is never kept.
+CREATE TABLE IF NOT EXISTS oauth_clients (
+    client_id TEXT PRIMARY KEY,
+    client_name TEXT NOT NULL,
+    redirect_uris TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TABLE IF NOT EXISTS oauth_authorization_codes (
+    code_hash TEXT PRIMARY KEY,
+    client_id TEXT NOT NULL,
+    user_id INTEGER NOT NULL,
+    redirect_uri TEXT NOT NULL,
+    scope TEXT NOT NULL,
+    code_challenge TEXT NOT NULL,
+    expires_at DATETIME NOT NULL,
+    used INTEGER NOT NULL DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (client_id) REFERENCES oauth_clients(client_id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+CREATE TABLE IF NOT EXISTS oauth_tokens (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    client_id TEXT NOT NULL,
+    access_hash TEXT NOT NULL UNIQUE,
+    refresh_hash TEXT NOT NULL UNIQUE,
+    scope TEXT NOT NULL,
+    expires_at DATETIME NOT NULL,
+    revoked INTEGER NOT NULL DEFAULT 0,
+    last_used_at DATETIME,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (client_id) REFERENCES oauth_clients(client_id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_oauth_tokens_user ON oauth_tokens(user_id, id DESC);
+CREATE INDEX IF NOT EXISTS idx_oauth_tokens_access ON oauth_tokens(access_hash);
+
+-- Privacy-minimal Developer API audit trail. Inputs/results are deliberately
+-- not stored: the operation, outcome, and timing are enough for owners and
+-- operators to investigate agent activity without duplicating household data.
+CREATE TABLE IF NOT EXISTS developer_api_audit (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    api_key_id INTEGER,
+    oauth_token_id INTEGER,
+    user_id INTEGER NOT NULL,
+    group_id INTEGER,
+    transport TEXT NOT NULL CHECK (transport IN ('rest', 'mcp')),
+    tool_name TEXT NOT NULL,
+    action TEXT,
+    is_write INTEGER NOT NULL DEFAULT 0,
+    status TEXT NOT NULL CHECK (status IN ('ok', 'error', 'forbidden', 'confirmation_required')),
+    duration_ms INTEGER NOT NULL DEFAULT 0,
+    error_code TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (api_key_id) REFERENCES api_keys(id) ON DELETE CASCADE,
+    FOREIGN KEY (oauth_token_id) REFERENCES oauth_tokens(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (group_id) REFERENCES groups(id) ON DELETE SET NULL
+);
+CREATE INDEX IF NOT EXISTS idx_developer_api_audit_key_created
+    ON developer_api_audit(api_key_id, id DESC);
+CREATE INDEX IF NOT EXISTS idx_developer_api_audit_user_created
+    ON developer_api_audit(user_id, id DESC);
+
 -- Durable outbox for side effects that must not block (or fail) the HTTP
 -- request that produced them: APNs pushes and waitlist Resend emails.
 -- status is pending → running → done | failed; available_at is the retry clock.
