@@ -177,6 +177,7 @@ struct FamilyLifeApp: App {
                     } else {
                         // Logout: drop all in-memory caches so a second account
                         // on this device never sees the previous user's data.
+                        HomeDiskCache.clearAll()
                         messageCache.clear()
                         profileImageCache.clear()
                         householdService.clear()

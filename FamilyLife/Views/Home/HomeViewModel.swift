@@ -43,19 +43,30 @@ final class HomeViewModel {
     private var currentUserName: String?
     private var currentUsername: String?
 
-    func loadAll(api: APIService, userName: String? = nil, username: String? = nil) async {
+    func loadAll(api: APIService, userId: Int? = nil, userName: String? = nil, username: String? = nil) async {
         currentUserName = userName ?? currentUserName
         currentUsername = username ?? currentUsername
-        isLoading = true
         error = nil
         clearStaleDismissals()
 
         let dismissed = dismissedHeroIds
-        let result = await Self.safeFetch { try await api.fetchHome() }
-        if let home = result.value {
+        if let userId, let cached = HomeDiskCache.load(userId: userId) {
+            applyBootstrap(cached, dismissed: dismissed)
+            isLoading = false
+        } else {
+            isLoading = true
+        }
+
+        do {
+            let home = try await api.fetchHome()
             applyBootstrap(home, dismissed: dismissed)
-        } else if let e = result.error {
-            error = e
+            if let userId { HomeDiskCache.save(home, userId: userId) }
+        } catch let fetchError {
+            if fetchError.isNotModified {
+                // ETag matched — keep the disk snapshot already on screen.
+            } else if !fetchError.isCancellation {
+                if summary == nil { self.error = fetchError.localizedDescription }
+            }
         }
         isLoading = false
     }
@@ -358,5 +369,49 @@ final class HomeViewModel {
 
     private static func todayString() -> String {
         DateFormatter.isoDate.string(from: Date())
+    }
+}
+
+// Stale-while-revalidate Home payload — namespaced per signed-in user so a
+// second account on the same device never reads the first account's feed.
+enum HomeDiskCache {
+    private static let schemaVersion = 1
+
+    private struct Envelope: Codable {
+        let schema_version: Int
+        let saved_at: String
+        let payload: APIService.HomeBootstrap
+    }
+
+    static func load(userId: Int) -> APIService.HomeBootstrap? {
+        guard let url = fileURL(userId: userId),
+              let data = try? Data(contentsOf: url),
+              let envelope = try? JSONDecoder().decode(Envelope.self, from: data),
+              envelope.schema_version == schemaVersion else { return nil }
+        return envelope.payload
+    }
+
+    static func save(_ payload: APIService.HomeBootstrap, userId: Int) {
+        guard let url = fileURL(userId: userId) else { return }
+        let envelope = Envelope(
+            schema_version: schemaVersion,
+            saved_at: ISO8601DateFormatter().string(from: Date()),
+            payload: payload
+        )
+        guard let data = try? JSONEncoder().encode(envelope) else { return }
+        try? data.write(to: url, options: .atomic)
+    }
+
+    static func clearAll() {
+        let dir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("home", isDirectory: true)
+        try? FileManager.default.removeItem(at: dir)
+    }
+
+    private static func fileURL(userId: Int) -> URL? {
+        let dir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("home", isDirectory: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        return dir.appendingPathComponent("\(userId).json")
     }
 }

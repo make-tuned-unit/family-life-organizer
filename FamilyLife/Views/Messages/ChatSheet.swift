@@ -395,8 +395,8 @@ struct GroupChatView: View {
             await loadDecisions()
         }
         .onAppear {
-            pollTimer = Timer.scheduledTimer(withTimeInterval: 5, repeats: true) { _ in
-                Task { @MainActor in await loadPosts() }
+            pollTimer = Timer.scheduledTimer(withTimeInterval: 15, repeats: true) { _ in
+                Task { @MainActor in await pollNewPosts() }
             }
         }
         .onDisappear {
@@ -449,6 +449,20 @@ struct GroupChatView: View {
             // The daily brief lives on the Home feed, not in the family chat thread.
             posts = fetched.filter { $0.post_type != "brief" }
         }
+    }
+
+    private func pollNewPosts() async {
+        guard let newestId = posts.first?.id else {
+            await loadPosts()
+            return
+        }
+        guard let delta = try? await api.fetchFeed(groupId: groupId, afterId: newestId) else { return }
+        let incoming = delta.filter { $0.post_type != "brief" }
+        guard !incoming.isEmpty else { return }
+        var byId: [Int: APIService.FeedPostResponse] = [:]
+        for post in posts { byId[post.id] = post }
+        for post in incoming { byId[post.id] = post }
+        posts = byId.values.sorted { $0.id > $1.id }
     }
 
     private func loadDecisions() async {

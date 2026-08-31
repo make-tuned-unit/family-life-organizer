@@ -278,10 +278,9 @@ struct ConversationView: View {
             try? await api.markMessagesRead(partnerId: partnerId)
         }
         .onAppear {
-            pollTimer = Timer.scheduledTimer(withTimeInterval: 5, repeats: true) { _ in
+            pollTimer = Timer.scheduledTimer(withTimeInterval: 15, repeats: true) { _ in
                 Task { @MainActor in
-                    await refreshMessages()
-                    try? await api.markMessagesRead(partnerId: partnerId)
+                    await pollNewMessages()
                 }
             }
         }
@@ -299,6 +298,17 @@ struct ConversationView: View {
         do {
             let fetched = try await api.fetchMessages(partnerId: partnerId, limit: messagePageSize)
             messageCache.mergeNewest(fetched, for: partnerId)
+        } catch {}
+    }
+
+    private func pollNewMessages() async {
+        guard let newestId = messages.first(where: { $0.id < MessageCache.tempIdThreshold })?.id else {
+            await refreshMessages()
+            return
+        }
+        do {
+            let delta = try await api.fetchMessages(partnerId: partnerId, limit: 50, afterId: newestId)
+            messageCache.mergeDelta(delta, for: partnerId)
         } catch {}
     }
 
@@ -414,6 +424,7 @@ struct ConversationView: View {
                 )
                 // Replace optimistic with server data
                 await refreshMessages()
+                try? await api.markMessagesRead(partnerId: partnerId)
             } catch {
                 guard !error.isCancellation else { return }
                 // Pull the phantom bubble and say what happened. Restore the

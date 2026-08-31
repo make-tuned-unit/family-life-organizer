@@ -101,6 +101,15 @@ final class MessageCache {
         cache[partnerId] = byId.values.sorted { $0.id > $1.id }
     }
 
+    /// Merge only rows newer than what we already have — used by the 15s poll.
+    func mergeDelta(_ delta: [APIService.DirectMessageResponse], for partnerId: Int) {
+        guard !delta.isEmpty else { return }
+        var byId: [Int: APIService.DirectMessageResponse] = [:]
+        for m in cache[partnerId] ?? [] { byId[m.id] = m }
+        for m in delta where m.id < Self.tempIdThreshold { byId[m.id] = m }
+        cache[partnerId] = byId.values.sorted { $0.id > $1.id }
+    }
+
     /// Optimistically insert a sent message for instant display
     func insertOptimistic(partnerId: Int, text: String, senderId: Int, senderName: String,
                           referenceType: String? = nil, referenceId: Int? = nil,
@@ -141,8 +150,8 @@ final class MessageCache {
         Task {
             defer { pendingImages.remove(messageId) }
             do {
-                let base64 = try await api.fetchMessageImage(partnerId: partnerId, messageId: messageId)
-                if let data = Data(base64Encoded: base64), let img = UIImage(data: data) {
+                let data = try await api.fetchMessageImage(partnerId: partnerId, messageId: messageId)
+                if let img = UIImage(data: data) {
                     imageCache[messageId] = img
                 }
             } catch {}

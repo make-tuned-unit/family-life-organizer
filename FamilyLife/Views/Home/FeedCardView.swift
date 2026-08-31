@@ -521,8 +521,7 @@ struct FeedCard: View {
             photo = cached
             return
         }
-        guard let b64 = try? await api.fetchFeedPhoto(postId: item.ref_id),
-              let data = Data(base64Encoded: b64),
+        guard let data = try? await api.fetchFeedPhotoData(postId: item.ref_id),
               let img = UIImage(data: data) else { return }
         FeedPhotoCache.shared.setObject(img, forKey: NSNumber(value: item.ref_id))
         photo = img

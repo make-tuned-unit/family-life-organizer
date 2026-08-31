@@ -1216,9 +1216,10 @@ final class APIService {
         var reaction_type: String
     }
 
-    func fetchFeed(groupId: Int, limit: Int = 50, beforeId: Int? = nil) async throws -> [FeedPostResponse] {
+    func fetchFeed(groupId: Int, limit: Int = 50, beforeId: Int? = nil, afterId: Int? = nil) async throws -> [FeedPostResponse] {
         var params: [String: String] = ["limit": String(limit)]
         if let beforeId { params["before_id"] = String(beforeId) }
+        if let afterId { params["after_id"] = String(afterId) }
         return try await get("/api/groups/\(groupId)/feed", queryParams: params)
     }
 
@@ -1327,10 +1328,9 @@ final class APIService {
         let photo_url: String?
     }
 
-    /// Fetch one feed post's photo (base64) — the activity list only carries a flag.
-    func fetchFeedPhoto(postId: Int) async throws -> String? {
-        let res: FeedPhotoResponse = try await get("/api/feed/\(postId)/photo")
-        return res.photo_url
+    /// Fetch one feed post's photo bytes — the activity list only carries a flag.
+    func fetchFeedPhotoData(postId: Int) async throws -> Data {
+        try await fetchImageBytes("/api/feed/\(postId)/photo")
     }
 
     func fetchActivity(limit: Int = 50) async throws -> [ActivityItem] {
@@ -1377,9 +1377,10 @@ final class APIService {
         try await get("/api/messages")
     }
 
-    func fetchMessages(partnerId: Int, limit: Int = 50, beforeId: Int? = nil) async throws -> [DirectMessageResponse] {
+    func fetchMessages(partnerId: Int, limit: Int = 50, beforeId: Int? = nil, afterId: Int? = nil) async throws -> [DirectMessageResponse] {
         var params = ["limit": String(limit)]
         if let beforeId { params["before_id"] = String(beforeId) }
+        if let afterId { params["after_id"] = String(afterId) }
         return try await get("/api/messages/\(partnerId)", queryParams: params)
     }
 
@@ -1392,9 +1393,8 @@ final class APIService {
         return try await post("/api/messages", body: body)
     }
 
-    func fetchMessageImage(partnerId: Int, messageId: Int) async throws -> String {
-        let response: AvatarResponse = try await get("/api/messages/\(partnerId)/\(messageId)/image")
-        return response.image
+    func fetchMessageImage(partnerId: Int, messageId: Int) async throws -> Data {
+        try await fetchImageBytes("/api/messages/\(partnerId)/\(messageId)/image")
     }
 
     func markMessagesRead(partnerId: Int) async throws {
@@ -1458,18 +1458,16 @@ final class APIService {
         ])
     }
 
-    func fetchProfileImage(userId: Int) async throws -> String {
-        let response: AvatarResponse = try await get("/api/users/\(userId)/avatar")
-        return response.image
+    func fetchProfileImage(userId: Int) async throws -> Data {
+        try await fetchImageBytes("/api/users/\(userId)/avatar")
     }
 
     func uploadGroupImage(groupId: Int, _ base64: String) async throws {
         let _: SuccessResponse = try await put("/api/groups/\(groupId)/avatar", body: ["image": base64])
     }
 
-    func fetchGroupImage(groupId: Int) async throws -> String {
-        let response: AvatarResponse = try await get("/api/groups/\(groupId)/avatar")
-        return response.image
+    func fetchGroupImage(groupId: Int) async throws -> Data {
+        try await fetchImageBytes("/api/groups/\(groupId)/avatar")
     }
 
     // MARK: - Lists
@@ -1813,6 +1811,17 @@ final class APIService {
             guard !Task.isCancelled, Self.isRetryableGETFailure(error) else { throw error }
             return try await session.data(for: request)
         }
+    }
+
+    /// Raw image bytes from routes that can answer application/json or image/jpeg.
+    private func fetchImageBytes(_ path: String) async throws -> Data {
+        guard let url = URL(string: baseURL + path) else { throw APIError.invalidResponse }
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("image/jpeg, image/png, */*", forHTTPHeaderField: "Accept")
+        let (data, response) = try await performGET(request)
+        try checkResponse(response, data: data)
+        return data
     }
 
     private static func isRetryableGETFailure(_ error: Error) -> Bool {
