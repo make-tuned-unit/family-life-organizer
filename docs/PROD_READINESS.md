@@ -146,3 +146,33 @@ This doc's original body predates a large amount of shipped work. Corrections:
 5. Enable **2FA** in production when the 2FA-capable build is broadly installed.
 6. First real device build should exercise: login → silent re-login, account
    deletion, receipt-scan consent, cooking mode, and notification taps.
+
+## Addendum — 2026-08-31 (cellular perf G3–G4)
+
+Shipped in PR #4 (`perf/cellular-g3-g4`): stale Home disk cache, binary
+images, chat `after_id` polls, and `MediaDiskCache` for message/feed photos.
+
+### Code gates (done)
+
+- [x] `npm test` — 192/192 (fixed `household-invite.test.js` port collision with
+  `developer-api.test.js`; invite suite now uses port 3996)
+- [x] `xcrun swiftc -parse` on touched Swift files
+- [x] Message bubble `image(for:)` reads disk synchronously (no placeholder
+  flash when JPEG is already cached)
+
+### Ops / device (human-owned — G4 ship bar)
+
+- [x] **Railway region** — production responds via `x-railway-edge: jfk1`
+  (2026-08-31 probe). Acceptable for Halifax / Atlantic Canada vs us-west.
+  Re-check after any Railway service migration.
+- [ ] **LTE walk** (Network Link Conditioner 3G or ~200 ms RTT): Home paints
+  from disk in < 500 ms; unread badge still updates; avatars and cached photos
+  load without refetching full lists.
+- [ ] **Offline photos** — view Home feed + DM photos on Wi-Fi, enable airplane
+  mode, force-quit, relaunch: cached JPEGs still visible from
+  `Caches/media/{userId}/`.
+- [ ] **Logout isolation** — sign out, confirm `Caches/media/` and
+  `Caches/home/` are cleared; second account on device sees no prior user's
+  data.
+- [ ] **Regression spot-check** — DM send (optimistic + failure path),
+  pull-to-refresh Home, concierge write refresh, calendar share, second account.
