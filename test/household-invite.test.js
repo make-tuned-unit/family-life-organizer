@@ -10,7 +10,7 @@ const path = require('path');
 
 const { parseEmails, householdInviteEmail, sendHouseholdInvites, MAX_PER_REQUEST } = require('../services/householdInvite');
 
-const PORT = 3988;
+const PORT = 3996;
 const BASE = `http://127.0.0.1:${PORT}`;
 let server, tmpDir;
 
