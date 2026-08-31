@@ -148,6 +148,7 @@ struct MainTabView: View {
     @Environment(APIService.self) private var api
     @Environment(AuthService.self) private var auth
     @Environment(DeepLinkRouter.self) private var deepLinkRouter
+    @Environment(SubscriptionService.self) private var subscription
     #if DEBUG
     @State private var selectedTab: MainTab = ScreenshotHarness.initialTab
     @State private var loadedTabs: Set<MainTab> = [ScreenshotHarness.initialTab, .home]
@@ -321,6 +322,9 @@ struct MainTabView: View {
             // lands on the feed even if this device enabled it before the flag existed.
             try? await api.setConciergeEnabled(aiConciergeEnabled)
             await pollUnread()
+            if let type = deepLinkRouter.pendingType {
+                await handleDeepLink(type: type)
+            }
         }
         .onChange(of: aiConciergeEnabled) {
             Task { try? await api.setConciergeEnabled(aiConciergeEnabled) }
@@ -530,6 +534,7 @@ struct MainTabView: View {
     private func handleDeepLink(type: String) async {
         let refId = deepLinkRouter.pendingRefId
         let name = deepLinkRouter.pendingName
+        let sessionId = deepLinkRouter.pendingSessionId
         deepLinkRouter.consume()
 
         switch type {
@@ -573,6 +578,12 @@ struct MainTabView: View {
             // Feed-centric items live on Home.
             switchTab(to: .home)
         case "concierge":
+            switchTab(to: .concierge)
+        case "subscribed":
+            await subscription.handleCheckoutReturn(sessionId: sessionId, api: api)
+            switchTab(to: .concierge)
+        case "subscribe-canceled":
+            subscription.handleCheckoutCanceled()
             switchTab(to: .concierge)
         default:
             switchTab(to: .home)

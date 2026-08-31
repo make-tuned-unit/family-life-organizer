@@ -1,12 +1,20 @@
 import Foundation
 import StoreKit
 
-/// Manages the Concierge subscription via StoreKit 2.
+extension Notification.Name {
+    /// Household Concierge entitlement just became active (web Checkout or StoreKit).
+    static let kinrowsSubscriptionActivated = Notification.Name("kinrowsSubscriptionActivated")
+}
+
+/// Manages the Concierge subscription.
 ///
-/// Two tiers (Lite / Premium), each billed monthly or yearly. Entitlement is
-/// per-HOUSEHOLD and the backend is authoritative: this device may have no local
-/// transaction yet still be entitled because another household member subscribed —
-/// so `refresh` always reconciles with the server, which also reports the tier.
+/// Web Stripe Checkout is the app-first path: the signed-in app opens Safari,
+/// the user pays (Apple Pay works there), then a `kinrows://` return plus a
+/// foreground refresh unlock the household. StoreKit remains available as
+/// "Subscribe with Apple" / Restore. Entitlement is per-HOUSEHOLD and the
+/// backend is authoritative: this device may have no local transaction yet
+/// still be entitled because another household member subscribed — so `refresh`
+/// always reconciles with the server, which also reports the tier.
 @MainActor
 @Observable
 final class SubscriptionService {
@@ -40,8 +48,15 @@ final class SubscriptionService {
     private(set) var isPremium = false           // entitled to ANY paid tier
     private(set) var tier: Tier?                  // active tier per backend
     private(set) var products: [Product] = []
+    private(set) var catalog: SubscriptionCatalog?
     private(set) var isPurchasing = false
+    /// True after Safari Checkout opened; cleared on return, cancel, or unlock.
+    private(set) var pendingWebCheckout = false
     var lastError: String?
+
+    func clearError() { lastError = nil }
+
+    @ObservationIgnored private var lastCheckoutSessionId: String?
 
     // `nonisolated(unsafe)` so the nonisolated `deinit` can cancel it. Plain
     // `nonisolated` is rejected on mutable stored properties; `(unsafe)` is the
@@ -65,6 +80,7 @@ final class SubscriptionService {
         }
         Task {
             await loadProducts()
+            await loadCatalog(api: api)
             await refresh(api: api)
         }
     }
@@ -77,12 +93,26 @@ final class SubscriptionService {
             // Stable order: Premium before Lite, monthly before yearly.
             products = loaded.sorted { ($0.price, $0.id) > ($1.price, $1.id) }
         } catch {
-            lastError = error.localizedDescription
+            // StoreKit catalog is optional — web Checkout is the app-first path.
         }
+    }
+
+    func loadCatalog(api: APIService) async {
+        catalog = try? await api.fetchSubscriptionCatalog(currency: Self.presentmentCurrency())
     }
 
     func product(_ tier: Tier, _ period: Period) -> Product? {
         products.first { $0.id == Self.productID(tier, period) }
+    }
+
+    func catalogPlan(_ tier: Tier, _ period: Period) -> SubscriptionCatalog.Plan? {
+        catalog?.plan(productId: Self.productID(tier, period))
+    }
+
+    static func presentmentCurrency() -> String? {
+        let raw = Locale.current.currency?.identifier.lowercased() ?? ""
+        if raw == "cad" || raw == "usd" || raw == "eur" { return raw }
+        return nil
     }
 
     /// Reconcile entitlement: sync any local transaction to the backend, then
@@ -106,10 +136,94 @@ final class SubscriptionService {
             status = try? await api.fetchSubscriptionStatus()
         }
         if let status {
-            isPremium = status.premium
-            tier = status.tier.flatMap(Tier.init(rawValue:))
+            apply(status)
         }
         return isPremium
+    }
+
+    private func apply(_ status: SubscriptionStatus) {
+        isPremium = status.premium
+        tier = status.tier.flatMap(Tier.init(rawValue:))
+        if isPremium {
+            pendingWebCheckout = false
+        }
+    }
+
+    private func applyConfirm(_ status: CheckoutConfirmResponse) {
+        isPremium = status.premium
+        tier = status.tier.flatMap(Tier.init(rawValue:))
+        if isPremium {
+            pendingWebCheckout = false
+            NotificationCenter.default.post(name: .kinrowsSubscriptionActivated, object: nil)
+        }
+    }
+
+    /// Opens Stripe Checkout in Safari, bound to this signed-in household.
+    /// Returns the Checkout URL for the view to hand to `openURL`.
+    func startWebCheckout(tier: Tier, period: Period, api: APIService) async -> URL? {
+        isPurchasing = true
+        lastError = nil
+        let productId = Self.productID(tier, period)
+        do {
+            let session = try await api.createCheckoutSession(
+                productId: productId,
+                currency: Self.presentmentCurrency(),
+                source: "app"
+            )
+            guard let url = URL(string: session.url) else {
+                lastError = "Could not open checkout."
+                isPurchasing = false
+                return nil
+            }
+            lastCheckoutSessionId = session.id
+            pendingWebCheckout = true
+            isPurchasing = false
+            return url
+        } catch {
+            pendingWebCheckout = false
+            lastError = error.localizedDescription
+            isPurchasing = false
+            return nil
+        }
+    }
+
+    /// Deeplink return from `/open/subscribed` (`kinrows://subscribed?session_id=`).
+    func handleCheckoutReturn(sessionId: String?, api: APIService) async {
+        isPurchasing = true
+        lastError = nil
+        defer { isPurchasing = false }
+        let id = sessionId?.isEmpty == false ? sessionId : lastCheckoutSessionId
+        if let id {
+            if let confirmed = try? await api.confirmCheckoutSession(id) {
+                applyConfirm(confirmed)
+                if isPremium { return }
+            }
+        }
+        await refresh(api: api)
+        if isPremium {
+            NotificationCenter.default.post(name: .kinrowsSubscriptionActivated, object: nil)
+        }
+    }
+
+    func handleCheckoutCanceled() {
+        pendingWebCheckout = false
+        lastCheckoutSessionId = nil
+        isPurchasing = false
+    }
+
+    /// User switched back from Safari without tapping Open Kinrows — confirm
+    /// the pending session with the app's own cookie.
+    func handleAppForeground(api: APIService) async {
+        guard pendingWebCheckout else { return }
+        if let id = lastCheckoutSessionId,
+           let confirmed = try? await api.confirmCheckoutSession(id) {
+            applyConfirm(confirmed)
+            if isPremium { return }
+        }
+        await refresh(api: api)
+        if isPremium {
+            NotificationCenter.default.post(name: .kinrowsSubscriptionActivated, object: nil)
+        }
     }
 
     func purchase(_ product: Product, api: APIService) async {
@@ -126,6 +240,9 @@ final class SubscriptionService {
                     if synced { await txn.finish() }
                 }
                 await refresh(api: api)
+                if isPremium {
+                    NotificationCenter.default.post(name: .kinrowsSubscriptionActivated, object: nil)
+                }
             case .userCancelled, .pending:
                 break
             @unknown default:
@@ -139,5 +256,8 @@ final class SubscriptionService {
     func restore(api: APIService) async {
         try? await AppStore.sync()
         await refresh(api: api)
+        if isPremium {
+            NotificationCenter.default.post(name: .kinrowsSubscriptionActivated, object: nil)
+        }
     }
 }

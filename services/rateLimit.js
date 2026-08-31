@@ -12,10 +12,10 @@
 // IP) isn't throttled; no test depends on rate-limit behavior.
 const RATE_LIMIT_OFF = process.env.NODE_ENV === 'test';
 
-function createRateLimiter({ windowMs = 60000, max = 30, keyFn, maxFn }) {
+function createRateLimiter({ windowMs = 60000, max = 30, keyFn, maxFn, extraFn, force }) {
   const hits = new Map(); // key -> [timestamps]
   return async function rateLimit(req, res, next) {
-    if (RATE_LIMIT_OFF) return next();
+    if (RATE_LIMIT_OFF && !force) return next();
     let key, limit = max;
     try {
       key = await keyFn(req);
@@ -28,7 +28,19 @@ function createRateLimiter({ windowMs = 60000, max = 30, keyFn, maxFn }) {
     const now = Date.now();
     const recent = (hits.get(key) || []).filter(t => now - t < windowMs);
     if (recent.length >= limit) {
-      return res.status(429).json({ error: 'Too many requests, please slow down.' });
+      const retryAfter = Math.max(1, Math.ceil(((recent[0] || now) + windowMs - now) / 1000));
+      if (typeof res.set === 'function') res.set('Retry-After', String(retryAfter));
+      let extra = {};
+      if (extraFn) {
+        try { extra = (await extraFn(req, { limit, used: recent.length, retryAfter, windowMs })) || {}; } catch { /* ignore */ }
+      }
+      return res.status(429).json({
+        error: extra.error || 'Too many requests, please slow down.',
+        code: extra.code || 'rate_limited',
+        limit,
+        retry_after: retryAfter,
+        ...extra,
+      });
     }
     recent.push(now);
     hits.set(key, recent);

@@ -116,6 +116,7 @@ final class APIService {
         let two_factor_enabled: Bool
         let has_password: Bool?
         let apple_linked: Bool?
+        let share_presence: Bool?
 
         var hasPassword: Bool { has_password ?? true }
         var appleLinked: Bool { apple_linked ?? false }
@@ -524,6 +525,22 @@ final class APIService {
         try await get("/api/subscription/status")
     }
 
+    func fetchSubscriptionCatalog(currency: String? = nil) async throws -> SubscriptionCatalog {
+        var params: [String: String] = [:]
+        if let currency { params["currency"] = currency }
+        return try await get("/api/subscription/catalog", queryParams: params)
+    }
+
+    func createCheckoutSession(productId: String, currency: String? = nil, source: String = "app") async throws -> CheckoutSessionResponse {
+        var body: [String: Any] = ["product_id": productId, "source": source]
+        if let currency { body["currency"] = currency }
+        return try await post("/api/subscription/checkout", body: body)
+    }
+
+    func confirmCheckoutSession(_ sessionId: String) async throws -> CheckoutConfirmResponse {
+        try await get("/api/subscription/checkout/session", queryParams: ["session_id": sessionId])
+    }
+
     func sendConciergeMessage(
         _ message: String,
         conversationId: Int?,
@@ -575,7 +592,25 @@ final class APIService {
                         NotificationCenter.default.post(name: Self.unauthorizedNotification, object: nil)
                         throw APIError.unauthorized
                     }
-                    guard (200...299).contains(http.statusCode) else { throw APIError.serverError(http.statusCode) }
+                    guard (200...299).contains(http.statusCode) else {
+                        var raw = ""
+                        for try await line in bytes.lines {
+                            raw += line
+                            if raw.count > 2000 { break }
+                        }
+                        if let data = raw.data(using: .utf8),
+                           let body = try? JSONDecoder().decode(ServerErrorBody.self, from: data),
+                           let message = body.error, !message.isEmpty {
+                            throw APIError.serverMessage(http.statusCode, message)
+                        }
+                        if http.statusCode == 429 {
+                            throw APIError.serverMessage(429, "You've used today's concierge chats. Try again tomorrow.")
+                        }
+                        if http.statusCode == 402 {
+                            throw APIError.serverMessage(402, "Concierge chat needs a Lite or Premium plan.")
+                        }
+                        throw APIError.serverError(http.statusCode)
+                    }
 
                     var pendingEvent = ""
                     for try await line in bytes.lines {
@@ -1432,6 +1467,26 @@ final class APIService {
             "ref_id": refId,
             "reason": reason,
         ])
+    }
+
+    func setSharePresence(enabled: Bool) async throws {
+        let _: SuccessResponse = try await post("/api/account/presence", body: ["enabled": enabled])
+    }
+
+    func fetchSharePresence() async throws -> Bool {
+        struct Body: Codable { let enabled: Bool }
+        let body: Body = try await get("/api/account/presence")
+        return body.enabled
+    }
+
+    func exportAccountData() async throws -> Data {
+        guard let url = URL(string: baseURL + "/api/account/export") else { throw APIError.invalidResponse }
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.timeoutInterval = 60
+        let (data, response) = try await session.data(for: request)
+        try checkResponse(response, data: data)
+        return data
     }
 
     func updateName(_ name: String) async throws {

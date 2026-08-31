@@ -36,6 +36,9 @@ enum AppConfig {
     static let appName = "Kinrows"
     static let privacyPolicyURL = URL(string: "https://kinrows.com/privacy.html")!
     static let termsOfUseURL = URL(string: "https://kinrows.com/terms.html")!
+    /// Custom URL scheme used to return from Safari Checkout.
+    static let urlScheme = "kinrows"
+    static let siteURL = "https://kinrows.com"
 
     static var appVersion: String {
         Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"

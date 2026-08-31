@@ -453,6 +453,7 @@ CREATE TABLE IF NOT EXISTS users (
     last_lng REAL,
     last_location_name TEXT,
     last_location_at DATETIME,
+    share_presence INTEGER DEFAULT 0,  -- 1 = household may see last_lat/lng (server-enforced opt-in)
     email_verified INTEGER DEFAULT 0,
     two_factor_enabled INTEGER DEFAULT 0,
     email_opt_out INTEGER DEFAULT 0,     -- 1 = no product/onboarding email (2FA codes still send)
@@ -852,6 +853,13 @@ CREATE TABLE IF NOT EXISTS subscriptions (
 );
 
 CREATE INDEX IF NOT EXISTS idx_subscriptions_group ON subscriptions(group_id);
+
+-- Stripe webhook idempotency: one row per event.id so retries don't re-email.
+CREATE TABLE IF NOT EXISTS stripe_event_log (
+    id TEXT PRIMARY KEY,
+    type TEXT NOT NULL,
+    processed_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
 
 -- Concierge proactive nudges (throttle/dedup log)
 CREATE TABLE IF NOT EXISTS concierge_nudges (

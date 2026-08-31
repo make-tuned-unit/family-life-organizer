@@ -136,16 +136,44 @@ function randomSuffix(n = 8) {
   return s;
 }
 
-async function createCheckoutSession({
-  productId, userId, groupId, customerId, customerEmail, successUrl, cancelUrl,
+// Same sticker in CAD / USD / EUR. The Price's native currency is USD; these
+// options make Checkout charge Canadians in CAD and Eurozone customers in EUR
+// without Adaptive Pricing's conversion markup. Adaptive Pricing still covers
+// everywhere else (GBP, AUD, …).
+function currencyOptionsForAmount(cents) {
+  const n = Number(cents);
+  return {
+    cad: { unit_amount: n },
+    eur: { unit_amount: n },
+  };
+}
+
+// App-first Checkout returns to public /open/* pages that bounce into
+// kinrows:// so Safari never has to share the app's cookie jar.
+function checkoutReturnUrls(base, source) {
+  const root = String(base || '').replace(/\/$/, '');
+  if (String(source || '').toLowerCase() === 'app') {
+    return {
+      successUrl: `${root}/open/subscribed?session_id={CHECKOUT_SESSION_ID}`,
+      cancelUrl: `${root}/open/subscribe-canceled`,
+    };
+  }
+  return {
+    successUrl: `${root}/subscribe.html?success=1&session_id={CHECKOUT_SESSION_ID}`,
+    cancelUrl: `${root}/subscribe.html?canceled=1`,
+  };
+}
+
+function buildCheckoutParams({
+  price, productId, userId, groupId, customerId, customerEmail, successUrl, cancelUrl, currency, source,
 }) {
-  const price = await priceIdForProduct(productId);
-  if (!price) throw Object.assign(new Error('Unknown or unpriced product'), { status: 400 });
   const meta = {
     kinrows_user_id: String(userId),
     kinrows_group_id: String(groupId),
     kinrows_product_id: productId,
   };
+  const fromApp = String(source || '').toLowerCase() === 'app';
+  if (fromApp) meta.kinrows_source = 'app';
   const params = {
     mode: 'subscription',
     line_items: [{ price, quantity: 1 }],
@@ -153,25 +181,129 @@ async function createCheckoutSession({
     cancel_url: cancelUrl,
     client_reference_id: String(groupId),
     metadata: meta,
-    subscription_data: { metadata: meta },
+    subscription_data: {
+      metadata: meta,
+      description: 'Kinrows Concierge — one plan for the whole household',
+    },
     allow_promotion_codes: true,
-    billing_address_collection: 'auto',
+    // Required (not 'auto') so Apple Pay / Google Pay can see a billing
+    // country and show the wallet button on hosted Checkout.
+    billing_address_collection: 'required',
+    locale: 'auto',
+    adaptive_pricing: { enabled: true },
+    custom_text: {
+      submit: { message: 'Concierge unlocks for everyone in your household — not just you.' },
+      after_submit: {
+        message: fromApp
+          ? 'Returning you to Kinrows. Concierge unlocks as soon as the app opens.'
+          : 'Open Kinrows on your iPhone. Your household is covered.',
+      },
+    },
     integration_identifier: `kinrowsweb${randomSuffix()}`,
-    // This account has Managed Payments on by default, which requires a product
-    // tax_code + tax registration. Keep Checkout working until Stripe Tax is
-    // actually registered; flip this on then (and set automatic_tax).
+    // Managed Payments + automatic_tax stay off until Stripe Tax is registered.
     managed_payments: { enabled: false },
   };
-  if (customerId) params.customer = customerId;
-  else if (customerEmail) params.customer_email = customerEmail;
-  return stripeRequest('POST', '/checkout/sessions', params);
+  if (customerId) {
+    params.customer = customerId;
+    params.customer_update = { name: 'auto', address: 'auto' };
+  } else if (customerEmail) {
+    params.customer_email = customerEmail;
+  }
+  const cur = String(currency || '').toLowerCase();
+  if (cur === 'cad' || cur === 'usd' || cur === 'eur') params.currency = cur;
+  return params;
+}
+
+async function createCheckoutSession({
+  productId, userId, groupId, customerId, customerEmail, successUrl, cancelUrl, currency, source,
+}) {
+  const price = await priceIdForProduct(productId);
+  if (!price) throw Object.assign(new Error('Unknown or unpriced product'), { status: 400 });
+  const params = buildCheckoutParams({
+    price, productId, userId, groupId, customerId, customerEmail, successUrl, cancelUrl, currency, source,
+  });
+  try {
+    return await stripeRequest('POST', '/checkout/sessions', params);
+  } catch (err) {
+    // Adaptive Pricing can be Dashboard-gated; still charge local CAD/USD/EUR via
+    // Price currency_options even if this flag is refused.
+    const msg = String(err && err.message || '');
+    if (params.adaptive_pricing && /adaptive.?pricing/i.test(msg)) {
+      delete params.adaptive_pricing;
+      return stripeRequest('POST', '/checkout/sessions', params);
+    }
+    throw err;
+  }
+}
+
+let _portalConfigId = null;
+
+async function ensurePortalConfiguration() {
+  if (_portalConfigId) return _portalConfigId;
+  try {
+    const listed = await stripeRequest('GET', '/billing_portal/configurations', { limit: 20, active: true });
+    const existing = (listed.data || []).find((c) => c.metadata?.kinrows === '1' && c.active !== false);
+    if (existing?.id) {
+      _portalConfigId = existing.id;
+      return _portalConfigId;
+    }
+  } catch { /* fall through to create */ }
+
+  const byProduct = new Map(); // stripe product id -> price ids
+  for (const productId of Object.keys(PRICE_ENV)) {
+    try {
+      const priceId = await priceIdForProduct(productId);
+      if (!priceId) continue;
+      const price = await stripeRequest('GET', `/prices/${priceId}`);
+      const prod = typeof price.product === 'string' ? price.product : price.product?.id;
+      if (!prod) continue;
+      if (!byProduct.has(prod)) byProduct.set(prod, []);
+      byProduct.get(prod).push(priceId);
+    } catch { /* skip a missing price */ }
+  }
+  const products = [...byProduct.entries()].map(([product, prices]) => ({ product, prices }));
+  const site = (process.env.SITE_URL || 'https://kinrows.com').replace(/\/$/, '');
+  const created = await stripeRequest('POST', '/billing_portal/configurations', {
+    business_profile: {
+      headline: 'Kinrows Concierge',
+      privacy_policy_url: `${site}/privacy.html`,
+      terms_of_service_url: `${site}/terms.html`,
+    },
+    features: {
+      customer_update: { enabled: true, allowed_updates: ['email', 'address', 'name'] },
+      invoice_history: { enabled: true },
+      payment_method_update: { enabled: true },
+      subscription_cancel: {
+        enabled: true,
+        mode: 'at_period_end',
+        proration_behavior: 'none',
+      },
+      subscription_update: products.length ? {
+        enabled: true,
+        default_allowed_updates: ['price'],
+        proration_behavior: 'create_prorations',
+        products,
+      } : { enabled: false },
+    },
+    metadata: { kinrows: '1' },
+  });
+  _portalConfigId = created.id;
+  return _portalConfigId;
 }
 
 async function createPortalSession({ customerId, returnUrl }) {
-  return stripeRequest('POST', '/billing_portal/sessions', {
-    customer: customerId,
-    return_url: returnUrl,
-  });
+  const params = { customer: customerId, return_url: returnUrl };
+  try {
+    const configuration = await ensurePortalConfiguration();
+    if (configuration) params.configuration = configuration;
+  } catch (err) {
+    console.error('[stripe] portal configuration skipped:', err.message || err);
+  }
+  return stripeRequest('POST', '/billing_portal/sessions', params);
+}
+
+async function retrieveCheckoutSession(id) {
+  return stripeRequest('GET', `/checkout/sessions/${id}`, { 'expand[0]': 'subscription' });
 }
 
 async function retrieveSubscription(id) {
@@ -235,7 +367,11 @@ module.exports = {
   environmentFromLivemode,
   allowTestStripe,
   createCheckoutSession,
+  checkoutReturnUrls,
+  buildCheckoutParams,
+  currencyOptionsForAmount,
   createPortalSession,
+  retrieveCheckoutSession,
   retrieveSubscription,
   verifyWebhookSignature,
   signWebhookPayload,

@@ -1103,6 +1103,7 @@ body::before{
 .sub-banner{
   border-radius:16px;padding:14px 18px;margin-bottom:22px;font-size:.98rem;font-weight:500;
   background:rgba(123,160,91,.14);color:var(--ink-1);border:1px solid rgba(123,160,91,.25);
+  scroll-margin-top:88px;
 }
 .sub-banner[data-kind="error"]{background:rgba(196,106,74,.12);border-color:rgba(196,106,74,.28)}
 .sub-banner[data-kind="info"]{background:rgba(217,158,58,.12);border-color:rgba(217,158,58,.28)}
@@ -1130,9 +1131,11 @@ body::before{
 .sub-blurb{color:var(--ink-3);margin-bottom:4px}
 .sub-card .btn{margin-top:18px;width:100%}
 .sub-account{
-  margin-top:36px;background:var(--card-2);border:1px solid var(--line);border-radius:22px;
-  padding:22px 24px;box-shadow:var(--shadow-sm);
+  margin:0 0 28px;background:var(--card-2);border:1px solid var(--line);border-radius:22px;
+  padding:22px 24px;box-shadow:var(--shadow-sm);scroll-margin-top:88px;
 }
+.sub-account.is-needed{border-color:var(--terracotta);box-shadow:0 0 0 4px rgba(196,106,74,.12)}
+#sub-2fa[hidden]{display:none !important}
 .sub-account-copy{color:var(--ink-2);margin-bottom:14px}
 .sub-login{display:grid;grid-template-columns:1fr 1fr auto;gap:12px;align-items:end}
 .sub-login label{display:flex;flex-direction:column;gap:6px;font-size:.82rem;font-weight:600;color:var(--ink-3)}
@@ -1147,6 +1150,17 @@ body::before{
 .sub-signed-in{margin:0;color:var(--ink-2);display:flex;flex-wrap:wrap;gap:10px;align-items:center}
 .sub-fine{margin-top:22px;color:var(--ink-3);font-size:.9rem;line-height:1.55}
 .sub-fine a{text-decoration:underline}
+.sub-trust{
+  list-style:none;margin:22px 0 0;padding:0;display:flex;flex-wrap:wrap;gap:10px 18px;
+  justify-content:center;color:var(--ink-3);font-size:.88rem;
+}
+.sub-trust li{position:relative;padding-left:14px}
+.sub-trust li:before{content:"";position:absolute;left:0;top:.55em;width:6px;height:6px;border-radius:50%;background:var(--sage)}
+.sub-faq{margin:36px auto 0;max-width:640px}
+.sub-faq h2{font-family:var(--serif);font-size:1.45rem;margin:0 0 12px;text-align:center}
+.sub-faq details{border:1px solid var(--line);border-radius:16px;padding:12px 18px;margin:0 0 10px;background:var(--card)}
+.sub-faq summary{cursor:pointer;font-weight:600}
+.sub-faq p{margin:8px 0 0;color:var(--ink-3);line-height:1.55}
 @media (max-width:720px){
   .sub-grid,.sub-login,#sub-2fa{grid-template-columns:1fr}
   .sub-login .btn{width:100%}

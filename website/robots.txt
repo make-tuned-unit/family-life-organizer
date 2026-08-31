@@ -26,6 +26,7 @@ Allow: /
 Disallow: /app
 Disallow: /login
 Disallow: /api/
+Disallow: /c/
 
 # Everyone else (search engines, etc.)
 User-agent: *
@@ -33,5 +34,6 @@ Allow: /
 Disallow: /app
 Disallow: /login
 Disallow: /api/
+Disallow: /c/
 
 Sitemap: https://kinrows.com/sitemap.xml

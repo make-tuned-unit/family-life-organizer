@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// Developer API keys: lets a paid household plug its own agent (Claude, ChatGPT,
 /// a custom bot) into Kinrows. Keys drive the same tool surface the Concierge
@@ -37,7 +38,13 @@ struct DeveloperAPIView: View {
                             .font(.system(.footnote, design: .monospaced))
                             .textSelection(.enabled)
                         Button {
-                            UIPasteboard.general.string = freshKey.key
+                            UIPasteboard.general.setItems(
+                                [[UTType.utf8PlainText.identifier: freshKey.key]],
+                                options: [
+                                    .localOnly: true,
+                                    .expirationDate: Date().addingTimeInterval(60),
+                                ]
+                            )
                             copied = true
                         } label: {
                             Label(copied ? "Copied" : "Copy key", systemImage: copied ? "checkmark" : "doc.on.doc")

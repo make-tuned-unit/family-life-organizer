@@ -100,3 +100,72 @@ test('analytics: drain envelope uses real booleans so Permagent can decode it', 
   assert.ok(typeof ev.at === 'string' && ev.at.includes('T'), 'at is ISO-8601');
   assert.equal(ev.kind, 'pageview');
 });
+
+test('analytics: custom events drain with a name and flat properties', async () => {
+  const collect = await fetch(BASE + '/api/permagent-analytics/collect', {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain', 'User-Agent': 'Mozilla/5.0 test-browser' },
+    body: JSON.stringify({
+      k: 'ev',
+      p: '/subscribe.html',
+      r: null,
+      n: 'sale_plan_click',
+      d: { product_id: 'com.kinrows.app.concierge.lite.monthly', period: 'monthly', nested: { drop: 1 } },
+      s: 'sess-sale',
+    }),
+  });
+  assert.equal(collect.status, 202);
+
+  const res = await fetch(BASE + '/api/permagent-analytics/drain?since=0&limit=50', {
+    headers: { 'x-permagent-key': KEY },
+  });
+  const body = await res.json();
+  const ev = body.events.find((e) => e.name === 'sale_plan_click');
+  assert.ok(ev, 'sale_plan_click drained');
+  assert.equal(ev.kind, 'event');
+  assert.equal(ev.properties.product_id, 'com.kinrows.app.concierge.lite.monthly');
+  assert.equal(ev.properties.period, 'monthly');
+  assert.equal(ev.properties.nested, undefined);
+});
+
+test('stripeSaleEvent maps Checkout, invoice, and cancel webhooks', () => {
+  const permagent = require('../services/permagent');
+  const complete = permagent.stripeSaleEvent(
+    {
+      type: 'checkout.session.completed',
+      data: { object: {
+        livemode: false,
+        currency: 'cad',
+        amount_total: 9999,
+        metadata: { kinrows_product_id: 'com.kinrows.app.concierge.premium.yearly', kinrows_source: 'app' },
+      } },
+    },
+    { applied: true, productId: 'com.kinrows.app.concierge.premium.yearly', status: 'active', tier: 'premium' },
+  );
+  assert.equal(complete.name, 'sale_checkout_complete');
+  assert.equal(complete.properties.source, 'app');
+  assert.equal(complete.properties.amount_cents, 9999);
+  assert.equal(complete.properties.tier, 'premium');
+  assert.equal(complete.properties.period, 'yearly');
+
+  const paid = permagent.stripeSaleEvent(
+    { type: 'invoice.paid', data: { object: { currency: 'usd', amount_paid: 499, billing_reason: 'subscription_cycle' } } },
+    { applied: true, productId: 'com.kinrows.app.concierge.lite.monthly', status: 'active', tier: 'lite' },
+  );
+  assert.equal(paid.name, 'sale_invoice_paid');
+  assert.equal(paid.properties.billing_reason, 'subscription_cycle');
+
+  const failed = permagent.stripeSaleEvent(
+    { type: 'invoice.payment_failed', data: { object: {} } },
+    { applied: true, productId: 'com.kinrows.app.concierge.lite.monthly', status: 'expired', tier: 'lite' },
+  );
+  assert.equal(failed.name, 'sale_payment_failed');
+
+  const canceled = permagent.stripeSaleEvent(
+    { type: 'customer.subscription.deleted', data: { object: {} } },
+    { applied: true, productId: 'com.kinrows.app.concierge.premium.monthly', status: 'expired', tier: 'premium' },
+  );
+  assert.equal(canceled.name, 'sale_subscription_canceled');
+
+  assert.equal(permagent.stripeSaleEvent({ type: 'ping' }, { applied: false }), null);
+});

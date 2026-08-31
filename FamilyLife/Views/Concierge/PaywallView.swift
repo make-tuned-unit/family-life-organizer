@@ -4,6 +4,10 @@ import StoreKit
 /// Premium upsell for the conversational concierge. The daily brief stays free;
 /// this unlocks the butler you can talk to and that acts on your behalf.
 ///
+/// App-first path: Subscribe opens Safari Checkout (Apple Pay lives there),
+/// then a `kinrows://` return unlocks the household without a second sign-in.
+/// StoreKit remains as Restore / Subscribe with Apple.
+///
 /// Two tiers — Lite and Premium — each billable monthly or yearly (yearly = two
 /// months free). Both tiers get every feature; they differ only by how many chats
 /// per day the household gets.
@@ -11,6 +15,7 @@ struct PaywallView: View {
     @Environment(APIService.self) private var api
     @Environment(SubscriptionService.self) private var subscription
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.openURL) private var openURL
 
     @State private var period: SubscriptionService.Period = .yearly
 
@@ -30,17 +35,21 @@ struct PaywallView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 24) {
                         header
-                        perkList
-                        periodToggle
-                        planCard(tier: .premium,
-                                 title: "Premium",
-                                 blurb: "Up to 40 concierge chats a day",
-                                 recommended: true)
-                        planCard(tier: .lite,
-                                 title: "Lite",
-                                 blurb: "Up to 10 concierge chats a day",
-                                 recommended: false)
-                        restoreAndLegal
+                        if subscription.isPremium {
+                            unlockedCard
+                        } else {
+                            perkList
+                            periodToggle
+                            planCard(tier: .premium,
+                                     title: "Premium",
+                                     blurb: "Up to 40 concierge chats a day",
+                                     recommended: true)
+                            planCard(tier: .lite,
+                                     title: "Lite",
+                                     blurb: "Up to 10 concierge chats a day",
+                                     recommended: false)
+                            restoreAndLegal
+                        }
                     }
                     .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
                     .padding(.vertical, 24)
@@ -51,6 +60,14 @@ struct PaywallView: View {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Close") { dismiss() }
                 }
+            }
+            .inlineError(subscription.lastError) { subscription.clearError() }
+            .task { await subscription.loadCatalog(api: api) }
+            .onChange(of: subscription.isPremium) { _, premium in
+                if premium { dismiss() }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .kinrowsSubscriptionActivated)) { _ in
+                dismiss()
             }
         }
     }
@@ -63,10 +80,28 @@ struct PaywallView: View {
             Text("Your AI Life Concierge")
                 .font(.flScreenTitle)
                 .foregroundStyle(WarmPalette.ink1)
-            Text("A personal butler for your family — always organized, always one step ahead.")
+            Text(subscription.pendingWebCheckout
+                 ? "Finish in Safari, then we will bring you back and unlock Concierge."
+                 : "A personal butler for your family — always organized, always one step ahead.")
                 .font(.flBody)
                 .foregroundStyle(WarmPalette.ink3)
         }
+    }
+
+    private var unlockedCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("You are in")
+                .font(.flTitle)
+                .foregroundStyle(WarmPalette.ink1)
+            Text("Concierge is on for everyone in this household.")
+                .font(.flSubheadline)
+                .foregroundStyle(WarmPalette.ink3)
+            Button("Continue") { dismiss() }
+                .buttonStyle(.flCTA(fill: accent))
+        }
+        .padding(DesignTokens.Spacing.cardPadding)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .flCard(tint: accent)
     }
 
     private var perkList: some View {
@@ -102,7 +137,7 @@ struct PaywallView: View {
 
     @ViewBuilder
     private func planCard(tier: SubscriptionService.Tier, title: String, blurb: String, recommended: Bool) -> some View {
-        let product = subscription.product(tier, period)
+        let storeProduct = subscription.product(tier, period)
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .firstTextBaseline) {
                 Text(title)
@@ -116,7 +151,7 @@ struct PaywallView: View {
                         .background(accent.opacity(0.15), in: Capsule())
                 }
                 Spacer()
-                Text(priceLabel(product))
+                Text(priceLabel(tier: tier, product: storeProduct))
                     .font(.flSubheadline.weight(.semibold))
                     .foregroundStyle(WarmPalette.ink1)
             }
@@ -125,32 +160,53 @@ struct PaywallView: View {
                 .foregroundStyle(WarmPalette.ink3)
 
             Button {
-                guard let product else { return }
-                Task { await subscription.purchase(product, api: api); if subscription.isPremium { dismiss() } }
+                Task {
+                    guard let url = await subscription.startWebCheckout(tier: tier, period: period, api: api) else { return }
+                    openURL(url)
+                }
             } label: {
                 if subscription.isPurchasing {
                     ProgressView()
+                } else if subscription.pendingWebCheckout {
+                    Text("Opening Safari…")
                 } else {
                     Text("Subscribe")
                 }
             }
             .buttonStyle(.flCTA(fill: recommended ? accent : AccentTheme.sage.color))
-            .disabled(subscription.isPurchasing || product == nil)
+            .disabled(subscription.isPurchasing || subscription.pendingWebCheckout)
+
+            if let storeProduct {
+                Button("Subscribe with Apple") {
+                    Task { await subscription.purchase(storeProduct, api: api) }
+                }
+                .font(.flCaption)
+                .foregroundStyle(WarmPalette.ink3)
+                .disabled(subscription.isPurchasing || subscription.pendingWebCheckout)
+            }
         }
         .padding(DesignTokens.Spacing.cardPadding)
         .frame(maxWidth: .infinity, alignment: .leading)
         .flCard(tint: recommended ? accent : AccentTheme.sage.color)
     }
 
-    private func priceLabel(_ product: Product?) -> String {
-        guard let product else { return "—" }
-        return period == .yearly ? "\(product.displayPrice)/yr" : "\(product.displayPrice)/mo"
+    private func priceLabel(tier: SubscriptionService.Tier, product: Product?) -> String {
+        if let product {
+            return period == .yearly ? "\(product.displayPrice)/yr" : "\(product.displayPrice)/mo"
+        }
+        guard let plan = subscription.catalogPlan(tier, period) else { return "—" }
+        return period == .yearly ? "\(plan.displayPrice)/yr" : "\(plan.displayPrice)/mo"
     }
 
     private var restoreAndLegal: some View {
         VStack(spacing: 12) {
+            Text("You will finish in Safari with Apple Pay, then return here automatically. No second sign-in.")
+                .font(.flCaption)
+                .foregroundStyle(WarmPalette.ink2)
+                .multilineTextAlignment(.center)
+
             Button("Restore Purchases") {
-                Task { await subscription.restore(api: api); if subscription.isPremium { dismiss() } }
+                Task { await subscription.restore(api: api) }
             }
             .buttonStyle(FLSecondaryButtonStyle())
 
@@ -161,7 +217,7 @@ struct PaywallView: View {
                     .multilineTextAlignment(.center)
             }
 
-            Text("Payment will be charged to your Apple ID account at confirmation of purchase. The subscription automatically renews unless you cancel at least 24 hours before the end of the current period. Your account will be charged for renewal within 24 hours prior to the end of the current period. You can manage and cancel your subscriptions in your App Store account settings after purchase.")
+            Text("Billed on the web via Stripe (Apple Pay / card). Cancel anytime in the Stripe Customer Portal. Apple subscriptions restore from Settings. If you buy in the App Store instead: payment is charged to your Apple ID at confirmation and renews unless cancelled at least 24 hours before the period ends.")
                 .font(.flCaption2)
                 .foregroundStyle(WarmPalette.ink3)
                 .multilineTextAlignment(.center)

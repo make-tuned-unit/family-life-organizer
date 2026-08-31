@@ -154,21 +154,22 @@
             <li><strong>Household &amp; group setup.</strong> The households and "clans" you create or join, who's in them, and the invitations you send.</li>
             <li><strong>The content you create.</strong> Everything you put into the app to organize your home — appointments and calendar entries, tasks and lists, decisions and votes, budget categories, expenses, recurring payments, receipts, pantry items, trips and itineraries, gift ideas, special dates, notes, messages, and feed posts. When you scan a receipt, its photo is sent to our AI provider to read the details and is <strong>not stored</strong> — we keep only the extracted merchant, total, and category.</li>
             <li><strong>Family &amp; contact details.</strong> Information you add about family members and contacts, including phone numbers if you choose to add them, and — only if you choose to add them — addresses, which we convert to map coordinates so the app can show locations.</li>
-            <li><strong>Location.</strong> While a trip you start is active, the app shares your device location so your family can see your ETA and get an arrival alert; this stops when the trip ends or you cancel it. Separately, <strong>only if you turn on presence sharing</strong> (off by default), the app periodically shares your approximate place — home, work, or out — with your household. Your health/fitness step counts are read (with your permission) only to score fitness challenges you join.</li>
+            <li><strong>Location.</strong> While a trip you start is active, the app shares your device location so your family can see your ETA and get an arrival alert; this stops when the trip ends or you cancel it. Separately, <strong>only if you turn on presence sharing</strong> (off by default, and enforced on the server), the app periodically shares your approximate place — home, work, or out — with your household. You can turn this off anytime; we then delete the stored coordinates. Your health/fitness step counts are read (with your permission) only to score fitness challenges you join.</li>
             <li><strong>Website sign-up.</strong> If you ask to be notified at launch, we collect your email address for that single purpose.</li>
             <li><strong>What you send to support.</strong> The contents of any message you send us.</li>
           </ul>
 
           <h3>Information collected automatically</h3>
           <ul>
-            <li><strong>Log data.</strong> When your app talks to our servers, our systems record standard request information such as IP address and timestamps for security and troubleshooting. We do <strong>not</strong> use any third-party analytics, crash-reporting, or advertising SDKs, and we do not track which screens you open.</li>
+            <li><strong>Log data.</strong> When your app talks to our servers, our systems record standard request information such as IP address and timestamps for security and troubleshooting. We do <strong>not</strong> use any third-party advertising, crash-reporting, or tracking SDKs, and we do not track which screens you open inside the iPhone app.</li>
+            <li><strong>Website analytics.</strong> On kinrows.com we record first-party pageviews (path, referrer, a salted daily visitor hash — not a cookie that identifies you across days) and conversion events for Concierge billing (plan chosen, checkout started or completed, payment failed, canceled) so we can see which steps of subscribe work. No email, user id, or card number is stored on those events. This is our own collector, not Google Analytics or similar. You can block browser beacons with a content blocker; completed purchases are still recorded on the server so the household can be unlocked. It is not used for ads.</li>
             <li><strong>Push tokens.</strong> If you enable notifications, a device token so we can deliver them. It is removed when you sign out.</li>
           </ul>
 
           <h3>Information from others</h3>
           <ul>
             <li><strong>Apple.</strong> If you subscribe to Concierge in the iPhone app, Apple confirms to us that your subscription is active so we can unlock the feature. If you use Sign in with Apple, Apple confirms your identity. <strong>We never receive your card number or full payment details</strong> — Apple handles the transaction.</li>
-            <li><strong>Stripe.</strong> If you subscribe to Concierge on the web, Stripe processes the payment. We receive a customer and subscription identifier so we can unlock the feature for your household, plus the billing email you enter at checkout. Stripe handles the card number; we do not store it.</li>
+            <li><strong>Stripe.</strong> If you subscribe to Concierge on the web, Stripe processes the payment (card, Apple Pay, or Google Pay). We receive a customer and subscription identifier so we can unlock the feature for your household, plus the billing email you enter at checkout. Stripe handles the card number; we do not store it.</li>
             <li><strong>People in your household.</strong> Other members may add information that involves you (for example, an appointment that includes you), which then appears in your shared household.</li>
           </ul>
 
@@ -210,6 +211,7 @@
             <li><strong>Who processes it.</strong> Server-side AI is processed by <strong>Anthropic</strong> (the maker of Claude), acting as our processor under contract. Some quick summaries are generated <strong>privately on your own device</strong> and never leave your iPhone.</li>
             <li><strong>No training.</strong> Your content is <strong>not used to train</strong> our AI provider's models. It is processed to give you a result and is not retained by the provider to improve their models.</li>
             <li><strong>You stay in control.</strong> When you ask it to, Concierge can create, edit, and delete items across the app on your behalf — and it only ever acts within your own household and groups, never anyone else's data. You can turn it off at any time, and you can clear what it has remembered for you.</li>
+            <li><strong>Bring your own agent.</strong> Paid households can mint a Developer API key and point their own AI at Kinrows. That key can read and change the same household data the Concierge can. Treat it like a password. Data those agents send to <em>your</em> model is governed by that provider's policy, not ours.</li>
             <li><strong>It can be wrong.</strong> AI output may contain mistakes. Please review it before relying on it, especially for anything important.</li>
           </ul>
         </section>
@@ -243,10 +245,11 @@
             them to protect it:
           </p>
           <ul class="def-list">
-            <li><strong>Cloud hosting</strong> — to store your data and run our servers.</li>
+            <li><strong>Cloud hosting</strong> — Railway, to store your data and run our servers.</li>
             <li><strong>Anthropic</strong> — to power Concierge's server-side AI features (only when you use them).</li>
             <li><strong>Apple</strong> — to deliver the app, process in-app subscriptions, send push notifications, and (if you choose it) Sign in with Apple.</li>
             <li><strong>Stripe</strong> — to process Concierge subscriptions purchased on the web.</li>
+            <li><strong>Resend</strong> — to send transactional email (sign-in codes, waitlist, getting-started messages).</li>
           </ul>
           <p>
             We keep this list short on purpose. If you'd like the current details of our subprocessors,
@@ -284,7 +287,7 @@
           <ul>
             <li><strong>Access</strong> the personal information we hold about you.</li>
             <li><strong>Correct</strong> information that's wrong or incomplete — much of which you can edit directly in the app.</li>
-            <li><strong>Export</strong> a copy of your data in a portable format, by emailing us (we do not yet offer an in-app download).</li>
+            <li><strong>Export</strong> a copy of your data in a portable JSON format from Settings in the app, or by contacting us.</li>
             <li><strong>Delete</strong> your data and your entire account, from within the app or by contacting us.</li>
             <li><strong>Object to or restrict</strong> certain processing, and <strong>withdraw consent</strong> (for example, by turning off push notifications).</li>
             <li><strong>Not be discriminated against</strong> for exercising any of these rights.</li>

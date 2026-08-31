@@ -248,6 +248,7 @@ class FamilyDB {
         )`, () => {});
         this.db.run('CREATE INDEX IF NOT EXISTS idx_jobs_drain ON jobs(status, available_at, id)', () => {});
         this.db.run('ALTER TABLE users ADD COLUMN concierge_enabled INTEGER DEFAULT 0', () => {});
+        this.db.run('ALTER TABLE users ADD COLUMN share_presence INTEGER DEFAULT 0', () => {});
         this.db.run('ALTER TABLE users ADD COLUMN last_location_at DATETIME', (err) => {
           // Fresh databases already get this column from schema.sql. Treat the
           // idempotent duplicate-column result as success while still surfacing
@@ -3036,6 +3037,7 @@ class FamilyDB {
           await run('DELETE FROM auth_tokens WHERE user_id = ?', [uid]);
           await run('DELETE FROM device_tokens WHERE user_id = ?', [uid]);
           await run('DELETE FROM login_challenges WHERE user_id = ?', [uid]);
+          await run('DELETE FROM api_keys WHERE user_id = ?', [uid]);
           await run('DELETE FROM group_members WHERE user_id = ?', [uid]);
           await run('DELETE FROM users WHERE id = ?', [uid]);
           await run('COMMIT');
@@ -3048,6 +3050,88 @@ class FamilyDB {
         await closeDb();
       }
     })();
+  }
+
+  // Stripe subscription ids (`stripe:sub_…`) on households where this user is
+  // the last remaining member — cancel these at Stripe before wiping the row.
+  listSoleHouseholdStripeSubs(userId) {
+    const uid = parseInt(userId);
+    return new Promise((resolve, reject) => {
+      this.db.all(`
+        SELECT s.original_transaction_id
+        FROM subscriptions s
+        JOIN groups g ON g.id = s.group_id AND g.group_type = 'household'
+        WHERE s.original_transaction_id LIKE 'stripe:%'
+          AND s.group_id IN (
+            SELECT gm.group_id FROM group_members gm
+            WHERE gm.user_id = ?
+              AND (SELECT COUNT(*) FROM group_members gm2
+                   WHERE gm2.group_id = gm.group_id AND gm2.user_id IS NOT NULL) = 1
+          )
+      `, [uid], (err, rows) => err ? reject(err) : resolve((rows || []).map(r => r.original_transaction_id)));
+    });
+  }
+
+  // Portable dump of the caller's own data (GDPR / privacy-policy export).
+  // Omits password hashes, tokens, API key hashes, and image blobs.
+  async exportUserAccount(userId) {
+    const uid = parseInt(userId);
+    if (!uid) throw new Error('Invalid user id');
+    const get = (sql, p = []) => new Promise((r, j) => this.db.get(sql, p, (e, x) => e ? j(e) : r(x)));
+    const all = (sql, p = []) => new Promise((r, j) => this.db.all(sql, p, (e, x) => e ? j(e) : r(x || [])));
+    const user = await get(
+      `SELECT id, username, name, email, email_verified, apple_user_id IS NOT NULL AS has_apple,
+              phone, work_address, created_at, share_presence
+       FROM users WHERE id = ?`, [uid]);
+    if (!user) throw new Error('User not found');
+    const groups = await all(
+      `SELECT g.id, g.name, g.group_type, g.invite_code, gm.role
+       FROM group_members gm JOIN groups g ON g.id = gm.group_id
+       WHERE gm.user_id = ?`, [uid]);
+    const householdIds = groups.filter(g => g.group_type === 'household').map(g => g.id);
+    const hidPlace = householdIds.length ? householdIds.map(() => '?').join(',') : 'NULL';
+    const scoped = householdIds.length
+      ? async (table, extra = '') => all(`SELECT * FROM ${table} WHERE group_id IN (${hidPlace}) ${extra}`, householdIds)
+      : async () => [];
+    const notes = await all(
+      `SELECT id, title, body, color, pinned, shared_scope, group_id, can_collaborate, created_at, updated_at
+       FROM notes WHERE user_id = ?`, [uid]);
+    const messages = await all(
+      `SELECT id, sender_id, recipient_id, text, reference_type, reference_id, reference_title,
+              CASE WHEN image_data IS NOT NULL THEN 1 ELSE 0 END AS has_image,
+              read_at, created_at
+       FROM direct_messages WHERE sender_id = ? OR recipient_id = ?
+       ORDER BY id`, [uid, uid]);
+    const contacts = await all('SELECT id, name, relationship, phone, email, created_at FROM contacts WHERE added_by = ?', [uid]);
+    const memory = await all('SELECT id, content, created_at FROM concierge_memory WHERE user_id = ?', [uid]);
+    const conversations = await all(
+      `SELECT id, created_at FROM concierge_conversations WHERE user_id = ?`, [uid]);
+    const lists = await all(
+      `SELECT id, name, list_type, created_at FROM lists WHERE created_by = ?`, [uid]);
+    return {
+      exported_at: new Date().toISOString(),
+      user: { ...user, has_apple: !!user.has_apple, share_presence: !!user.share_presence },
+      groups,
+      notes,
+      contacts,
+      lists,
+      messages,
+      concierge_memory: memory,
+      concierge_conversations: conversations,
+      tasks: await scoped('tasks'),
+      appointments: await scoped('appointments'),
+      receipts: householdIds.length
+        ? await all(`SELECT id, merchant, amount, category, date, group_id FROM receipts WHERE group_id IN (${hidPlace})`, householdIds)
+        : [],
+      pantry: await scoped('pantry'),
+      trips: await scoped('trips'),
+      decisions: await scoped('decisions'),
+      gift_people: await scoped('gift_people'),
+      gift_ideas: await scoped('gift_ideas'),
+      milestones: await scoped('milestones'),
+      routines: await scoped('routines'),
+      coverage_requests: await all('SELECT id, reason, note, status, created_at FROM coverage_requests WHERE requester_id = ?', [uid]),
+    };
   }
 
   // Merge one household into another: re-point all household-scoped data and
@@ -3523,16 +3607,18 @@ class FamilyDB {
 
   getHealthMetrics(metric_type, days = 30) {
     return new Promise((resolve, reject) => {
-      const sql = `
-        SELECT * FROM health 
-        WHERE metric_type = ? 
-        AND date >= date('now', '-${days} days')
-        ORDER BY date DESC
-      `;
-      this.db.all(sql, [metric_type], (err, rows) => {
-        if (err) reject(err);
-        else resolve(rows);
-      });
+      // `days` is parameterized — never interpolated. This helper is unused by
+      // HTTP routes (HealthKit stays on-device); keep it injection-safe anyway.
+      const n = Number.parseInt(days, 10);
+      const window = Number.isInteger(n) && n > 0 ? Math.min(n, 3650) : 30;
+      this.db.all(
+        `SELECT * FROM health
+         WHERE metric_type = ?
+           AND date >= date('now', '-' || ? || ' days')
+         ORDER BY date DESC`,
+        [metric_type, window],
+        (err, rows) => err ? reject(err) : resolve(rows)
+      );
     });
   }
 
@@ -4017,15 +4103,19 @@ class FamilyDB {
 
   getRecipientByToken(token) {
     return new Promise((resolve, reject) => {
+      // 16-byte hex tokens expire 30 days after issue so a leaked share link
+      // cannot approve coverage indefinitely. Cancelled requests are dead too.
       this.db.get(`
         SELECT cr.*, c.name as contact_name,
-          creq.reason, creq.note, creq.requester_id,
+          creq.reason, creq.note, creq.requester_id, creq.status as request_status,
           u.name as requester_name
         FROM coverage_recipients cr
         JOIN contacts c ON c.id = cr.contact_id
         JOIN coverage_requests creq ON creq.id = cr.request_id
         JOIN users u ON u.id = creq.requester_id
         WHERE cr.invite_token = ?
+          AND creq.status != 'cancelled'
+          AND datetime(cr.created_at) > datetime('now', '-30 days')
       `, [token], (err, row) => err ? reject(err) : resolve(row));
     });
   }
@@ -4266,14 +4356,39 @@ class FamilyDB {
 
   getHouseholdPresence(userId) {
     return new Promise((resolve, reject) => {
+      // Live GPS is only returned for members who opted in server-side.
+      // Work address is a saved household field, not a live coordinate stream.
       this.db.all(`
-        SELECT u.id, u.name, u.last_lat, u.last_lng, u.last_location_name, u.last_location_at,
-          u.work_address, u.work_lat, u.work_lng
+        SELECT u.id, u.name,
+          CASE WHEN u.share_presence = 1 THEN u.last_lat END AS last_lat,
+          CASE WHEN u.share_presence = 1 THEN u.last_lng END AS last_lng,
+          CASE WHEN u.share_presence = 1 THEN u.last_location_name END AS last_location_name,
+          CASE WHEN u.share_presence = 1 THEN u.last_location_at END AS last_location_at,
+          u.work_address, u.work_lat, u.work_lng,
+          u.share_presence
         FROM users u
         JOIN group_members gm ON gm.user_id = u.id
         JOIN groups g ON g.id = gm.group_id AND g.group_type = 'household'
         WHERE gm.group_id IN (SELECT group_id FROM group_members WHERE user_id = ?)
       `, [userId], (err, rows) => err ? reject(err) : resolve(rows || []));
+    });
+  }
+
+  getSharePresence(userId) {
+    return new Promise((resolve, reject) => {
+      this.db.get('SELECT share_presence FROM users WHERE id = ?', [userId],
+        (err, row) => err ? reject(err) : resolve(!!row?.share_presence));
+    });
+  }
+
+  setSharePresence(userId, enabled) {
+    return new Promise((resolve, reject) => {
+      const on = enabled ? 1 : 0;
+      const sql = on
+        ? 'UPDATE users SET share_presence = 1 WHERE id = ?'
+        : `UPDATE users SET share_presence = 0, last_lat = NULL, last_lng = NULL,
+             last_location_name = NULL, last_location_at = NULL WHERE id = ?`;
+      this.db.run(sql, [userId], (err) => err ? reject(err) : resolve());
     });
   }
 
@@ -4465,12 +4580,26 @@ class FamilyDB {
   getActiveSubscriptionForGroup(groupId) {
     return new Promise((resolve, reject) => {
       if (!groupId) return resolve(null); // never treat the NULL-group bucket as entitled
-      this.db.get(
+      this.db.all(
         `SELECT * FROM subscriptions
-         WHERE group_id = ? AND status = 'active' AND expires_at > CURRENT_TIMESTAMP
-         ORDER BY expires_at DESC LIMIT 1`,
+         WHERE group_id = ? AND status = 'active' AND expires_at > CURRENT_TIMESTAMP`,
         [groupId],
-        (err, row) => err ? reject(err) : resolve(row || null)
+        (err, rows) => {
+          if (err) return reject(err);
+          if (!rows || !rows.length) return resolve(null);
+          const rank = (productId) => {
+            const id = String(productId || '');
+            if (id.includes('.premium.') || /\.concierge\.monthly$/.test(id)) return 2;
+            if (id.includes('.lite.')) return 1;
+            return 0;
+          };
+          rows.sort((a, b) => {
+            const d = rank(b.product_id) - rank(a.product_id);
+            if (d) return d;
+            return String(b.expires_at || '').localeCompare(String(a.expires_at || ''));
+          });
+          resolve(rows[0]);
+        }
       );
     });
   }
@@ -4508,6 +4637,21 @@ class FamilyDB {
          ORDER BY updated_at DESC LIMIT 1`,
         [groupId],
         (err, row) => err ? reject(err) : resolve(row || null)
+      );
+    });
+  }
+
+  // Returns true when this Stripe event id is new (INSERT), false on retry.
+  insertStripeEvent(id, type) {
+    return new Promise((resolve, reject) => {
+      if (!id) return resolve(true);
+      this.db.run(
+        'INSERT OR IGNORE INTO stripe_event_log (id, type) VALUES (?, ?)',
+        [String(id), String(type || '')],
+        function (err) {
+          if (err) reject(err);
+          else resolve(this.changes > 0);
+        }
       );
     });
   }
@@ -5029,6 +5173,11 @@ class FamilyDB {
           resolve({ id: this.lastID });
         }
       );
+      // Cap growth: drop events older than 90 days and anything beyond the
+      // newest 100k rows so an unauthenticated collector cannot fill the disk.
+      this.db.run(`DELETE FROM permagent_analytics_events
+        WHERE created_at < datetime('now', '-90 days')
+           OR id < (SELECT IFNULL(MAX(id), 0) - 100000 FROM permagent_analytics_events)`);
     });
   }
 

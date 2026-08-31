@@ -3,6 +3,11 @@
 Date: 2026-06-25. Scope: full-codebase review (auth, authz/isolation, AI/concierge,
 payments, email, DB, deploy, iOS) followed by remediation of P0/P1 findings.
 
+**Live source of truth for launch checkboxes:** [PRODUCTION_CHECKLIST.md](PRODUCTION_CHECKLIST.md).
+`docs/PROD_READINESS.md` carries historical snapshots and later addenda; prefer
+PRODUCTION_CHECKLIST for submit blockers. This log is append-only; later addenda
+supersede earlier claims when they conflict.
+
 ## 2026-08-26 — SQLite job outbox
 
 Push and waitlist email no longer run inline on the request that produced them.
@@ -11,6 +16,131 @@ are claimed by an in-process drain (kick-after-enqueue + ~5s interval). Failures
 retry up to `max_attempts` then stay inspectable as `failed`. No new npm dependency;
 single-process SQLite (no SKIP LOCKED). Onboarding drip, 2FA, concierge chat, and
 receipt scan stay on their existing paths. Tests: `test/jobs.test.js`.
+
+## 2026-08-26 — Pre-launch security audit
+
+Full-stack specialist pass (threat-model first, then every Express route, Concierge
+`GROUPS` handler, iOS `APIService` / entitlements, and unauthenticated path).
+**P0/P1 fixed in the same pass.** Live production was checked **read-only**
+(TLS, headers, public pages, `/healthz`, catalog). No authenticated probing, waitlist
+POSTs, analytics floods, or webhook replays against Railway.
+
+Standards used as checklists: OWASP ASVS L2 + API Top 10, MASVS, OWASP LLM Top 10,
+App Store 5.1.x.
+
+### Threat model (frozen)
+
+- **Assets:** household PII (kids’ sleep/chores/milestones, DMs, receipts, GPS,
+  EventKit titles, Concierge memory), session cookies + refresh tokens, developer
+  API keys, StoreKit/Stripe entitlements, invite/coverage URLs, SQLite + unencrypted
+  `VACUUM INTO` backups.
+- **Primary attackers:** a logged-in member of household B (IDOR / clan leakage —
+  historically #1), a stranger with a stolen cookie/token/key, a BYO-agent with a
+  `kr_live_` key, webhook forgers (Apple/Stripe), prompt injection via stored
+  notes/titles, same-origin XSS on `kinrows.com` (API + marketing share one Express origin).
+
+### Findings fixed in this pass (P0 / P1)
+
+| Sev | Finding | Fix |
+|---|---|---|
+| P0 | SIWA accounts had a random unusable `password_hash`; `POST /api/account/delete` required `current_password` — App Store **5.1.1(v)** blocker | Accept Apple `identity_token` + `nonce` (JWKS verify, `sub` must match `users.apple_user_id`) **or** password |
+| P0 | `deleteUserAccount` ran `PRAGMA foreign_keys = OFF` and could orphan `api_keys` (billing/agent keys outliving the user) | Explicit `DELETE FROM api_keys`; best-effort Stripe cancel for sole-owner households |
+| P0 | `PUT /api/notes/:id` spread `req.body`, so `group_id` could retarget a note at another household | Allowlisted fields only; `group_id` set solely via `resolveNoteShare` when `shared_scope` is present |
+| P0 | `POST /api/location` had no server opt-in; a modified client could always post GPS and `GET /api/household/presence` returned coords | `users.share_presence` (default 0); POST location 403 unless on; opt-out clears lat/lng; presence query nulls coords for opted-out members |
+| P1 | Coverage `/c/:token` (128-bit, no expiry, PII in HTML); JSON GET did not hex-validate | Token must be 32 hex chars; lookup requires not cancelled **and** `created_at` within 30 days; `robots.txt` `Disallow: /c/`; coverage HTML sets `PAGE_CSP` |
+| P1 | Analytics collect was unauthenticated with no rate limit; drain used `!==` | 120/min/IP; prune events older than 90 days / beyond newest 100k rows; drain uses `timingSafeEqualString` |
+| P1 | Privacy policy promised in-app export that did not exist | `GET /api/account/export` (JSON dump, no hashes/tokens/blobs) + Settings export |
+| P1 | DMs stayed readable after leaving a shared group | `GET /api/messages` filters to `usersShareGroup`; partner thread 403 otherwise |
+| P1 | Dormant `getHealthMetrics` interpolated `days` into SQL | Parameterized `'-' \|\| ? \|\| ' days'`, clamped 1–3650. Still not HTTP-routed |
+| P1 | Helmet CSP off; marketing CSP not applied to blog/static or coverage HTML | `WEBSITE_CSP` via `setHeaders` on `website/` HTML/txt; `PAGE_CSP` on `/c/:token` |
+| P1 | `public/sw.js` was cache-first for `/` and `/login` | Unregister + drop caches on activate |
+| P1 | Admin diagnostic dumped all users | Counts only (`user_count`, group-type counts). Fail-closed if `ADMIN_USER_IDS` unset |
+| P1 | iOS logout left presence / calendar-share / HealthKit watermarks; developer keys copied to general clipboard | Logout clears those keys; pasteboard `localOnly` (+ 60s expiry on API keys) |
+| P2 | `website/privacy.html` / App Privacy label stale (Render, no analytics, no SIWA/Resend/BYO) | Policy last-updated 2026-08-26; label host is Railway; Stripe + SIWA listed |
+
+Tests: `test/prelaunch-security.test.js` + SIWA delete case in `test/apple-signin.test.js`.
+
+### Wave 2 — remaining surfaces (verified, no extra P0/P1)
+
+Household CRUD (receipts, budget, pantry, trips, gifts, projects, recurring, cook,
+feed, lists, itineraries, coverage, people, routines, milestones) still 403s on
+`!groupId` and uses `requireHouseholdRow` / `requireGroupRow` / `requireListAccess` /
+`requireContactOwner` / `usersShareGroup` as appropriate. Clan vs household:
+`requireGroupManage` + rivalry `getUserIdByName(..., group_id)`. Invite codes reject
+unknowns. `COMP_PREMIUM_ALL` is env-only and defaults off. Email 2FA /
+`AUTH_2FA_ECHO_CODE` fail-fast in production. Push payload minimization remains
+deferred (not P0). `/v1` read-scope is handler-name prefix `get_|list_|analyze_`;
+write actions (`log_chore`, `add`, `log_expense`, …) do not sneak under it.
+`STRIPE_ALLOW_TEST` / `STOREKIT_ALLOW_SANDBOX` have **no code default on** — only
+the env flag or `NODE_ENV !== 'production'`.
+
+### Read-only production checks (2026-08-26, this agent)
+
+Against `https://kinrows.com` and `https://family-life-organizer-production.up.railway.app`:
+
+- TLS 1.3 (`TLS_AES_256_GCM_SHA384`), valid Let’s Encrypt chains, verify OK.
+- HSTS `max-age=31536000; includeSubDomains` on both hosts.
+- `/healthz` → `{"ok":true}` only (no DB leak). `/c/` without a token → 404.
+- Public `GET /api/subscription/catalog` returns product ids / prices only; Stripe is live (`"stripe":true`).
+- Marketing `/`, `/privacy`, `/developers`, `/subscribe` already send `WEBSITE_CSP`.
+  **Live blog HTML and `/c/:token` do not yet** — that lands when this branch deploys
+  (`setHeaders` + `PAGE_CSP`). Live `robots.txt` does not yet `Disallow: /c/` (same).
+- `llms.txt` / `llms-full.txt` do not publish admin ids or env internals.
+
+**Not done (by design):** login, waitlist POST, analytics POST, Stripe/Apple webhook replay, coverage-token enumeration.
+
+### Prior-doc contradictions (resolved here)
+
+Earlier sections of this file and [PRODUCTION_CHECKLIST.md](PRODUCTION_CHECKLIST.md)
+disagreed. **This addendum is authoritative for the 2026-08-26 audit:**
+
+| Topic | Old claim A | Old claim B | 2026-08-26 |
+|---|---|---|---|
+| Email 2FA in prod | “already `AUTH_2FA_ENABLED=1` on Railway” | “still OFF / unset” | **OFF.** Railway CLI 2026-08-26: `AUTH_2FA_ENABLED` is present but empty; `AUTH_2FA_ECHO_CODE` unset. |
+| Git-history purge | “NOT done” (2026-07-11 addendum below) | Checklist: purged 2026-07-11 via `git filter-repo` | **Treat purge as done** per checklist evidence. **`SESSION_SECRET` rotated 2026-08-26 via Railway CLI.** Reset legacy jesse/sophie passwords if those accounts still exist. |
+| Privacy copy | “contradicts GPS / receipts” | Checklist: GPS copy reconciled | **Reconciled in this pass** (GPS opt-in, first-party pageviews, SIWA, Resend, Railway, BYO-agent, in-app export). |
+| Host | Render in privacy label / old human-actions | Railway | **Railway.** Render config was removed 2026-07-11. |
+
+### Residuals (P2 / P3 — documented, not built)
+
+- No TLS pinning (acceptable for Railway + ATS).
+- Token-login bypasses email 2FA **by design** (device already enrolled).
+- In-memory rate limiter (multi-replica bypass). Redis is out of “no new deps”; a SQLite-backed limiter is a follow-up if a second replica appears.
+- Unencrypted same-disk `VACUUM INTO` backups (14-day). Optional `age`/libsodium is P2.
+- Developer keys: no expiry / IP allow-list; `/v1/snapshot` is a full household dump to any valid key.
+- Indirect prompt injection via stored titles/notes — mitigation is prompt text + sanitizers + `remember` caps + `minimizedFacts` + `cloudAIEnabled` chokepoint. Not solvable as a filter.
+- No in-app lock / screenshot protection (product decision).
+- `NSHealthUpdateUsageDescription` remains in the Xcode project because the HealthKit **capability** is on for reads; Apple still expects the update string. App does not write HealthKit.
+- APNs payloads still carry message/coverage/child-name text (Notification Service Extension deferred).
+- `npm audit` 2026-08-26: highs/critical are **build-only** under `sqlite3 → node-gyp` (`tar`, `ip-address`, `socks-proxy-agent`, `brace-expansion`). Not imported by `dashboard.js`. Do not `npm audit fix --force` (it wants sqlite3@6). CI continues `|| true` with that comment.
+
+### Human-owned (Railway CLI applied 2026-08-26)
+
+Done from this agent (project **Kinrows**, service **family-life-organizer**):
+
+1. **`SESSION_SECRET` rotated** (new 128-char hex). Live sessions/cookies are invalid — users sign in again.
+2. **`COMP_PREMIUM_ALL` deleted** (was `1`). Boot will no longer grant premium to every household. Existing `comp:` rows in SQLite may still entitle households until revoked via `POST /api/admin/comp`.
+3. **`FAMILY_DB_DIR=/opt/render/project/src/vault/family-life`** (same path as the attached 5 GB volume).
+4. **`AUTH_2FA_ECHO_CODE` unset.** `STOREKIT_ALLOW_SANDBOX` unset. Leftover **Gmail IMAP** env vars deleted.
+5. **`AUTH_2FA_ENABLED` is off** (key present, empty). `ADMIN_USER_IDS` is a single real id. `NODE_ENV=production`. `APNS_ENV=production`.
+
+Still human:
+
+1. Reset legacy jesse/sophie **passwords** if those accounts still exist.
+2. Enable `AUTH_2FA_ENABLED=1` only after every TestFlight user has the 2FA UI.
+3. Optionally revoke leftover comp entitlements and set a Railway `healthcheckPath` of `/healthz` (currently unset on the service).
+4. Compile touched Swift in Xcode before submit (`swiftc` was not on the audit machine).
+5. First live web Checkout purchase (Lite + Premium) after this cutover — confirm entitlement + Customer Portal.
+6. Enable **Associated Domains** on App ID `com.kinrows.app` (team `Z58XSBM78S`) so Universal Links for `/open/*` sign; the `kinrows://` custom scheme works without it. Walk the app-first path once: Subscribe in the iPhone app → Safari Checkout + Apple Pay → auto-return → Concierge unlocked.
+
+### Stripe live cutover (2026-08-26, later the same day)
+
+Production is **live Stripe**, not test:
+
+- Live catalog on account `acct_1U8kNvAFD5YfBJgE`: Lite `prod_V98PyRIxlZ3v19`, Premium `prod_V98QNWgRBTE8mx`, four USD prices with StoreKit lookup keys (`price_1U8q9X…` / `price_1U8q9k…`).
+- Live webhook `we_1U8q9tAFD5YfBJgEICI8fCaV` → `https://kinrows.com/api/subscription/stripe` (checkout completed, subscription updated/deleted, invoice paid / payment_failed).
+- Railway: `sk_live_` / `pk_live_`, live `STRIPE_WEBHOOK_SECRET`, live `STRIPE_PRICE_*`. **`STRIPE_ALLOW_TEST` deleted.**
+- Deploy `50fbf719` SUCCESS. Read-only probes: `/healthz` `{"ok":true}`; `GET /api/subscription/catalog` `"stripe":true` + four plans; unauth checkout 401; unsigned webhook 400; logs `Stripe billing: ENABLED`.
 
 ## 2026-08-26 — Stripe web subscriptions (Concierge)
 
@@ -28,7 +158,10 @@ they cannot collide with StoreKit original transaction ids.
   `STOREKIT_ALLOW_SANDBOX`).
 - Secret and restricted keys live in env only (`.env` gitignored). Prefer a restricted
   key with Checkout / Billing / Webhooks / Customers once this is proven on test keys.
-- Tests: `test/stripe-billing.test.js`.
+- Tests: `test/stripe-billing.test.js`, `test/billing-email.test.js`, `test/rate-limit.test.js`.
+- **Funnel (2026-08-27):** hosted Checkout with promo codes, auto locale, household copy, `{CHECKOUT_SESSION_ID}` success URL that the subscribe page confirms before celebrating. Customer Portal is created with plan-switch + cancel-at-period-end. Kinrows emails (via Resend) fire on checkout completed, payment failed, and cancellation — Stripe still sends receipts. Lite = **10** chats/day, Premium = **40**, enforced after the premium gate so unpaid callers get 402 not a burned quota; 429 names the tier and suggests upgrade on Lite. Duplicate Stripe events are logged and not re-emailed. **Local currency:** CAD/USD/EUR stickers via Price `currency_options` (same numbers); Adaptive Pricing for everywhere else. **Apple Pay / Google Pay:** Checkout `billing_address_collection=required`; live payment-method domains `kinrows.com` + `www.kinrows.com` (`apple_pay=active`); association file at `/.well-known/apple-developer-merchantid-domain-association`.
+- **Permagent sale funnel (2026-08-27):** conversion events land in `permagent_analytics_events` (same drain as pageviews). Server writes `sale_checkout_start` / `_complete` / `_blocked`, `sale_invoice_paid`, `sale_payment_failed`, `sale_subscription_updated` / `_canceled`, `sale_portal_open`, `sale_return_success` / `_canceled`, `sale_storekit_verified`. The subscribe page adds intent events (`sale_plan_click`, `sale_signin_*`, `sale_checkout_redirect`). No user id / email / Stripe customer id. iPhone app still has no analytics SDK.
+- **App-first purchase (2026-08-27):** iPhone paywall Subscribe calls `POST /api/subscription/checkout` with `source=app` using the app session (Safari never sees the password). Success/cancel URLs are public `/open/subscribed` and `/open/subscribe-canceled`, which bounce into `kinrows://` (and Universal Links via `/.well-known/apple-app-site-association`, appID `Z58XSBM78S.com.kinrows.app`, paths `/open/*`). The app confirms `GET /api/subscription/checkout/session` and refreshes household status on foreground if the user switches back without tapping Open Kinrows. Return pages are unauthenticated on purpose — they must not call billing APIs from Safari. Enable **Associated Domains** on App ID `com.kinrows.app` so Universal Links sign; the custom scheme works without it.
 
 ## 2026-08-26 — Pre-signup onboarding + Sign in with Apple
 
@@ -249,6 +382,11 @@ The system moved on substantially since the 2026-06-25 log. Current state:
   `.completeFileProtection`. PII (receipt amounts, raw emails) removed from logs.
 
 ### Still requiring HUMAN action (unchanged / new)
+
+> **Superseded 2026-08-26.** See the pre-launch addendum at the top of this file.
+> Git-history purge was completed 2026-07-11 (rotation still required). 2FA on
+> Railway is **unconfirmed**. Privacy copy and export were fixed in that pass.
+
 - **Git-history purge NOT done** — plaintext passwords + old session secret
   remain in early commits. Run `git filter-repo`, force-push, rotate the secret.
 - **2FA still OFF** in production (`AUTH_2FA_ENABLED` unset) — enable per the

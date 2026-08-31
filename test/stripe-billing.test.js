@@ -72,6 +72,8 @@ before(async () => {
       STRIPE_SECRET_KEY: '',
       STRIPE_WEBHOOK_SECRET: WHSEC,
       STRIPE_ALLOW_TEST: '1',
+      PERMAGENT_ANALYTICS_KEY: 'test-drain-key-stripe',
+      PERMAGENT_ANALYTICS_SALT: 'test-salt',
     },
     stdio: 'ignore',
   });
@@ -93,8 +95,63 @@ test('catalog is public and lists the four Concierge plans', async () => {
   assert.equal(res.status, 200);
   const body = await res.json();
   assert.equal(body.stripe, false);
+  assert.equal(body.currency, 'cad');
   assert.equal(body.plans.length, 4);
+  assert.equal(body.caps.lite, 10);
+  assert.equal(body.caps.premium, 40);
   assert.ok(body.plans.every(p => p.product_id.startsWith('com.kinrows.app.concierge.')));
+  assert.ok(body.plans.every(p => p.currency === 'cad'));
+  assert.equal(body.plans.find(p => p.tier === 'lite').chats, 10);
+  assert.equal(body.plans.find(p => p.tier === 'premium').chats, 40);
+});
+
+test('presentment currency follows country, Accept-Language, then CAD', () => {
+  assert.equal(subscription.presentmentCurrencyFromHints({ country: 'CA' }), 'cad');
+  assert.equal(subscription.presentmentCurrencyFromHints({ country: 'US' }), 'usd');
+  assert.equal(subscription.presentmentCurrencyFromHints({ country: 'FR' }), 'eur');
+  assert.equal(subscription.presentmentCurrencyFromHints({ country: 'GB' }), 'cad');
+  assert.equal(subscription.presentmentCurrencyFromHints({ acceptLanguage: 'en-US,en;q=0.9' }), 'usd');
+  assert.equal(subscription.presentmentCurrencyFromHints({ explicit: 'eur', country: 'US' }), 'eur');
+  assert.equal(subscription.presentmentCurrencyFromHints({}), 'cad');
+});
+
+test('catalog honors ?currency= and geo country headers', async () => {
+  const eur = await fetch(BASE + '/api/subscription/catalog?currency=eur');
+  assert.equal(eur.status, 200);
+  const eurBody = await eur.json();
+  assert.equal(eurBody.currency, 'eur');
+  assert.ok(eurBody.plans.every(p => p.currency === 'eur'));
+
+  const us = await fetch(BASE + '/api/subscription/catalog', { headers: { 'CF-IPCountry': 'US' } });
+  assert.equal((await us.json()).currency, 'usd');
+});
+
+test('subscribe.html inline scripts parse and sign-in sits above the plans', async () => {
+  const html = await (await fetch(BASE + '/subscribe.html')).text();
+  assert.match(html, /class="btn btn-primary sub-buy"/);
+  assert.ok(html.indexOf('id="sub-account"') < html.indexOf('class="sub-grid"'));
+  assert.match(html, /Sign in to subscribe/);
+  assert.ok(!html.includes("showBanner('You're"));
+  const vm = require('node:vm');
+  const scripts = [...html.matchAll(/<script(?![^>]*\bsrc=)([^>]*)>([\s\S]*?)<\/script>/g)];
+  assert.ok(scripts.length >= 2);
+  for (const m of scripts) {
+    const attrs = m[1] || '';
+    const body = m[2] || '';
+    if (/type\s*=\s*"application\/ld\+json"/i.test(attrs)) continue;
+    assert.doesNotThrow(() => new vm.Script(body), body.slice(0, 80));
+  }
+  assert.match(html, /sale_plan_click/);
+  assert.match(html, /sale_checkout_redirect/);
+  assert.match(html, /sale_return_success/);
+});
+
+test('Apple Pay domain association file is served', async () => {
+  const res = await fetch(BASE + '/.well-known/apple-developer-merchantid-domain-association');
+  assert.equal(res.status, 200);
+  const body = await res.text();
+  assert.ok(body.length > 100);
+  assert.match(res.headers.get('content-type') || '', /octet-stream|text\/plain/i);
 });
 
 test('checkout requires auth, a known plan, and a configured Stripe key', async () => {
@@ -162,6 +219,32 @@ test('signed webhook unlocks the household; unsigned is refused', async () => {
   assert.equal(after.body.tier, 'lite');
   assert.equal(after.body.source, 'stripe');
   assert.equal(after.body.stripe_managed, true);
+  assert.equal(after.body.chats_per_day, 10);
+
+  const again = await fetch(BASE + '/api/subscription/stripe', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Stripe-Signature': stripe.signWebhookPayload(raw, WHSEC),
+    },
+    body: raw,
+  });
+  assert.equal(again.status, 200);
+  const dup = await again.json();
+  assert.equal(dup.duplicate, true);
+
+  let updatedCount = 0;
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < 2000) {
+    const drain = await fetch(BASE + '/api/permagent-analytics/drain?since=0&limit=1000', {
+      headers: { 'x-permagent-key': 'test-drain-key-stripe' },
+    });
+    const env = await drain.json();
+    updatedCount = (env.events || []).filter((ev) => ev.name === 'sale_subscription_updated').length;
+    if (updatedCount >= 1) break;
+    await new Promise(r => setTimeout(r, 50));
+  }
+  assert.equal(updatedCount, 1, 'webhook writes sale_subscription_updated once (duplicates ignored)');
 });
 
 test('applyStripeSubscription refuses an unbound event and maps cancellation', async () => {
@@ -217,4 +300,197 @@ test('applyStripeSubscription refuses an unbound event and maps cancellation', a
 
   db.close();
   fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test('active household picks premium over a later-expiring lite row', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fl-stripe-tier-'));
+  process.env.FAMILY_DB_DIR = dir;
+  delete require.cache[require.resolve('../database.js')];
+  const FamilyDB = require('../database.js');
+  const db = new FamilyDB();
+  await db.initSchema();
+  await new Promise(r => setTimeout(r, 400));
+
+  const u = await new Promise((resolve, reject) => {
+    db.db.run("INSERT INTO users (username, name, password_hash) VALUES ('c_tier', 'T', 'x')", function (err) {
+      err ? reject(err) : resolve(this.lastID);
+    });
+  });
+  const g = await new Promise((resolve, reject) => {
+    db.db.run("INSERT INTO groups (name, group_type, invite_code, created_by) VALUES ('G', 'household', 'TIEROK1', ?)", [u], function (err) {
+      err ? reject(err) : resolve(this.lastID);
+    });
+  });
+  await new Promise((resolve, reject) => {
+    db.db.run('INSERT INTO group_members (group_id, user_id, role) VALUES (?, ?, ?)', [g, u, 'admin'], (err) => err ? reject(err) : resolve());
+  });
+
+  const far = new Date(Date.now() + 90 * 24 * 3600 * 1000).toISOString().slice(0, 19).replace('T', ' ');
+  const near = new Date(Date.now() + 10 * 24 * 3600 * 1000).toISOString().slice(0, 19).replace('T', ' ');
+  await db.upsertSubscription({
+    group_id: g, user_id: u,
+    product_id: 'com.kinrows.app.concierge.lite.yearly',
+    original_transaction_id: 'stripe:sub_lite_later',
+    expires_at: far, environment: 'StripeTest', status: 'active',
+  });
+  await db.upsertSubscription({
+    group_id: g, user_id: u,
+    product_id: 'com.kinrows.app.concierge.premium.monthly',
+    original_transaction_id: 'stripe:sub_prem_sooner',
+    expires_at: near, environment: 'StripeTest', status: 'active',
+  });
+
+  const status = await subscription.getStatus(db, u);
+  assert.equal(status.tier, 'premium');
+  assert.equal(status.chats_per_day, 40);
+
+  db.close();
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test('Checkout Session payload includes conversion fields and session_id success url', () => {
+  const params = stripe.buildCheckoutParams({
+    price: 'price_lite_m',
+    productId: 'com.kinrows.app.concierge.lite.monthly',
+    userId: 9,
+    groupId: 4,
+    customerEmail: 'ada@example.com',
+    successUrl: 'https://kinrows.com/subscribe.html?success=1&session_id={CHECKOUT_SESSION_ID}',
+    cancelUrl: 'https://kinrows.com/subscribe.html?canceled=1',
+  });
+  assert.equal(params.mode, 'subscription');
+  assert.equal(params.allow_promotion_codes, true);
+  assert.equal(params.locale, 'auto');
+  assert.equal(params.billing_address_collection, 'required');
+  assert.equal(params.adaptive_pricing.enabled, true);
+  assert.equal(params.currency, undefined);
+  assert.equal(params.excluded_payment_method_types, undefined);
+  assert.equal(params.payment_method_types, undefined);
+  assert.equal(params.customer_email, 'ada@example.com');
+  assert.match(params.success_url, /session_id=\{CHECKOUT_SESSION_ID\}/);
+  assert.match(params.custom_text.submit.message, /household/);
+  assert.equal(params.line_items[0].price, 'price_lite_m');
+  assert.equal(params.subscription_data.metadata.kinrows_group_id, '4');
+  assert.equal(params.managed_payments.enabled, false);
+  assert.equal(params.metadata.kinrows_source, undefined);
+
+  const cad = stripe.buildCheckoutParams({
+    price: 'price_lite_m',
+    productId: 'com.kinrows.app.concierge.lite.monthly',
+    userId: 9,
+    groupId: 4,
+    successUrl: 'https://kinrows.com/subscribe.html?success=1',
+    cancelUrl: 'https://kinrows.com/subscribe.html?canceled=1',
+    currency: 'cad',
+  });
+  assert.equal(cad.currency, 'cad');
+  const gbp = stripe.buildCheckoutParams({
+    price: 'price_lite_m',
+    productId: 'com.kinrows.app.concierge.lite.monthly',
+    userId: 9,
+    groupId: 4,
+    successUrl: 'https://kinrows.com/subscribe.html?success=1',
+    cancelUrl: 'https://kinrows.com/subscribe.html?canceled=1',
+    currency: 'gbp',
+  });
+  assert.equal(gbp.currency, undefined);
+
+  const app = stripe.buildCheckoutParams({
+    price: 'price_lite_m',
+    productId: 'com.kinrows.app.concierge.lite.monthly',
+    userId: 9,
+    groupId: 4,
+    successUrl: 'https://kinrows.com/open/subscribed?session_id={CHECKOUT_SESSION_ID}',
+    cancelUrl: 'https://kinrows.com/open/subscribe-canceled',
+    source: 'app',
+  });
+  assert.equal(app.metadata.kinrows_source, 'app');
+  assert.match(app.custom_text.after_submit.message, /Returning you to Kinrows/);
+});
+
+test('app-first Checkout return URLs bounce into kinrows:// not the website login', () => {
+  const web = stripe.checkoutReturnUrls('https://kinrows.com', 'web');
+  assert.match(web.successUrl, /subscribe\.html\?success=1/);
+  assert.match(web.cancelUrl, /subscribe\.html\?canceled=1/);
+
+  const app = stripe.checkoutReturnUrls('https://kinrows.com/', 'app');
+  assert.equal(app.successUrl, 'https://kinrows.com/open/subscribed?session_id={CHECKOUT_SESSION_ID}');
+  assert.equal(app.cancelUrl, 'https://kinrows.com/open/subscribe-canceled');
+});
+
+test('app return pages are public and deep-link into the iPhone app', async () => {
+  const ok = await fetch(BASE + '/open/subscribed?session_id=cs_live_abc123XYZ');
+  assert.equal(ok.status, 200);
+  const html = await ok.text();
+  assert.match(html, /kinrows:\/\/subscribed\?session_id=cs_live_abc123XYZ/);
+  assert.match(html, /Open Kinrows/);
+  assert.match(html, /window\.location\.replace/);
+  assert.match(ok.headers.get('cache-control') || '', /no-store/i);
+
+  const evil = await fetch(BASE + '/open/subscribed?session_id=' + encodeURIComponent('"><script>alert(1)</script>'));
+  const evilHtml = await evil.text();
+  assert.equal(evil.status, 200);
+  assert.ok(!evilHtml.includes('<script>alert'));
+  assert.match(evilHtml, /kinrows:\/\/subscribed"/);
+
+  const cancel = await fetch(BASE + '/open/subscribe-canceled');
+  assert.equal(cancel.status, 200);
+  const cancelHtml = await cancel.text();
+  assert.match(cancelHtml, /kinrows:\/\/subscribe-canceled/);
+  assert.match(cancelHtml, /Nothing was charged/);
+});
+
+test('Apple App Site Association is served as JSON for Universal Links', async () => {
+  const res = await fetch(BASE + '/.well-known/apple-app-site-association');
+  assert.equal(res.status, 200);
+  assert.match(res.headers.get('content-type') || '', /json/i);
+  const body = await res.json();
+  const detail = body.applinks.details[0];
+  assert.equal(detail.appID, 'Z58XSBM78S.com.kinrows.app');
+  assert.ok(detail.paths.includes('/open/*'));
+
+  const alias = await fetch(BASE + '/apple-app-site-association');
+  assert.equal(alias.status, 200);
+  assert.equal((await alias.json()).applinks.details[0].appID, 'Z58XSBM78S.com.kinrows.app');
+});
+
+test('subscribe.html offers an Open Kinrows deep link after web checkout', async () => {
+  const html = await (await fetch(BASE + '/subscribe.html')).text();
+  assert.match(html, /href="kinrows:\/\/subscribed"/);
+  assert.match(html, /id="sub-open-app"/);
+});
+
+test('app return pages and blocked checkout record Permagent sale events', async () => {
+  await fetch(BASE + '/open/subscribed?session_id=cs_live_abc123XYZ');
+  await fetch(BASE + '/open/subscribe-canceled');
+  const ada = makeClient();
+  await ada('POST', '/api/auth/register', { username: 'sale_ada', password: 'password123', name: 'Ada Sale' });
+  await ada('POST', '/api/subscription/checkout', {
+    product_id: 'com.kinrows.app.concierge.premium.yearly',
+    source: 'app',
+  });
+
+  const startedAt = Date.now();
+  let names = [];
+  let events = [];
+  while (Date.now() - startedAt < 2000) {
+    const drain = await fetch(BASE + '/api/permagent-analytics/drain?since=0&limit=1000', {
+      headers: { 'x-permagent-key': 'test-drain-key-stripe' },
+    });
+    const env = await drain.json();
+    events = env.events || [];
+    names = events.filter((ev) => ev.kind === 'event').map((ev) => ev.name);
+    if (names.includes('sale_return_success') && names.includes('sale_return_canceled')
+        && names.includes('sale_checkout_blocked')) break;
+    await new Promise(r => setTimeout(r, 50));
+  }
+  assert.ok(names.includes('sale_return_success'), names.join(','));
+  assert.ok(names.includes('sale_return_canceled'), names.join(','));
+  assert.ok(names.includes('sale_checkout_blocked'), names.join(','));
+  const blocked = events.find((ev) => ev.name === 'sale_checkout_blocked' && ev.properties?.source === 'app');
+  assert.ok(blocked, 'app checkout blocked event');
+  assert.equal(blocked.properties.reason, 'unconfigured');
+  assert.equal(blocked.properties.tier, 'premium');
+  const ret = events.find((ev) => ev.name === 'sale_return_success' && ev.properties?.via === 'app');
+  assert.ok(ret, 'app return success event');
 });

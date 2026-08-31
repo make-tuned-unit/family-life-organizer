@@ -9,17 +9,51 @@ class DeepLinkRouter {
     var pendingType: String?
     var pendingRefId: Int?
     var pendingName: String?
+    var pendingSessionId: String?
 
-    func route(type: String, refId: Int?, name: String? = nil) {
+    func route(type: String, refId: Int? = nil, name: String? = nil, sessionId: String? = nil) {
         pendingType = type
         pendingRefId = refId
         pendingName = name
+        pendingSessionId = sessionId
     }
 
     func consume() {
         pendingType = nil
         pendingRefId = nil
         pendingName = nil
+        pendingSessionId = nil
+    }
+
+    /// Custom scheme (`kinrows://subscribed`) and Universal Links
+    /// (`https://kinrows.com/open/subscribed`) after Safari Checkout.
+    func handleIncomingURL(_ url: URL) {
+        let sessionId = URLComponents(url: url, resolvingAgainstBaseURL: false)?
+            .queryItems?
+            .first(where: { $0.name == "session_id" })?
+            .value
+
+        if url.scheme == AppConfig.urlScheme {
+            let host = (url.host ?? url.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))).lowercased()
+            if host == "subscribed" {
+                route(type: "subscribed", sessionId: sessionId)
+                return
+            }
+            if host == "subscribe-canceled" {
+                route(type: "subscribe-canceled")
+                return
+            }
+        }
+
+        let host = (url.host ?? "").lowercased()
+        let isKinrowsWeb = host == "kinrows.com" || host == "www.kinrows.com" || host == "localhost"
+        guard isKinrowsWeb else { return }
+        let path = url.path.lowercased()
+        if path == "/open/subscribed" || path.hasPrefix("/open/subscribed/") {
+            route(type: "subscribed", sessionId: sessionId)
+        } else if path == "/open/subscribe-canceled" || path.hasPrefix("/open/subscribe-canceled/") {
+            route(type: "subscribe-canceled")
+        }
     }
 }
 
@@ -192,6 +226,14 @@ struct FamilyLifeApp: App {
                 .onReceive(NotificationCenter.default.publisher(for: ASAuthorizationAppleIDProvider.credentialRevokedNotification)) { _ in
                     authService.logout()
                 }
+                .onOpenURL { url in
+                    deepLinkRouter.handleIncomingURL(url)
+                }
+                .onContinueUserActivity(NSUserActivityTypeBrowsingWeb) { activity in
+                    if let url = activity.webpageURL {
+                        deepLinkRouter.handleIncomingURL(url)
+                    }
+                }
                 .onReceive(NotificationCenter.default.publisher(for: APIService.unauthorizedNotification)) { _ in
                     Task {
                         await authService.validateSession(api: apiService)
@@ -201,6 +243,7 @@ struct FamilyLifeApp: App {
                     guard authService.isAuthenticated, let userId = authService.currentUser?.id else { return }
                     messageCache.preload(api: apiService, userId: userId)
                     Task { await calendarService.syncToHousehold(api: apiService) }
+                    Task { await subscriptionService.handleAppForeground(api: apiService) }
                     // If the launch-time roster load failed (offline start),
                     // this is the retry that actually repopulates the
                     // mention/assignee/care-team pickers.

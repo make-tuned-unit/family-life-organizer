@@ -1,6 +1,9 @@
 # FamilyLife iOS Production Readiness
 
-Last updated: 2026-04-07
+Last updated: 2026-04-07. **Historical.** Launch checkboxes now live in
+[PRODUCTION_CHECKLIST.md](PRODUCTION_CHECKLIST.md); security findings in
+[SECURITY_AUDIT.md](SECURITY_AUDIT.md) (2026-08-26 pre-launch addendum). Do not
+treat the SwiftData / Render items below as current.
 
 This file is the maintained list of work required before the app should be treated as production-ready.
 
@@ -90,10 +93,12 @@ wired up for real billing yet**. Before this can sell:
   2026-08-26): `POST /api/subscription/checkout` (session auth) → Stripe Checkout →
   `POST /api/subscription/stripe` (signed webhook) → household row in `subscriptions`
   with `original_transaction_id` `stripe:sub_…`. Customer Portal at
-  `POST /api/subscription/portal`. Website: `/subscribe.html`. Still before live
-  charges: put **live** keys + `STRIPE_WEBHOOK_SECRET` on Railway, enable Stripe Tax
-  once you have a registration, and confirm App Store external-link / reader-app
-  rules before promoting the web paywall from the iOS app.
+  `POST /api/subscription/portal`. Website: `/subscribe.html`. **App-first (2026-08-27):**
+  `source=app` returns to public `/open/subscribed` → `kinrows://subscribed` → app
+  confirms with its own cookie. AASA at `/.well-known/apple-app-site-association`.
+  Still before live charges in a new country: Stripe Tax once registered. Confirm App
+  Store external-link / reader-app rules if web Checkout stays the in-app primary
+  for US/EEA digital goods (StoreKit remains as Subscribe with Apple / Restore).
 - [ ] Decide whether to lower the Premium cap from 40/day or keep the per-household cap as
   the abuse backstop (at the 40/day ceiling a household can exceed the $8.49 net — extreme,
   but possible). Revisit once real usage data exists.

@@ -43,6 +43,8 @@ const { runProactiveSweep } = require('./services/conciergeNudge');
 const { announceRivalryCompletion } = require('./services/rivalryAnnounce');
 const { createRateLimiter } = require('./services/rateLimit');
 const email = require('./services/email');
+const billingEmail = require('./services/billingEmail');
+const permagent = require('./services/permagent');
 const { runOnboardingEmailSweep } = require('./services/onboardingEmail');
 const householdInvite = require('./services/householdInvite');
 const appleSignIn = require('./services/appleSignIn');
@@ -78,13 +80,13 @@ const conciergeLimiter = createRateLimiter({ windowMs: 60000, max: 30, keyFn: re
 // the cap bounds the household's combined spend, not each member's). Lite = 10/day,
 // Premium = 40/day. Null tier (no active sub) defaults to the lite cap, but
 // requirePremium blocks those callers anyway, so it's only a backstop.
-const TIER_DAILY_CAP = { premium: 40, lite: 10 };
+const TIER_DAILY_CAP = subscription.TIER_DAILY_CAP;
 
 // Resolve {household key, tier} for a request, memoized briefly to avoid a DB hit on
 // every call (household membership and tier change rarely). Falls back to a per-user
 // key if the household can't be resolved. Cache is invalidated on subscription verify.
 const _householdEntitlementCache = new Map(); // userId -> { gid, tier, ts }
-const HOUSEHOLD_KEY_TTL_MS = 5 * 60 * 1000;
+const HOUSEHOLD_KEY_TTL_MS = 60 * 1000;
 async function resolveHouseholdEntitlement(req) {
   const uid = req.session?.user?.id;
   if (!uid) return { key: clientIp(req), tier: null };
@@ -107,11 +109,31 @@ async function resolveHouseholdEntitlement(req) {
 async function householdRateKey(req) { return (await resolveHouseholdEntitlement(req)).key; }
 async function householdDailyMax(req) {
   const { tier } = await resolveHouseholdEntitlement(req); // second call this request hits the cache
-  return TIER_DAILY_CAP[tier] ?? TIER_DAILY_CAP.lite;
+  return subscription.chatsForTier(tier) || TIER_DAILY_CAP.lite;
 }
 
 // Tier-aware daily cap, bounded per HOUSEHOLD (was a flat 200/user = ~6000/mo, dangerous).
-const conciergeChatDailyLimiter = createRateLimiter({ windowMs: 24 * 60 * 60 * 1000, keyFn: householdRateKey, maxFn: householdDailyMax });
+const conciergeChatDailyLimiter = createRateLimiter({
+  windowMs: 24 * 60 * 60 * 1000,
+  keyFn: householdRateKey,
+  maxFn: householdDailyMax,
+  extraFn: async (req, { limit, retryAfter }) => {
+    const { tier } = await resolveHouseholdEntitlement(req);
+    const t = tier || 'lite';
+    const upgrade = t === 'lite';
+    return {
+      code: 'daily_cap',
+      tier: t,
+      limit,
+      chats: limit,
+      upgrade,
+      error: upgrade
+        ? `You've used today's ${limit} Lite chats. Upgrade to Premium for ${TIER_DAILY_CAP.premium} a day, or try again tomorrow.`
+        : `You've used today's ${limit} Premium chats. Try again tomorrow.`,
+      retry_after: retryAfter,
+    };
+  },
+});
 
 // Daily cap for the other Anthropic-calling endpoints (cook suggestions,
 // receipt vision scans). Generous for real use, but stops an authenticated
@@ -173,6 +195,19 @@ function codeMatches(code, hash) {
   const a = Buffer.from(hashCode(code));
   const b = Buffer.from(hash);
   return a.length === b.length && crypto.timingSafeEqual(a, b);
+}
+function timingSafeEqualString(a, b) {
+  if (typeof a !== 'string' || typeof b !== 'string') return false;
+  const ba = Buffer.from(a);
+  const bb = Buffer.from(b);
+  if (ba.length !== bb.length) return false;
+  return crypto.timingSafeEqual(ba, bb);
+}
+// Coverage share links are 16 random bytes as hex (32 chars). Reject anything
+// else before hitting the DB so a scanner can't probe with arbitrary strings.
+function parseCoverageToken(raw) {
+  const t = String(raw || '');
+  return /^[a-f0-9]{32}$/i.test(t) ? t : null;
 }
 function challengeExpiry() {
   return new Date(Date.now() + TWO_FA_TTL_MS).toISOString();
@@ -250,9 +285,9 @@ function haversineDistance(lat1, lng1, lat2, lng2) {
 // cookies and req.ip work correctly.
 app.set('trust proxy', 1);
 app.use(helmet({
-  // The API + a few server-rendered pages; CSP is enforced on the static
-  // marketing site via its own meta tags. Keep HSTS/no-sniff/frame-guard.
-  // The server-rendered /login and /app pages set their own CSP (PAGE_CSP).
+  // JSON API responses do not need a browser CSP. HTML surfaces set their own:
+  // WEBSITE_CSP on marketing/blog (header + static setHeaders), PAGE_CSP on
+  // /login, /app, and /c/:token. Keep HSTS / nosniff / frame-guard from Helmet.
   contentSecurityPolicy: false,
 }));
 
@@ -440,6 +475,38 @@ function serveWebsiteHtml(filePath) {
 }
 
 // Explicit routes for website HTML files (must come BEFORE express.static)
+// Apple Pay domain verification (Payment Request / Checkout wallets).
+// Served as octet-stream with no extra Content-Disposition — Apple is picky.
+app.get('/.well-known/apple-developer-merchantid-domain-association', (req, res) => {
+  const file = path.join(__dirname, 'website', '.well-known', 'apple-developer-merchantid-domain-association');
+  fs.readFile(file, (err, buf) => {
+    if (err) return res.status(404).end();
+    // Apple rejects extra Content-Disposition; send's default ignores
+    // `.well-known` as a hidden path, so read + send the bytes ourselves.
+    res.set({
+      'Content-Type': 'application/octet-stream',
+      'Cache-Control': 'public, max-age=86400',
+    });
+    res.send(buf);
+  });
+});
+
+// Universal Links for the app-first Checkout return. Must be JSON, no
+// redirect, no sendFile — Express treats `.well-known` as a hidden path.
+function sendAppleAppSiteAssociation(req, res) {
+  const file = path.join(__dirname, 'website', '.well-known', 'apple-app-site-association');
+  fs.readFile(file, (err, buf) => {
+    if (err) return res.status(404).end();
+    res.set({
+      'Content-Type': 'application/json',
+      'Cache-Control': 'public, max-age=86400',
+    });
+    res.send(buf);
+  });
+}
+app.get('/.well-known/apple-app-site-association', sendAppleAppSiteAssociation);
+app.get('/apple-app-site-association', sendAppleAppSiteAssociation);
+
 app.get('/', serveWebsiteHtml('index.html'));
 app.get('/about', serveWebsiteHtml('index.html')); // /about also serves index.html for SPA routing
 app.get('/privacy', serveWebsiteHtml('privacy.html'));
@@ -454,6 +521,86 @@ app.get('/compare', serveWebsiteHtml('compare.html'));
 app.get('/compare.html', serveWebsiteHtml('compare.html'));
 app.get('/subscribe', serveWebsiteHtml('subscribe.html'));
 app.get('/subscribe.html', serveWebsiteHtml('subscribe.html'));
+
+// Public bounce pages after Stripe Checkout when the purchase started in the
+// iPhone app. Safari does not share the app cookie jar, so these must NOT
+// require auth — they only redirect into kinrows://. The app then confirms
+// the session with its own login.
+function isStripeCheckoutSessionId(id) {
+  return /^cs_(test|live)_[A-Za-z0-9]+$/.test(String(id || ''));
+}
+
+function sendAppReturnPage(res, { title, message, button, schemeUrl, auto }) {
+  const href = htmlEsc(schemeUrl);
+  const jsUrl = JSON.stringify(schemeUrl);
+  res.set({
+    'Content-Type': 'text/html; charset=utf-8',
+    'Cache-Control': 'no-store',
+    'Content-Security-Policy': PAGE_CSP,
+  });
+  res.send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<meta name="robots" content="noindex"/>
+<title>${htmlEsc(title)} · Kinrows</title>
+${auto ? `<meta http-equiv="refresh" content="0;url=${href}"/>` : ''}
+<style>
+  :root { --cream:#fdf5e0; --ink:#2a1f1a; --muted:#7a6353; --saffron:#d99e3a; --card:#fef8ea; }
+  * { box-sizing:border-box; }
+  body { margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,sans-serif;
+    background:var(--cream); color:var(--ink); padding:32px 20px; }
+  .card { max-width:420px; width:100%; background:var(--card); border-radius:28px;
+    padding:36px 28px; box-shadow:0 10px 30px rgba(120,74,46,.10); text-align:center; }
+  .eyebrow { font-size:12px; letter-spacing:.14em; text-transform:uppercase; color:var(--saffron);
+    font-weight:600; margin-bottom:10px; }
+  h1 { font-size:28px; line-height:1.2; margin:0 0 10px; font-weight:600; }
+  p { margin:0 0 24px; color:var(--muted); line-height:1.5; }
+  a.btn { display:inline-block; background:var(--saffron); color:#fff; text-decoration:none;
+    font-weight:600; padding:14px 22px; border-radius:22px; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <p class="eyebrow">Kinrows</p>
+    <h1>${htmlEsc(title)}</h1>
+    <p>${htmlEsc(message)}</p>
+    <a class="btn" href="${href}">${htmlEsc(button)}</a>
+  </div>
+  ${auto ? `<script>window.location.replace(${jsUrl});</script>` : ''}
+</body>
+</html>`);
+}
+
+app.get('/open/subscribed', (req, res) => {
+  const raw = String(req.query.session_id || '');
+  const sessionId = isStripeCheckoutSessionId(raw) ? raw : '';
+  const schemeUrl = sessionId
+    ? `kinrows://subscribed?session_id=${encodeURIComponent(sessionId)}`
+    : 'kinrows://subscribed';
+  sendAppReturnPage(res, {
+    title: 'Concierge is ready',
+    message: 'Return to Kinrows — we will unlock Concierge for your household.',
+    button: 'Open Kinrows',
+    schemeUrl,
+    auto: true,
+  });
+  permagent.trackSale(null, 'sale_return_success', { via: 'app' }, { path: '/open/subscribed', req });
+});
+
+app.get('/open/subscribe-canceled', (req, res) => {
+  sendAppReturnPage(res, {
+    title: 'Checkout canceled',
+    message: 'Nothing was charged. Open Kinrows to pick a plan when you are ready.',
+    button: 'Return to Kinrows',
+    schemeUrl: 'kinrows://subscribe-canceled',
+    auto: true,
+  });
+  permagent.trackSale(null, 'sale_return_canceled', { via: 'app' }, { path: '/open/subscribe-canceled', req });
+});
+
 app.get('/best-chore-app-for-families', serveWebsiteHtml('best-chore-app-for-families.html'));
 app.get('/best-chore-app-for-families.html', serveWebsiteHtml('best-chore-app-for-families.html'));
 app.get('/best-family-calendar-app', serveWebsiteHtml('best-family-calendar-app.html'));
@@ -465,8 +612,24 @@ app.get('/best-shared-shopping-list-app.html', serveWebsiteHtml('best-shared-sho
 
 // Public static assets (CSS, JS, images, etc.) — serve after HTML routes
 // so /analytics.js and /assets/* are still available from express.static
-app.use(express.static(path.join(__dirname, 'website')));
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(__dirname, 'website'), {
+  setHeaders(res, filePath) {
+    if (filePath.endsWith('.html') || filePath.endsWith('.txt')) {
+      res.set('Content-Security-Policy', WEBSITE_CSP);
+    }
+    if (filePath.endsWith(`${path.sep}sw.js`) || filePath.endsWith('/sw.js')) {
+      res.set('Cache-Control', 'no-store');
+      res.set('Service-Worker-Allowed', '/');
+    }
+  }
+}));
+app.use(express.static(path.join(__dirname, 'public'), {
+  setHeaders(res, filePath) {
+    if (filePath.endsWith('sw.js')) {
+      res.set('Cache-Control', 'no-store');
+    }
+  }
+}));
 
 // Liveness/readiness probe (used by the host's health check). Pings the DB.
 app.get('/healthz', (req, res) => {
@@ -1292,6 +1455,18 @@ app.post('/api/account/delete', requireAuth, loginLimiter, async (req, res) => {
       return res.status(401).json({ error: hint });
     }
 
+    // Sole-owner households: cancel Stripe so billing does not outlive the wipe.
+    if (stripeBilling.isConfigured()) {
+      try {
+        const txns = await db.listSoleHouseholdStripeSubs(req.session.user.id);
+        for (const txn of txns) {
+          const sid = stripeBilling.stripeSubscriptionIdFromTxn(txn);
+          if (sid) {
+            await stripeBilling.stripeRequest('POST', `/subscriptions/${sid}/cancel`).catch(() => {});
+          }
+        }
+      } catch { /* deletion still proceeds */ }
+    }
     await db.deleteUserAccount(req.session.user.id);
     req.session.destroy(() => res.json({ success: true }));
   } catch (err) {
@@ -1391,7 +1566,7 @@ app.get('/api/account/security', requireAuth, async (req, res) => {
       two_factor_enabled: !!user?.two_factor_enabled,
       has_password: user?.password_login !== 0 && user?.password_login !== '0',
       apple_linked: !!user?.apple_user_id,
-    });
+      share_presence: !!user?.share_presence,    });
   } catch (err) {
     sendServerError(res, err);
   } finally {
@@ -1468,6 +1643,7 @@ const householdInviteLimiter = createRateLimiter({
   max: 10,
   keyFn: req => req.session?.user?.id ?? clientIp(req),
 });
+const analyticsCollectLimiter = createRateLimiter({ windowMs: 60000, max: 120, keyFn: clientIp });
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 app.post('/api/waitlist', waitlistLimiter, async (req, res) => {
@@ -1570,6 +1746,37 @@ app.post('/api/email/unsubscribe', unsubscribeLimiter, async (req, res) => {
   }
 });
 
+// Server-side opt-in for household presence GPS. The iOS toggle is not enough —
+// a modified client must not be able to publish coordinates without this flag.
+app.get('/api/account/presence', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const enabled = await db.getSharePresence(req.session.user.id);
+    res.json({ enabled });
+  } catch (err) { sendServerError(res, err); }
+  finally { db.close(); }
+});
+
+app.post('/api/account/presence', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const enabled = !!req.body.enabled;
+    await db.setSharePresence(req.session.user.id, enabled);
+    res.json({ success: true, enabled });
+  } catch (err) { sendServerError(res, err); }
+  finally { db.close(); }
+});
+
+app.get('/api/account/export', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const dump = await db.exportUserAccount(req.session.user.id);
+    res.set('Content-Disposition', 'attachment; filename="kinrows-export.json"');
+    res.json(dump);
+  } catch (err) { sendServerError(res, err); }
+  finally { db.close(); }
+});
+
 // Update work address for a user
 app.put('/api/users/:id/work-address', requireAuth, async (req, res) => {
   const db = new FamilyDB();
@@ -1601,6 +1808,9 @@ app.post('/api/location', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
     const userId = req.session.user.id;
+    if (!(await db.getSharePresence(userId))) {
+      return res.status(403).json({ error: 'Presence sharing is off' });
+    }
     const { lat, lng } = req.body;
 
     // Check against saved addresses to determine location name
@@ -3510,10 +3720,15 @@ app.put('/api/notes/:id', requireAuth, async (req, res) => {
 
     if (note.user_id === userId) {
       // Owner — full update including sharing + collaboration settings.
-      const updates = { ...req.body };
-      if (updates.shared_scope !== undefined) {
-        const groupId = await resolveNoteShare(db, userId, updates.shared_scope, updates.group_id);
-        updates.shared_scope = groupId ? updates.shared_scope : 'private';
+      // Never spread req.body: a client-supplied group_id without a matching
+      // shared_scope used to retarget the note at another household.
+      const updates = {};
+      for (const k of ['title', 'body', 'color', 'pinned', 'can_collaborate']) {
+        if (req.body[k] !== undefined) updates[k] = req.body[k];
+      }
+      if (req.body.shared_scope !== undefined) {
+        const groupId = await resolveNoteShare(db, userId, req.body.shared_scope, req.body.group_id);
+        updates.shared_scope = groupId ? req.body.shared_scope : 'private';
         updates.group_id = groupId;
       }
       await db.updateNote(req.params.id, updates, userId);
@@ -3974,6 +4189,11 @@ app.post('/api/subscription/verify', requireAuth, async (req, res) => {
     if (!signed) return res.status(400).json({ error: 'signed_transaction required' });
     const status = await subscription.verifyAndStore(db, req.session.user.id, signed);
     _householdEntitlementCache.delete(req.session.user.id); // reflect new/upgraded tier immediately
+    permagent.trackSale(db, 'sale_storekit_verified', {
+      ...permagent.planBits(status.product_id),
+      premium: !!status.premium,
+      source: 'app',
+    }, { path: '/api/subscription/verify', req });
     res.json(status);
   } catch (err) {
     // Log the real reason server-side; keep the client message opaque.
@@ -3991,6 +4211,13 @@ app.post('/api/subscription/notifications', async (req, res) => {
     const signedPayload = req.body.signedPayload;
     if (!signedPayload) return res.status(400).json({ error: 'signedPayload required' });
     const result = await subscription.verifyAndApplyNotification(db, signedPayload);
+    if (result?.applied) {
+      permagent.trackSale(db, 'sale_storekit_notification', {
+        type: result.type || undefined,
+        status: result.status || undefined,
+        source: 'app',
+      }, { path: '/api/subscription/notifications', req });
+    }
     res.json(result);
   } catch (err) {
     // Apple is the caller; log details server-side, respond opaquely.
@@ -4015,9 +4242,18 @@ app.get('/api/subscription/status', requireAuth, async (req, res) => {
 
 // Public Concierge plan list (no secrets). Used by the website subscribe page.
 app.get('/api/subscription/catalog', (req, res) => {
+  const currency = subscription.presentmentCurrencyFromHints({
+    country: req.get('cf-ipcountry') || req.get('x-vercel-ip-country')
+      || req.get('cloudfront-viewer-country') || req.get('x-country-code'),
+    acceptLanguage: req.get('accept-language'),
+    explicit: req.query.currency,
+  });
   res.json({
     stripe: stripeBilling.isConfigured(),
-    plans: subscription.CATALOG,
+    currency,
+    currencies: subscription.PRESENTMENT,
+    plans: subscription.catalogForCurrency(currency),
+    caps: subscription.TIER_DAILY_CAP,
   });
 });
 
@@ -4025,8 +4261,68 @@ app.get('/api/subscription/catalog', (req, res) => {
 // household so the webhook can't attach the entitlement anywhere else.
 app.post('/api/subscription/checkout', requireAuth, async (req, res) => {
   const productId = String(req.body?.product_id || '');
+  const fromApp = String(req.body?.source || '').toLowerCase() === 'app';
+  const source = fromApp ? 'app' : 'web';
   if (!subscription.CATALOG.some((p) => p.product_id === productId)) {
     return res.status(400).json({ error: 'Unknown plan' });
+  }
+  if (!stripeBilling.isConfigured()) {
+    permagent.trackSale(null, 'sale_checkout_blocked', {
+      ...permagent.planBits(productId), reason: 'unconfigured', source,
+    }, { path: '/api/subscription/checkout', req });
+    return res.status(503).json({ error: 'Web billing is not configured' });
+  }
+  const db = new FamilyDB();
+  try {
+    const userId = req.session.user.id;
+    const groupId = await db.getUserHouseholdId(userId);
+    if (!groupId) {
+      permagent.trackSale(db, 'sale_checkout_blocked', {
+        ...permagent.planBits(productId), reason: 'no_household', source,
+      }, { path: '/api/subscription/checkout', req });
+      return res.status(400).json({ error: 'Join a household before subscribing' });
+    }
+    const user = await db.getUserById(userId);
+    let customerId = null;
+    try { customerId = await subscription.stripeCustomerIdForGroup(db, groupId); } catch { /* first purchase */ }
+    const base = publicBaseUrl();
+    const { successUrl, cancelUrl } = stripeBilling.checkoutReturnUrls(base, source);
+    const session = await stripeBilling.createCheckoutSession({
+      productId,
+      userId,
+      groupId,
+      customerId,
+      customerEmail: (!customerId && user?.email) ? user.email : null,
+      successUrl,
+      cancelUrl,
+      currency: req.body?.currency,
+      source,
+    });
+    permagent.trackSale(db, 'sale_checkout_start', {
+      ...permagent.planBits(productId),
+      source,
+      currency: req.body?.currency || undefined,
+    }, { path: '/api/subscription/checkout', req });
+    res.json({ url: session.url, id: session.id });
+  } catch (err) {
+    if (err.status === 400) return res.status(400).json({ error: err.message });
+    console.error('[subscription/checkout]', err && err.stack ? err.stack : err);
+    permagent.trackSale(null, 'sale_checkout_blocked', {
+      ...permagent.planBits(productId), reason: 'stripe_error', source,
+    }, { path: '/api/subscription/checkout', req });
+    res.status(502).json({ error: 'Could not start checkout' });
+  } finally {
+    db.close();
+  }
+});
+
+// Confirm a Checkout return (success_url includes {CHECKOUT_SESSION_ID}).
+// The webhook is authoritative; this lets the page wait until entitlement lands
+// and covers a delayed webhook by applying the session's subscription once.
+app.get('/api/subscription/checkout/session', requireAuth, async (req, res) => {
+  const sessionId = String(req.query.session_id || '');
+  if (!/^cs_(test|live)_[A-Za-z0-9]+$/.test(sessionId)) {
+    return res.status(400).json({ error: 'Invalid session' });
   }
   if (!stripeBilling.isConfigured()) {
     return res.status(503).json({ error: 'Web billing is not configured' });
@@ -4035,25 +4331,33 @@ app.post('/api/subscription/checkout', requireAuth, async (req, res) => {
   try {
     const userId = req.session.user.id;
     const groupId = await db.getUserHouseholdId(userId);
-    if (!groupId) return res.status(400).json({ error: 'Join a household before subscribing' });
-    const user = await db.getUserById(userId);
-    let customerId = null;
-    try { customerId = await subscription.stripeCustomerIdForGroup(db, groupId); } catch { /* first purchase */ }
-    const base = publicBaseUrl();
-    const session = await stripeBilling.createCheckoutSession({
-      productId,
-      userId,
-      groupId,
-      customerId,
-      customerEmail: (!customerId && user?.email) ? user.email : null,
-      successUrl: `${base}/subscribe.html?success=1`,
-      cancelUrl: `${base}/subscribe.html?canceled=1`,
+    if (!groupId) return res.status(400).json({ error: 'No household' });
+    const session = await stripeBilling.retrieveCheckoutSession(sessionId);
+    const boundGroup = Number(session.client_reference_id || session.metadata?.kinrows_group_id);
+    if (boundGroup !== Number(groupId)) {
+      return res.status(403).json({ error: 'Session does not belong to this household' });
+    }
+    const paid = session.status === 'complete' || session.payment_status === 'paid';
+    if (paid && session.subscription) {
+      const subRef = session.subscription;
+      const stripeSub = typeof subRef === 'object' ? subRef : await stripeBilling.retrieveSubscription(subRef);
+      await subscription.applyStripeSubscription(db, stripeSub, {
+        groupId,
+        userId: Number(session.metadata?.kinrows_user_id) || userId,
+        productId: session.metadata?.kinrows_product_id,
+      });
+      _householdEntitlementCache.clear();
+    }
+    const status = await subscription.getStatus(db, userId);
+    res.json({
+      session_status: session.status,
+      payment_status: session.payment_status,
+      ...status,
     });
-    res.json({ url: session.url, id: session.id });
   } catch (err) {
-    if (err.status === 400) return res.status(400).json({ error: err.message });
-    console.error('[subscription/checkout]', err && err.stack ? err.stack : err);
-    res.status(502).json({ error: 'Could not start checkout' });
+    if (err.status === 404) return res.status(404).json({ error: 'Unknown session' });
+    console.error('[subscription/checkout/session]', err && err.stack ? err.stack : err);
+    res.status(502).json({ error: 'Could not confirm checkout' });
   } finally {
     db.close();
   }
@@ -4074,6 +4378,7 @@ app.post('/api/subscription/portal', requireAuth, async (req, res) => {
       customerId,
       returnUrl: `${publicBaseUrl()}/subscribe.html`,
     });
+    permagent.trackSale(db, 'sale_portal_open', { source: 'web' }, { path: '/api/subscription/portal', req });
     res.json({ url: session.url });
   } catch (err) {
     console.error('[subscription/portal]', err && err.stack ? err.stack : err);
@@ -4098,7 +4403,21 @@ app.post('/api/subscription/stripe', async (req, res) => {
   try {
     const result = await subscription.applyStripeEvent(db, event);
     _householdEntitlementCache.clear();
-    res.json(result);
+    const fresh = event.id ? await db.insertStripeEvent(event.id, event.type) : true;
+    if (fresh) {
+      const sale = permagent.stripeSaleEvent(event, result);
+      if (sale && (result.applied || sale.name === 'sale_payment_failed')) {
+        permagent.trackSale(db, sale.name, sale.properties, { path: sale.path, req });
+      }
+    }
+    if (result.applied && fresh) {
+      try {
+        await billingEmail.notifyStripeEvent(db, event, result);
+      } catch (err) {
+        console.error('[subscription/stripe] email', err && err.message ? err.message : err);
+      }
+    }
+    res.json(fresh ? result : { ...result, duplicate: true });
   } catch (err) {
     console.error('[subscription/stripe]', err && err.stack ? err.stack : err);
     res.status(400).json({ error: 'Event rejected' });
@@ -4342,7 +4661,7 @@ app.delete('/v1/mcp', (req, res) => res.status(204).end());
 app.use('/v1', (req, res) => res.status(404).json({ error: 'Not found' }));
 
 // Concierge - conversational chat with tool-calling (premium)
-app.post('/api/concierge/chat', requireAuth, conciergeLimiter, conciergeChatDailyLimiter, requirePremium, async (req, res) => {
+app.post('/api/concierge/chat', requireAuth, conciergeLimiter, requirePremium, conciergeChatDailyLimiter, async (req, res) => {
   const db = new FamilyDB();
   try {
     const message = (req.body.message || '').trim();
@@ -4369,7 +4688,7 @@ app.post('/api/concierge/chat', requireAuth, conciergeLimiter, conciergeChatDail
 // is streamed token-by-token. The non-streaming endpoint above stays as a
 // fallback. Gating runs before any SSE bytes; once streaming starts, errors are
 // delivered as `error` events.
-app.post('/api/concierge/chat/stream', requireAuth, conciergeLimiter, conciergeChatDailyLimiter, requirePremium, async (req, res) => {
+app.post('/api/concierge/chat/stream', requireAuth, conciergeLimiter, requirePremium, conciergeChatDailyLimiter, async (req, res) => {
   const db = new FamilyDB();
   try {
     const message = (req.body.message || '').trim();
@@ -7172,7 +7491,11 @@ app.get('/api/messages', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
     const conversations = await db.getConversations(req.session.user.id);
-    res.json(conversations);
+    const visible = [];
+    for (const c of conversations) {
+      if (await usersShareGroup(db, req.session.user.id, c.partner_id)) visible.push(c);
+    }
+    res.json(visible);
   } catch (err) { sendServerError(res, err); }
   finally { db.close(); }
 });
@@ -7180,7 +7503,11 @@ app.get('/api/messages', requireAuth, async (req, res) => {
 app.get('/api/messages/:partnerId', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
-    const messages = await db.getMessages(req.session.user.id, parseInt(req.params.partnerId), {
+    const partnerId = parseInt(req.params.partnerId);
+    if (!(await usersShareGroup(db, req.session.user.id, partnerId))) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+    const messages = await db.getMessages(req.session.user.id, partnerId, {
       limit: clampLimit(req.query.limit, 50),
       before_id: req.query.before_id ? parseInt(req.query.before_id) : undefined,
       after_id: req.query.after_id ? parseInt(req.query.after_id) : undefined,
@@ -7271,14 +7598,20 @@ app.get('/api/admin/diagnostic', requireAuth, requireAdmin, async (req, res) => 
     const query = (sql, params = []) => new Promise((resolve, reject) => {
       db.db.all(sql, params, (err, rows) => err ? reject(err) : resolve(rows));
     });
-    const users = await query('SELECT id, username, name FROM users');
-    const groups = await query('SELECT * FROM groups');
-    const members = await query(`SELECT gm.*, u.name as user_name, u.username
-      FROM group_members gm LEFT JOIN users u ON u.id = gm.user_id`);
+    const users = await query('SELECT COUNT(*) AS n FROM users');
+    const groups = await query(`SELECT group_type, COUNT(*) AS n FROM groups GROUP BY group_type`);
+    const members = await query('SELECT COUNT(*) AS n FROM group_members');
     const apptStats = await query(`SELECT group_id, COUNT(*) as count FROM appointments GROUP BY group_id`);
     const decisionStats = await query(`SELECT group_id, COUNT(*) as count FROM decisions GROUP BY group_id`);
     const totalAppts = await query('SELECT COUNT(*) as count FROM appointments');
-    res.json({ users, groups, members, apptStats, decisionStats, totalAppts: totalAppts[0]?.count });
+    res.json({
+      user_count: users[0]?.n || 0,
+      groups,
+      member_count: members[0]?.n || 0,
+      apptStats,
+      decisionStats,
+      totalAppts: totalAppts[0]?.count,
+    });
   } catch (err) { sendServerError(res, err); }
   finally { db.close(); }
 });
@@ -7697,7 +8030,9 @@ app.post('/api/coverage/:id/cancel', requireAuth, async (req, res) => {
 app.get('/api/coverage/approve/:token', async (req, res) => {
   const db = new FamilyDB();
   try {
-    const recipient = await db.getRecipientByToken(req.params.token);
+    const token = parseCoverageToken(req.params.token);
+    if (!token) return res.status(404).json({ error: 'Invalid or expired link' });
+    const recipient = await db.getRecipientByToken(token);
     if (!recipient) return res.status(404).json({ error: 'Invalid or expired link' });
     const windows = await db.getCoverageWindows(recipient.request_id);
     res.json({
@@ -7723,10 +8058,11 @@ app.get('/api/coverage/approve/:token', async (req, res) => {
 app.get('/c/:token', async (req, res) => {
   const db = new FamilyDB();
   try {
-    const token = String(req.params.token || '');
-    const recipient = /^[a-f0-9]{16,64}$/i.test(token) ? await db.getRecipientByToken(token) : null;
+    const token = parseCoverageToken(req.params.token);
+    const recipient = token ? await db.getRecipientByToken(token) : null;
     const windows = recipient ? await db.getCoverageWindows(recipient.request_id) : [];
     res.set('Cache-Control', 'no-store');
+    res.set('Content-Security-Policy', PAGE_CSP);
     res.type('html').send(coveragePage({ recipient, windows, token }));
   } catch (err) {
     sendServerError(res, err);
@@ -7799,7 +8135,9 @@ catch(e){err.textContent=e.message;go.disabled=false;go.textContent='I can help'
 app.post('/api/coverage/approve/:token', async (req, res) => {
   const db = new FamilyDB();
   try {
-    const recipient = await db.getRecipientByToken(req.params.token);
+    const token = parseCoverageToken(req.params.token);
+    if (!token) return res.status(404).json({ error: 'Invalid or expired link' });
+    const recipient = await db.getRecipientByToken(token);
     if (!recipient) return res.status(404).json({ error: 'Invalid or expired link' });
     if (recipient.status === 'approved') return res.status(409).json({ error: 'Already approved' });
 
@@ -7935,12 +8273,11 @@ async function initializeDatabase() {
 // ============================================================================
 // Permagent self-hosted analytics: POST /api/permagent-analytics/collect
 // ============================================================================
-// IMPORTANT: This route is EXEMPT from global rate limiting — a normal browsing
-// session can produce many pageviews and must never be throttled. It is also NOT
-// gated behind auth — analytics must work for unauthenticated visitors.
-// navigator.sendBeacon sends Content-Type: text/plain, so we accept text/* and
-// parse defensively. Malformed bodies return 204, never 500.
-app.post('/api/permagent-analytics/collect', textAny, (req, res) => {
+// Not gated behind auth — marketing pageviews from signed-out visitors.
+// Rate-limited (120/min/IP) and capped in SQLite so an unauthenticated
+// collector cannot fill the disk. navigator.sendBeacon sends text/plain, so
+// we accept text/* and parse defensively. Malformed bodies return 204, never 500.
+app.post('/api/permagent-analytics/collect', analyticsCollectLimiter, textAny, (req, res) => {
   // textAny parser gives us req.body as a string (or empty string if no body)
   let body;
   
@@ -8075,7 +8412,7 @@ app.get('/api/permagent-analytics/drain', async (req, res) => {
   const KEY = process.env.PERMAGENT_ANALYTICS_KEY;
 
   // Fail closed: if the env var is not set or the header does not match, return 401
-  if (!KEY || req.get('x-permagent-key') !== KEY) {
+  if (!KEY || !timingSafeEqualString(req.get('x-permagent-key') || '', KEY)) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
