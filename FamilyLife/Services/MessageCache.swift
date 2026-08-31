@@ -146,7 +146,13 @@ final class MessageCache {
     // MARK: - Image Cache
 
     func image(for messageId: Int) -> UIImage? {
-        imageCache[messageId]
+        if let cached = imageCache[messageId] { return cached }
+        let diskKey = "msg-\(messageId)"
+        if let img = MediaDiskCache.load(key: diskKey) {
+            imageCache[messageId] = img
+            return img
+        }
+        return nil
     }
 
     func fetchImageIfNeeded(messageId: Int, partnerId: Int, api: APIService) {
