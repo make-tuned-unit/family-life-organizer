@@ -121,3 +121,37 @@ test('notes and pantry reads stay capped (small household still returns everythi
   assert.ok(Array.isArray(pantry.body));
   assert.ok(pantry.body.some(x => x.item === 'Milk'));
 });
+
+test('DM poll with after_id returns only newer rows', async () => {
+  const a = makeClient();
+  const b = makeClient();
+  const ra = await a('POST', '/api/auth/register', {
+    username: 'page_dm_a', password: 'password123', name: 'DM A',
+  });
+  assert.equal(ra.status, 200);
+  const invite = ra.body.household.invite_code;
+  const rb = await b('POST', '/api/auth/register', {
+    username: 'page_dm_b', password: 'password123', name: 'DM B', invite_code: invite,
+  });
+  assert.equal(rb.status, 200);
+  const bId = rb.body.user.id;
+
+  const first = await a('POST', '/api/messages', { recipient_id: bId, text: 'hello' });
+  assert.equal(first.status, 200);
+  const page = await a('GET', `/api/messages/${bId}?limit=50`);
+  assert.equal(page.status, 200);
+  assert.equal(page.body.length, 1);
+  const latestId = page.body[0].id;
+
+  const empty = await a('GET', `/api/messages/${bId}?after_id=${latestId}`);
+  assert.equal(empty.status, 200);
+  assert.deepEqual(empty.body, []);
+
+  const second = await a('POST', '/api/messages', { recipient_id: bId, text: 'follow up' });
+  assert.equal(second.status, 200);
+  const delta = await a('GET', `/api/messages/${bId}?after_id=${latestId}`);
+  assert.equal(delta.status, 200);
+  assert.equal(delta.body.length, 1);
+  assert.equal(delta.body[0].text, 'follow up');
+  assert.ok(delta.body[0].id > latestId);
+});

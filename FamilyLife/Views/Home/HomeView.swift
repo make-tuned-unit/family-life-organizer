@@ -71,13 +71,13 @@ struct HomeView: View {
         }
         .flMinimizesTabBar()
         .refreshable {
-            await viewModel.loadAll(api: api, userName: auth.currentUser?.name, username: auth.currentUser?.username)
+            await viewModel.loadAll(api: api, userId: auth.currentUser?.id, userName: auth.currentUser?.name, username: auth.currentUser?.username)
             checkFeedNotifications()
             await loadOnThisDay()
         }
         .task { await loadOnThisDay() }
         .onConciergeDataChange {
-            await viewModel.loadAll(api: api, userName: auth.currentUser?.name, username: auth.currentUser?.username)
+            await viewModel.loadAll(api: api, userId: auth.currentUser?.id, userName: auth.currentUser?.name, username: auth.currentUser?.username)
             await loadOnThisDay()
         }
         .background { AmbientBackground(style: .home) }
@@ -134,7 +134,7 @@ struct HomeView: View {
         }
         .sheet(isPresented: $showingNewDecision) {
             NewDecisionView {
-                await viewModel.loadAll(api: api)
+                await viewModel.loadAll(api: api, userId: auth.currentUser?.id)
             }
         }
         .sheet(isPresented: $showingNewEvent) {
@@ -143,7 +143,7 @@ struct HomeView: View {
                     if let newId = try? await api.addAppointment(data), syncToApple {
                         await calendarService.syncCreate(appointmentId: newId, fields: data)
                     }
-                    await viewModel.loadAll(api: api)
+                    await viewModel.loadAll(api: api, userId: auth.currentUser?.id)
                 }
             }
         }
@@ -156,14 +156,14 @@ struct HomeView: View {
         .sheet(item: $selectedFeedEvent) { appt in
             NavigationStack {
                 EventDetailView(appointment: appt) {
-                    await viewModel.loadAll(api: api)
+                    await viewModel.loadAll(api: api, userId: auth.currentUser?.id)
                 }
             }
         }
         .sheet(item: $selectedFeedPerson) { person in
             NavigationStack {
                 PersonDetailView(person: person) {
-                    await viewModel.loadAll(api: api)
+                    await viewModel.loadAll(api: api, userId: auth.currentUser?.id)
                 }
                 .toolbar {
                     ToolbarItem(placement: .topBarLeading) {
@@ -187,7 +187,7 @@ struct HomeView: View {
         .sheet(item: $selectedFeedDecision) { decision in
             NavigationStack {
                 DecisionDetailView(decision: decision) {
-                    await viewModel.loadAll(api: api)
+                    await viewModel.loadAll(api: api, userId: auth.currentUser?.id)
                 }
                 .toolbar {
                     ToolbarItem(placement: .topBarLeading) {
@@ -236,7 +236,7 @@ struct HomeView: View {
             viewModel.error = nil
         }
         .task {
-            await viewModel.loadAll(api: api, userName: auth.currentUser?.name, username: auth.currentUser?.username)
+            await viewModel.loadAll(api: api, userId: auth.currentUser?.id, userName: auth.currentUser?.name, username: auth.currentUser?.username)
             checkFeedNotifications()
             await pollLiveHomeData()
         }

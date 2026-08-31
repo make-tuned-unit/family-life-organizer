@@ -73,9 +73,8 @@ final class ProfileImageCache {
         Task {
             defer { pending.remove(userId) }
             do {
-                let payload = try await api.fetchProfileImage(userId: userId)
-                if let data = Self.imageData(from: payload),
-                   let img = UIImage(data: data) {
+                let data = try await api.fetchProfileImage(userId: userId)
+                if let img = UIImage(data: data) {
                     images[userId] = img
                     persist(img, file: userFile(userId))
                 }
@@ -128,9 +127,8 @@ final class ProfileImageCache {
         Task {
             defer { pendingGroups.remove(groupId) }
             do {
-                let payload = try await api.fetchGroupImage(groupId: groupId)
-                if let data = Self.imageData(from: payload),
-                   let img = UIImage(data: data) {
+                let data = try await api.fetchGroupImage(groupId: groupId)
+                if let img = UIImage(data: data) {
                     groupImages[groupId] = img
                     persist(img, file: groupFile(groupId))
                 }
@@ -164,12 +162,5 @@ final class ProfileImageCache {
     private func persist(_ image: UIImage, file: URL?) {
         guard let file, let jpeg = image.jpegData(compressionQuality: 0.7) else { return }
         try? jpeg.write(to: file, options: .atomic)
-    }
-
-    private static func imageData(from payload: String) -> Data? {
-        if let range = payload.range(of: "base64,") {
-            return Data(base64Encoded: String(payload[range.upperBound...]))
-        }
-        return Data(base64Encoded: payload)
     }
 }
