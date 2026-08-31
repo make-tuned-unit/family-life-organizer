@@ -39,6 +39,11 @@ final class MessageCache {
         nextTempId = Int.max
     }
 
+    /// Bind disk-backed media to the signed-in account.
+    func setOwner(_ userId: Int) {
+        MediaDiskCache.setOwner(userId)
+    }
+
     func setMessages(_ messages: [APIService.DirectMessageResponse], for partnerId: Int) {
         cache[partnerId] = messages
     }
@@ -146,6 +151,11 @@ final class MessageCache {
 
     func fetchImageIfNeeded(messageId: Int, partnerId: Int, api: APIService) {
         guard imageCache[messageId] == nil, !pendingImages.contains(messageId) else { return }
+        let diskKey = "msg-\(messageId)"
+        if let img = MediaDiskCache.load(key: diskKey) {
+            imageCache[messageId] = img
+            return
+        }
         pendingImages.insert(messageId)
         Task {
             defer { pendingImages.remove(messageId) }
@@ -153,6 +163,7 @@ final class MessageCache {
                 let data = try await api.fetchMessageImage(partnerId: partnerId, messageId: messageId)
                 if let img = UIImage(data: data) {
                     imageCache[messageId] = img
+                    MediaDiskCache.save(img, key: diskKey)
                 }
             } catch {}
         }
@@ -176,6 +187,84 @@ final class MessageCache {
                     }
                 }
             } catch {}
+        }
+    }
+}
+
+// JPEG persistence for lazily fetched message and feed photos. Namespaced per
+// auth user under Caches/media/{userId}/; evicts oldest files past ~50 MB.
+enum MediaDiskCache {
+    static let maxBytes = 50 * 1024 * 1024
+    private static var ownerUserId: Int?
+
+    static func setOwner(_ userId: Int) {
+        guard ownerUserId != userId else { return }
+        ownerUserId = userId
+    }
+
+    static func clearAll() {
+        let dir = baseDir()
+        try? FileManager.default.removeItem(at: dir)
+        ownerUserId = nil
+    }
+
+    static func load(key: String) -> UIImage? {
+        guard let url = fileURL(key: key),
+              let data = try? Data(contentsOf: url),
+              let img = UIImage(data: data) else { return nil }
+        try? FileManager.default.setAttributes([.modificationDate: Date()], ofItemAtPath: url.path)
+        return img
+    }
+
+    static func save(_ image: UIImage, key: String) {
+        guard let url = fileURL(key: key),
+              let data = image.jpegData(compressionQuality: 0.75) else { return }
+        try? data.write(to: url, options: .atomic)
+        evictIfNeeded()
+    }
+
+    private static func baseDir() -> URL {
+        FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("media", isDirectory: true)
+    }
+
+    private static func ownerDir() -> URL? {
+        guard let ownerUserId else { return nil }
+        let dir = baseDir().appendingPathComponent(String(ownerUserId), isDirectory: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        return dir
+    }
+
+    private static func fileURL(key: String) -> URL? {
+        ownerDir()?.appendingPathComponent("\(key).jpg")
+    }
+
+    private static func evictIfNeeded() {
+        guard let dir = ownerDir(),
+              let files = try? FileManager.default.contentsOfDirectory(
+                at: dir,
+                includingPropertiesForKeys: [.fileSizeKey, .contentModificationDateKey],
+                options: [.skipsHiddenFiles]
+              ) else { return }
+
+        var entries: [(url: URL, size: Int, date: Date)] = []
+        var total = 0
+        for url in files {
+            let values = try? url.resourceValues(forKeys: [.fileSizeKey, .contentModificationDateKey])
+            let size = values?.fileSize ?? 0
+            let date = values?.contentModificationDate ?? .distantPast
+            total += size
+            entries.append((url, size, date))
+        }
+        guard total > maxBytes else { return }
+
+        entries.sort { $0.date < $1.date }
+        var freed = 0
+        let target = total - maxBytes
+        for entry in entries {
+            try? FileManager.default.removeItem(at: entry.url)
+            freed += entry.size
+            if freed >= target { break }
         }
     }
 }

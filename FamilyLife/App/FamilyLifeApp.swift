@@ -145,6 +145,8 @@ struct FamilyLifeApp: App {
                         subscriptionService.start(api: apiService)
                         if let userId = authService.currentUser?.id {
                             profileImageCache.setOwner(userId)
+                            messageCache.setOwner(userId)
+                            MediaDiskCache.setOwner(userId)
                         }
                         await householdService.reload(api: apiService, profileCache: profileImageCache, currentUserId: authService.currentUser?.id)
                         if let userId = authService.currentUser?.id {
@@ -165,6 +167,8 @@ struct FamilyLifeApp: App {
                         Task {
                             if let userId = authService.currentUser?.id {
                                 profileImageCache.setOwner(userId)
+                                messageCache.setOwner(userId)
+                                MediaDiskCache.setOwner(userId)
                             }
                             await householdService.reload(api: apiService, profileCache: profileImageCache, currentUserId: authService.currentUser?.id)
                             // Re-register for push on login
@@ -178,6 +182,8 @@ struct FamilyLifeApp: App {
                         // Logout: drop all in-memory caches so a second account
                         // on this device never sees the previous user's data.
                         HomeDiskCache.clearAll()
+                        MediaDiskCache.clearAll()
+                        FeedPhotoCache.shared.clearMemory()
                         messageCache.clear()
                         profileImageCache.clear()
                         householdService.clear()

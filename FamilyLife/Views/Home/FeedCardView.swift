@@ -517,13 +517,13 @@ struct FeedCard: View {
     }
 
     private func loadPhoto() async {
-        if let cached = FeedPhotoCache.shared.object(forKey: NSNumber(value: item.ref_id)) {
+        if let cached = FeedPhotoCache.shared.image(for: item.ref_id) {
             photo = cached
             return
         }
         guard let data = try? await api.fetchFeedPhotoData(postId: item.ref_id),
               let img = UIImage(data: data) else { return }
-        FeedPhotoCache.shared.setObject(img, forKey: NSNumber(value: item.ref_id))
+        FeedPhotoCache.shared.store(img, for: item.ref_id)
         photo = img
     }
 
@@ -736,11 +736,36 @@ struct FeedCard: View {
     }
 }
 
-/// Process-wide cache for lazily-fetched feed photos, so scrolling the Home
-/// feed doesn't refetch the same image.
+/// Process-wide memory front for lazily-fetched feed photos; JPEG bytes live
+/// on disk via MediaDiskCache so scrolling Home offline still shows photos.
+@MainActor
 final class FeedPhotoCache {
-    static let shared = NSCache<NSNumber, UIImage>()
-    private init() {}
+    static let shared = FeedPhotoCache()
+    private let memory = NSCache<NSNumber, UIImage>()
+
+    private init() {
+        memory.countLimit = 100
+    }
+
+    func image(for postId: Int) -> UIImage? {
+        let key = NSNumber(value: postId)
+        if let img = memory.object(forKey: key) { return img }
+        if let img = MediaDiskCache.load(key: "feed-\(postId)") {
+            memory.setObject(img, forKey: key)
+            return img
+        }
+        return nil
+    }
+
+    func store(_ image: UIImage, for postId: Int) {
+        let key = NSNumber(value: postId)
+        memory.setObject(image, forKey: key)
+        MediaDiskCache.save(image, key: "feed-\(postId)")
+    }
+
+    func clearMemory() {
+        memory.removeAllObjects()
+    }
 }
 
 #Preview {
