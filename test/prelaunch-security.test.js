@@ -11,7 +11,7 @@ const os = require('node:os');
 const path = require('node:path');
 const sqlite3 = require('sqlite3');
 
-const PORT = 3984;
+const PORT = 3980;
 const BASE = `http://127.0.0.1:${PORT}`;
 let server, tmpDir;
 
