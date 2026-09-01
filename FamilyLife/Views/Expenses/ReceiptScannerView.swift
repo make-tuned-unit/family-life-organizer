@@ -13,7 +13,12 @@ struct ReceiptScannerView: View {
     var onReceiptSaved: (() async -> Void)?
 
     @AppStorage("cloudAIEnabled") private var cloudAIEnabled = true
-    @State private var selectedPhoto: PhotosPickerItem?
+    @State private var selectedPhotos: [PhotosPickerItem] = []
+    /// Library photos still waiting to be scanned. A camera capture never
+    /// queues — that flow stays one shot at a time.
+    @State private var photoQueue: [Data] = []
+    @State private var queueTotal = 0     // batch size, for "Receipt i of N"
+    @State private var queueIndex = 0     // 1-based position in the batch
     @State private var imageData: Data?
     @State private var scanResult: ScanResult?
     @State private var isScanning = false
@@ -70,9 +75,14 @@ struct ReceiptScannerView: View {
                         sourcePickerSection
                     }
 
+                    if queueTotal > 1 {
+                        batchProgressChip
+                    }
 
                     if isScanning {
-                        FLLoadingState(message: "Scanning receipt with AI...")
+                        FLLoadingState(message: queueTotal > 1
+                            ? "Scanning receipt \(queueIndex) of \(queueTotal)..."
+                            : "Scanning receipt with AI...")
                     }
 
                     if let error {
@@ -108,6 +118,10 @@ struct ReceiptScannerView: View {
 
                     if let result = scanResult {
                         scanResultSection(result)
+                    } else if imageData != nil, !isScanning, error != nil {
+                        // A scan failed mid-flow — offer a way forward instead
+                        // of a dead end (retry, or move on through the batch).
+                        scanFailureActions
                     }
                 }
                 .padding(.vertical)
@@ -127,7 +141,7 @@ struct ReceiptScannerView: View {
                 await loadBudgetCategories()
                 itineraries = (try? await api.fetchItineraries()) ?? []
             }
-            .onChange(of: selectedPhoto) { loadAndScan() }
+            .onChange(of: selectedPhotos) { loadBatchAndScan() }
             .sheet(isPresented: $showingCamera) {
                 CameraView { data in
                     imageData = data
@@ -169,7 +183,7 @@ struct ReceiptScannerView: View {
             Text(isProjectMode ? "Scan receipt for \(projectName ?? "project")" : "Scan a receipt")
                 .font(.flTitle)
                 .foregroundStyle(WarmPalette.ink1)
-            Text("Take a photo or choose from your library. AI will extract the merchant, items, and total.")
+            Text("Take a photo, or pick several receipts from your library at once — AI extracts the merchant, items, and total from each.")
                 .font(.flSubheadline)
                 .foregroundStyle(WarmPalette.ink3)
                 .multilineTextAlignment(.center)
@@ -186,22 +200,70 @@ struct ReceiptScannerView: View {
             .buttonStyle(.flCTA)
             .padding(.horizontal, 22)
 
-            // Photo library
-            PhotosPicker(selection: $selectedPhoto, matching: .images) {
-                HStack(spacing: 12) {
-                    Image(systemName: "photo.on.rectangle")
-                        .font(.system(size: 20))
-                    Text("Choose from Library")
-                        .font(.flHeadline)
+            // Photo library — multi-select so a stack of receipts is one trip
+            // to the picker, then reviewed and saved one after another.
+            PhotosPicker(selection: $selectedPhotos, maxSelectionCount: 10, matching: .images) {
+                VStack(spacing: 4) {
+                    HStack(spacing: 12) {
+                        Image(systemName: "photo.on.rectangle.angled")
+                            .font(.system(size: 20))
+                        Text("Choose from Library")
+                            .font(.flHeadline)
+                    }
+                    .foregroundStyle(WarmPalette.ink1)
+                    Text("Select up to 10 receipts")
+                        .font(.flCaption)
+                        .foregroundStyle(WarmPalette.ink3)
                 }
-                .foregroundStyle(WarmPalette.ink1)
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 16)
+                .padding(.vertical, 14)
                 .flCard()
             }
             .padding(.horizontal, 22)
         }
         .padding(.top, 20)
+    }
+
+    /// "Receipt 2 of 5 · 1 saved" — batch position while working a stack.
+    private var batchProgressChip: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "doc.on.doc.fill")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(TabAccent.expenses.color)
+            Text("Receipt \(max(queueIndex, 1)) of \(queueTotal)")
+                .font(.flFootnote.weight(.semibold))
+                .foregroundStyle(WarmPalette.ink1)
+            if savedCount > 0 {
+                Text("· \(savedCount) saved")
+                    .font(.flFootnote)
+                    .foregroundStyle(WarmPalette.good)
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
+        .background(WarmPalette.cardSurface, in: Capsule())
+    }
+
+    /// Shown when a scan errored: retry the same photo, or move on.
+    private var scanFailureActions: some View {
+        VStack(spacing: 10) {
+            Button {
+                if let data = imageData { scanImage(data) }
+            } label: {
+                Text("Try Again")
+            }
+            .buttonStyle(.flCTA(fill: TabAccent.home.color))
+
+            Button {
+                if photoQueue.isEmpty { resetForNextScan() } else { advanceQueue() }
+            } label: {
+                Text(photoQueue.isEmpty ? "Choose a Different Photo" : "Skip This Receipt")
+                    .font(.flSubheadline.weight(.medium))
+                    .foregroundStyle(WarmPalette.ink3)
+                    .frame(maxWidth: .infinity)
+            }
+        }
+        .padding(.horizontal, 22)
     }
 
     // MARK: - Scan Results
@@ -334,7 +396,7 @@ struct ReceiptScannerView: View {
                         Image(systemName: "checkmark.circle.fill")
                             .font(.system(size: 20))
                             .foregroundStyle(WarmPalette.good)
-                        Text("Receipt saved!")
+                        Text(queueTotal > 1 ? "That's the whole stack — \(savedCount) saved!" : "Receipt saved!")
                             .font(.flHeadline)
                             .foregroundStyle(WarmPalette.good)
                         Spacer()
@@ -375,9 +437,9 @@ struct ReceiptScannerView: View {
                 .disabled(isSaving || editableTotal.isEmpty || editableMerchant.isEmpty)
 
                 Button {
-                    resetForNextScan()
+                    if photoQueue.isEmpty { resetForNextScan() } else { advanceQueue() }
                 } label: {
-                    Text("Discard & Scan Again")
+                    Text(photoQueue.isEmpty ? "Discard & Scan Again" : "Skip This Receipt")
                         .font(.flSubheadline.weight(.medium))
                         .foregroundStyle(WarmPalette.ink3)
                         .frame(maxWidth: .infinity)
@@ -414,15 +476,34 @@ struct ReceiptScannerView: View {
     }
 
     private func resetForNextScan() {
-        scanResult = nil
+        clearScanFields()
         imageData = nil
-        selectedPhoto = nil
+        selectedPhotos = []
+        photoQueue = []
+        queueTotal = 0
+        queueIndex = 0
+    }
+
+    /// Clears the per-receipt state only — batch bookkeeping survives so the
+    /// next queued photo scans into a clean sheet.
+    private func clearScanFields() {
+        scanResult = nil
         error = nil
         currentScanSaved = false
         selectedCategory = "Other"
         editableTotal = ""
         editableMerchant = ""
         editableDate = ""
+    }
+
+    /// Pop the next library photo off the queue and scan it.
+    private func advanceQueue() {
+        guard !photoQueue.isEmpty else { return }
+        clearScanFields()
+        let next = photoQueue.removeFirst()
+        queueIndex += 1
+        imageData = next
+        scanImage(next)
     }
 
     private func loadBudgetCategories() async {
@@ -435,15 +516,26 @@ struct ReceiptScannerView: View {
         categories = merged
     }
 
-    private func loadAndScan() {
-        guard let selectedPhoto else { return }
+    private func loadBatchAndScan() {
+        guard !selectedPhotos.isEmpty else { return }
+        let items = selectedPhotos
+        selectedPhotos = []
         Task {
-            guard let data = try? await selectedPhoto.loadTransferable(type: Data.self) else { return }
-            // PhotosPicker can return HEIC/PNG data. Normalize library photos
-            // to JPEG so the server/vision provider receive a stable contract.
-            let scanData = normalizedScanImageData(data) ?? data
-            imageData = scanData
-            scanImage(scanData)
+            var images: [Data] = []
+            for item in items {
+                guard let data = try? await item.loadTransferable(type: Data.self) else { continue }
+                // PhotosPicker can return HEIC/PNG data. Normalize library photos
+                // to JPEG so the server/vision provider receive a stable contract.
+                images.append(normalizedScanImageData(data) ?? data)
+            }
+            guard !images.isEmpty else {
+                error = "Couldn't load those photos — try picking them again."
+                return
+            }
+            queueTotal = images.count
+            queueIndex = 0
+            photoQueue = images
+            advanceQueue()
         }
     }
 
@@ -525,9 +617,15 @@ struct ReceiptScannerView: View {
                     "notes": "\(selectedCategory) receipt\n\(itemDetail)"
                 ]
                 let _ = try await api.addProjectExpense(projectId: projectId, expense: expenseData)
-                currentScanSaved = true
                 savedCount += 1
                 Task.detached { await onProjectExpenseSaved?() }
+                if photoQueue.isEmpty {
+                    currentScanSaved = true
+                } else {
+                    // More receipts waiting — straight on to the next one.
+                    UINotificationFeedbackGenerator().notificationOccurred(.success)
+                    advanceQueue()
+                }
             } else {
                 let itinId = selectedCategory == "Trip" ? selectedItinerary?.id : nil
                 let savedId = try await api.saveScannedReceipt(result: result, category: selectedCategory, notes: itemDetail, itineraryId: itinId)
@@ -535,10 +633,15 @@ struct ReceiptScannerView: View {
                     self.error = "Receipt save did not return a valid id. Try again."
                     return
                 }
-                currentScanSaved = true
                 savedCount += 1
                 UINotificationFeedbackGenerator().notificationOccurred(.success)
                 await onReceiptSaved?()
+                if photoQueue.isEmpty {
+                    currentScanSaved = true
+                } else {
+                    // More receipts waiting — straight on to the next one.
+                    advanceQueue()
+                }
             }
         } catch {
             self.error = "Failed to save: \(error.localizedDescription)"
