@@ -6994,6 +6994,7 @@ app.get('/api/home', requireAuth, async (req, res) => {
       chores,
       presence,
       groups,
+      dailyBrief,
     ] = await Promise.all([
       db.getDailySummary(userId),
       db.getGroceries('needed', userId),
@@ -7005,6 +7006,7 @@ app.get('/api/home', requireAuth, async (req, res) => {
       choresTodayForUser(db, userId),
       db.getHouseholdPresence(userId),
       db.getGroupsByUser(userId),
+      db.getLatestBriefPost(userId),
     ]);
 
     const appointmentsToday = monthAppointments.filter(a => a.appointment_date === today);
@@ -7025,6 +7027,9 @@ app.get('/api/home', requireAuth, async (req, res) => {
       chores,
       presence,
       groups,
+      // The Concierge's daily brief lives in its own Home section (updated in
+      // place each day) instead of stacking up in the activity feed.
+      daily_brief: dailyBrief,
     });
   } catch (err) {
     sendServerError(res, err);

@@ -66,6 +66,7 @@ struct HomeView: View {
                 presenceRow
                 sleepBarSection
                 choreBarSection
+                dailyBriefSection
                 statsGrid
                 heroFocusCard
                 onThisDaySection
@@ -567,6 +568,45 @@ struct HomeView: View {
                              onTap: { selectedChoreCheckoff = FeedRoutineTarget(id: summary.routine_id) })
                 }
             }
+            .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
+            .padding(.bottom, 16)
+        }
+    }
+
+    // MARK: - Daily Brief
+
+    /// The Concierge's day-ahead brief in its own stable slot — it updates in
+    /// place each day instead of stacking up in the activity feed below.
+    @ViewBuilder
+    private var dailyBriefSection: some View {
+        if let brief = viewModel.dailyBrief, let body = brief.body, !body.isEmpty {
+            Button { selectedTab = .concierge } label: {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "sparkles")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(AccentTheme.saffron.color)
+                        Text(brief.title ?? "Today's brief")
+                            .font(.flOverline)
+                            .foregroundStyle(WarmPalette.ink3)
+                            .textCase(.uppercase).tracking(0.4)
+                        Spacer(minLength: 0)
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(WarmPalette.ink4)
+                    }
+                    Text(body)
+                        .font(.flSubheadline)
+                        .foregroundStyle(WarmPalette.ink2)
+                        .multilineTextAlignment(.leading)
+                        .lineSpacing(3)
+                }
+                .padding(DesignTokens.Spacing.cardPadding)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .flCard(tint: AccentTheme.saffron.color.opacity(0.05))
+            }
+            .buttonStyle(.flCardPress)
+            .accessibilityLabel("Today's Concierge brief. Opens the Concierge tab.")
             .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
             .padding(.bottom, 16)
         }

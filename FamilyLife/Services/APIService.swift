@@ -211,6 +211,16 @@ final class APIService {
         let chores: [ChoresTodaySummary]
         let presence: [PresenceMember]
         let groups: [GroupResponse]
+        /// Today's Concierge brief — rendered as its own Home section that
+        /// updates in place, never as activity-feed rows.
+        let daily_brief: DailyBriefPost?
+    }
+
+    struct DailyBriefPost: Codable {
+        let id: Int
+        let title: String?
+        let body: String?
+        let created_at: String?
     }
 
     func fetchHome() async throws -> HomeBootstrap {

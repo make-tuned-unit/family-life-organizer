@@ -2836,6 +2836,21 @@ class FamilyDB {
     });
   }
 
+  // The newest daily brief for any household the user belongs to — the Home
+  // "Today's brief" section reads this instead of the activity feed.
+  getLatestBriefPost(userId) {
+    return new Promise((resolve, reject) => {
+      this.db.get(`
+        SELECT fp.id, fp.group_id, fp.title, fp.body, fp.created_at
+        FROM feed_posts fp
+        JOIN group_members gm ON gm.group_id = fp.group_id AND gm.user_id = ?
+        WHERE fp.post_type = 'brief'
+        ORDER BY fp.created_at DESC, fp.id DESC
+        LIMIT 1
+      `, [userId], (err, row) => err ? reject(err) : resolve(row || null));
+    });
+  }
+
   // ============================================
   // Groups
   // ============================================
@@ -3767,7 +3782,8 @@ class FamilyDB {
         LEFT JOIN users u ON u.id = fp.author_id
         LEFT JOIN groups g ON g.id = fp.group_id
         WHERE fp.group_id IN (${myGroups})
-          AND fp.post_type != 'text'
+          -- Briefs render in their own Home section, not as feed spam.
+          AND fp.post_type NOT IN ('text', 'brief')
           AND (
             (fp.post_type NOT IN ('decision', 'poll') AND (fp.reference_type IS NULL OR fp.reference_type != 'decision'))
             OR EXISTS (SELECT 1 FROM decisions d WHERE d.id = fp.reference_id AND d.status = 'active')

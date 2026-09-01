@@ -33,6 +33,9 @@ final class HomeViewModel {
     var choresToday: [ChoresTodaySummary] = []
     var groups: [APIService.GroupResponse] = []
     var presenceMembers: [APIService.PresenceMember] = []
+    /// Today's Concierge brief for the dedicated Home section (nil when the
+    /// household hasn't opted in or no brief has been written yet).
+    var dailyBrief: APIService.DailyBriefPost?
     var isLoading = false
     var error: String?
     var visibleFeedCount = 15
@@ -96,6 +99,7 @@ final class HomeViewModel {
         activeTrips = home.trips
         sleepNow = home.sleep
         choresToday = home.chores
+        dailyBrief = home.daily_brief
     }
 
     func reloadTrips(api: APIService) async {
