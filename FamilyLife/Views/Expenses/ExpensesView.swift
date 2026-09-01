@@ -240,7 +240,8 @@ struct ExpensesView: View {
     private var headerSection: some View {
         HStack {
             VStack(alignment: .leading, spacing: 4) {
-                Text("\(viewModel.displayMonthString) \u{00B7} halfway through")
+                Text(viewModel.monthPhaseString.map { "\(viewModel.displayMonthString) \u{00B7} \($0)" }
+                     ?? viewModel.displayMonthString)
                     .font(.flOverline)
                     .foregroundStyle(WarmPalette.ink3)
                     .tracking(0.4)
