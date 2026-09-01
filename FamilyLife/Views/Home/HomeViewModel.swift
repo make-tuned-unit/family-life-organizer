@@ -100,6 +100,30 @@ final class HomeViewModel {
         sleepNow = home.sleep
         choresToday = home.chores
         dailyBrief = home.daily_brief
+        publishWidgetSnapshot(home)
+    }
+
+    /// Every Home refresh republishes the day-ahead snapshot the home-screen
+    /// widget renders — the widget itself never talks to the network.
+    private func publishWidgetSnapshot(_ home: APIService.HomeBootstrap) {
+        let fmt = DateFormatter()
+        fmt.dateFormat = "yyyy-MM-dd"
+        let choresTotal = home.chores.reduce(0) { $0 + $1.total_slots }
+        let choresOpen = home.chores.reduce(0) { $0 + $1.open_slots }
+        let next = home.appointments_today
+            .sorted { ($0.appointment_time ?? "") < ($1.appointment_time ?? "") }
+            .first
+        WidgetDataStore.save(WidgetDaySnapshot(
+            date: fmt.string(from: Date()),
+            briefTitle: home.daily_brief?.title,
+            briefBody: home.daily_brief?.body,
+            choresDone: max(0, choresTotal - choresOpen),
+            choresTotal: choresTotal,
+            eventsTodayCount: home.appointments_today.count,
+            nextEventTitle: next?.title,
+            nextEventTime: next?.appointment_time.map { String($0.prefix(5)) },
+            updatedAt: Date()
+        ))
     }
 
     func reloadTrips(api: APIService) async {

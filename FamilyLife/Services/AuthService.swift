@@ -324,6 +324,9 @@ final class AuthService {
         // inherit (or re-fire against) the previous account's history.
         UserDefaults.standard.removeObject(forKey: "notified_dm_ids")
         UserDefaults.standard.removeObject(forKey: "notified_feed_keys")
+        // The home-screen widget renders from the App Group snapshot — wipe it
+        // so it never shows the previous account's family.
+        WidgetDataStore.clear()
         // Scheduled local notifications outlive the session. Most are one-shot
         // and expire quietly, but the bedtime nudge repeats nightly — without
         // this it would keep naming the previous family's child on whatever
