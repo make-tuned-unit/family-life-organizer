@@ -37,7 +37,9 @@ This file is the maintained list of work required before the app should be treat
 - [ ] Apple Calendar integration with EventKit import/export and busy overlays.
 - [ ] Memory / knowledge capture UI for warranties, preferences, sizes, allergies, and service history.
 - [ ] Native capture flows from outside the app: Share Extension and App Intents.
-- [ ] Widgets for agenda, groceries, and pantry status.
+- [x] Day Ahead home-screen widget (Concierge brief + chores + next event) via the
+      `group.com.kinrows.app` App Group snapshot — the extension holds no network
+      or keychain access. Agenda/groceries/pantry variants still open.
 - [ ] Live Activity for active trips.
 - [ ] Spotlight indexing for household records.
 - [ ] App Shortcuts for high-frequency actions like add grocery, add task, start trip, and scan receipt.

@@ -60,6 +60,18 @@ App Store 5.1.x.
 
 Tests: `test/prelaunch-security.test.js` + SIWA delete case in `test/apple-signin.test.js`.
 
+### Coverage recipient identity (2026-09)
+
+`coverage_recipients.user_id` is now stamped at creation and is the authoritative
+"is this request for me?" check (the old `LOWER(contacts.name) = LOWER(users.name)`
+compare survives only as a fallback for pre-migration rows). New request paths and
+their guards: `user_ids` and household `group_id` targeting require
+`usersShareGroup` / `isGroupMember` respectively (contacts are still materialized
+as caller-owned rows, so contact PII disclosure via `GET /api/coverage/:id` is
+unchanged); `appointment_id` attachment is gated by `requireHouseholdRow` on
+`appointments`. Pushes go to the stamped `user_id`, never a name match.
+Tests: `test/coverage-visibility.test.js`.
+
 ### Wave 2 — remaining surfaces (verified, no extra P0/P1)
 
 Household CRUD (receipts, budget, pantry, trips, gifts, projects, recurring, cook,
