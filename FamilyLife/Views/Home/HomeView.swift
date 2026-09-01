@@ -24,6 +24,11 @@ struct HomeView: View {
     /// A routine opened straight from its feed row. Int is Identifiable via the
     /// wrapper below so `.sheet(item:)` can drive it.
     @State private var selectedFeedRoutine: FeedRoutineTarget?
+    /// A chore row tapped on Home — opens the kid-facing check-off modal.
+    @State private var selectedChoreCheckoff: FeedRoutineTarget?
+    /// Set when the check-off modal asks for the full program; the routine
+    /// detail sheet opens once the modal has finished dismissing.
+    @State private var pendingProgramRoutine: Int?
     @State private var selectedFeedDecision: DecisionResponse?
     /// Milestones and key dates live on a person's card. The feed opens that
     /// person directly; `showingPeople` is the fallback when the row doesn't
@@ -61,6 +66,7 @@ struct HomeView: View {
                 presenceRow
                 sleepBarSection
                 choreBarSection
+                dailyBriefSection
                 statsGrid
                 heroFocusCard
                 onThisDaySection
@@ -195,6 +201,18 @@ struct HomeView: View {
                             .foregroundStyle(WarmPalette.ink2)
                     }
                 }
+            }
+        }
+        .sheet(item: $selectedChoreCheckoff, onDismiss: {
+            if let id = pendingProgramRoutine {
+                pendingProgramRoutine = nil
+                selectedFeedRoutine = FeedRoutineTarget(id: id)
+            }
+            Task { await viewModel.reloadChoresToday(api: api) }
+        }) { target in
+            ChoreCheckoffSheet(routineId: target.id, viewModel: viewModel) {
+                pendingProgramRoutine = target.id
+                selectedChoreCheckoff = nil
             }
         }
         .sheet(item: $selectedFeedRoutine, onDismiss: {
@@ -547,9 +565,48 @@ struct HomeView: View {
                              onToggle: { choreId, slot in
                                  Task { await viewModel.toggleChore(routineId: summary.routine_id, choreId: choreId, slot: slot, api: api) }
                              },
-                             onTap: { selectedFeedRoutine = FeedRoutineTarget(id: summary.routine_id) })
+                             onTap: { selectedChoreCheckoff = FeedRoutineTarget(id: summary.routine_id) })
                 }
             }
+            .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
+            .padding(.bottom, 16)
+        }
+    }
+
+    // MARK: - Daily Brief
+
+    /// The Concierge's day-ahead brief in its own stable slot — it updates in
+    /// place each day instead of stacking up in the activity feed below.
+    @ViewBuilder
+    private var dailyBriefSection: some View {
+        if let brief = viewModel.dailyBrief, let body = brief.body, !body.isEmpty {
+            Button { selectedTab = .concierge } label: {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "sparkles")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(AccentTheme.saffron.color)
+                        Text(brief.title ?? "Today's brief")
+                            .font(.flOverline)
+                            .foregroundStyle(WarmPalette.ink3)
+                            .textCase(.uppercase).tracking(0.4)
+                        Spacer(minLength: 0)
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(WarmPalette.ink4)
+                    }
+                    Text(body)
+                        .font(.flSubheadline)
+                        .foregroundStyle(WarmPalette.ink2)
+                        .multilineTextAlignment(.leading)
+                        .lineSpacing(3)
+                }
+                .padding(DesignTokens.Spacing.cardPadding)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .flCard(tint: AccentTheme.saffron.color.opacity(0.05))
+            }
+            .buttonStyle(.flCardPress)
+            .accessibilityLabel("Today's Concierge brief. Opens the Concierge tab.")
             .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
             .padding(.bottom, 16)
         }

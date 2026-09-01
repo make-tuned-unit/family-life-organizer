@@ -139,7 +139,38 @@
 		AA00021C /* ChoreCards.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00021C /* ChoreCards.swift */; };
 		AA00021D /* ChoreProgramView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00021D /* ChoreProgramView.swift */; };
 		AA00021E /* ChoreBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00021E /* ChoreBar.swift */; };
+		AA00021F /* ConfettiCelebration.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00021F /* ConfettiCelebration.swift */; };
+		AA000220 /* ChoreCheckoffSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000220 /* ChoreCheckoffSheet.swift */; };
+		AA000230 /* KinrowsWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000230 /* KinrowsWidget.swift */; };
+		AA000231 /* WidgetDataStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000231 /* WidgetDataStore.swift */; };
+		AA000232 /* WidgetDataStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000231 /* WidgetDataStore.swift */; };
+		AA000233 /* DesignTokens.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00003B /* DesignTokens.swift */; };
+		AA000234 /* KinrowsWidgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = CC000002 /* KinrowsWidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		FF000039 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = FF000099 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = FF000030;
+			remoteInfo = KinrowsWidgetExtension;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		FF000037 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				AA000234 /* KinrowsWidgetExtension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		BB000001 /* FamilyLifeApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FamilyLifeApp.swift; sourceTree = "<group>"; };
@@ -274,11 +305,25 @@
 		BB00021C /* ChoreCards.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChoreCards.swift; sourceTree = "<group>"; };
 		BB00021D /* ChoreProgramView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChoreProgramView.swift; sourceTree = "<group>"; };
 		BB00021E /* ChoreBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChoreBar.swift; sourceTree = "<group>"; };
+		BB00021F /* ConfettiCelebration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfettiCelebration.swift; sourceTree = "<group>"; };
+		BB000220 /* ChoreCheckoffSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChoreCheckoffSheet.swift; sourceTree = "<group>"; };
+		BB000230 /* KinrowsWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KinrowsWidget.swift; sourceTree = "<group>"; };
+		BB000231 /* WidgetDataStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetDataStore.swift; sourceTree = "<group>"; };
+		BB000232 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		BB000233 /* KinrowsWidget.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = KinrowsWidget.entitlements; sourceTree = "<group>"; };
+		CC000002 /* KinrowsWidgetExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = KinrowsWidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		CC000001 /* FamilyLife.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = FamilyLife.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		DD000001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		DD000002 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -292,8 +337,19 @@
 			isa = PBXGroup;
 			children = (
 				EE000002 /* FamilyLife */,
+				EE000030 /* KinrowsWidget */,
 				EE000003 /* Products */,
 			);
+			sourceTree = "<group>";
+		};
+		EE000030 /* KinrowsWidget */ = {
+			isa = PBXGroup;
+			children = (
+				BB000230 /* KinrowsWidget.swift */,
+				BB000232 /* Info.plist */,
+				BB000233 /* KinrowsWidget.entitlements */,
+			);
+			path = KinrowsWidget;
 			sourceTree = "<group>";
 		};
 		EE000002 /* FamilyLife */ = {
@@ -312,6 +368,7 @@
 			isa = PBXGroup;
 			children = (
 				CC000001 /* FamilyLife.app */,
+				CC000002 /* KinrowsWidgetExtension.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -364,6 +421,7 @@
 				BB000070 /* ProfileImageCache.swift */,
 				BB000077 /* MessageCache.swift */,
 				BB000092 /* SubscriptionService.swift */,
+				BB000231 /* WidgetDataStore.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -416,6 +474,7 @@
 				BB000202 /* SecurityView.swift */,
 				BB00021B /* DeveloperAPIView.swift */,
 				BB00021E /* ChoreBar.swift */,
+				BB000220 /* ChoreCheckoffSheet.swift */,
 				BB000051 /* HouseholdView.swift */,
 				BB000054 /* NewPostView.swift */,
 				BB000055 /* FeedCardView.swift */,
@@ -529,6 +588,7 @@
 			isa = PBXGroup;
 			children = (
 				BB000039 /* AmbientBackground.swift */,
+				BB00021F /* ConfettiCelebration.swift */,
 				BB00003B /* DesignTokens.swift */,
 				BB00003C /* FLCardModifier.swift */,
 				BB000041 /* ButtonStyles.swift */,
@@ -637,16 +697,35 @@
 				FF000002 /* Sources */,
 				DD000001 /* Frameworks */,
 				FF000003 /* Resources */,
+				FF000037 /* Embed Foundation Extensions */,
 				FF000009 /* Set build number */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				FF000038 /* PBXTargetDependency */,
 			);
 			name = FamilyLife;
 			productName = FamilyLife;
 			productReference = CC000001 /* FamilyLife.app */;
 			productType = "com.apple.product-type.application";
+		};
+		FF000030 /* KinrowsWidgetExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = FF000034 /* Build configuration list for PBXNativeTarget "KinrowsWidgetExtension" */;
+			buildPhases = (
+				FF000031 /* Sources */,
+				DD000002 /* Frameworks */,
+				FF000033 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = KinrowsWidgetExtension;
+			productName = KinrowsWidgetExtension;
+			productReference = CC000002 /* KinrowsWidgetExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
 		};
 /* End PBXNativeTarget section */
 
@@ -678,6 +757,7 @@
 			projectRoot = "";
 			targets = (
 				FF000001 /* FamilyLife */,
+				FF000030 /* KinrowsWidgetExtension */,
 			);
 		};
 /* End PBXProject section */
@@ -689,6 +769,13 @@
 			files = (
 				AA00000D /* Assets.xcassets in Resources */,
 				AA000047 /* PrivacyInfo.xcprivacy in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		FF000033 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -805,6 +892,8 @@
 				AA000037 /* EditAppointmentView.swift in Sources */,
 				AA000038 /* EditPantryItemView.swift in Sources */,
 				AA000039 /* AmbientBackground.swift in Sources */,
+				AA00021F /* ConfettiCelebration.swift in Sources */,
+				AA000220 /* ChoreCheckoffSheet.swift in Sources */,
 				AA00003B /* DesignTokens.swift in Sources */,
 				AA0000A1 /* TabBarChrome.swift in Sources */,
 				AA0000A2 /* OnboardingTourView.swift in Sources */,
@@ -847,10 +936,29 @@
 				AA000053 /* BudgetCategoryDetailView.swift in Sources */,
 				AA000054 /* NewPostView.swift in Sources */,
 				AA000055 /* FeedCardView.swift in Sources */,
+				AA000232 /* WidgetDataStore.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		FF000031 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AA000230 /* KinrowsWidget.swift in Sources */,
+				AA000231 /* WidgetDataStore.swift in Sources */,
+				AA000233 /* DesignTokens.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		FF000038 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = FF000030 /* KinrowsWidgetExtension */;
+			targetProxy = FF000039 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		FF000011 /* Debug */ = {
@@ -861,7 +969,7 @@
 				CODE_SIGN_ENTITLEMENTS = FamilyLife/FamilyLifeDebug.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 238;
+				CURRENT_PROJECT_VERSION = 239;
 				DEVELOPMENT_ASSET_PATHS = "";
 				DEVELOPMENT_TEAM = Z58XSBM78S;
 				ENABLE_PREVIEWS = YES;
@@ -906,7 +1014,7 @@
 				CODE_SIGN_ENTITLEMENTS = FamilyLife/FamilyLife.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 238;
+				CURRENT_PROJECT_VERSION = 239;
 				DEVELOPMENT_ASSET_PATHS = "";
 				DEVELOPMENT_TEAM = Z58XSBM78S;
 				ENABLE_PREVIEWS = YES;
@@ -1070,12 +1178,81 @@
 		};
 /* End XCBuildConfiguration section */
 
+		FF000035 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = KinrowsWidget/KinrowsWidget.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 239;
+				DEVELOPMENT_TEAM = Z58XSBM78S;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = KinrowsWidget/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Kinrows;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.kinrows.app.widget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		FF000036 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = KinrowsWidget/KinrowsWidget.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 239;
+				DEVELOPMENT_TEAM = Z58XSBM78S;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = KinrowsWidget/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Kinrows;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.kinrows.app.widget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
 /* Begin XCConfigurationList section */
 		FF000010 /* Build configuration list for PBXNativeTarget "FamilyLife" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				FF000011 /* Debug */,
 				FF000012 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		FF000034 /* Build configuration list for PBXNativeTarget "KinrowsWidgetExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				FF000035 /* Debug */,
+				FF000036 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

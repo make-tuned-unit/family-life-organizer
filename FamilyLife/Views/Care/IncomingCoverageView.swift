@@ -41,6 +41,12 @@ struct IncomingRequestCard: View {
                     Text(request.reason)
                         .font(.flFootnote)
                         .foregroundStyle(WarmPalette.ink2)
+                    if let event = request.event_title, !event.isEmpty {
+                        Label(event, systemImage: "calendar")
+                            .font(.flCaption)
+                            .foregroundStyle(WarmPalette.ink3)
+                            .lineLimit(1)
+                    }
                 }
                 Spacer()
 
@@ -272,7 +278,8 @@ struct ApproveRequestSheet: View {
             request: APIService.IncomingCoverageRequest(
                 id: 1, reason: "Watch the kids", note: "Back by 9pm!", status: "pending",
                 created_at: nil, requester_name: "Melissa", recipient_id: 1,
-                recipient_status: "pending", invite_token: nil
+                recipient_status: "pending", invite_token: nil,
+                appointment_id: nil, event_title: "Dentist for the kids"
             )
         ) {}
     }

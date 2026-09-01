@@ -116,7 +116,7 @@ test('sweep posts one brief per opted-in household per day', async () => {
   assert.equal(again.length, 1, 'second sweep the same day must not duplicate');
 });
 
-test('PUT /api/users/me/concierge persists the opt-in and the brief shows on the feed', async () => {
+test('PUT /api/users/me/concierge persists the opt-in; brief feeds the Home section, not the activity feed', async () => {
   const client = makeClient();
   const username = `brief_http_${Date.now()}`;
   const reg = await client('POST', '/api/auth/register', {
@@ -137,13 +137,20 @@ test('PUT /api/users/me/concierge persists the opt-in and the brief shows on the
   const posted = await runDailyBriefSweep(db);
   assert.ok(posted.posted >= 1, JSON.stringify(posted));
 
+  // The brief no longer stacks up in the activity feed — it has its own
+  // Home section that updates in place each day.
   const feed = await client('GET', '/api/activity?limit=50');
   assert.equal(feed.status, 200);
-  const brief = (feed.body || []).find(p => p.feed_type === 'post' && p.status === 'brief');
-  assert.ok(brief, 'brief appears on the activity feed');
-  assert.equal(brief.author, 'Concierge');
+  const inFeed = (feed.body || []).find(p => p.feed_type === 'post' && p.status === 'brief');
+  assert.ok(!inFeed, 'brief must NOT appear on the activity feed');
+
+  const home = await client('GET', '/api/home');
+  assert.equal(home.status, 200);
+  const brief = home.body.daily_brief;
+  assert.ok(brief, 'GET /api/home carries daily_brief');
   assert.match(brief.title, /brief$/i);
-  assert.ok(brief.body);
+  assert.ok(brief.body && brief.body.length > 0);
+  assert.ok(!(home.body.feed || []).some(p => p.status === 'brief'), 'home feed slice is brief-free too');
 
   const putOff = await client('PUT', '/api/users/me/concierge', { enabled: false });
   assert.equal(putOff.body.enabled, false);

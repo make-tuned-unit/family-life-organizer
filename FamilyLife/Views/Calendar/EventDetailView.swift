@@ -10,6 +10,7 @@ struct EventDetailView: View {
     @State private var showingEdit = false
     @State private var showingShareSheet = false
     @State private var showingSendTo = false
+    @State private var showingCoverage = false
 
     var body: some View {
         ScrollView(showsIndicators: false) {
@@ -148,6 +149,21 @@ struct EventDetailView: View {
                         .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.tile))
                     }
 
+                    // Ask someone to cover this slot — same cascade as the
+                    // calendar long-press, prefilled from this event.
+                    Button { showingCoverage = true } label: {
+                        HStack(spacing: 10) {
+                            Image(systemName: "person.2.fill")
+                                .font(.system(size: 16))
+                            Text("Request Coverage")
+                                .font(.flSubheadline.weight(.semibold))
+                        }
+                        .foregroundStyle(TabAccent.care.color)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                        .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.tile))
+                    }
+
                     // Send to family member
                     Button { showingSendTo = true } label: {
                         HStack(spacing: 10) {
@@ -217,6 +233,20 @@ struct EventDetailView: View {
                 id: appointment.id,
                 title: appointment.title
             ))
+        }
+        .sheet(isPresented: $showingCoverage) {
+            NavigationStack {
+                CareCascadeView(prefill: {
+                    let start = (appointment.appointment_time?.count ?? 0) >= 5
+                        ? String(appointment.appointment_time!.prefix(5)) : "09:00"
+                    let endHour = min(23, (Int(start.prefix(2)) ?? 9) + 2)
+                    return CoveragePrefill(eventTitle: appointment.title,
+                                           date: appointment.appointment_date,
+                                           startTime: start,
+                                           endTime: String(format: "%02d%@", endHour, String(start.dropFirst(2))),
+                                           appointmentId: appointment.id)
+                }())
+            }
         }
     }
 

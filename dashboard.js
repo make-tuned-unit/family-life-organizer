@@ -6994,6 +6994,7 @@ app.get('/api/home', requireAuth, async (req, res) => {
       chores,
       presence,
       groups,
+      dailyBrief,
     ] = await Promise.all([
       db.getDailySummary(userId),
       db.getGroceries('needed', userId),
@@ -7005,6 +7006,7 @@ app.get('/api/home', requireAuth, async (req, res) => {
       choresTodayForUser(db, userId),
       db.getHouseholdPresence(userId),
       db.getGroupsByUser(userId),
+      db.getLatestBriefPost(userId),
     ]);
 
     const appointmentsToday = monthAppointments.filter(a => a.appointment_date === today);
@@ -7025,6 +7027,9 @@ app.get('/api/home', requireAuth, async (req, res) => {
       chores,
       presence,
       groups,
+      // The Concierge's daily brief lives in its own Home section (updated in
+      // place each day) instead of stacking up in the activity feed.
+      daily_brief: dailyBrief,
     });
   } catch (err) {
     sendServerError(res, err);
@@ -7882,25 +7887,102 @@ app.post('/api/coverage', requireAuth, async (req, res) => {
     const userId = req.session.user?.id;
     const { reason, note, windows } = req.body;
 
-    // Recipients must resolve to contacts the requester owns — otherwise
-    // another user's contact names/phones would be disclosed via
-    // GET /api/coverage/:id. Household members arrive as negative pseudo-ids
-    // and are materialized into real owned contact rows (see helper).
+    // Recipients arrive three ways, all resolved to {contact_id, user_id}
+    // specs: contact_ids (owned contacts / negative household pseudo-ids),
+    // user_ids (app users sharing a group — the identity-first path), and
+    // group_id (a whole household/clan, fanned out to its other members).
+    // Contacts must resolve to rows the requester owns — otherwise another
+    // user's contact names/phones would be disclosed via GET /api/coverage/:id.
     const rawIds = Array.isArray(req.body.contact_ids) ? req.body.contact_ids : [];
-    if (rawIds.length > 20) return res.status(400).json({ error: 'Too many recipients' });
-    const contact_ids = [];
-    const clientIdFor = new Map();   // resolved contact id -> the id the client sent
+    const rawUserIds = Array.isArray(req.body.user_ids) ? req.body.user_ids : [];
+    const targetGroupId = Number.isInteger(req.body.group_id) ? req.body.group_id : null;
+    if (rawIds.length + rawUserIds.length > 20) return res.status(400).json({ error: 'Too many recipients' });
+
+    const specs = [];                 // { contact_id, user_id, client_id }
+    const seenContacts = new Set();
+    const seenUsers = new Set();
+    const addSpec = (spec) => {
+      if (spec.user_id != null) {
+        if (seenUsers.has(spec.user_id)) return;
+        seenUsers.add(spec.user_id);
+      }
+      if (seenContacts.has(spec.contact_id)) return;
+      seenContacts.add(spec.contact_id);
+      specs.push(spec);
+    };
+
     for (const rawId of rawIds) {
       const resolved = await resolveOwnedContactId(db, rawId, userId, res);
       if (resolved === null) return;  // 4xx already sent
-      if (!contact_ids.includes(resolved)) { contact_ids.push(resolved); clientIdFor.set(resolved, Number(rawId)); }
+      // Stamp the app user this contact represents (if any) at creation time,
+      // so visibility never depends on display names again.
+      const helperId = Number(rawId) < 0 ? -Number(rawId) : await db.resolveContactUserId(resolved);
+      addSpec({ contact_id: resolved, user_id: helperId || null, client_id: Number(rawId) });
     }
 
-    // Create request
-    const request = await db.createCoverageRequest({ requester_id: userId, reason, note });
+    for (const rawUid of rawUserIds) {
+      const uid = Number(rawUid);
+      if (!Number.isInteger(uid) || uid <= 0) return res.status(400).json({ error: 'Invalid recipient' });
+      if (uid === userId) continue;
+      // Same consent gate + owned-contact materialization as pseudo-ids.
+      const resolved = await resolveOwnedContactId(db, -uid, userId, res);
+      if (resolved === null) return;
+      addSpec({ contact_id: resolved, user_id: uid, client_id: -uid });
+    }
 
-    // Add windows (normalize dates)
-    for (const w of (windows || [])) {
+    if (targetGroupId != null) {
+      if (!(await db.isGroupMember(targetGroupId, userId))) {
+        return res.status(403).json({ error: 'You can only ask groups you belong to' });
+      }
+      const members = await db.getGroupMembers(targetGroupId);
+      for (const m of members) {
+        // Contact-only roster entries have no app account to notify — the
+        // requester can still add them individually via contact_ids.
+        if (!Number.isInteger(m.user_id) || m.user_id === userId) continue;
+        const resolved = await resolveOwnedContactId(db, -m.user_id, userId, res);
+        if (resolved === null) return;
+        addSpec({ contact_id: resolved, user_id: m.user_id, client_id: -m.user_id });
+      }
+    }
+
+    // Optional calendar attachment: a household event by id (must be in the
+    // caller's household), or a device-calendar event by EventKit id + title.
+    let appointment = null;
+    const appointmentId = Number.isInteger(req.body.appointment_id) ? req.body.appointment_id : null;
+    if (appointmentId != null) {
+      if (!(await requireHouseholdRow(db, 'appointments', appointmentId, req, res))) return;
+      appointment = await dbGet(db, 'SELECT id, title, appointment_date, appointment_time FROM appointments WHERE id = ?', [appointmentId]);
+    }
+    const externalEventId = typeof req.body.external_event_id === 'string'
+      ? req.body.external_event_id.slice(0, 200) : null;
+    const eventTitle = (typeof req.body.event_title === 'string' && req.body.event_title.trim())
+      ? req.body.event_title.trim().slice(0, 200)
+      : (appointment?.title || null);
+
+    // Create request
+    const request = await db.createCoverageRequest({
+      requester_id: userId, reason, note,
+      appointment_id: appointment?.id || null,
+      external_event_id: externalEventId,
+      event_title: eventTitle,
+    });
+
+    // Add windows (normalize dates). When the request is attached to a
+    // household event and no window was sent, the event's own slot is the
+    // window — that's the "one tap from the calendar" path.
+    const windowList = Array.isArray(windows) ? [...windows] : [];
+    if (windowList.length === 0 && appointment?.appointment_date) {
+      const start = /^\d{2}:\d{2}/.test(appointment.appointment_time || '')
+        ? appointment.appointment_time.slice(0, 5) : '09:00';
+      const endHour = Math.min(23, parseInt(start.slice(0, 2), 10) + 2);
+      windowList.push({
+        window_date: appointment.appointment_date,
+        start_time: start,
+        end_time: `${String(endHour).padStart(2, '0')}${start.slice(2)}`,
+        description: appointment.title,
+      });
+    }
+    for (const w of windowList) {
       const winData = { request_id: request.id, ...w };
       if (winData.window_date) winData.window_date = normalizeDate(winData.window_date);
       await db.addCoverageWindow(winData);
@@ -7908,22 +7990,23 @@ app.post('/api/coverage', requireAuth, async (req, res) => {
 
     // Add recipients and generate invite tokens
     const recipients = [];
-    for (const contactId of (contact_ids || [])) {
-      const rec = await db.addCoverageRecipient({ request_id: request.id, contact_id: contactId });
+    for (const spec of specs) {
+      const rec = await db.addCoverageRecipient({
+        request_id: request.id, contact_id: spec.contact_id, user_id: spec.user_id });
       // The client keys its share buttons by the id it sent (household members
       // arrive as negative pseudo-ids), so hand that back alongside the link.
-      recipients.push({ ...rec, contact_id: contactId, client_contact_id: clientIdFor.get(contactId) ?? contactId,
+      recipients.push({ ...rec, contact_id: spec.contact_id, client_contact_id: spec.client_id,
         share_url: coverageShareUrl(rec.invite_token) });
     }
 
     res.json({ success: true, id: request.id, recipients });
 
-    // Push to helpers who are app users
+    // Push to helpers who are app users — by the stamped user id.
     const senderName = req.session.user?.name || 'Someone';
-    for (const contactId of (contact_ids || [])) {
-      const helperId = await db.getUserIdByContactId(contactId);
-      if (helperId) {
-        jobs.pushToUser(db, helperId, `${senderName} needs your help`, reason || 'Coverage request', {
+    for (const spec of specs) {
+      if (spec.user_id) {
+        jobs.pushToUser(db, spec.user_id, `${senderName} needs your help`,
+          eventTitle ? `${reason || 'Coverage'} · ${eventTitle}` : (reason || 'Coverage request'), {
           type: 'coverage', ref_id: request.id
         });
       }

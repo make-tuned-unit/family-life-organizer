@@ -2185,13 +2185,13 @@ const TOOLS = [
       }
       const recipients = [];
       for (const contactId of (input.contact_ids || [])) {
-        const rec = await ctx.db.addCoverageRecipient({ request_id: request.id, contact_id: contactId });
+        // Stamp the recipient's user id at creation (tolerant of nickname
+        // contacts) so in-app visibility never depends on display names.
+        const helperId = await ctx.db.resolveContactUserId(contactId);
+        const rec = await ctx.db.addCoverageRecipient({ request_id: request.id, contact_id: contactId, user_id: helperId });
         recipients.push(rec);
-        if (ctx.push) {
-          const helperId = await ctx.db.getUserIdByContactId(contactId);
-          if (helperId) {
-            ctx.push.pushToUser(ctx.db, helperId, `${ctx.userName} needs your help`, input.reason, { type: 'coverage', ref_id: request.id });
-          }
+        if (ctx.push && helperId) {
+          ctx.push.pushToUser(ctx.db, helperId, `${ctx.userName} needs your help`, input.reason, { type: 'coverage', ref_id: request.id });
         }
       }
       const summary = `Created a coverage request: ${input.reason}`;
