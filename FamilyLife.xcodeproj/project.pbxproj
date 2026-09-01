@@ -139,6 +139,8 @@
 		AA00021C /* ChoreCards.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00021C /* ChoreCards.swift */; };
 		AA00021D /* ChoreProgramView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00021D /* ChoreProgramView.swift */; };
 		AA00021E /* ChoreBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00021E /* ChoreBar.swift */; };
+		AA00021F /* ConfettiCelebration.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00021F /* ConfettiCelebration.swift */; };
+		AA000220 /* ChoreCheckoffSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000220 /* ChoreCheckoffSheet.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -274,6 +276,8 @@
 		BB00021C /* ChoreCards.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChoreCards.swift; sourceTree = "<group>"; };
 		BB00021D /* ChoreProgramView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChoreProgramView.swift; sourceTree = "<group>"; };
 		BB00021E /* ChoreBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChoreBar.swift; sourceTree = "<group>"; };
+		BB00021F /* ConfettiCelebration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfettiCelebration.swift; sourceTree = "<group>"; };
+		BB000220 /* ChoreCheckoffSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChoreCheckoffSheet.swift; sourceTree = "<group>"; };
 		CC000001 /* FamilyLife.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = FamilyLife.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -416,6 +420,7 @@
 				BB000202 /* SecurityView.swift */,
 				BB00021B /* DeveloperAPIView.swift */,
 				BB00021E /* ChoreBar.swift */,
+				BB000220 /* ChoreCheckoffSheet.swift */,
 				BB000051 /* HouseholdView.swift */,
 				BB000054 /* NewPostView.swift */,
 				BB000055 /* FeedCardView.swift */,
@@ -529,6 +534,7 @@
 			isa = PBXGroup;
 			children = (
 				BB000039 /* AmbientBackground.swift */,
+				BB00021F /* ConfettiCelebration.swift */,
 				BB00003B /* DesignTokens.swift */,
 				BB00003C /* FLCardModifier.swift */,
 				BB000041 /* ButtonStyles.swift */,
@@ -805,6 +811,8 @@
 				AA000037 /* EditAppointmentView.swift in Sources */,
 				AA000038 /* EditPantryItemView.swift in Sources */,
 				AA000039 /* AmbientBackground.swift in Sources */,
+				AA00021F /* ConfettiCelebration.swift in Sources */,
+				AA000220 /* ChoreCheckoffSheet.swift in Sources */,
 				AA00003B /* DesignTokens.swift in Sources */,
 				AA0000A1 /* TabBarChrome.swift in Sources */,
 				AA0000A2 /* OnboardingTourView.swift in Sources */,
@@ -861,7 +869,7 @@
 				CODE_SIGN_ENTITLEMENTS = FamilyLife/FamilyLifeDebug.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 238;
+				CURRENT_PROJECT_VERSION = 239;
 				DEVELOPMENT_ASSET_PATHS = "";
 				DEVELOPMENT_TEAM = Z58XSBM78S;
 				ENABLE_PREVIEWS = YES;
@@ -906,7 +914,7 @@
 				CODE_SIGN_ENTITLEMENTS = FamilyLife/FamilyLife.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 238;
+				CURRENT_PROJECT_VERSION = 239;
 				DEVELOPMENT_ASSET_PATHS = "";
 				DEVELOPMENT_TEAM = Z58XSBM78S;
 				ENABLE_PREVIEWS = YES;

@@ -24,6 +24,11 @@ struct HomeView: View {
     /// A routine opened straight from its feed row. Int is Identifiable via the
     /// wrapper below so `.sheet(item:)` can drive it.
     @State private var selectedFeedRoutine: FeedRoutineTarget?
+    /// A chore row tapped on Home — opens the kid-facing check-off modal.
+    @State private var selectedChoreCheckoff: FeedRoutineTarget?
+    /// Set when the check-off modal asks for the full program; the routine
+    /// detail sheet opens once the modal has finished dismissing.
+    @State private var pendingProgramRoutine: Int?
     @State private var selectedFeedDecision: DecisionResponse?
     /// Milestones and key dates live on a person's card. The feed opens that
     /// person directly; `showingPeople` is the fallback when the row doesn't
@@ -195,6 +200,18 @@ struct HomeView: View {
                             .foregroundStyle(WarmPalette.ink2)
                     }
                 }
+            }
+        }
+        .sheet(item: $selectedChoreCheckoff, onDismiss: {
+            if let id = pendingProgramRoutine {
+                pendingProgramRoutine = nil
+                selectedFeedRoutine = FeedRoutineTarget(id: id)
+            }
+            Task { await viewModel.reloadChoresToday(api: api) }
+        }) { target in
+            ChoreCheckoffSheet(routineId: target.id, viewModel: viewModel) {
+                pendingProgramRoutine = target.id
+                selectedChoreCheckoff = nil
             }
         }
         .sheet(item: $selectedFeedRoutine, onDismiss: {
@@ -547,7 +564,7 @@ struct HomeView: View {
                              onToggle: { choreId, slot in
                                  Task { await viewModel.toggleChore(routineId: summary.routine_id, choreId: choreId, slot: slot, api: api) }
                              },
-                             onTap: { selectedFeedRoutine = FeedRoutineTarget(id: summary.routine_id) })
+                             onTap: { selectedChoreCheckoff = FeedRoutineTarget(id: summary.routine_id) })
                 }
             }
             .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
