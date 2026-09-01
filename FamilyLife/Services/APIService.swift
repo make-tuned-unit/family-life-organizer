@@ -1619,6 +1619,9 @@ final class APIService {
         var approval_count: Int?
         var recipient_count: Int?
         var created_at: String?
+        var appointment_id: Int?
+        var external_event_id: String?
+        var event_title: String?
     }
 
     struct CoverageWindowResponse: Codable, Identifiable {
@@ -1668,6 +1671,9 @@ final class APIService {
         var note: String?
         var status: String
         var created_at: String?
+        var appointment_id: Int?
+        var external_event_id: String?
+        var event_title: String?
         var windows: [CoverageWindowResponse]
         var recipients: [CoverageRecipientResponse]
         var approvals: [CoverageApprovalResponse]
@@ -1689,13 +1695,21 @@ final class APIService {
         }
     }
 
-    func createCoverageRequest(reason: String, note: String?, windows: [[String: Any]], contactIds: [Int]) async throws -> CreateCoverageResponse {
-        let body: [String: Any] = [
+    func createCoverageRequest(reason: String, note: String?, windows: [[String: Any]],
+                               contactIds: [Int], userIds: [Int] = [], groupId: Int? = nil,
+                               appointmentId: Int? = nil, externalEventId: String? = nil,
+                               eventTitle: String? = nil) async throws -> CreateCoverageResponse {
+        var body: [String: Any] = [
             "reason": reason,
             "note": note ?? "",
             "windows": windows,
             "contact_ids": contactIds
         ]
+        if !userIds.isEmpty { body["user_ids"] = userIds }
+        if let groupId { body["group_id"] = groupId }
+        if let appointmentId { body["appointment_id"] = appointmentId }
+        if let externalEventId { body["external_event_id"] = externalEventId }
+        if let eventTitle { body["event_title"] = eventTitle }
         return try await post("/api/coverage", body: body)
     }
 
@@ -1736,6 +1750,8 @@ final class APIService {
         let recipient_id: Int
         let recipient_status: String
         let invite_token: String?
+        let appointment_id: Int?
+        let event_title: String?
     }
 
     func fetchIncomingCoverage() async throws -> [IncomingCoverageRequest] {

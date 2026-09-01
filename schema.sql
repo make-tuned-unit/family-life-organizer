@@ -635,8 +635,12 @@ CREATE TABLE IF NOT EXISTS coverage_requests (
     reason TEXT NOT NULL,               -- 'kids' | 'dog' | 'house' | custom text
     note TEXT,
     status TEXT DEFAULT 'pending',      -- pending | approved | expired | cancelled
+    appointment_id INTEGER,             -- optional: the household event this covers
+    external_event_id TEXT,             -- optional: EventKit id of a device-calendar event
+    event_title TEXT,                   -- display title when attached to an event
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (requester_id) REFERENCES users(id)
+    FOREIGN KEY (requester_id) REFERENCES users(id),
+    FOREIGN KEY (appointment_id) REFERENCES appointments(id)
 );
 
 -- Candidate time windows proposed by the requester
@@ -651,16 +655,20 @@ CREATE TABLE IF NOT EXISTS coverage_windows (
     FOREIGN KEY (request_id) REFERENCES coverage_requests(id) ON DELETE CASCADE
 );
 
--- Which contacts were asked (the care team for this request)
+-- Which contacts were asked (the care team for this request).
+-- user_id is the authoritative link to an app user when the recipient is one;
+-- the legacy display-name match survives only as a fallback for old rows.
 CREATE TABLE IF NOT EXISTS coverage_recipients (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     request_id INTEGER NOT NULL,
     contact_id INTEGER NOT NULL,
+    user_id INTEGER,
     invite_token TEXT UNIQUE,            -- unique token for the approval link
     status TEXT DEFAULT 'pending',       -- pending | viewed | approved | declined
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (request_id) REFERENCES coverage_requests(id) ON DELETE CASCADE,
-    FOREIGN KEY (contact_id) REFERENCES contacts(id)
+    FOREIGN KEY (contact_id) REFERENCES contacts(id),
+    FOREIGN KEY (user_id) REFERENCES users(id)
 );
 
 -- An approval from a care team member (they pick a window + confirm their time)

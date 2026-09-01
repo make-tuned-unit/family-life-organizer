@@ -23,6 +23,9 @@ struct CalendarView: View {
     /// side you swiped from rather than cross-fading in place.
     @State private var movingForward = true
     @State private var showingCareCascade = false
+    /// Long-press "Request coverage" on any event card — the cascade opens
+    /// with that event's slot as the proposed window.
+    @State private var requestCoverageFor: CoveragePrefill?
     // showingIncomingCoverage removed — incoming handled in combined MyCoverageRequestsView
     @State private var showingMyRequests = false
     @State private var incomingCount = 0
@@ -105,6 +108,9 @@ struct CalendarView: View {
         }
         .sheet(isPresented: $showingCareCascade) {
             NavigationStack { CareCascadeView() }
+        }
+        .sheet(item: $requestCoverageFor) { prefill in
+            NavigationStack { CareCascadeView(prefill: prefill) }
         }
         #if DEBUG
         .onAppear { if ScreenshotHarness.openCare { showingCareCascade = true } }
@@ -558,12 +564,15 @@ struct CalendarView: View {
                             CalendarEventCard(appointment: appt)
                         }
                         .buttonStyle(.flCardPress)
+                        .contextMenu { coverageMenuButton(coveragePrefill(for: appt)) }
                     }
                     ForEach(dayExternal) { event in
                         ExternalEventCard(event: event)
+                            .contextMenu { coverageMenuButton(coveragePrefill(for: event)) }
                     }
                     ForEach(dayHousehold) { event in
                         HouseholdEventCard(event: event, color: colorForOwner(event.owner_id))
+                            .contextMenu { coverageMenuButton(coveragePrefill(for: event)) }
                     }
                 }
                 .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
@@ -648,17 +657,61 @@ struct CalendarView: View {
                             CalendarEventCard(appointment: appt)
                         }
                         .buttonStyle(.flCardPress)
+                        .contextMenu { coverageMenuButton(coveragePrefill(for: appt)) }
                     }
                     ForEach(dayExternal) { event in
                         ExternalEventCard(event: event)
+                            .contextMenu { coverageMenuButton(coveragePrefill(for: event)) }
                     }
                     ForEach(dayHousehold) { event in
                         HouseholdEventCard(event: event, color: colorForOwner(event.owner_id))
+                            .contextMenu { coverageMenuButton(coveragePrefill(for: event)) }
                     }
                 }
                 .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
             }
         }
+    }
+
+    // MARK: - Coverage from an event
+
+    private func coverageMenuButton(_ prefill: CoveragePrefill) -> some View {
+        Button { requestCoverageFor = prefill } label: {
+            Label("Request coverage", systemImage: "person.2.fill")
+        }
+    }
+
+    /// "HH:MM" + 2 hours, clamped to the same day.
+    private func plusTwoHours(_ start: String) -> String {
+        guard start.count >= 5, let h = Int(start.prefix(2)) else { return "17:00" }
+        return String(format: "%02d%@", min(23, h + 2), String(start.dropFirst(2).prefix(3)))
+    }
+
+    private func coveragePrefill(for appt: AppointmentResponse) -> CoveragePrefill {
+        let start = (appt.appointment_time?.count ?? 0) >= 5 ? String(appt.appointment_time!.prefix(5)) : "09:00"
+        return CoveragePrefill(eventTitle: appt.title, date: appt.appointment_date,
+                               startTime: start, endTime: plusTwoHours(start),
+                               appointmentId: appt.id)
+    }
+
+    private func coveragePrefill(for event: ExternalEvent) -> CoveragePrefill {
+        let day = DateFormatter.isoDate.string(from: event.startDate)
+        let start = event.isAllDay ? "09:00" : DateFormatter.hourMinute.string(from: event.startDate)
+        let end = event.isAllDay ? "17:00" : DateFormatter.hourMinute.string(from: event.endDate)
+        return CoveragePrefill(eventTitle: event.title, date: day,
+                               startTime: start, endTime: end,
+                               externalEventId: event.id)
+    }
+
+    private func coveragePrefill(for event: APIService.SyncedEventResponse) -> CoveragePrefill {
+        let day = String(event.starts_at.prefix(10))
+        let start = event.starts_at.count >= 16 && event.all_day != 1
+            ? String(event.starts_at.dropFirst(11).prefix(5)) : "09:00"
+        let end = (event.ends_at?.count ?? 0) >= 16 && event.all_day != 1
+            ? String(event.ends_at!.dropFirst(11).prefix(5)) : plusTwoHours(start)
+        return CoveragePrefill(eventTitle: event.title ?? "Family event", date: day,
+                               startTime: start, endTime: end,
+                               externalEventId: "synced:\(event.id)")
     }
 
     /// Move one period in the direction of the swipe, in whatever unit the

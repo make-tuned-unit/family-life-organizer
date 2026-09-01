@@ -249,6 +249,42 @@ class FamilyDB {
         this.db.run('CREATE INDEX IF NOT EXISTS idx_jobs_drain ON jobs(status, available_at, id)', () => {});
         this.db.run('ALTER TABLE users ADD COLUMN concierge_enabled INTEGER DEFAULT 0', () => {});
         this.db.run('ALTER TABLE users ADD COLUMN share_presence INTEGER DEFAULT 0', () => {});
+        // Coverage: recipients keyed by user id (display-name matching broke
+        // spouse-to-spouse visibility whenever a nickname contact shadowed the
+        // user's full name), plus optional calendar-event attachment.
+        this.db.run('ALTER TABLE coverage_recipients ADD COLUMN user_id INTEGER REFERENCES users(id)', () => {});
+        this.db.run('ALTER TABLE coverage_requests ADD COLUMN appointment_id INTEGER REFERENCES appointments(id)', () => {});
+        this.db.run('ALTER TABLE coverage_requests ADD COLUMN external_event_id TEXT', () => {});
+        this.db.run('ALTER TABLE coverage_requests ADD COLUMN event_title TEXT', () => {});
+        this.db.run('CREATE INDEX IF NOT EXISTS idx_coverage_recipients_user ON coverage_recipients(user_id)', () => {});
+        // Backfill old recipient rows: exact-name match within a shared group
+        // first, then an unambiguous first-name match (the nickname-contact
+        // case that made requests invisible). Idempotent — only NULL rows.
+        this.db.run(`UPDATE coverage_recipients SET user_id = (
+            SELECT u.id FROM users u
+            JOIN contacts c ON c.id = coverage_recipients.contact_id
+            WHERE LOWER(u.name) = LOWER(c.name)
+              AND EXISTS (SELECT 1 FROM group_members gm1
+                          JOIN group_members gm2 ON gm1.group_id = gm2.group_id
+                          WHERE gm1.user_id = u.id AND gm2.user_id = c.added_by)
+          ) WHERE user_id IS NULL`, () => {});
+        this.db.run(`UPDATE coverage_recipients SET user_id = (
+            SELECT u.id FROM users u
+            JOIN contacts c ON c.id = coverage_recipients.contact_id
+            WHERE LOWER(substr(u.name, 1, instr(u.name || ' ', ' ') - 1)) =
+                  LOWER(substr(c.name, 1, instr(c.name || ' ', ' ') - 1))
+              AND EXISTS (SELECT 1 FROM group_members gm1
+                          JOIN group_members gm2 ON gm1.group_id = gm2.group_id
+                          WHERE gm1.user_id = u.id AND gm2.user_id = c.added_by)
+          ) WHERE user_id IS NULL AND (
+            SELECT COUNT(*) FROM users u
+            JOIN contacts c ON c.id = coverage_recipients.contact_id
+            WHERE LOWER(substr(u.name, 1, instr(u.name || ' ', ' ') - 1)) =
+                  LOWER(substr(c.name, 1, instr(c.name || ' ', ' ') - 1))
+              AND EXISTS (SELECT 1 FROM group_members gm1
+                          JOIN group_members gm2 ON gm1.group_id = gm2.group_id
+                          WHERE gm1.user_id = u.id AND gm2.user_id = c.added_by)
+          ) = 1`, () => {});
         this.db.run('ALTER TABLE users ADD COLUMN last_location_at DATETIME', (err) => {
           // Fresh databases already get this column from schema.sql. Treat the
           // idempotent duplicate-column result as success while still surfacing
@@ -4023,8 +4059,9 @@ class FamilyDB {
   createCoverageRequest(req) {
     return new Promise((resolve, reject) => {
       this.db.run(
-        'INSERT INTO coverage_requests (requester_id, reason, note) VALUES (?, ?, ?)',
-        [req.requester_id, req.reason, req.note || null],
+        'INSERT INTO coverage_requests (requester_id, reason, note, appointment_id, external_event_id, event_title) VALUES (?, ?, ?, ?, ?, ?)',
+        [req.requester_id, req.reason, req.note || null,
+         req.appointment_id || null, req.external_event_id || null, req.event_title || null],
         function(err) {
           if (err) reject(err);
           else resolve({ id: this.lastID });
@@ -4050,8 +4087,8 @@ class FamilyDB {
     return new Promise((resolve, reject) => {
       const token = require('crypto').randomBytes(16).toString('hex');
       this.db.run(
-        'INSERT INTO coverage_recipients (request_id, contact_id, invite_token) VALUES (?, ?, ?)',
-        [rec.request_id, rec.contact_id, token],
+        'INSERT INTO coverage_recipients (request_id, contact_id, user_id, invite_token) VALUES (?, ?, ?, ?)',
+        [rec.request_id, rec.contact_id, rec.user_id || null, token],
         function(err) {
           if (err) reject(err);
           else resolve({ id: this.lastID, invite_token: token });
@@ -4178,25 +4215,57 @@ class FamilyDB {
     });
   }
 
+  // Like getUserIdByContactId, but tolerant of nickname contacts: falls back
+  // to a first-name match ("Sarah" contact ↔ "Sarah Sharratt" user) when it is
+  // unambiguous among users sharing a group with the contact's owner. Used at
+  // creation time to stamp coverage_recipients.user_id.
+  async resolveContactUserId(contactId) {
+    const exact = await this.getUserIdByContactId(contactId);
+    if (exact) return exact;
+    return new Promise((resolve, reject) => {
+      this.db.all(`
+        SELECT u.id FROM users u
+        JOIN contacts c ON c.id = ?
+        WHERE LOWER(substr(u.name, 1, instr(u.name || ' ', ' ') - 1)) =
+              LOWER(substr(c.name, 1, instr(c.name || ' ', ' ') - 1))
+          AND EXISTS (
+            SELECT 1 FROM group_members gm1
+            JOIN group_members gm2 ON gm1.group_id = gm2.group_id
+            WHERE gm1.user_id = u.id AND gm2.user_id = c.added_by
+          )
+        LIMIT 2
+      `, [contactId], (err, rows) => {
+        if (err) return reject(err);
+        resolve(rows && rows.length === 1 ? rows[0].id : null);
+      });
+    });
+  }
+
+  // "Is this request for me?" is answered by coverage_recipients.user_id,
+  // stamped at creation. The display-name compare survives only as a fallback
+  // for rows created before user_id existed (and the backfill misses).
   getIncomingCoverageRequests(userId) {
     return new Promise((resolve, reject) => {
       this.db.all(`
         SELECT cr.id, cr.reason, cr.note, cr.status, cr.created_at,
+          cr.appointment_id, cr.event_title,
           u.name as requester_name,
           crec.id as recipient_id, crec.status as recipient_status, crec.invite_token
         FROM coverage_requests cr
         JOIN coverage_recipients crec ON crec.request_id = cr.id
         JOIN contacts c ON c.id = crec.contact_id
         JOIN users u ON u.id = cr.requester_id
-        WHERE LOWER(c.name) = (SELECT LOWER(name) FROM users WHERE id = ?)
-          AND EXISTS (
-            SELECT 1 FROM group_members gm1
-            JOIN group_members gm2 ON gm1.group_id = gm2.group_id
-            WHERE gm1.user_id = ? AND gm2.user_id = c.added_by
-          )
+        WHERE (crec.user_id = ?
+           OR (crec.user_id IS NULL
+               AND LOWER(c.name) = (SELECT LOWER(name) FROM users WHERE id = ?)
+               AND EXISTS (
+                 SELECT 1 FROM group_members gm1
+                 JOIN group_members gm2 ON gm1.group_id = gm2.group_id
+                 WHERE gm1.user_id = ? AND gm2.user_id = c.added_by
+               )))
           AND cr.status IN ('pending', 'approved')
         ORDER BY cr.created_at DESC
-      `, [userId, userId], (err, rows) => err ? reject(err) : resolve(rows || []));
+      `, [userId, userId, userId], (err, rows) => err ? reject(err) : resolve(rows || []));
     });
   }
 
@@ -4206,13 +4275,15 @@ class FamilyDB {
         SELECT crec.* FROM coverage_recipients crec
         JOIN contacts c ON c.id = crec.contact_id
         WHERE crec.request_id = ?
-          AND LOWER(c.name) = (SELECT LOWER(name) FROM users WHERE id = ?)
-          AND EXISTS (
-            SELECT 1 FROM group_members gm1
-            JOIN group_members gm2 ON gm1.group_id = gm2.group_id
-            WHERE gm1.user_id = ? AND gm2.user_id = c.added_by
-          )
-      `, [requestId, userId, userId], (err, row) => err ? reject(err) : resolve(row));
+          AND (crec.user_id = ?
+           OR (crec.user_id IS NULL
+               AND LOWER(c.name) = (SELECT LOWER(name) FROM users WHERE id = ?)
+               AND EXISTS (
+                 SELECT 1 FROM group_members gm1
+                 JOIN group_members gm2 ON gm1.group_id = gm2.group_id
+                 WHERE gm1.user_id = ? AND gm2.user_id = c.added_by
+               )))
+      `, [requestId, userId, userId, userId], (err, row) => err ? reject(err) : resolve(row));
     });
   }
 

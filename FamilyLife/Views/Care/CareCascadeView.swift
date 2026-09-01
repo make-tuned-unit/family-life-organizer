@@ -6,6 +6,18 @@ import SwiftUI
 // 3. Approval triggers notification → user sees confirmed coverage
 // 4. User books their own appointment into the unlocked window
 
+/// Seeds the cascade from a calendar event ("cover this") — the event's slot
+/// becomes the proposed window and the request stays linked to the event.
+struct CoveragePrefill: Identifiable {
+    var eventTitle: String
+    var date: String            // yyyy-MM-dd
+    var startTime: String       // HH:MM
+    var endTime: String         // HH:MM
+    var appointmentId: Int? = nil
+    var externalEventId: String? = nil
+    var id: String { "\(appointmentId.map(String.init) ?? externalEventId ?? eventTitle)-\(date)-\(startTime)" }
+}
+
 struct CoverageCascadeView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(APIService.self) private var api
@@ -13,16 +25,31 @@ struct CoverageCascadeView: View {
     @Environment(HouseholdService.self) private var household
     @State private var currentStep: CoverageStep = .ask
 
-    // Step 1 state (contacts come from household service)
+    var prefill: CoveragePrefill?
+
+    // Step 1 state. Recipients are identity-first: app users travel as user
+    // ids (visibility never depends on contact display names), the whole
+    // household as its group id, and only true outside contacts as contact ids.
     @State private var selectedContactIds: Set<Int> = []
+    @State private var selectedUserIds: Set<Int> = []
+    @State private var sendToHousehold = false
     @State private var coverageReason: String = "Watch the kids"
     @State private var candidateWindows: [WindowDraft] = []
     @State private var noteText: String = ""
+    @State private var didSeedPrefill = false
 
     // After send
     @State private var createdRequestId: Int?
-    @State private var shareURLs: [Int: URL] = [:]       // the contact id the picker used -> branded link
+    @State private var shareURLs: [Int: URL] = [:]       // the client id the picker used -> branded link
+    /// Snapshot of who the request went to, for the pending list (household
+    /// fan-out means the server can add people the picker never showed).
+    @State private var sentRecipients: [SentRecipient] = []
     @State private var requestDetail: APIService.CoverageDetailResponse?
+
+    struct SentRecipient: Identifiable {
+        let id: Int          // client id: -userId for app users, contact id otherwise
+        let name: String
+    }
 
     // Step 4 state
     @State private var selectedApproval: APIService.CoverageApprovalResponse?
@@ -43,6 +70,12 @@ struct CoverageCascadeView: View {
             }
         }
         .background { AmbientBackground(style: .care) }
+        .task {
+            guard let prefill, !didSeedPrefill else { return }
+            didSeedPrefill = true
+            candidateWindows = [WindowDraft(date: prefill.date, startTime: prefill.startTime,
+                                            endTime: prefill.endTime, description: prefill.eventTitle)]
+        }
         .inlineError(errorMessage) { errorMessage = nil }
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -82,36 +115,57 @@ struct CoverageCascadeView: View {
                     accent: TabAccent.care.color
                 )
 
-                // Care team selection
+                // Attached event (from the calendar path)
+                if let prefill {
+                    HStack(spacing: 10) {
+                        Image(systemName: "calendar.badge.checkmark")
+                            .font(.system(size: 18)).foregroundStyle(TabAccent.care.color)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(prefill.eventTitle).font(.flSubheadline.weight(.semibold)).foregroundStyle(WarmPalette.ink1)
+                            Text("\(prefill.date) · \(prefill.startTime)–\(prefill.endTime)")
+                                .font(.flFootnote).foregroundStyle(WarmPalette.ink3)
+                        }
+                        Spacer()
+                    }
+                    .padding(12)
+                    .background(TabAccent.care.color.opacity(0.1), in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.tile))
+                    .padding(.horizontal, DesignTokens.Spacing.horizontalMargin).padding(.bottom, 14)
+                }
+
+                // Care team selection — the household group, its app users, and
+                // outside contacts, each carried by the id kind the server can
+                // match reliably.
                 sectionLabel("Who to ask")
-                if household.members.isEmpty {
+                if household.householdUsers.isEmpty && outsideContacts.isEmpty {
                     Text("Add family members in Family > Add Family Member first.")
                         .font(.flFootnote).foregroundStyle(WarmPalette.ink3)
                         .padding(.horizontal, DesignTokens.Spacing.horizontalMargin).padding(.bottom, 14)
                 } else {
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 8) {
-                            ForEach(household.members) { contact in
-                                let selected = selectedContactIds.contains(contact.id)
-                                Button {
-                                    if selected { selectedContactIds.remove(contact.id) }
-                                    else { selectedContactIds.insert(contact.id) }
-                                } label: {
-                                    HStack(spacing: 8) {
-                                        FamilyAvatar(initial: contact.avatar_initial ?? String(contact.name.prefix(1)).uppercased(), size: 28, name: contact.name)
-                                        Text(contact.name)
-                                            .font(.flFootnote.weight(.semibold))
-                                        if selected {
-                                            Image(systemName: "checkmark.circle.fill")
-                                                .font(.system(size: 14))
-                                                .foregroundStyle(TabAccent.care.color)
-                                        }
-                                    }
-                                    .padding(.vertical, 8).padding(.leading, 8).padding(.trailing, 14)
-                                    .background(WarmPalette.cardSurface, in: Capsule())
-                                    .overlay(Capsule().stroke(selected ? TabAccent.care.color.opacity(0.3) : .clear, lineWidth: 1))
+                            if household.householdGroup != nil && household.householdUsers.count > 1 {
+                                recipientChip(name: "Whole household", initial: "⌂",
+                                              selected: sendToHousehold) {
+                                    sendToHousehold.toggle()
+                                    if sendToHousehold { selectedUserIds.removeAll() }
                                 }
-                                .buttonStyle(.plain)
+                            }
+                            ForEach(household.householdUsers) { user in
+                                recipientChip(name: user.name,
+                                              initial: household.initial(for: user.name),
+                                              selected: sendToHousehold || selectedUserIds.contains(user.id)) {
+                                    guard !sendToHousehold else { return }
+                                    if selectedUserIds.contains(user.id) { selectedUserIds.remove(user.id) }
+                                    else { selectedUserIds.insert(user.id) }
+                                }
+                            }
+                            ForEach(outsideContacts) { contact in
+                                recipientChip(name: contact.name,
+                                              initial: contact.avatar_initial ?? String(contact.name.prefix(1)).uppercased(),
+                                              selected: selectedContactIds.contains(contact.id)) {
+                                    if selectedContactIds.contains(contact.id) { selectedContactIds.remove(contact.id) }
+                                    else { selectedContactIds.insert(contact.id) }
+                                }
                             }
                         }
                         .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
@@ -173,8 +227,8 @@ struct CoverageCascadeView: View {
                     }
                 }
                 .buttonStyle(.flCTA)
-                .disabled(selectedContactIds.isEmpty || candidateWindows.isEmpty)
-                .opacity(selectedContactIds.isEmpty || candidateWindows.isEmpty ? 0.5 : 1)
+                .disabled(!hasRecipients || candidateWindows.isEmpty)
+                .opacity(!hasRecipients || candidateWindows.isEmpty ? 0.5 : 1)
                 .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
 
                 Text("They'll get a shareable link to approve.")
@@ -184,18 +238,54 @@ struct CoverageCascadeView: View {
         }
     }
 
+    private var outsideContacts: [APIService.ContactResponse] {
+        household.members.filter { $0.id > 0 && !household.isHouseholdMember($0.name) }
+    }
+
+    private var hasRecipients: Bool {
+        sendToHousehold || !selectedUserIds.isEmpty || !selectedContactIds.isEmpty
+    }
+
     private func sendRequest() async {
         let windows: [[String: Any]] = candidateWindows.map { w in
             ["window_date": w.date, "start_time": w.startTime, "end_time": w.endTime, "description": w.description]
+        }
+        // App users travel as user ids (even outside contacts that resolve to
+        // one); only true non-app contacts fall back to contact ids.
+        var userIds = Array(selectedUserIds)
+        var contactIds: [Int] = []
+        var snapshot: [SentRecipient] = []
+        for uid in selectedUserIds {
+            let name = household.householdUsers.first { $0.id == uid }?.name ?? "Family member"
+            snapshot.append(SentRecipient(id: -uid, name: name))
+        }
+        for cid in selectedContactIds {
+            guard let contact = household.members.first(where: { $0.id == cid }) else { continue }
+            if let uid = household.userId(for: contact.name), !userIds.contains(uid) {
+                userIds.append(uid)
+                snapshot.append(SentRecipient(id: -uid, name: contact.name))
+            } else {
+                contactIds.append(cid)
+                snapshot.append(SentRecipient(id: cid, name: contact.name))
+            }
+        }
+        if sendToHousehold {
+            snapshot = household.householdUsers.map { SentRecipient(id: -$0.id, name: $0.name) }
         }
         do {
             let result = try await api.createCoverageRequest(
                 reason: coverageReason,
                 note: noteText.isEmpty ? nil : noteText,
                 windows: windows,
-                contactIds: Array(selectedContactIds)
+                contactIds: contactIds,
+                userIds: sendToHousehold ? [] : userIds,
+                groupId: sendToHousehold ? household.householdGroup?.id : nil,
+                appointmentId: prefill?.appointmentId,
+                externalEventId: prefill?.externalEventId,
+                eventTitle: prefill?.eventTitle
             )
             createdRequestId = result.id
+            sentRecipients = snapshot
             for rec in result.recipients {
                 let key = rec.client_contact_id ?? rec.contact_id ?? rec.id
                 if let s = rec.share_url, let url = URL(string: s) { shareURLs[key] = url }
@@ -221,11 +311,10 @@ struct CoverageCascadeView: View {
                 )
 
                 // Recipients with share buttons
-                let selectedContacts = household.members.filter { selectedContactIds.contains($0.id) }
-                ForEach(selectedContacts) { contact in
+                ForEach(sentRecipients) { contact in
                     let url = shareURLs[contact.id]
                     HStack(spacing: 12) {
-                        FamilyAvatar(initial: contact.avatar_initial ?? String(contact.name.prefix(1)).uppercased(), size: 36, name: contact.name)
+                        FamilyAvatar(initial: household.initial(for: contact.name), size: 36, name: contact.name)
                         VStack(alignment: .leading, spacing: 2) {
                             Text(contact.name).font(.flSubheadline.weight(.semibold))
                             HStack(spacing: 6) {
@@ -436,6 +525,34 @@ struct CoverageCascadeView: View {
         case "Eldercare": "heart.fill"
         default: "pencil"
         }
+    }
+
+    private func recipientChip(name: String, initial: String, selected: Bool,
+                               action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 8) {
+                if initial == "⌂" {
+                    Image(systemName: "house.fill")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(TabAccent.care.color)
+                        .frame(width: 28, height: 28)
+                        .background(Circle().fill(TabAccent.care.color.opacity(0.14)))
+                } else {
+                    FamilyAvatar(initial: initial, size: 28, name: name)
+                }
+                Text(name)
+                    .font(.flFootnote.weight(.semibold))
+                if selected {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 14))
+                        .foregroundStyle(TabAccent.care.color)
+                }
+            }
+            .padding(.vertical, 8).padding(.leading, 8).padding(.trailing, 14)
+            .background(WarmPalette.cardSurface, in: Capsule())
+            .overlay(Capsule().stroke(selected ? TabAccent.care.color.opacity(0.3) : .clear, lineWidth: 1))
+        }
+        .buttonStyle(.plain)
     }
 
     private func sectionLabel(_ text: String) -> some View {
