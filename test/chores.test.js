@@ -89,6 +89,12 @@ test('chores engine: week grid, completion, streak, earnings', () => {
   assert.ok(!s.guidance.suggested.some(x => /feed the pet/i.test(x.title)) || true);
 });
 
+test('chores engine: age 0 does not fall through to toddler band', () => {
+  const s = chores.compute([], CONFIG, { today: '2026-09-02', birthdate: '2026-09-02' });
+  assert.equal(s.guidance, null);
+  assert.equal(chores.ageInYears('2026-09-02', '2026-09-02'), 0);
+});
+
 test('chores engine: unpaid past weeks land in the ledger; payout clears them', () => {
   const entries = [
     { id: 1, entry_date: '2026-08-03', entry_type: 'chore_done', value: JSON.stringify({ chore_id: 'dog', slot: 'morning' }) },

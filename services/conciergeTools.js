@@ -62,29 +62,31 @@ async function assertListAccess(ctx, listId) {
   if (!row) throw new Error(`No list #${listId} in your household`);
 }
 
-// The child's birthdate for age-based guidance: the routine's own, else the
-// matching person in the household. Same rule as the API's resolver — scoped to
-// the household, and ambiguous names return nothing rather than a guess.
+// The child's birthdate for age-based guidance: People card (or birthday key
+// date) first, else the routine's own stamp. Same rule as the API resolver.
 async function resolveSubjectBirthdate(ctx, routine) {
-  if (routine?.subject_birthdate) return routine.subject_birthdate;
   const name = String(routine?.subject_name || '').trim();
-  if (!name || ctx.groupId == null) return null;
-  const people = await new Promise((resolve) => ctx.db.db.all(
-    'SELECT id, name, birthday FROM gift_people WHERE group_id = ?', [ctx.groupId],
-    (err, rows) => resolve(err ? [] : (rows || []))));
-  const firstOf = (n) => String(n || '').trim().toLowerCase().split(/\s+/)[0];
-  let matches = people.filter(p => String(p.name || '').trim().toLowerCase() === name.toLowerCase());
-  if (!matches.length) matches = people.filter(p => firstOf(p.name) === firstOf(name));
-  if (matches.length !== 1) return null;
-  if (matches[0].birthday) return String(matches[0].birthday).slice(0, 10);
-  const row = await dbGet(ctx,
-    `SELECT date FROM special_events
-     WHERE person_id = ? AND group_id = ? AND event_type = 'birthday'
-       -- A private key date is its owner's alone; resolving an age through one
-       -- would hand its date to the rest of the household.
-       AND (COALESCE(shared_scope, 'household') != 'private' OR created_by = ?)
-     ORDER BY date LIMIT 1`, [matches[0].id, ctx.groupId, ctx.userId]);
-  return row?.date ? String(row.date).slice(0, 10) : null;
+  if (name && ctx.groupId != null) {
+    const people = await new Promise((resolve) => ctx.db.db.all(
+      'SELECT id, name, birthday FROM gift_people WHERE group_id = ?', [ctx.groupId],
+      (err, rows) => resolve(err ? [] : (rows || []))));
+    const firstOf = (n) => String(n || '').trim().toLowerCase().split(/\s+/)[0];
+    let matches = people.filter(p => String(p.name || '').trim().toLowerCase() === name.toLowerCase());
+    if (!matches.length) matches = people.filter(p => firstOf(p.name) === firstOf(name));
+    if (matches.length === 1) {
+      if (matches[0].birthday) return String(matches[0].birthday).slice(0, 10);
+      const row = await dbGet(ctx,
+        `SELECT date FROM special_events
+         WHERE person_id = ? AND group_id = ? AND event_type = 'birthday'
+           -- A private key date is its owner's alone; resolving an age through one
+           -- would hand its date to the rest of the household.
+           AND (COALESCE(shared_scope, 'household') != 'private' OR created_by = ?)
+         ORDER BY date LIMIT 1`, [matches[0].id, ctx.groupId, ctx.userId]);
+      if (row?.date) return String(row.date).slice(0, 10);
+    }
+  }
+  if (routine?.subject_birthdate) return routine.subject_birthdate;
+  return null;
 }
 
 // ---- Chores helpers ----------------------------------------------------------

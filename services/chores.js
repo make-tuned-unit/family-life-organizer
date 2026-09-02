@@ -222,7 +222,12 @@ function ageInYears(birthdate, today) {
 
 function bandForYears(years) {
   if (years == null || years < 0) return null;
-  return BANDS.find(b => years >= b.minYears && years < b.maxYears) || BANDS[0];
+  const found = BANDS.find(b => years >= b.minYears && years < b.maxYears);
+  if (found) return found;
+  // Under the first band (age 0–1): no chore guidance yet — do NOT fall through
+  // to "Little helper", which previously made a today-stamped DOB look like a toddler.
+  if (years < BANDS[0].minYears) return null;
+  return BANDS[BANDS.length - 1];
 }
 
 function template() {

@@ -529,6 +529,23 @@ test('routines: the next-nap window is worked back from the last wake', async ()
   assert.equal(running.last_wake_at, '2026-07-28 18:10', 'a running sleep is ignored until it ends');
 });
 
+test('routines: People birthday wins over a stale routine stamp', async () => {
+  const [parent] = await member('stale_rt', 'Stale DOB RT');
+  // Simulate the old create bug: routine stamped with "today", People later corrected.
+  await parent('POST', '/api/people', { name: 'Rowan', birthday: '2022-10-01' });
+  const created = await parent('POST', '/api/routines', {
+    name: "Rowan's chores", routine_type: 'chores', subject_name: 'Rowan',
+    subject_birthdate: '2026-09-02',
+    config: { chores: [{ title: 'Fill the water bowl', slots: ['morning'] }], allowance: { weekly_amount: 2 } },
+  });
+  assert.equal(created.status, 200, JSON.stringify(created.body));
+  const detail = (await parent('GET', `/api/routines/${created.body.id}`)).body;
+  assert.equal(detail.resolved_birthdate, '2022-10-01', 'People card wins');
+  assert.equal(detail.birthdate_source, 'people');
+  assert.equal(detail.chores.guidance.age_years, 3, 'almost 4 on 2026-09-02 → 3 years old');
+  assert.equal(detail.subject_birthdate, '2026-09-02', 'stale stamp still stored on the row');
+});
+
 test('routines: the age falls back to the child\'s People record', async () => {
   const [parent] = await member('ppl_rt', 'People RT');
   // Jude's birthday lives on his People card, not on the routine.

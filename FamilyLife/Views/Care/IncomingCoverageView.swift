@@ -224,8 +224,16 @@ struct ApproveRequestSheet: View {
 
     private func loadWindows() async {
         isLoading = true
-        if let detail = try? await api.fetchCoverageDetail(id: request.id) {
+        do {
+            let detail = try await api.fetchCoverageDetail(id: request.id)
             windows = detail.windows
+            // One slot: select it so Confirm is available without a mystery tap.
+            if windows.count == 1 {
+                selectedWindow = windows[0]
+            }
+        } catch {
+            guard !error.isCancellation else { return }
+            errorMessage = "Couldn't load time slots — \(error.localizedDescription)"
         }
         isLoading = false
     }

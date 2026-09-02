@@ -17,6 +17,9 @@ struct NewRoutineView: View {
     @State private var name = ""
     @State private var subjectName = ""
     @State private var birthdate = Date()
+    /// Only POST subject_birthdate when we have a real DOB — never silently
+    /// stamp "today", which permanently shadows a later People-card birthday.
+    @State private var birthdateConfirmed = false
     // Chores: the first chore, when in the day it happens, and the money side.
     @State private var firstChore = ""
     @State private var firstChoreSlots: Set<String> = ["morning", "evening"]
@@ -52,14 +55,23 @@ struct NewRoutineView: View {
                     }
 
                     if type.needsBirthdate {
-                        field(label: "Date of birth") {
-                            DatePicker("", selection: $birthdate, in: ...Date(), displayedComponents: .date)
-                                .labelsHidden()
-                                .tint(accent)
+                        Toggle("Set date of birth on this routine", isOn: $birthdateConfirmed)
+                            .font(.flBody)
+                            .tint(accent)
+                        if birthdateConfirmed {
+                            field(label: "Date of birth") {
+                                DatePicker("", selection: $birthdate, in: ...Date(), displayedComponents: .date)
+                                    .labelsHidden()
+                                    .tint(accent)
+                            }
+                            Text("We use this to find the right phase and age-appropriate guidance. Prefer the People card when you can — that one repairs age everywhere.")
+                                .font(.flFootnote)
+                                .foregroundStyle(WarmPalette.ink3)
+                        } else {
+                            Text("We’ll use their People-card birthday when the name matches. Turn this on only to set a date here.")
+                                .font(.flFootnote)
+                                .foregroundStyle(WarmPalette.ink3)
                         }
-                        Text("We use this to find the right phase and age-appropriate guidance. It stays on this routine — nobody sees it unless you share it.")
-                            .font(.flFootnote)
-                            .foregroundStyle(WarmPalette.ink3)
                     }
 
                     if type.isCycle {
@@ -132,7 +144,10 @@ struct NewRoutineView: View {
                     subjectName = initialSubject
                     if type.isChores { name = "\(initialSubject.split(separator: " ").first.map(String.init) ?? initialSubject)'s chores" }
                 }
-                if let initialBirthdate, let d = DateFormatter.isoDate.date(from: initialBirthdate) { birthdate = d }
+                if let initialBirthdate, let d = DateFormatter.isoDate.date(from: initialBirthdate) {
+                    birthdate = d
+                    birthdateConfirmed = true
+                }
             }
         }
     }
@@ -304,7 +319,7 @@ struct NewRoutineView: View {
         ]
         let subject = subjectName.trimmingCharacters(in: .whitespaces)
         if !subject.isEmpty { body["subject_name"] = subject }
-        if type.needsBirthdate {
+        if type.needsBirthdate && birthdateConfirmed {
             let fmt = DateFormatter()
             fmt.calendar = Calendar(identifier: .gregorian)
             fmt.locale = Locale(identifier: "en_US_POSIX")

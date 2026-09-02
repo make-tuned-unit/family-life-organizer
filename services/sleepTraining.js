@@ -213,17 +213,44 @@ const PHASES = [
   },
 ];
 
-// Compute whole-day age from a YYYY-MM-DD birthdate using UTC midnights so the
-// result doesn't wobble with server timezone.
-function ageInDays(birthdate) {
-  if (!birthdate) return null;
-  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(birthdate).slice(0, 10));
+// Parse YYYY-MM-DD → [y, m0, d] or null.
+function parseYMD(birthdate) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(birthdate || '').slice(0, 10));
   if (!m) return null;
-  const born = Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  return [Number(m[1]), Number(m[2]) - 1, Number(m[3])];
+}
+
+function todayParts(today) {
+  if (today) {
+    const p = parseYMD(today);
+    if (p) return p;
+  }
   const now = new Date();
-  const today = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
+  return [now.getFullYear(), now.getMonth(), now.getDate()];
+}
+
+// Compute whole-day age from a YYYY-MM-DD birthdate using UTC midnights so the
+// result doesn't wobble with server timezone. Optional `today` (YYYY-MM-DD)
+// keeps tests deterministic.
+function ageInDays(birthdate, today) {
+  const bornParts = parseYMD(birthdate);
+  if (!bornParts) return null;
+  const born = Date.UTC(bornParts[0], bornParts[1], bornParts[2]);
+  const t = todayParts(today);
+  const todayUtc = Date.UTC(t[0], t[1], t[2]);
   if (Number.isNaN(born)) return null;
-  return Math.max(0, Math.floor((today - born) / 86400000));
+  return Math.max(0, Math.floor((todayUtc - born) / 86400000));
+}
+
+// Calendar months old (what parents mean by "turned 6 months today") — not
+// mean-solar-month arithmetic, which can undercount by one on anniversary days.
+function ageInMonths(birthdate, today) {
+  const born = parseYMD(birthdate);
+  if (!born) return null;
+  const t = todayParts(today);
+  let months = (t[0] - born[0]) * 12 + (t[1] - born[1]);
+  if (t[2] < born[2]) months -= 1;
+  return Math.max(0, months);
 }
 
 function methodInfo(key) {
@@ -253,11 +280,12 @@ function template() {
 
 // Given a baby's birthdate, return the current phase (with its method) plus
 // age, and a nudge if formal training isn't age-appropriate yet.
-function guidanceForBirthdate(birthdate) {
-  const days = ageInDays(birthdate);
+// Optional `today` (YYYY-MM-DD) keeps age labels deterministic in tests.
+function guidanceForBirthdate(birthdate, today) {
+  const days = ageInDays(birthdate, today);
   if (days == null) return null;
   const weeks = Math.floor(days / 7);
-  const months = Math.floor(days / 30.4375);
+  const months = ageInMonths(birthdate, today);
   const phase = PHASES.find(p => days >= p.minDays && days <= p.maxDays) || PHASES[PHASES.length - 1];
   return {
     age_days: days,
@@ -307,6 +335,6 @@ function wakeWindowForBirthdate(birthdate) {
 }
 
 module.exports = {
-  template, guidanceForBirthdate, ageInDays, wakeWindowForBirthdate,
+  template, guidanceForBirthdate, ageInDays, ageInMonths, wakeWindowForBirthdate,
   PHASES, METHODS, SAFE_SLEEP, SOURCES, WAKE_WINDOWS,
 };

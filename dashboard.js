@@ -6822,39 +6822,47 @@ app.post('/api/routines', requireAuth, async (req, res) => {
   finally { db.close(); }
 });
 
-// The child's birthdate, from the routine if it carries one, otherwise from the
-// person of that name in the same household — their People record, or failing
-// that a birthday key date tied to them. Age drives every piece of sleep
-// guidance, so a birthday already entered once shouldn't have to be typed again.
+// The child's birthdate, from the matching person in the household when one
+// exists, otherwise the routine's own stamp. People wins so fixing a birthday
+// on the child card repairs age guidance without editing every routine — and
+// so a create-time default of "today" cannot permanently shadow the real DOB.
 //
+// Returns { date, source } where source is 'people' | 'routine' | null.
 // Name matching is scoped to the household and refuses to guess: two people
 // whose names both match returns nothing rather than picking one.
 async function resolveSubjectBirthdate(db, routine, callerId) {
-  if (routine?.subject_birthdate) return routine.subject_birthdate;
   const name = String(routine?.subject_name || '').trim();
-  if (!name || routine.group_id == null) return null;
+  if (name && routine.group_id != null) {
+    const people = await new Promise((resolve) => db.db.all(
+      'SELECT id, name, birthday FROM gift_people WHERE group_id = ?', [routine.group_id],
+      (err, rows) => resolve(err ? [] : (rows || []))));
 
-  const people = await new Promise((resolve) => db.db.all(
-    'SELECT id, name, birthday FROM gift_people WHERE group_id = ?', [routine.group_id],
-    (err, rows) => resolve(err ? [] : (rows || []))));
+    const wanted = name.toLowerCase();
+    const firstOf = (n) => String(n || '').trim().toLowerCase().split(/\s+/)[0];
+    let matches = people.filter(p => String(p.name || '').trim().toLowerCase() === wanted);
+    if (!matches.length) matches = people.filter(p => firstOf(p.name) === firstOf(name));
+    if (matches.length === 1) {
+      const person = matches[0];
+      if (person.birthday) {
+        return { date: String(person.birthday).slice(0, 10), source: 'people' };
+      }
 
-  const wanted = name.toLowerCase();
-  const firstOf = (n) => String(n || '').trim().toLowerCase().split(/\s+/)[0];
-  let matches = people.filter(p => String(p.name || '').trim().toLowerCase() === wanted);
-  if (!matches.length) matches = people.filter(p => firstOf(p.name) === firstOf(name));
-  if (matches.length !== 1) return null;   // none, or ambiguous — don't guess
-  const person = matches[0];
-  if (person.birthday) return String(person.birthday).slice(0, 10);
+      // Fall back to a birthday key date filed against that person.
+      const row = await dbGet(db,
+        `SELECT date FROM special_events
+         WHERE person_id = ? AND group_id = ? AND event_type = 'birthday'
+           -- A private key date is its owner's alone; resolving an age through one
+           -- would hand its date to the rest of the household.
+           AND (COALESCE(shared_scope, 'household') != 'private' OR created_by = ?)
+         ORDER BY date LIMIT 1`, [person.id, routine.group_id, callerId]);
+      if (row?.date) return { date: String(row.date).slice(0, 10), source: 'people' };
+    }
+  }
 
-  // Fall back to a birthday key date filed against that person.
-  const row = await dbGet(db,
-    `SELECT date FROM special_events
-     WHERE person_id = ? AND group_id = ? AND event_type = 'birthday'
-       -- A private key date is its owner's alone; resolving an age through one
-       -- would hand its date to the rest of the household.
-       AND (COALESCE(shared_scope, 'household') != 'private' OR created_by = ?)
-     ORDER BY date LIMIT 1`, [person.id, routine.group_id, callerId]);
-  return row?.date ? String(row.date).slice(0, 10) : null;
+  if (routine?.subject_birthdate) {
+    return { date: String(routine.subject_birthdate).slice(0, 10), source: 'routine' };
+  }
+  return { date: null, source: null };
 }
 
 // Today's chores for Home: each chores routine the caller can see, with the
@@ -6870,7 +6878,7 @@ async function choresTodayForUser(db, userId) {
   const out = [];
   for (const routine of routines) {
     const entries = entriesBy.get(routine.id) || [];
-    const birthdate = await resolveSubjectBirthdate(db, routine, userId);
+    const birthdate = (await resolveSubjectBirthdate(db, routine, userId)).date;
     const summary = chores.compute(entries, routine.config, { today: todayLocal(), birthdate });
     const todayCol = summary.chores.map(c => {
       const d = c.days.find(x => x.today);
@@ -6922,7 +6930,7 @@ async function sleepNowForUser(db, userId) {
   const out = [];
   for (const routine of routines) {
     const entries = entriesBy.get(routine.id) || [];
-    const birthdate = await resolveSubjectBirthdate(db, routine, userId);
+    const birthdate = (await resolveSubjectBirthdate(db, routine, userId)).date;
 
     // A sleep in progress wins: the useful line then is "asleep 40m", and the
     // next-sleep prediction is meaningless until they wake.
@@ -7050,9 +7058,10 @@ app.get('/api/routines/:id', requireAuth, async (req, res) => {
     // and a cycle routine whose subject is "Me" can't accidentally resolve some
     // household member's birthday into its response.
     const needsAge = ['baby_sleep', 'sleep_training', 'chores'].includes(routine.routine_type);
-    const birthdate = needsAge
+    const resolved = needsAge
       ? await resolveSubjectBirthdate(db, routine, req.session.user?.id)
-      : null;
+      : { date: null, source: null };
+    const birthdate = resolved.date;
     if (routine.routine_type === 'chores') {
       choreSummary = chores.compute(entries, routine.config, { today: todayLocal(), birthdate });
     } else if (needsAge) {
@@ -7075,7 +7084,7 @@ app.get('/api/routines/:id', requireAuth, async (req, res) => {
       // What the age guidance was actually computed from, so the client can say
       // "using Jude's birthday from People" rather than looking psychic.
       resolved_birthdate: birthdate,
-      birthdate_source: routine.subject_birthdate ? 'routine' : (birthdate ? 'people' : null),
+      birthdate_source: resolved.source,
     });
   } catch (err) { sendServerError(res, err); }
   finally { db.close(); }
@@ -7166,7 +7175,7 @@ async function requireChoresRoutine(db, req, res) {
 
 async function choreDetail(db, routine, req) {
   const entries = await db.getRoutineEntries(routine.id, { limit: 1000 });
-  const birthdate = await resolveSubjectBirthdate(db, routine, req.session.user?.id);
+  const birthdate = (await resolveSubjectBirthdate(db, routine, req.session.user?.id)).date;
   return chores.compute(entries, routine.config, { today: todayLocal(), birthdate });
 }
 
@@ -7397,7 +7406,7 @@ app.get('/api/routines/:id/sleep-stats', requireAuth, async (req, res) => {
     if (!(await requireRoutineAccess(db, req.params.id, req, res))) return;
     const routine = await db.getRoutineById(req.params.id);
     const entries = await db.getRoutineEntries(req.params.id, { limit: 400 });
-    const birthdate = await resolveSubjectBirthdate(db, routine, req.session.user?.id);
+    const birthdate = (await resolveSubjectBirthdate(db, routine, req.session.user?.id)).date;
     const today = todayLocal();
     const stats = sleepStats.compute(entries, {
       // Same resolution as the detail route: the age can come from People.
