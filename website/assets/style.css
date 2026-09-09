@@ -657,8 +657,8 @@ a:focus-visible, button:focus-visible, input:focus-visible,
 
 @media (max-width:900px){
   /* narrow screens: keep the right of the scene (house, trees, sun) in frame */
-  .hero{background-image:url('brand/patterns/hero-lake-1024.jpg');background-position:right bottom}
-  .hero-ambient{background:linear-gradient(180deg, rgba(247,243,233,.78) 0%, rgba(247,243,233,.62) 45%, rgba(247,243,233,0) 80%)}
+  .hero{background-image:url('brand/patterns/hero-lake-portrait.jpg');background-position:center top}
+  .hero-ambient{background:none}   /* the portrait scene keeps its sky clear for the copy */
   .hero-rowan{position:static;width:150px;margin:18px auto 0}
   .phone-pair{max-width:380px;min-height:650px}
   .phone-pair .phone.back{transform:scale(.84) translate(58px,-40px) rotate(3deg)}
