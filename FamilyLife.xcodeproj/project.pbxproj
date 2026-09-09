@@ -324,21 +324,21 @@
 		BB000231 /* WidgetDataStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetDataStore.swift; sourceTree = "<group>"; };
 		BB000232 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		BB000233 /* KinrowsWidget.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = KinrowsWidget.entitlements; sourceTree = "<group>"; };
-		CC000001 /* FamilyLife.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = FamilyLife.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		CC000002 /* KinrowsWidgetExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = KinrowsWidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
-		BB000300 /* Fraunces72pt-SemiBold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = Fraunces72pt-SemiBold.ttf; sourceTree = "<group>"; };
-		BB000301 /* Fraunces72pt-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = Fraunces72pt-Regular.ttf; sourceTree = "<group>"; };
-		BB000302 /* Fraunces72pt-Italic.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = Fraunces72pt-Italic.ttf; sourceTree = "<group>"; };
+		BB000300 /* Fraunces72pt-SemiBold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Fraunces72pt-SemiBold.ttf"; sourceTree = "<group>"; };
+		BB000301 /* Fraunces72pt-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Fraunces72pt-Regular.ttf"; sourceTree = "<group>"; };
+		BB000302 /* Fraunces72pt-Italic.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Fraunces72pt-Italic.ttf"; sourceTree = "<group>"; };
 		BB000303 /* KinrowsIllustration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KinrowsIllustration.swift; sourceTree = "<group>"; };
 		BB000304 /* RowanMotionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RowanMotionView.swift; sourceTree = "<group>"; };
-		BB000305 /* rowan-wave.mov */ = {isa = PBXFileReference; lastKnownFileType = video.quicktime; path = rowan-wave.mov; sourceTree = "<group>"; };
-		BB000306 /* rowan-idle.mov */ = {isa = PBXFileReference; lastKnownFileType = video.quicktime; path = rowan-idle.mov; sourceTree = "<group>"; };
-		BB000307 /* rowan-celebrating.mov */ = {isa = PBXFileReference; lastKnownFileType = video.quicktime; path = rowan-celebrating.mov; sourceTree = "<group>"; };
-		BB000308 /* rowan-grateful.mov */ = {isa = PBXFileReference; lastKnownFileType = video.quicktime; path = rowan-grateful.mov; sourceTree = "<group>"; };
-		BB000309 /* rowan-on-it.mov */ = {isa = PBXFileReference; lastKnownFileType = video.quicktime; path = rowan-on-it.mov; sourceTree = "<group>"; };
-		BB00030A /* rowan-thinking.mov */ = {isa = PBXFileReference; lastKnownFileType = video.quicktime; path = rowan-thinking.mov; sourceTree = "<group>"; };
+		BB000305 /* rowan-wave.mov */ = {isa = PBXFileReference; lastKnownFileType = video.quicktime; path = "rowan-wave.mov"; sourceTree = "<group>"; };
+		BB000306 /* rowan-idle.mov */ = {isa = PBXFileReference; lastKnownFileType = video.quicktime; path = "rowan-idle.mov"; sourceTree = "<group>"; };
+		BB000307 /* rowan-celebrating.mov */ = {isa = PBXFileReference; lastKnownFileType = video.quicktime; path = "rowan-celebrating.mov"; sourceTree = "<group>"; };
+		BB000308 /* rowan-grateful.mov */ = {isa = PBXFileReference; lastKnownFileType = video.quicktime; path = "rowan-grateful.mov"; sourceTree = "<group>"; };
+		BB000309 /* rowan-on-it.mov */ = {isa = PBXFileReference; lastKnownFileType = video.quicktime; path = "rowan-on-it.mov"; sourceTree = "<group>"; };
+		BB00030A /* rowan-thinking.mov */ = {isa = PBXFileReference; lastKnownFileType = video.quicktime; path = "rowan-thinking.mov"; sourceTree = "<group>"; };
 		BB00030B /* KinrowsLaunchView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KinrowsLaunchView.swift; sourceTree = "<group>"; };
 		BB00030C /* PaddlingCrewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaddlingCrewView.swift; sourceTree = "<group>"; };
+		CC000001 /* FamilyLife.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = FamilyLife.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		CC000002 /* KinrowsWidgetExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = KinrowsWidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -693,6 +693,29 @@
 			path = KinrowsWidget;
 			sourceTree = "<group>";
 		};
+		EE000040 /* Fonts */ = {
+			isa = PBXGroup;
+			children = (
+				BB000300 /* Fraunces72pt-SemiBold.ttf */,
+				BB000301 /* Fraunces72pt-Regular.ttf */,
+				BB000302 /* Fraunces72pt-Italic.ttf */,
+			);
+			path = Fonts;
+			sourceTree = "<group>";
+		};
+		EE000041 /* Motion */ = {
+			isa = PBXGroup;
+			children = (
+				BB000305 /* rowan-wave.mov */,
+				BB000306 /* rowan-idle.mov */,
+				BB000307 /* rowan-celebrating.mov */,
+				BB000308 /* rowan-grateful.mov */,
+				BB000309 /* rowan-on-it.mov */,
+				BB00030A /* rowan-thinking.mov */,
+			);
+			path = Motion;
+			sourceTree = "<group>";
+		};
 		GG000001 /* Care */ = {
 			isa = PBXGroup;
 			children = (
@@ -717,29 +740,6 @@
 				BB00004E /* FamilyGroupsView.swift */,
 			);
 			path = Family;
-			sourceTree = "<group>";
-		};
-		EE000040 /* Fonts */ = {
-			isa = PBXGroup;
-			children = (
-				BB000300 /* Fraunces72pt-SemiBold.ttf */,
-				BB000301 /* Fraunces72pt-Regular.ttf */,
-				BB000302 /* Fraunces72pt-Italic.ttf */,
-			);
-			path = Fonts;
-			sourceTree = "<group>";
-		};
-		EE000041 /* Motion */ = {
-			isa = PBXGroup;
-			children = (
-				BB000305 /* rowan-wave.mov */,
-				BB000306 /* rowan-idle.mov */,
-				BB000307 /* rowan-celebrating.mov */,
-				BB000308 /* rowan-grateful.mov */,
-				BB000309 /* rowan-on-it.mov */,
-				BB00030A /* rowan-thinking.mov */,
-			);
-			path = Motion;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -1037,7 +1037,7 @@
 				CODE_SIGN_ENTITLEMENTS = FamilyLife/FamilyLifeDebug.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 241;
+				CURRENT_PROJECT_VERSION = 242;
 				DEVELOPMENT_ASSET_PATHS = "";
 				DEVELOPMENT_TEAM = Z58XSBM78S;
 				ENABLE_PREVIEWS = YES;
@@ -1082,7 +1082,7 @@
 				CODE_SIGN_ENTITLEMENTS = FamilyLife/FamilyLife.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 241;
+				CURRENT_PROJECT_VERSION = 242;
 				DEVELOPMENT_ASSET_PATHS = "";
 				DEVELOPMENT_TEAM = Z58XSBM78S;
 				ENABLE_PREVIEWS = YES;
