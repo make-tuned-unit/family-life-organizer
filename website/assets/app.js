@@ -203,6 +203,47 @@ if ('IntersectionObserver' in window && jsOn && !reduceMotion) {
   briefParas.forEach((p, i) => { p.innerHTML = briefHTML[i]; });
 }
 
+// Rowan (brand mascot) motion clips — alpha video over the page surface.
+// Rules (brand/docs/HIGGSFIELD_ONBOARDING_ANIMATION.md): never required information,
+// honour prefers-reduced-motion (poster only), play only while in view, single
+// play-through that holds on the last frame unless data-loop is set. Safari gets
+// the HEVC-alpha .mov; everyone else gets the VP9-alpha .webm — chosen in JS
+// because Chrome reports it can play hvc1 but drops the alpha channel.
+(function initRowan() {
+  const clips = document.querySelectorAll('video.rowan');
+  if (!clips.length) return;
+  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)');
+  const ua = navigator.userAgent;
+  const isSafari = /safari/i.test(ua) && !/chrome|chromium|crios|android|edg/i.test(ua);
+
+  const source = (v) => (isSafari ? v.dataset.mov : v.dataset.webm);
+  const arm = (v) => {
+    if (v.dataset.armed) return;
+    const src = source(v);
+    if (!src) return;
+    v.dataset.armed = '1';
+    v.src = src;
+    if (v.dataset.loop === 'true') v.loop = true;
+    v.addEventListener('ended', () => { if (!v.loop) v.pause(); }); // hold last frame
+    v.addEventListener('error', () => { v.removeAttribute('src'); v.load(); }); // back to poster
+  };
+  const play = (v) => { if (reduce.matches) return; arm(v); const p = v.play(); if (p && p.catch) p.catch(() => {}); };
+  const pause = (v) => { if (!v.paused) v.pause(); };
+
+  if ('IntersectionObserver' in window) {
+    const io = new IntersectionObserver((entries) => {
+      for (const e of entries) {
+        if (e.isIntersecting) play(e.target); else pause(e.target);
+      }
+    }, { threshold: 0.35 });
+    clips.forEach((v) => io.observe(v));
+  } else {
+    clips.forEach(play);
+  }
+  document.addEventListener('visibilitychange', () => { if (document.hidden) clips.forEach(pause); });
+  reduce.addEventListener && reduce.addEventListener('change', () => { if (reduce.matches) clips.forEach(pause); });
+})();
+
 // Referral: capture ?ref= from the share link so we can credit the referrer,
 // and clean it out of the URL so it isn't re-shared.
 const REF = new URLSearchParams(location.search).get('ref');
