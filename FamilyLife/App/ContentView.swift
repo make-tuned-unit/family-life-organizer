@@ -38,6 +38,11 @@ struct ContentView: View {
     @Environment(AuthService.self) private var authService
     @AppStorage("hasSeenOnboardingTour") private var hasSeenOnboardingTour = false
     @State private var unauthScreen: UnauthScreen?
+    /// The launch screen stays up for at least one full paddle stroke (the crew
+    /// animation's period) so it reads as a moment rather than a flash, even
+    /// when session restore finishes instantly.
+    @State private var launchHold = true
+    private static let minimumLaunchHold: Duration = .milliseconds(2400)
 
     private enum UnauthScreen: Equatable {
         case tour
@@ -47,6 +52,12 @@ struct ContentView: View {
 
     var body: some View {
         content
+            .animation(KinrowsBrand.Motion.standardCurve, value: launchHold)
+            .animation(KinrowsBrand.Motion.standardCurve, value: authService.isRestoringSession)
+            .task {
+                try? await Task.sleep(for: Self.minimumLaunchHold)
+                launchHold = false
+            }
             .onChange(of: authService.isAuthenticated) { _, authed in
                 if authed {
                     hasSeenOnboardingTour = true
@@ -69,8 +80,9 @@ struct ContentView: View {
 
     @ViewBuilder
     private var content: some View {
-        if holdLaunch || authService.isRestoringSession {
+        if holdLaunch || launchHold || authService.isRestoringSession {
             KinrowsLaunchView()
+                .transition(.opacity)
         } else if authService.isAuthenticated {
             MainTabView()
         } else {
