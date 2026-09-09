@@ -459,23 +459,22 @@ a:focus-visible, button:focus-visible, input:focus-visible,
 .assist .lede-sm{color:rgba(247,243,233,.8)}
 .assist .lede-sm b{color:var(--cream-1)}
 /* Meet Rowan — the face of Concierge */
-.assist-meet{display:flex;align-items:center;gap:18px;margin-bottom:8px}
-.assist-meet .rowan-wrap{width:104px;flex:none;filter:drop-shadow(0 8px 16px rgba(0,0,0,.25))}
-.assist-meet .eyebrow{margin:0}
-.assist-points{display:flex;flex-direction:column;gap:18px;margin-top:30px}
+.assist-points{display:flex;flex-direction:column;gap:14px;margin-top:26px}
 .ap{display:flex;gap:15px}
 .ap-ico{flex:none;width:42px;height:42px;border-radius:13px;display:grid;place-items:center;color:var(--sage-soft);
   background:rgba(143,174,143,.16);border:1px solid rgba(143,174,143,.3)}
 .ap-ico .ic{width:21px;height:21px}
 .ap b{color:var(--cream-1);font-size:1.05rem;font-weight:600}
-.ap p{color:rgba(247,243,233,.68);font-size:.95rem;margin-top:3px;line-height:1.5}
-.assist-cta{display:flex;align-items:center;gap:16px;margin-top:30px;flex-wrap:wrap}
+.ap p{color:rgba(247,243,233,.68);font-size:.92rem;margin-top:2px;line-height:1.45}
+.assist-cta{display:flex;align-items:center;gap:16px;margin-top:26px;flex-wrap:wrap}
 .assist .btn-primary{background:var(--sage-soft);color:var(--evergreen);box-shadow:0 8px 22px rgba(0,0,0,.2)}
 .assist .btn-primary:hover{background:#A3BFA3}
 .assist-cta-note{color:rgba(247,243,233,.68);font-size:.92rem}
 .assist-foot{margin-top:30px;padding-top:22px;border-top:1px solid rgba(143,174,143,.22);
   color:rgba(247,243,233,.62);font-size:.95rem;line-height:1.6}
-.assist-stage{display:grid;place-items:center}
+.assist-stage{display:flex;flex-direction:column;align-items:center;gap:6px}
+/* Rowan thinking, perched above the phone pair */
+.assist-rowan{width:150px;filter:drop-shadow(0 10px 18px rgba(0,0,0,.28))}
 .phone-dark{background:linear-gradient(160deg,#07211E,#0B2E2A)}
 .phone-dark::after{background:#07211E}
 
@@ -613,7 +612,7 @@ a:focus-visible, button:focus-visible, input:focus-visible,
 /* ============================================================
    Paired phones + extra in-app screens
    ============================================================ */
-.phone-pair{position:relative;width:100%;max-width:450px;min-height:710px;
+.phone-pair{position:relative;width:100%;max-width:450px;min-height:660px;
   display:flex;align-items:center;justify-content:center}
 .phone-pair .phone{position:absolute}
 .phone-pair .phone.front{transform:translate(-54px,36px) rotate(-2deg);z-index:3}
@@ -1087,7 +1086,7 @@ body::before{
 }
 
 /* ---------- Concierge: full-bleed band becomes a floating dark-glass panel ---------- */
-.assist{background:none;padding:56px 28px 104px;overflow:visible}
+.assist{background:none;padding:40px 28px 80px;overflow:visible}
 .assist::after{display:none}                /* grain moves inside the panel */
 .assist-ambient{                            /* warm halo *behind* the panel */
   background:
@@ -1096,7 +1095,7 @@ body::before{
   filter:blur(6px);
 }
 .assist-grid{
-  position:relative;z-index:2;border-radius:44px;padding:76px 64px;
+  position:relative;z-index:2;border-radius:44px;padding:56px 60px;
   background:
     radial-gradient(52% 46% at 84% 6%,  rgba(143,174,143,.18), transparent 70%),
     radial-gradient(56% 50% at 8% 96%,  rgba(107,143,176,.16), transparent 70%),
