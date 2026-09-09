@@ -230,12 +230,7 @@ async function sendLoginCode(to, code) {
   // shape iOS scans for to offer one-tap AutoFill above the keyboard (the app's
   // code field is .oneTimeCode), so the code usually needs no copy/paste at all.
   const text = `Your Kinrows verification code is ${code}\n\nIt expires in 10 minutes. If you didn't try to sign in, ignore this email.`;
-  const html = `<div style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;max-width:420px;margin:0 auto;padding:24px;color:#2c2017">
-    <h2 style="margin:0 0 8px">Your verification code</h2>
-    <p style="color:#5c4a3a;margin:0 0 16px">Your Kinrows verification code is:</p>
-    <p style="font-size:34px;font-weight:700;letter-spacing:8px;background:#fffaf0;border:1px solid #ece0c8;border-radius:12px;padding:16px;text-align:center;margin:0;font-family:ui-monospace,SFMono-Regular,Menlo,monospace">${code}</p>
-    <p style="color:#8a7460;font-size:13px;margin:16px 0 0">Tap to select the code above to copy it, or let your iPhone fill it in automatically. Expires in 10 minutes. If this wasn't you, ignore this email.</p>
-  </div>`;
+  const { html } = email.loginCodeEmail(code);
   return email.sendEmail({ to, subject, text, html });
 }
 
