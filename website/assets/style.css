@@ -665,7 +665,7 @@ a:focus-visible, button:focus-visible, input:focus-visible,
   /* narrow screens: keep the right of the scene (house, trees, sun) in frame */
   /* portrait scene sized to the viewport width and pinned to the top, so the
      mountains and lake are on screen on landing; the foliage runs under the phone */
-  .hero{background-image:url('brand/patterns/hero-lake-portrait.jpg');background-size:100% auto;background-position:center 52%;
+  .hero{background-image:url('brand/patterns/hero-lake-portrait.jpg');background-size:100% auto;background-position:center 58%;
     background-color:var(--cream-1)}
   .hero-link{background:rgba(247,243,233,.85);padding:6px 12px;border-radius:999px;margin-top:14px}
   .hero-ambient{background:none}   /* the portrait scene keeps its sky clear for the copy */
