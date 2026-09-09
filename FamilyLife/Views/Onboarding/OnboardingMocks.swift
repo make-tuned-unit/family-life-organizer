@@ -25,17 +25,16 @@ struct OnboardingAvatarCluster: View {
 }
 
 struct OnboardingChipRow: View {
-    let items: [(icon: String, tint: Color, text: String)]
+    /// Kit product icons (evergreen strokes) — the icon system in miniature.
+    let items: [(icon: KinrowsAsset.ProductIcon, text: String)]
 
     var body: some View {
         HStack(spacing: DesignTokens.Spacing.inset) {
             ForEach(items, id: \.text) { item in
                 VStack(spacing: 6) {
-                    Image(systemName: item.icon)
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(item.tint)
-                        .frame(width: 36, height: 36)
-                        .background(item.tint.opacity(DesignTokens.Opacity.badgeFill), in: Circle())
+                    KinrowsProductIcon(icon: item.icon, size: 26)
+                        .frame(width: 40, height: 40)
+                        .background(KinrowsBrand.mist, in: Circle())
                     Text(item.text)
                         .font(.flCaption2.weight(.medium))
                         .foregroundStyle(WarmPalette.ink2)
@@ -168,7 +167,7 @@ struct OnboardingPeopleMock: View {
                         .foregroundStyle(WarmPalette.ink1)
                     Text("K7MX-2P9Q")
                         .font(.system(.footnote, design: .monospaced).weight(.bold))
-                        .foregroundStyle(AccentTheme.terracotta.color)
+                        .foregroundStyle(KinrowsBrand.evergreen)
                 }
             }
             HStack(spacing: DesignTokens.Spacing.chipPadding) {
@@ -184,7 +183,7 @@ struct OnboardingPeopleMock: View {
             }
         }
         .padding(DesignTokens.Spacing.cardPadding)
-        .flCard(tint: AccentTheme.terracotta.color)
+        .flCard(tint: AccentTheme.sage.color)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Your partner joins with one invite code. Kids live in People with no phone needed.")
     }
@@ -203,13 +202,14 @@ struct OnboardingConciergeMock: View {
                 reply = "Taco night works: you have everything but cilantro. Added it to Groceries."
             }
             if let reply {
-                HStack {
+                HStack(alignment: .top, spacing: DesignTokens.Spacing.rowVertical) {
+                    KinrowsIllustration(.mascot(.idleSmile), maxWidth: 28, maxHeight: 32)
                     Text(reply)
                         .font(.flSubheadline)
                         .foregroundStyle(WarmPalette.ink1)
                         .padding(.horizontal, DesignTokens.Spacing.chipPadding)
                         .padding(.vertical, DesignTokens.Spacing.rowVertical)
-                        .background(WarmPalette.cream2, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.tile))
+                        .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.tile))
                     Spacer(minLength: DesignTokens.Spacing.large)
                 }
                 .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
@@ -243,6 +243,12 @@ struct OnboardingConciergeMock: View {
     OnboardingWeekRail()
         .padding()
         .background { AmbientBackground(style: .calendar) }
+}
+
+#Preview("Chips") {
+    OnboardingChipRow(items: [(.calendar, "Calendar"), (.lists, "Lists"), (.family, "Family")])
+        .padding()
+        .background { AmbientBackground(style: .home) }
 }
 
 #Preview("Grocery") {

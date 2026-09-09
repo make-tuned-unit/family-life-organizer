@@ -7,7 +7,7 @@ import SwiftUI
 //       ButtonStyle bodies cannot chain View extension modifiers via flCard().
 
 struct FLPrimaryButtonStyle: ButtonStyle {
-    var tint: Color = TabAccent.home.color
+    var tint: Color = KinrowsBrand.evergreen
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
@@ -28,9 +28,11 @@ struct FLSecondaryButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.subheadline.weight(.medium))
+            .foregroundStyle(KinrowsBrand.evergreen)
             .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
             .padding(.vertical, 12)
             .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
+            .overlay(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card).stroke(KinrowsBrand.mist, lineWidth: 1))
             .scaleEffect(configuration.isPressed ? 0.97 : 1.0)
             .animation(.spring(response: 0.2, dampingFraction: 0.7), value: configuration.isPressed)
     }
@@ -56,11 +58,11 @@ struct FLDestructiveButtonStyle: ButtonStyle {
 // THE primary call-to-action: full-width warm-ink bar with cream text,
 // card-radius corners, press scale. One CTA look everywhere — "Send request",
 // "Start cooking", "Confirm availability" — so the eye always knows the main
-// move. Pass a fill for semantic variants (e.g. WarmPalette.good for a
-// final confirm).
+// move. Brand: Evergreen is the high-emphasis action colour. Pass a fill for
+// semantic variants (e.g. WarmPalette.good for a final confirm).
 
 struct FLCTAButtonStyle: ButtonStyle {
-    var fill: Color = WarmPalette.ink1
+    var fill: Color = KinrowsBrand.evergreen
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label

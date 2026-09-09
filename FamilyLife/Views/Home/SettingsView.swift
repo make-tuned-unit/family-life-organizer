@@ -356,6 +356,18 @@ struct SettingsView: View {
             }
 
             Section("About") {
+                HStack {
+                    Spacer()
+                    VStack(spacing: 6) {
+                        KinrowsIllustration(.logo(.lockup), accessibility: .label("Kinrows"), maxWidth: 180)
+                        Text("Kin that rows together.")
+                            .font(.flDisplayItalic)
+                            .foregroundStyle(WarmPalette.ink2)
+                    }
+                    Spacer()
+                }
+                .padding(.vertical, DesignTokens.Spacing.rowVertical)
+                .listRowBackground(Color.clear)
                 Button {
                     showingWelcomeTour = true
                 } label: {

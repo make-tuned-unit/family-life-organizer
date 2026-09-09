@@ -60,7 +60,8 @@ struct TripsView: View {
                     WarmEmptyState(
                         title: "Plan your first trip",
                         systemImage: "car.fill",
-                        description: "Start a trip to share your ETA with family"
+                        description: "Start a trip to share your ETA with family",
+                        rowan: .walking
                     )
                 }
             }

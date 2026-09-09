@@ -25,7 +25,7 @@ struct ConciergeHistoryView: View {
                 } else if let errorMessage {
                     WarmEmptyState(title: "Couldn't load", systemImage: "exclamationmark.triangle", description: errorMessage)
                 } else if conversations.isEmpty {
-                    WarmEmptyState(title: "No conversations yet", systemImage: "sparkles", description: "Your past chats with the concierge will appear here.")
+                    WarmEmptyState(title: "Start a conversation", systemImage: "sparkles", description: "Your past chats with Rowan will appear here.", rowan: .idleSmile)
                 } else {
                     ScrollView {
                         VStack(spacing: 0) {
@@ -55,12 +55,8 @@ struct ConciergeHistoryView: View {
     private func row(_ convo: ConciergeConversationSummary) -> some View {
         Button { onSelect(convo.id) } label: {
             HStack(spacing: 12) {
-                Image(systemName: "sparkles")
-                    .font(.system(size: 14, weight: .semibold))
-                    .symbolRenderingMode(.hierarchical)
-                    .foregroundStyle(accent)
+                KinrowsIllustration(.mascot(.idleSmile), maxWidth: 26, maxHeight: 30)
                     .frame(width: 30, height: 30)
-                    .background(accent.opacity(0.15), in: Circle())
                 VStack(alignment: .leading, spacing: 2) {
                     Text(convo.displayTitle)
                         .font(.flSubheadline.weight(.medium))

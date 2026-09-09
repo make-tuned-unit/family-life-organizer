@@ -190,7 +190,8 @@ struct PantryView: View {
                 description: "Add what you have on hand to track quantities and expiry dates.",
                 actionLabel: "Add an item",
                 action: { showingAddItem = true },
-                conciergePrompt: "Help me stock the pantry — add our usual staples"
+                conciergePrompt: "Help me stock the pantry — add our usual staples",
+                rowan: .onIt
             )
         } else {
             let grouped = Dictionary(grouping: items) { $0.location?.capitalized ?? "Other" }

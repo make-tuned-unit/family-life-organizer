@@ -24,13 +24,11 @@ struct TwoFactorView: View {
             VStack(spacing: 16) {
                 Spacer(minLength: 80)
 
-                Image(systemName: "lock.shield.fill")
-                    .font(.system(size: 40))
-                    .foregroundStyle(AccentTheme.sage.color)
+                KinrowsIllustration(.logo(.boatMark), accessibility: .label("Kinrows"), maxWidth: 72)
 
                 Text(mode == .email ? "Verify your email" : "Enter your code")
-                    .font(.flScreenTitle)
-                    .foregroundStyle(WarmPalette.ink1)
+                    .font(.flDisplay)
+                    .foregroundStyle(KinrowsBrand.evergreen)
 
                 Text(subtitle)
                     .font(.flSubheadline)
@@ -66,7 +64,7 @@ struct TwoFactorView: View {
                     if isWorking { ProgressView() }
                     else { Text(mode == .email ? "Send code" : "Verify") }
                 }
-                .buttonStyle(.flCTA(fill: AccentTheme.sage.color))
+                .buttonStyle(.flCTA)
                 .disabled(!canSubmit)
                 .opacity(canSubmit ? 1 : 0.6)
                 .padding(.top, 4)
