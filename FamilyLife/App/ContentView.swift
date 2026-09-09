@@ -38,6 +38,11 @@ struct ContentView: View {
     @Environment(AuthService.self) private var authService
     @AppStorage("hasSeenOnboardingTour") private var hasSeenOnboardingTour = false
     @State private var unauthScreen: UnauthScreen?
+    /// The launch screen stays up for at least one full paddle stroke (the crew
+    /// animation's period) so it reads as a moment rather than a flash, even
+    /// when session restore finishes instantly.
+    @State private var launchHold = true
+    private static let minimumLaunchHold: Duration = .milliseconds(2400)
 
     private enum UnauthScreen: Equatable {
         case tour
@@ -47,6 +52,12 @@ struct ContentView: View {
 
     var body: some View {
         content
+            .animation(KinrowsBrand.Motion.standardCurve, value: launchHold)
+            .animation(KinrowsBrand.Motion.standardCurve, value: authService.isRestoringSession)
+            .task {
+                try? await Task.sleep(for: Self.minimumLaunchHold)
+                launchHold = false
+            }
             .onChange(of: authService.isAuthenticated) { _, authed in
                 if authed {
                     hasSeenOnboardingTour = true
@@ -58,14 +69,20 @@ struct ContentView: View {
         #endif
     }
 
+    /// DEBUG: keep the launch screen up (UITEST_HOLD_LAUNCH=1) to review the crew animation.
+    private var holdLaunch: Bool {
+        #if DEBUG
+        ScreenshotHarness.holdLaunch
+        #else
+        false
+        #endif
+    }
+
     @ViewBuilder
     private var content: some View {
-        if authService.isRestoringSession {
-            ZStack {
-                AmbientBackground(style: .home)
-                ProgressView()
-                    .tint(WarmPalette.ink2)
-            }
+        if holdLaunch || launchHold || authService.isRestoringSession {
+            KinrowsLaunchView()
+                .transition(.opacity)
         } else if authService.isAuthenticated {
             MainTabView()
         } else {
@@ -114,6 +131,8 @@ enum ScreenshotHarness {
     }
 
     static var initialChat: Bool { env["UITEST_SHEET"] == "chat" }
+
+    static var holdLaunch: Bool { env["UITEST_HOLD_LAUNCH"] == "1" }
 
     static var initialChatThread: ChatSheet.ChatThread? {
         guard let v = env["UITEST_CHAT_DM"] else { return nil }
@@ -212,7 +231,7 @@ struct MainTabView: View {
                                 .font(.system(size: 20))
                                 .foregroundStyle(.white)
                                 .frame(width: 52, height: 52)
-                                .background(TabAccent.home.color, in: Circle())
+                                .background(KinrowsBrand.evergreen, in: Circle())   // chat launcher wears Evergreen
                                 .shadow(color: .black.opacity(0.15), radius: 8, y: 4)
 
                             if unreadCount > 0 {
@@ -220,7 +239,7 @@ struct MainTabView: View {
                                     .font(.flCaption2.weight(.bold))
                                     .foregroundStyle(.white)
                                     .frame(minWidth: 18, minHeight: 18)
-                                    .background(AccentTheme.rose.color, in: Circle())
+                                    .background(KinrowsBrand.clay, in: Circle())
                                     .offset(x: 4, y: -4)
                             }
                         }

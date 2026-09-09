@@ -38,7 +38,8 @@ struct FamilyListsView: View {
                     description: "Groceries, packing, projects — keep them all in one place",
                     actionLabel: "New list",
                     action: { showingNewList = true },
-                    conciergePrompt: "Start a grocery list with our usual weekly staples"
+                    conciergePrompt: "Start a grocery list with our usual weekly staples",
+                    rowan: .onIt
                 )
                 .padding(.top, 40)
             }

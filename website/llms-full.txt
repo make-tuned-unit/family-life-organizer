@@ -45,6 +45,7 @@ Kinrows is a single, private home organizer for the whole household. It brings t
 - Groups: households plus separate "clans"/circles (e.g. each side of the family) with invite codes, each walled off from the others, with per-group feeds.
 
 ## Concierge (paid AI add-on)
+Rowan — the small sprout mascot with two evergreen leaves — is the face of the Concierge in the app and on the site (animated at onboarding and in the Concierge chat; still artwork elsewhere).
 - Daily brief: a prioritized summary of what needs attention today. On newer iPhones the summary runs on-device via Apple's models — private and available offline.
 - Chat that runs the app: full create/edit/delete/move across every domain — 22 tool domains, 100+ actions. Real examples that all work: "move the dentist task to Friday"; "take milk off the grocery list"; "move the batteries to the Costco list"; "I spent $42 at Costco" (logs the expense); "start a poll: pizza or tacos?"; "mark the Lego set as purchased"; "tell Sophie I'll be home late" (sends a real DM); "did anyone ask me for babysitting help?" followed by approving a coverage window in-chat; "end the step competition and call the winner".
 - Proactive nudges: a periodic server-side sweep sends gentle heads-up notifications from the Concierge between briefs — helpful, throttled, never naggy.

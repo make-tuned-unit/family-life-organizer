@@ -21,12 +21,10 @@ struct LoginView: View {
             VStack(spacing: 0) {
                 Spacer(minLength: 80)
 
-                VStack(spacing: 8) {
-                    Text("Kinrows")
-                        .font(.flHero)
-                        .foregroundStyle(WarmPalette.ink1)
-                    Text("Grow together.")
-                        .font(.flBody.weight(.medium))
+                VStack(spacing: DesignTokens.Spacing.rowVertical) {
+                    KinrowsIllustration(.logo(.lockup), accessibility: .label("Kinrows"), maxWidth: 220)
+                    Text("Kin that rows together.")
+                        .font(.flDisplayItalic)
                         .foregroundStyle(WarmPalette.ink2)
                 }
                 .padding(.bottom, 36)
@@ -67,7 +65,7 @@ struct LoginView: View {
                             Text("Sign in")
                         }
                     }
-                    .buttonStyle(.flCTA(fill: AccentTheme.sage.color))
+                    .buttonStyle(.flCTA)
                     .disabled(username.isEmpty || password.isEmpty || isLoading)
                     .opacity(username.isEmpty || password.isEmpty ? 0.6 : 1)
                     .padding(.top, 6)
@@ -85,7 +83,7 @@ struct LoginView: View {
                         Text("New here?")
                             .foregroundStyle(WarmPalette.ink3)
                         Text("Create an account")
-                            .foregroundStyle(WarmPalette.ink1)
+                            .foregroundStyle(KinrowsBrand.evergreen)
                             .fontWeight(.semibold)
                     }
                     .font(.flSubheadline)

@@ -314,7 +314,8 @@ struct HouseholdView: View {
                     systemImage: "person.2",
                     description: "Share your invite code or add family members manually.",
                     actionLabel: "Add member",
-                    action: { showingAddMember = true }
+                    action: { showingAddMember = true },
+                    rowan: .rowing
                 )
             }
         } header: {

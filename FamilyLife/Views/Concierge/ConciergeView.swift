@@ -162,19 +162,19 @@ struct ConciergeView: View {
 
     // MARK: - Header
 
+    // Rowan is the face of the Concierge: a small idling loop beside the title.
     private var header: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 8) {
-                Image(systemName: "sparkles")
-                    .font(.system(size: 20, weight: .semibold))
-                    .foregroundStyle(accent)
+        HStack(alignment: .center, spacing: DesignTokens.Spacing.chipPadding) {
+            RowanMotionView(pose: .idleSmile, loops: true, maxWidth: 44, maxHeight: 52)
+                .frame(width: 44, height: 52)
+            VStack(alignment: .leading, spacing: 2) {
                 Text("Concierge")
-                    .font(.flScreenTitle)
-                    .foregroundStyle(WarmPalette.ink1)
+                    .font(.flDisplaySmall)
+                    .foregroundStyle(KinrowsBrand.evergreen)
+                Text(greeting)
+                    .font(.flSubheadline)
+                    .foregroundStyle(WarmPalette.ink3)
             }
-            Text(greeting)
-                .font(.flSubheadline)
-                .foregroundStyle(WarmPalette.ink3)
         }
     }
 
@@ -207,8 +207,12 @@ struct ConciergeView: View {
         let summaryText = onDevice ?? brief.summary
         return VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 6) {
-                Image(systemName: onDevice != nil ? "iphone" : (brief.aiEnabled ? "sparkles" : "text.alignleft"))
-                    .font(.system(size: 12, weight: .semibold))
+                if onDevice == nil, brief.aiEnabled {
+                    KinrowsIllustration(.logo(.boatMark), maxWidth: 22, maxHeight: 16)
+                } else {
+                    Image(systemName: onDevice != nil ? "iphone" : "text.alignleft")
+                        .font(.system(size: 12, weight: .semibold))
+                }
                 Text(onDevice != nil ? "On-device brief" : (brief.aiEnabled ? "Your brief" : "Today at a glance"))
                     .font(.flCaption.weight(.semibold))
                     .textCase(.uppercase)
@@ -301,10 +305,8 @@ struct ConciergeView: View {
 
     private var allClearCard: some View {
         VStack(spacing: 8) {
-            Image(systemName: "checkmark.circle.fill")
-                .font(.system(size: 32))
-                .foregroundStyle(AccentTheme.sage.color)
-            Text("All caught up")
+            KinrowsIllustration(.mascot(.settled), maxWidth: 96, maxHeight: 110)
+            Text("All clear")
                 .font(.flHeadline)
                 .foregroundStyle(WarmPalette.ink1)
             Text("Nothing needs your attention right now.")
@@ -318,7 +320,13 @@ struct ConciergeView: View {
     }
 
     private var loadingCard: some View {
-        FLLoadingState(message: "Gathering your day…")
+        VStack(spacing: 0) {
+            RowanMotionView(pose: .thinking, loops: true, maxWidth: 110, maxHeight: 130)
+                .frame(height: 130)
+            FLLoadingState(message: "Rowan is reading the household…")
+        }
+        .frame(maxWidth: .infinity)
+        .accessibilityElement(children: .combine)
     }
 
     private func errorCard(_ message: String) -> some View {

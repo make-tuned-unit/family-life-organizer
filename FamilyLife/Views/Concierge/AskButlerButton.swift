@@ -196,7 +196,7 @@ struct ConciergeLauncherButton: View {
             .font(.system(size: 20, weight: .semibold))
             .foregroundStyle(.white)
             .frame(width: 52, height: 52)
-            .background(isListening ? AccentTheme.rose.color : AccentTheme.saffron.color, in: Circle())
+            .background(isListening ? KinrowsBrand.clayDeep : KinrowsBrand.clay, in: Circle())   // Concierge launcher wears Clay
             .scaleEffect(isListening ? 1.12 : 1)
             .shadow(color: .black.opacity(0.15), radius: 8, y: 4)
             .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isListening)

@@ -127,12 +127,8 @@ struct ConciergeChatView: View {
         case .assistant:
             VStack(alignment: .leading, spacing: 8) {
                 HStack(alignment: .top, spacing: 10) {
-                    Image(systemName: "sparkles")
-                        .font(.system(size: 14, weight: .semibold))
-                        .symbolRenderingMode(.hierarchical)
-                        .foregroundStyle(accent)
-                        .frame(width: 28, height: 28)
-                        .background(accent.opacity(0.15), in: Circle())
+                    KinrowsIllustration(.mascot(.idleSmile), maxWidth: 28, maxHeight: 32)
+                        .frame(width: 28, height: 32)
                     Text(message.text)
                         .font(.flBody)
                         .foregroundStyle(WarmPalette.ink1)
@@ -144,8 +140,11 @@ struct ConciergeChatView: View {
                 }
                 if !message.actions.isEmpty {
                     VStack(alignment: .leading, spacing: 4) {
-                        Label("Task complete", systemImage: "checkmark.circle.fill")
-                            .font(.flFootnote.weight(.bold))
+                        HStack(spacing: 6) {
+                            KinrowsIllustration(.mascot(.celebrating), maxWidth: 22, maxHeight: 22)
+                            Label("Task complete", systemImage: "checkmark.circle.fill")
+                        }
+                        .font(.flFootnote.weight(.bold))
                         ForEach(message.actions, id: \.self) { action in
                             Text(action.summary)
                                 .font(.flCaption.weight(.medium))
@@ -159,17 +158,18 @@ struct ConciergeChatView: View {
         }
     }
 
+    // Rowan thinks while the reply is on its way — the loop replaces the
+    // spinner, the text keeps the state readable.
     private var typingIndicator: some View {
         HStack(spacing: 10) {
-            Image(systemName: "sparkles")
-                .font(.system(size: 14, weight: .semibold))
-                .symbolRenderingMode(.hierarchical)
-                .foregroundStyle(accent)
-                .frame(width: 28, height: 28)
-                .background(accent.opacity(0.15), in: Circle())
-            ProgressView().tint(accent)
+            RowanMotionView(pose: .thinking, loops: true, maxWidth: 44, maxHeight: 52)
+                .frame(width: 44, height: 52)
+            Text("Rowan is thinking…")
+                .font(.flFootnote)
+                .foregroundStyle(WarmPalette.ink3)
             Spacer()
         }
+        .accessibilityElement(children: .combine)
     }
 
     private func errorRow(_ message: String) -> some View {
@@ -181,12 +181,11 @@ struct ConciergeChatView: View {
     private var emptyState: some View {
         VStack(alignment: .leading, spacing: 14) {
             VStack(alignment: .leading, spacing: 6) {
-                Image(systemName: "sparkles")
-                    .font(.system(size: 26))
-                    .foregroundStyle(accent)
+                RowanMotionView(pose: .wave, maxWidth: 120, maxHeight: 130)
+                    .frame(height: 130)
                 Text("How can I help?")
-                    .font(.flTitle)
-                    .foregroundStyle(WarmPalette.ink1)
+                    .font(.flDisplaySmall)
+                    .foregroundStyle(KinrowsBrand.evergreen)
                 Text("Ask me to add events or tasks, check your budget, plan dinner, and more.")
                     .font(.flSubheadline)
                     .foregroundStyle(WarmPalette.ink3)

@@ -1,7 +1,9 @@
 import SwiftUI
 
-/// Pre-signup product story (and Settings replay). Six swipeable pages:
-/// welcome, week, lists/dinner, people, Concierge, then create/join/sign-in.
+/// Pre-signup product story (and Settings replay), told in the five brand
+/// beats from the Kinrows kit with Rowan heading each page:
+///   01 Welcome · 02 Plan · 03 Stay in sync · 04 Make time · 05 Further together
+/// The last beat is also the commit page (create / join / sign in).
 ///
 /// Pre-auth: presented as the unauthenticated root. Skip jumps to the commit
 /// page. Replay: full-screen cover from Settings; last page shows the invite.
@@ -22,7 +24,7 @@ struct OnboardingTourView: View {
     @AppStorage("household_invite_code") private var householdInviteCode = ""
 
     @State private var page = 0
-    private let pageCount = 6
+    private let pageCount = 5
 
     init(
         mode: Mode = .preAuth,
@@ -36,7 +38,7 @@ struct OnboardingTourView: View {
         self.onJoinHousehold = onJoinHousehold
         #if DEBUG
         if let v = ProcessInfo.processInfo.environment["UITEST_TOUR_PAGE"], let n = Int(v) {
-            _page = State(initialValue: min(max(n, 0), 5))
+            _page = State(initialValue: min(max(n, 0), 4))
         }
         #endif
     }
@@ -50,14 +52,13 @@ struct OnboardingTourView: View {
 
                 TabView(selection: $page) {
                     welcomePage.tag(0)
-                    weekPage.tag(1)
-                    listsPage.tag(2)
-                    peoplePage.tag(3)
-                    conciergePage.tag(4)
-                    readyPage.tag(5)
+                    planPage.tag(1)
+                    syncPage.tag(2)
+                    timePage.tag(3)
+                    togetherPage.tag(4)
                 }
                 .tabViewStyle(.page(indexDisplayMode: .never))
-                .animation(reduceMotion ? nil : .easeInOut(duration: 0.25), value: page)
+                .animation(reduceMotion ? nil : KinrowsBrand.Motion.standardCurve, value: page)
 
                 pageDots
                     .padding(.bottom, DesignTokens.Spacing.cardGap)
@@ -73,7 +74,9 @@ struct OnboardingTourView: View {
     private var ambientStyle: AmbientBackground.AmbientStyle {
         switch page {
         case 1: .calendar
-        case 2: .pantry
+        case 2: .care
+        case 3: .home
+        case 4: .trips
         default: .home
         }
     }
@@ -107,7 +110,7 @@ struct OnboardingTourView: View {
         HStack(spacing: 8) {
             ForEach(0..<pageCount, id: \.self) { i in
                 Capsule()
-                    .fill(i == page ? WarmPalette.ink1 : WarmPalette.ink4)
+                    .fill(i == page ? KinrowsBrand.evergreen : WarmPalette.ink4)
                     .frame(width: i == page ? 22 : 7, height: 7)
                     .animation(reduceMotion ? nil : .spring(duration: 0.3), value: page)
             }
@@ -126,12 +129,12 @@ struct OnboardingTourView: View {
                 Button { finishPreAuth { onCreateHousehold?() } } label: {
                     Text("Create household")
                 }
-                .buttonStyle(.flCTA(fill: AccentTheme.sage.color))
+                .buttonStyle(.flCTA)
 
                 Button { finishPreAuth { onJoinHousehold?() } } label: {
                     Text("I have an invite code")
                         .font(.flSubheadline.weight(.semibold))
-                        .foregroundStyle(WarmPalette.ink1)
+                        .foregroundStyle(KinrowsBrand.evergreen)
                         .frame(maxWidth: .infinity)
                         .frame(minHeight: 52)
                         .background(
@@ -140,7 +143,7 @@ struct OnboardingTourView: View {
                         )
                         .overlay(
                             RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card)
-                                .stroke(WarmPalette.ink4.opacity(0.5), lineWidth: 1)
+                                .stroke(KinrowsBrand.sage.opacity(0.7), lineWidth: 1)
                         )
                 }
                 .buttonStyle(.plain)
@@ -166,70 +169,66 @@ struct OnboardingTourView: View {
         action()
     }
 
-    // MARK: - Pages
+    // MARK: - Pages (the five kit beats)
 
+    /// 01 — Welcome. Rowan waves; the illustrated crew lockup sits above.
     private var welcomePage: some View {
         tourPage(
-            icon: "house.fill",
-            accent: AccentTheme.sage.color,
-            eyebrow: "Welcome to Kinrows",
-            title: "One calm place for the whole household.",
-            body: "The calendar, the lists, the meals, the trips — out of scattered group chats and into a home everyone can see."
+            hero: .motion(.wave),
+            eyebrow: "Welcome",
+            title: "A calmer home together.",
+            body: "The calendar, the lists, the meals, the trips — out of scattered group chats and into one home everyone can see.",
+            isActive: page == 0
         ) {
             VStack(spacing: DesignTokens.Spacing.cardGap) {
-                OnboardingAvatarCluster()
+                KinrowsIllustration(.logo(.lockup), accessibility: .label("Kinrows"), maxWidth: 200)
+                    .padding(.bottom, DesignTokens.Spacing.tinyLabel)
                 OnboardingChipRow(items: [
-                    ("calendar", TabAccent.calendar.color, "Calendar"),
-                    ("list.bullet.rectangle.fill", AccentTheme.sage.color, "Lists"),
-                    ("bubble.left.and.text.bubble.right.fill", AccentTheme.ocean.color, "Family chat"),
+                    (.calendar, "Calendar"),
+                    (.lists, "Lists"),
+                    (.family, "Family"),
                 ])
             }
         }
     }
 
-    private var weekPage: some View {
+    /// 02 — Plan. Rowan checks the list; the week rail + grocery mock show it.
+    private var planPage: some View {
         tourPage(
-            icon: "calendar",
-            accent: TabAccent.calendar.color,
-            eyebrow: "Your week, sorted",
-            title: "Add it once. Everyone knows.",
-            body: "Events land in everyone's pocket the moment you add them — and the calendars you already keep merge right in."
+            hero: .motion(.onIt),
+            eyebrow: "Plan",
+            title: "Plan meals. Organize life.",
+            body: "Add it once and everyone knows. Groceries check off from the aisle, and dinner comes from what's actually in the pantry.",
+            isActive: page == 1
         ) {
-            OnboardingWeekRail()
+            VStack(spacing: DesignTokens.Spacing.cardGap) {
+                OnboardingWeekRail()
+                OnboardingGroceryMock(animateCheck: page == 1)
+            }
         }
     }
 
-    private var listsPage: some View {
+    /// 03 — Stay in sync. Rowan thinks it over; the people mock shows how.
+    private var syncPage: some View {
         tourPage(
-            icon: "cart.fill",
-            accent: AccentTheme.sage.color,
-            eyebrow: "From the aisle, and the pantry",
-            title: "The list in her pocket updates while you shop.",
-            body: "Groceries check off in real time. Dinner ideas come from what's actually in the pantry."
-        ) {
-            OnboardingGroceryMock(animateCheck: page == 2)
-        }
-    }
-
-    private var peoplePage: some View {
-        tourPage(
-            icon: "person.2.fill",
-            accent: AccentTheme.terracotta.color,
-            eyebrow: "Your people",
-            title: "A family does better when it rows together.",
-            body: "The mental load gets shared the moment your people join — a partner with a code, kids without a phone."
+            hero: .motion(.thinking, loops: true),
+            eyebrow: "Stay in sync",
+            title: "Keep everyone on the same page.",
+            body: "The mental load gets shared the moment your people join — a partner with a code, kids without a phone.",
+            isActive: page == 2
         ) {
             OnboardingPeopleMock()
         }
     }
 
-    private var conciergePage: some View {
+    /// 04 — Make time. Rowan hugs the heart; the Concierge does the invisible work.
+    private var timePage: some View {
         tourPage(
-            icon: "sparkles",
-            accent: AccentTheme.saffron.color,
-            eyebrow: "Meet the Concierge",
-            title: "An assistant for the invisible work.",
-            body: "It knows the calendar, lists and birthdays — briefs you each morning, and does the doing when you ask. Off until you say so."
+            hero: .motion(.grateful),
+            eyebrow: "Make time",
+            title: "More time for what matters.",
+            body: "Rowan, your Concierge, knows the calendar, lists and birthdays — briefs you each morning and does the doing when you ask. Off until you say so.",
+            isActive: page == 3
         ) {
             VStack(alignment: .leading, spacing: DesignTokens.Spacing.inset) {
                 OnboardingConciergeMock()
@@ -242,11 +241,11 @@ struct OnboardingTourView: View {
                         Button { aiConciergeEnabled = true } label: {
                             Label("Turn it on now", systemImage: "sparkles")
                                 .font(.flSubheadline.weight(.semibold))
-                                .foregroundStyle(WarmPalette.ink1)
+                                .foregroundStyle(WarmPalette.cream1)
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, DesignTokens.Spacing.inset)
                                 .background(
-                                    AccentTheme.saffron.color,
+                                    KinrowsBrand.evergreen,
                                     in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.small)
                                 )
                         }
@@ -257,15 +256,16 @@ struct OnboardingTourView: View {
         }
     }
 
-    private var readyPage: some View {
+    /// 05 — Further together. The whole crew rows; this is the commit page.
+    private var togetherPage: some View {
         tourPage(
-            icon: "figure.2.and.child.holdinghands",
-            accent: AccentTheme.sage.color,
-            eyebrow: mode == .preAuth ? "You're ready" : "You're ready",
-            title: "Start with the week you're in.",
+            hero: .scenic,
+            eyebrow: "Further together",
+            title: "Kin that rows together.",
             body: mode == .preAuth
                 ? "Your household lives here — not on this phone. Create one so your partner can join with a code."
-                : "Put tonight on the calendar, start a grocery list, say hello in the feed — small wins first."
+                : "Put tonight on the calendar, start a grocery list, say hello in the feed — small wins first.",
+            isActive: page == 4
         ) {
             if mode == .replay, !householdInviteCode.isEmpty {
                 VStack(spacing: DesignTokens.Spacing.tinyLabel) {
@@ -284,40 +284,42 @@ struct OnboardingTourView: View {
                 .frame(maxWidth: .infinity)
                 .padding(DesignTokens.Spacing.cardPadding)
                 .flCard(tint: AccentTheme.sage.color)
+            } else {
+                OnboardingAvatarCluster()
             }
         }
     }
 
+    // MARK: - Page scaffold
+
+    private enum Hero {
+        case motion(KinrowsAsset.RowanPose, loops: Bool = false)
+        case scenic
+    }
+
     private func tourPage(
-        icon: String,
-        accent: Color,
+        hero: Hero,
         eyebrow: String,
         title: String,
         body: String,
+        isActive: Bool,
         @ViewBuilder content: () -> some View
     ) -> some View {
         let inner = content()
         return GeometryReader { geo in
             ScrollView(showsIndicators: false) {
                 VStack(spacing: DesignTokens.Spacing.sectionGap) {
-                    ZStack {
-                        Circle()
-                            .fill(accent.opacity(DesignTokens.Opacity.interactiveTint))
-                            .frame(width: 84, height: 84)
-                        Image(systemName: icon)
-                            .font(.system(size: 36, weight: .semibold))
-                            .foregroundStyle(accent)
-                    }
+                    heroView(hero, isActive: isActive)
 
                     VStack(spacing: DesignTokens.Spacing.rowVertical) {
                         Text(eyebrow)
                             .font(.flOverline)
                             .tracking(0.4)
                             .textCase(.uppercase)
-                            .foregroundStyle(WarmPalette.ink2)
+                            .foregroundStyle(AccentTheme.sage.color)
                         Text(title)
-                            .font(.flTitle)
-                            .foregroundStyle(WarmPalette.ink1)
+                            .font(.flDisplay)
+                            .foregroundStyle(KinrowsBrand.evergreen)
                             .multilineTextAlignment(.center)
                         Text(body)
                             .font(.flBody)
@@ -335,6 +337,44 @@ struct OnboardingTourView: View {
             }
         }
     }
+
+    @ViewBuilder
+    private func heroView(_ hero: Hero, isActive: Bool) -> some View {
+        switch hero {
+        case let .motion(pose, loops):
+            RowanMotionView(pose: pose, loops: loops, isActive: isActive, maxWidth: 170, maxHeight: 170)
+                .frame(height: 170)
+        case .scenic:
+            // Beat 05 ships as the still: generated motion kept redrawing the
+            // crew's faces (rejected per the brand guide), so the card gets a
+            // slow native float instead — off under Reduce Motion.
+            KinrowsIllustration(.scenicRow, accessibility: .decorative)
+                .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.cardLarge, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.cardLarge, style: .continuous)
+                        .stroke(KinrowsBrand.sage.opacity(0.35), lineWidth: 1)
+                )
+                .modifier(ScenicFloat(isActive: isActive && !reduceMotion))
+                .accessibilityLabel("A family rowing a canoe together across a calm lake")
+                .accessibilityAddTraits(.isImage)
+        }
+    }
+}
+
+/// A 6-second, 4pt vertical bob — the boat "on the water" without touching
+/// the artwork. Restarts whenever the page becomes active.
+private struct ScenicFloat: ViewModifier {
+    var isActive: Bool
+    @State private var up = false
+
+    func body(content: Content) -> some View {
+        content
+            .offset(y: up ? -4 : 4)
+            .animation(isActive ? .easeInOut(duration: 3).repeatForever(autoreverses: true) : .default, value: up)
+            .onChange(of: isActive, initial: true) { _, active in
+                up = active
+            }
+    }
 }
 
 #Preview("Pre-auth") {
@@ -343,4 +383,8 @@ struct OnboardingTourView: View {
 
 #Preview("Replay") {
     OnboardingTourView(mode: .replay)
+}
+
+#Preview("Further together") {
+    OnboardingTourView(mode: .preAuth)
 }

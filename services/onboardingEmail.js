@@ -22,7 +22,7 @@
 const email = require('./email');
 const subscription = require('./subscription');
 
-const { BRAND, escapeHtml, emailConfig } = email;
+const { BRAND, escapeHtml, emailConfig, patternTableAttrs, patternVml, sharedCss, footerMark } = email;
 
 // Public URL of THIS server (unsubscribe links must land on the API, not the
 // static marketing site).
@@ -57,27 +57,13 @@ function shell({ subject, preheader, eyebrow, eyebrowColor, title, sections, uns
 <meta name="supported-color-schemes" content="light dark">
 <title>${escapeHtml(subject)}</title>
 <!--[if mso]><style>* {font-family: Georgia, serif !important;}</style><![endif]-->
-<style>
-  @media (prefers-color-scheme: dark) {
-    .bg { background:#1b140d !important; }
-    .card { background:#241a11 !important; }
-    .ink1, .brand { color:#fbe6c8 !important; }
-    .ink2 { color:#dcc6a6 !important; }
-    .ink3 { color:#b59a78 !important; }
-    .line { border-color:#3a2c1c !important; }
-    .hr { background:#3a2c1c !important; }
-  }
-  a { color:${BRAND.terra}; }
-  @media only screen and (max-width:620px) {
-    .px { padding-left:24px !important; padding-right:24px !important; }
-    .brand { font-size:30px !important; }
-    .h1 { font-size:28px !important; }
-  }
+<style>${sharedCss()}
 </style>
 </head>
 <body class="bg" style="margin:0; padding:0; width:100%; background:${BRAND.cream}; -webkit-text-size-adjust:100%; -ms-text-size-adjust:100%;">
+  ${patternVml(site)}
   <div style="display:none; max-height:0; overflow:hidden; opacity:0; mso-hide:all;">${escapeHtml(preheader)}&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;</div>
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="bg" style="background:${BRAND.cream};">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" ${patternTableAttrs(site)}>
     <tr>
       <td align="center" style="padding:40px 16px;">
         <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:600px; max-width:600px;">
@@ -116,7 +102,7 @@ ${sections}
           </tr>
           <tr>
             <td class="px" style="padding:26px 48px 8px;" align="center">
-              <img src="${site}/assets/logo.png" width="44" height="44" alt="Kinrows" style="display:block; margin:0 auto 14px; border-radius:11px;">
+              ${footerMark(site)}
               <p class="ink3" style="margin:0; font-family:'Helvetica Neue',Arial,sans-serif; font-size:12px; line-height:1.6; color:${BRAND.ink3};">
                 A few getting-started notes because you created a Kinrows account &mdash; then we go quiet.<br>
                 <a href="${unsubUrl}" style="color:${BRAND.ink3};">Unsubscribe</a> any time; account and security emails still reach you.
@@ -181,8 +167,8 @@ function cta(label, href) {
                   <td class="px" style="padding:28px 48px 0;">
                     <table role="presentation" cellpadding="0" cellspacing="0" border="0">
                       <tr>
-                        <td align="center" bgcolor="${BRAND.terra}" style="border-radius:999px;">
-                          <a href="${href}" style="display:inline-block; padding:14px 30px; font-family:'Helvetica Neue',Arial,sans-serif; font-size:15px; font-weight:600; color:#fffaf0; text-decoration:none; border-radius:999px;">${escapeHtml(label)} &rarr;</a>
+                        <td align="center" bgcolor="${BRAND.evergreen}" style="border-radius:999px;">
+                          <a href="${href}" style="display:inline-block; padding:14px 30px; font-family:'Helvetica Neue',Arial,sans-serif; font-size:15px; font-weight:600; color:${BRAND.cream}; text-decoration:none; border-radius:999px;">${escapeHtml(label)} &rarr;</a>
                         </td>
                       </tr>
                     </table>

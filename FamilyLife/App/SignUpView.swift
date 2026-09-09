@@ -89,13 +89,11 @@ struct SignUpView: View {
 
     private var header: some View {
         VStack(spacing: 8) {
-            Image(systemName: mode == .join ? "person.badge.plus" : "house.fill")
-                .font(.system(size: 40, weight: .semibold))
-                .foregroundStyle(AccentTheme.sage.color)
+            KinrowsIllustration(.logo(.boatMark), accessibility: .label("Kinrows"), maxWidth: 72)
                 .padding(.bottom, 4)
             Text(mode == .join ? "Join a household" : "Create your household")
-                .font(.flScreenTitle)
-                .foregroundStyle(WarmPalette.ink1)
+                .font(.flDisplay)
+                .foregroundStyle(KinrowsBrand.evergreen)
             Text(mode == .join
                  ? "Enter the code your partner shared."
                  : "So the house can share this — not just this phone.")
@@ -161,7 +159,7 @@ struct SignUpView: View {
                 Text(mode == .join ? "Join household" : "Create household")
             }
         }
-        .buttonStyle(.flCTA(fill: AccentTheme.sage.color))
+        .buttonStyle(.flCTA)
         .disabled(!canSubmitEmail || isLoading)
         .opacity(canSubmitEmail ? 1 : 0.5)
         .padding(.top, 8)

@@ -6,73 +6,59 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;450;500;600&display=swap" rel="stylesheet" />
 <style>
+  /* Kinrows Direction 2.0 — tokens from brand/tokens/kinrows-brand-tokens.css */
   :root{
-    --cream:#fdf5e0; --ink1:#2c2017; --ink2:#5c4a3a; --ink3:#8a7460;
-    --card:#fffaf0; --terra:#c46a4a; --saffron:#d99a3c; --sage:#7ba05b;
+    --evergreen:#0F3D37; --sage:#8FAE8F; --oat:#F7F3E9; --clay:#C76F4F; --river:#6B8FB0; --sun:#F2C94C;
+    --ink:#1F2A24; --ink2:#3E4A43; --ink3:#6B756F; --mist:#E8EEE9; --card:#FBF9F3;
   }
   *{margin:0;padding:0;box-sizing:border-box}
-  body{width:1200px;height:630px;overflow:hidden;font-family:Inter,system-ui,sans-serif}
-  .card{position:relative;width:1200px;height:630px;overflow:hidden}
-  .bg{position:absolute;inset:0;background:url('assets/heroimage.jpg') center/cover no-repeat}
-  .scrim{position:absolute;inset:0;background:
-     linear-gradient(105deg, rgba(36,24,14,.88) 0%, rgba(36,24,14,.62) 40%, rgba(36,24,14,.18) 72%, rgba(36,24,14,.05) 100%)}
-  .wrap{position:relative;height:100%;display:flex;align-items:center;justify-content:space-between;padding:0 78px;gap:48px}
+  body{width:1200px;height:630px;overflow:hidden;font-family:Inter,system-ui,sans-serif;background:var(--oat)}
+  .card{position:relative;width:1200px;height:630px;overflow:hidden;background:var(--oat)}
+  .bg{position:absolute;inset:0;background:
+     radial-gradient(52% 60% at 88% 12%, rgba(143,174,143,.35), transparent 70%),
+     radial-gradient(40% 50% at 8% 100%, rgba(107,143,176,.22), transparent 70%)}
+  .sun{position:absolute;right:120px;top:52px;width:110px}
+  .cloud{position:absolute;right:330px;top:96px;width:120px;opacity:.9}
+  .waves{position:absolute;left:0;right:0;bottom:-8px;height:120px;opacity:.3;
+     background:url('assets/brand/illustrations/kinrows-waves-strip.png') repeat-x left bottom / 260px auto;
+     -webkit-mask-image:linear-gradient(90deg,transparent,#000 10%,#000 90%,transparent)}
+  .wrap{position:relative;height:100%;display:flex;align-items:center;justify-content:space-between;padding:0 78px 0 84px;gap:40px}
 
-  /* Left: brand + badge */
-  .left{display:flex;flex-direction:column;gap:26px;max-width:560px;color:var(--cream)}
-  .brand{font-family:Fraunces,Georgia,serif;font-weight:600;font-size:112px;line-height:.92;letter-spacing:-3px;color:var(--cream)}
-  .tag{font-size:30px;font-weight:450;line-height:1.32;color:rgba(253,245,224,.94);letter-spacing:-.2px}
-  .tag b{font-weight:600;color:#f4c98a}
+  .left{display:flex;flex-direction:column;gap:22px;max-width:640px;color:var(--ink)}
+  .lockup{width:360px;height:auto;display:block;margin-left:-6px}
+  .head{font-family:Fraunces,Georgia,serif;font-weight:600;font-size:66px;line-height:1.02;letter-spacing:-1.5px;color:var(--evergreen)}
+  .tag{font-size:26px;font-weight:450;line-height:1.36;color:var(--ink2);letter-spacing:-.2px;max-width:560px}
+  .tag b{font-weight:600;color:var(--evergreen)}
 
-  .badge{display:inline-flex;align-items:center;gap:13px;background:#000;border:1px solid rgba(255,255,255,.28);
-     border-radius:14px;padding:12px 20px 12px 18px;width:max-content;box-shadow:0 8px 26px rgba(0,0,0,.32)}
-  .badge svg{width:30px;height:30px;fill:#fff}
-  .badge .bt{display:flex;flex-direction:column;line-height:1.05;color:#fff;font-family:Inter,sans-serif}
-  .badge .bt small{font-size:13px;font-weight:400;letter-spacing:.2px}
+  .badge{display:inline-flex;align-items:center;gap:13px;background:var(--evergreen);color:var(--oat);
+     border-radius:14px;padding:12px 20px 12px 18px;width:max-content;box-shadow:0 10px 26px rgba(15,61,55,.28)}
+  .badge svg{width:30px;height:30px;fill:var(--oat)}
+  .badge .bt{display:flex;flex-direction:column;line-height:1.05;font-family:Inter,sans-serif}
+  .badge .bt small{font-size:13px;font-weight:400;letter-spacing:.2px;opacity:.9}
   .badge .bt span{font-size:25px;font-weight:600;letter-spacing:-.3px;margin-top:1px}
 
-  /* Right: Concierge phone showing the morning brief */
-  /* iPhone proportions: ~9:19.5 (262 x 566 ≈ 0.463) */
-  .phone{position:relative;width:262px;height:566px;border-radius:50px;background:#241810;
-     padding:10px;box-shadow:0 30px 70px rgba(20,12,4,.55), inset 0 0 0 2px rgba(255,255,255,.06)}
-  .screen{position:relative;height:100%;border-radius:42px;overflow:hidden;
-     background:linear-gradient(180deg,#fffaf0 0%, #fdf2dc 100%);padding:24px 19px 18px}
-  .island{position:absolute;top:11px;left:50%;transform:translateX(-50%);width:82px;height:25px;
-     background:#0e0a06;border-radius:14px;z-index:6}
-  .sb{display:flex;justify-content:space-between;font-size:12px;font-weight:600;color:var(--ink3);margin-bottom:15px}
-  .ey{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:600;color:var(--saffron);
-     text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px}
-  .ey svg{width:15px;height:15px;stroke:var(--saffron);fill:none;stroke-width:2}
-  .greet{font-family:Fraunces,Georgia,serif;font-weight:600;font-size:25px;line-height:1.1;color:var(--ink1);margin-bottom:13px;letter-spacing:-.5px}
-  .brief p{font-size:14px;line-height:1.46;color:var(--ink2);margin-bottom:10px}
-  .brief b{color:var(--ink1);font-weight:600}
-  .composer{position:absolute;left:19px;right:19px;bottom:18px;display:flex;align-items:center;justify-content:space-between;
-     background:#fff;border:1px solid rgba(44,32,23,.1);border-radius:26px;padding:11px 11px 11px 16px;
-     font-size:13.5px;color:var(--ink3);box-shadow:0 6px 18px rgba(44,32,23,.08)}
-  .composer .send{display:flex;align-items:center;justify-content:center;width:31px;height:31px;border-radius:50%;
-     background:var(--terra)}
-  .composer .send svg{width:16px;height:16px;stroke:#fff;fill:none;stroke-width:2.4}
-  .screen.shot{padding:0}
-  .screen.shot img{display:block;width:100%;height:100%;object-fit:cover}
+  .right{position:relative;width:390px;height:100%;display:flex;align-items:flex-end;justify-content:center}
+  .rowan{width:330px;height:auto;display:block;margin-bottom:34px;filter:drop-shadow(0 18px 30px rgba(15,61,55,.16))}
 </style>
 </head>
 <body>
   <div class="card">
     <div class="bg"></div>
-    <div class="scrim"></div>
+    <img class="sun" src="assets/brand/illustrations/kinrows-sun.png" alt="">
+    <img class="cloud" src="assets/brand/illustrations/kinrows-cloud.png" alt="">
+    <div class="waves"></div>
     <div class="wrap">
       <div class="left">
-        <div class="brand">Kinrows</div>
-        <div class="tag">Family life, moving together — with a <b>Concierge</b> that runs the app for you.</div>
+        <img class="lockup" src="assets/brand/logos/kinrows-lockup.png" alt="Kinrows">
+        <div class="head">A calmer<br>home together.</div>
+        <div class="tag">Kin that rows together — the calendar, the lists, the trips and the small decisions in one quiet place, with <b>Rowan</b>, your family's Concierge.</div>
         <div class="badge">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17.05 12.04c-.03-2.6 2.13-3.84 2.22-3.9-1.21-1.78-3.1-2.02-3.78-2.04-1.6-.16-3.13.94-3.94.94-.81 0-2.06-.92-3.4-.9-1.74.03-3.35 1.02-4.25 2.58-1.82 3.16-.47 7.83 1.3 10.4.86 1.25 1.89 2.66 3.24 2.61 1.3-.05 1.79-.84 3.36-.84 1.57 0 2.01.84 3.39.81 1.4-.02 2.28-1.27 3.14-2.53.99-1.46 1.4-2.87 1.42-2.94-.03-.02-2.72-1.05-2.75-4.13Z"/><path d="M14.6 4.5c.72-.87 1.2-2.08 1.07-3.28-1.03.04-2.28.69-3.02 1.56-.66.77-1.24 2-1.08 3.18 1.15.09 2.32-.59 3.03-1.46Z"/></svg>
           <div class="bt"><small>Coming this September to the</small><span>App Store</span></div>
         </div>
       </div>
-      <div class="phone">
-        <div class="screen shot">
-          <img src="assets/shots/home.png" alt="Kinrows app home screen">
-        </div>
+      <div class="right">
+        <img class="rowan" src="assets/brand/mascot/rowan-wave.png" alt="Rowan, the Kinrows mascot, waving">
       </div>
     </div>
   </div>

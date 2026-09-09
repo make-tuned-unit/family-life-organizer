@@ -1,8 +1,9 @@
 import SwiftUI
 
 // MARK: - Design Tokens
-// Single source of truth for the Liquid Glass warm design system.
-// Palette inspired by terracotta, cream, and natural tones.
+// Single source of truth for the Kinrows design system (Direction 2.0:
+// evergreen / sage / oat / clay / river / sun on warm Liquid-Glass surfaces).
+// Brand colours live in KinrowsBrand below; semantic roles resolve onto them.
 
 enum DesignTokens {
     enum Spacing {
@@ -53,6 +54,7 @@ enum DesignTokens {
 //   flCaption       12  regular     dense annotations
 //   flOverline      11  semibold    UPPERCASE section eyebrows (pair with .tracking(0.4))
 //   flHero          44  bold rounded  the one big dashboard number per screen
+//   flDisplay*      Fraunces (brand serif) — onboarding/auth/empty-state headings only
 
 extension Font {
     static let flScreenTitle: Font = .system(.title, weight: .bold)
@@ -67,9 +69,73 @@ extension Font {
     /// scales. Use flOverline for the semibold/uppercase variant.
     static let flCaption2: Font = .system(.caption2)
     static let flHero: Font = .system(size: 44, weight: .bold, design: .rounded)
+    /// Fraunces display roles (brand voice) — onboarding titles, the auth
+    /// lockup, large empty-state headings, celebration moments. Scales with
+    /// Dynamic Type via relativeTo. Keep nav/forms/lists on the SF roles.
+    static let flDisplay: Font = .custom(KinrowsBrand.Typeface.displaySemiBold, size: 28, relativeTo: .title)
+    static let flDisplayLarge: Font = .custom(KinrowsBrand.Typeface.displaySemiBold, size: 36, relativeTo: .largeTitle)
+    static let flDisplaySmall: Font = .custom(KinrowsBrand.Typeface.displayRegular, size: 22, relativeTo: .title2)
+    static let flDisplayItalic: Font = .custom(KinrowsBrand.Typeface.displayItalic, size: 22, relativeTo: .title2)
     /// Secondary big number (detail-screen totals) — rounded numerals are the
     /// friendly-but-adult signature for money/stats; scales with Dynamic Type.
     static let flStat: Font = .system(.largeTitle, design: .rounded, weight: .bold)
+}
+
+// MARK: - Kinrows Brand (Direction 2.0 — "Kin that rows together")
+// Source of truth: brand/tokens/kinrows-brand-tokens.json. These eight hexes
+// are the ONLY brand colours; everything below is a tint/shade of one of
+// them so the product never grows a second palette. Never sample colours
+// from screenshots — import from here.
+
+enum KinrowsBrand {
+    // The eight kit tokens.
+    static let evergreen = Color(hex: "#0F3D37")   // primary: nav, high-emphasis text/actions
+    static let sage      = Color(hex: "#8FAE8F")   // secondary: supportive states, leaf/crew accents
+    static let oat       = Color(hex: "#F7F3E9")   // main warm background
+    static let clay      = Color(hex: "#C76F4F")   // warm accent: moments, attention
+    static let river     = Color(hex: "#6B8FB0")   // links, travel, water, informational UI
+    static let sun       = Color(hex: "#F2C94C")   // celebration / highlight ONLY
+    static let ink       = Color(hex: "#1F2A24")   // body text
+    static let mist      = Color(hex: "#E8EEE9")   // secondary surfaces + dividers
+
+    // Accessible shades (same hue, darker) for glyphs/text on Oat — Sage and
+    // Sun themselves fall below 3:1 on cream, so they stay fills/highlights.
+    static let sageDeep  = Color(hex: "#5E8262")
+    static let sunDeep   = Color(hex: "#B9891A")
+    static let clayDeep  = Color(hex: "#A5563A")
+    static let riverDeep = Color(hex: "#4E7091")
+
+    // Oat tints for layered surfaces and ambient gradients.
+    static let oatLight  = Color(hex: "#FBF9F3")   // cards sit lighter than the page
+    static let oat2      = Color(hex: "#EFEADB")
+    static let oat3      = Color(hex: "#E4DECB")
+
+    enum Radius {       // kit radii — product surfaces keep DesignTokens.CornerRadius
+        static let sm: CGFloat = 10
+        static let md: CGFloat = 16
+        static let lg: CGFloat = 24
+        static let pill: CGFloat = 999
+    }
+
+    enum Motion {       // kit motion durations (seconds)
+        static let micro: Double = 0.18
+        static let standard: Double = 0.28
+        static let celebration: Double = 0.42
+        /// cubic-bezier(0.22, 1, 0.36, 1) — a soft, settled ease-out.
+        static var standardCurve: Animation { .timingCurve(0.22, 1, 0.36, 1, duration: standard) }
+        static var microCurve: Animation { .timingCurve(0.22, 1, 0.36, 1, duration: micro) }
+        static var celebrationCurve: Animation { .timingCurve(0.22, 1, 0.36, 1, duration: celebration) }
+    }
+
+    enum Typeface {
+        /// Fraunces static instances bundled in Resources/Fonts (OFL). Display
+        /// roles only — onboarding titles, brand moments, large empty-state
+        /// headings. Navigation, forms, lists and controls stay on SF (the
+        /// platform-native stand-in for the kit's Inter).
+        static let displaySemiBold = "Fraunces72pt-SemiBold"
+        static let displayRegular = "Fraunces72pt-Regular"
+        static let displayItalic = "Fraunces72pt-Italic"
+    }
 }
 
 // MARK: - Person Palette
@@ -78,17 +144,20 @@ extension Font {
 // Use everywhere a person appears — avatar fills, assignee dots, calendar
 // tags, leaderboard accents — so each family member reads as one color
 // across every feature. Always pair with a non-color cue (initial/name).
+// Eight slots: the five brand hues plus three muted companions (taupe, teal,
+// plum) chosen to sit quietly beside them — a household needs more distinct
+// identities than the kit has hues.
 
 enum PersonPalette {
     static let pairs: [(Color, Color)] = [
-        (Color(hex: "#c46a4a"), Color(hex: "#8a3e2a")),  // terracotta
-        (Color(hex: "#d99a3c"), Color(hex: "#a86a1c")),  // saffron
-        (Color(hex: "#7ba05b"), Color(hex: "#4a6a35")),  // sage
-        (Color(hex: "#6b8aa0"), Color(hex: "#3a5870")),  // ocean
-        (Color(hex: "#b97090"), Color(hex: "#7a4868")),  // rose
-        (Color(hex: "#8a7468"), Color(hex: "#5a463a")),  // taupe
-        (Color(hex: "#6a9a8a"), Color(hex: "#3a6a5a")),  // teal
-        (Color(hex: "#9a6ab0"), Color(hex: "#6a3a80")),  // violet
+        (KinrowsBrand.clay,  KinrowsBrand.clayDeep),       // clay
+        (Color(hex: "#D9A72B"), KinrowsBrand.sunDeep),     // sun
+        (KinrowsBrand.sage,  KinrowsBrand.sageDeep),       // sage
+        (KinrowsBrand.river, KinrowsBrand.riverDeep),      // river
+        (Color(hex: "#2E6158"), KinrowsBrand.evergreen),   // evergreen
+        (Color(hex: "#9C8878"), Color(hex: "#6B5A4D")),    // taupe
+        (Color(hex: "#5F9A8C"), Color(hex: "#3B6E62")),    // teal
+        (Color(hex: "#9A7A9C"), Color(hex: "#6A4E6C")),    // plum
     ]
 
     static func index(for name: String) -> Int {
@@ -110,55 +179,65 @@ enum PersonPalette {
 }
 
 // MARK: - Warm Palette
+// Semantic surface + text roles, now resolved onto the Kinrows tokens. The
+// names are historical (cream/peach/sunset date from the terracotta era) and
+// stay so 1,000+ call sites don't churn; the VALUES are Oat/Ink/Sun/Clay.
 
 enum WarmPalette {
-    static let cream1 = Color(hex: "#fbf3e8")
-    static let cream2 = Color(hex: "#f5e6d0")
-    static let cream3 = Color(hex: "#efd4b4")
-    static let peach = Color(hex: "#f7c89a")
-    static let sunset = Color(hex: "#e89a76")
-    static let rose = Color(hex: "#d97a7a")
-    static let mauve = Color(hex: "#8a6585")
+    static let cream1 = KinrowsBrand.oat            // page background
+    static let cream2 = KinrowsBrand.oat2           // deeper oat (ambient gradients)
+    static let cream3 = KinrowsBrand.oat3
+    static let mist   = KinrowsBrand.mist           // dividers, secondary surfaces
+    static let peach  = Color(hex: "#F3DFA0")       // sun @ ~50% over oat (ambient warmth)
+    static let sunset = Color(hex: "#DDA089")       // clay @ ~60% over oat
+    static let rose   = KinrowsBrand.clay
+    static let mauve  = KinrowsBrand.riverDeep
 
-    /// Opaque card surface — no alpha compositing needed. Matches the warm cream aesthetic.
-    static let cardSurface = Color(hex: "#f8f0e4")
+    /// Opaque card surface — no alpha compositing needed. Sits a step lighter than Oat.
+    static let cardSurface = KinrowsBrand.oatLight
 
-    static let ink1 = Color(hex: "#2a1f1a")
-    static let ink2 = Color(hex: "#5a463a")
-    static let ink3 = Color(hex: "#8a7468")
-    static let ink4 = Color(hex: "#b8a394")
+    static let ink1 = KinrowsBrand.ink
+    static let ink2 = Color(hex: "#3E4A43")
+    static let ink3 = Color(hex: "#6B756F")
+    static let ink4 = Color(hex: "#A9B1AC")
 
-    static let good = Color(hex: "#7ba05b")
-    static let warn = Color(hex: "#d99a3c")
-    static let bad = Color(hex: "#c25a5a")
+    static let good = KinrowsBrand.sageDeep
+    static let warn = KinrowsBrand.sunDeep
+    static let bad  = KinrowsBrand.clayDeep
 }
 
 // MARK: - Accent Colors
+// Case names are persisted (person colour choices) so they keep their
+// historical rawValues; each now resolves to a Kinrows hue:
+//   terracotta → Clay · saffron → Sun (deep for glyphs) · rose → Evergreen
+//   sage → Sage (deep for glyphs) · mauve → River (deep) · ocean → River
 
 enum AccentTheme: String, CaseIterable, Identifiable {
     case terracotta, saffron, rose, sage, mauve, ocean
 
     var id: String { rawValue }
 
+    /// Glyph/text-safe colour (≥3:1 on Oat).
     var color: Color {
         switch self {
-        case .terracotta: Color(hex: "#c46a4a")
-        case .saffron:    Color(hex: "#d99a3c")
-        case .rose:       Color(hex: "#c25a7a")
-        case .sage:       Color(hex: "#7ba05b")
-        case .mauve:      Color(hex: "#8a6585")
-        case .ocean:      Color(hex: "#5a87a0")
+        case .terracotta: KinrowsBrand.clay
+        case .saffron:    KinrowsBrand.sunDeep
+        case .rose:       KinrowsBrand.evergreen
+        case .sage:       KinrowsBrand.sageDeep
+        case .mauve:      KinrowsBrand.riverDeep
+        case .ocean:      KinrowsBrand.river
         }
     }
 
+    /// Fill/highlight variant (chips, tints, celebration).
     var soft: Color {
         switch self {
-        case .terracotta: Color(hex: "#e89a7a")
-        case .saffron:    Color(hex: "#f0c178")
-        case .rose:       Color(hex: "#e89ab0")
-        case .sage:       Color(hex: "#a8c489")
-        case .mauve:      Color(hex: "#b89cb4")
-        case .ocean:      Color(hex: "#8eaec4")
+        case .terracotta: Color(hex: "#E7BBAA")
+        case .saffron:    KinrowsBrand.sun
+        case .rose:       KinrowsBrand.sage
+        case .sage:       KinrowsBrand.sage
+        case .mauve:      Color(hex: "#A9BFD3")
+        case .ocean:      Color(hex: "#A9BFD3")
         }
     }
 }
@@ -171,7 +250,7 @@ enum TabAccent {
     var color: Color {
         switch self {
         case .home:       AccentTheme.sage.color
-        case .calendar:   Color(hex: "#b97090")
+        case .calendar:   KinrowsBrand.evergreen
         case .pantry:     AccentTheme.ocean.color
         case .expenses:   AccentTheme.terracotta.color
         case .trips:      AccentTheme.ocean.color
@@ -180,7 +259,7 @@ enum TabAccent {
         case .decisions:  AccentTheme.mauve.color
         case .gifts:      AccentTheme.saffron.color
         case .care:       AccentTheme.sage.color
-        case .routines:   Color(hex: "#7b83b8")
+        case .routines:   KinrowsBrand.riverDeep
         }
     }
 }

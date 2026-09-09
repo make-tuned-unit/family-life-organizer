@@ -220,8 +220,10 @@ struct FLLoadingState: View {
                 title: "Stock your pantry",
                 systemImage: "cabinet",
                 description: "Track what you have and when it expires.",
-                actionLabel: "Add an item"
-            ) {}
+                actionLabel: "Add an item",
+                action: {},
+                rowan: .onIt
+            )
         }
     }
 }
@@ -625,6 +627,9 @@ struct WarmEmptyState: View {
     /// Conversational path: a pre-seeded concierge prompt ("What should we
     /// make for dinner?"). Renders only when the concierge is enabled.
     var conciergePrompt: String? = nil
+    /// Rowan still above the title — medium-density surfaces only (feature
+    /// roots, family setup, Concierge). Leave nil on dense grids and forms.
+    var rowan: KinrowsAsset.RowanPose? = nil
 
     @Environment(ConciergeLaunch.self) private var conciergeLaunch: ConciergeLaunch?
     @AppStorage("aiConciergeEnabled") private var aiConciergeEnabled = false
@@ -634,13 +639,18 @@ struct WarmEmptyState: View {
 
     var body: some View {
         VStack(spacing: 10) {
-            Image(systemName: systemImage)
-                .font(.system(size: 36))
-                .foregroundStyle(WarmPalette.ink4)
-                .symbolRenderingMode(.hierarchical)
+            if let rowan {
+                KinrowsIllustration(.mascot(rowan), maxWidth: 120, maxHeight: 130)
+                    .padding(.bottom, 4)
+            } else {
+                Image(systemName: systemImage)
+                    .font(.system(size: 36))
+                    .foregroundStyle(WarmPalette.ink4)
+                    .symbolRenderingMode(.hierarchical)
+            }
             Text(title)
-                .font(.flHeadline)
-                .foregroundStyle(WarmPalette.ink2)
+                .font(rowan == nil ? .flHeadline : .flDisplaySmall)
+                .foregroundStyle(rowan == nil ? WarmPalette.ink2 : KinrowsBrand.evergreen)
             if let description {
                 Text(description)
                     .font(.flSubheadline)

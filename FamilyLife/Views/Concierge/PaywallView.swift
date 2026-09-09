@@ -74,12 +74,10 @@ struct PaywallView: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Image(systemName: "sparkles")
-                .font(.system(size: 34, weight: .semibold))
-                .foregroundStyle(accent)
-            Text("Your AI Life Concierge")
-                .font(.flScreenTitle)
-                .foregroundStyle(WarmPalette.ink1)
+            KinrowsIllustration(.mascot(.excited), maxWidth: 120, maxHeight: 130)
+            Text("Meet Rowan, your Concierge")
+                .font(.flDisplay)
+                .foregroundStyle(KinrowsBrand.evergreen)
             Text(subscription.pendingWebCheckout
                  ? "Finish in Safari, then we will bring you back and unlock Concierge."
                  : "A personal butler for your family — always organized, always one step ahead.")
@@ -90,14 +88,15 @@ struct PaywallView: View {
 
     private var unlockedCard: some View {
         VStack(alignment: .leading, spacing: 12) {
+            KinrowsIllustration(.mascot(.celebrating), maxWidth: 88, maxHeight: 88)
             Text("You are in")
-                .font(.flTitle)
-                .foregroundStyle(WarmPalette.ink1)
+                .font(.flDisplaySmall)
+                .foregroundStyle(KinrowsBrand.evergreen)
             Text("Concierge is on for everyone in this household.")
                 .font(.flSubheadline)
                 .foregroundStyle(WarmPalette.ink3)
             Button("Continue") { dismiss() }
-                .buttonStyle(.flCTA(fill: accent))
+                .buttonStyle(.flCTA)
         }
         .padding(DesignTokens.Spacing.cardPadding)
         .frame(maxWidth: .infinity, alignment: .leading)
