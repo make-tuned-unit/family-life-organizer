@@ -662,13 +662,15 @@ a:focus-visible, button:focus-visible, input:focus-visible,
 .itin-row .ic{margin-left:auto;width:16px;height:16px;color:var(--ocean)}
 
 @media (max-width:900px){
-  /* narrow screens: keep the right of the scene (house, trees, sun) in frame */
-  /* portrait scene sized to the viewport width and pinned to the top, so the
-     mountains and lake are on screen on landing; the foliage runs under the phone */
-  .hero{background-image:url('brand/patterns/hero-lake-portrait.jpg');background-size:100% auto;background-position:center 58%;
-    background-color:var(--cream-1)}
+  /* narrow screens: the portrait scene is a bottom-anchored layer whose top is
+     masked to Oat, so the copy always sits on plain page (whatever the device
+     height) while the sun and ridge line rise into the first screen. */
+  .hero{background:var(--cream-1)}
+  .hero-ambient{inset:auto 0 0 0;height:min(228vw,1100px);
+    background:url('brand/patterns/hero-lake-portrait.jpg') no-repeat center bottom / 128% auto;
+    -webkit-mask-image:linear-gradient(180deg,transparent 0%,rgba(0,0,0,.55) 26%,#000 44%);
+    mask-image:linear-gradient(180deg,transparent 0%,rgba(0,0,0,.55) 26%,#000 44%)}
   .hero-link{background:rgba(247,243,233,.85);padding:6px 12px;border-radius:999px;margin-top:14px}
-  .hero-ambient{background:none}   /* the portrait scene keeps its sky clear for the copy */
   .hero-rowan{position:absolute;left:0;bottom:-10px;width:124px;margin:0}   /* bottom-left corner of the phone */
   .phone-pair{max-width:380px;min-height:650px}
   .phone-pair .phone.back{transform:scale(.84) translate(58px,-40px) rotate(3deg)}
