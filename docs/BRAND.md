@@ -47,6 +47,8 @@ How they were made (repeat this to add a pose):
 4. Recover alpha and encode with `brand/mascot/motion/encode.sh` — a soft luma key (`max(r,g,b)` 4→26 ramp) + `unpremultiply`, trimming the first 10 frames (the model's black→magenta transition), then `hevc_videotoolbox -alpha_quality 0.9` for `.mov` and `libvpx-vp9 yuva420p` for `.webm`.
 5. Reject any clip where the face or leaf silhouette changes; compare first and last frame to the source at 100%.
 
+Take notes from the first run: `rowan-on-it` needed the magenta backdrop bleed recoloured out of the clipboard (a hue-gated `geq` before keying, kept in `masters/02-plan-nobg.mp4`); `rowan-grateful` trims 14 frames and masks the left 34% to hide the stray mark in the kit source; beat 05 (the scenic family row) has **no generated clip** — Kling refused the panoramic frame three times and Seedance redrew the crew's faces, so both iOS and web ship the cleaned still with a slow native float.
+
 Playback: `RowanMotionView` (iOS) plays once and holds the last frame (loops only for thinking/idle), pauses when `isActive` is false, and falls back to the still under Reduce Motion or when the clip is missing. On the web, `assets/app.js` applies the same rules to `video.rowan` (`prefers-reduced-motion`, IntersectionObserver pause).
 
 ## Deliberate deviations from the handoff

@@ -146,6 +146,17 @@
 		AA000232 /* WidgetDataStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000231 /* WidgetDataStore.swift */; };
 		AA000233 /* DesignTokens.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00003B /* DesignTokens.swift */; };
 		AA000234 /* KinrowsWidgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = CC000002 /* KinrowsWidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		AA000300 /* Fraunces72pt-SemiBold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = BB000300 /* Fraunces72pt-SemiBold.ttf */; };
+		AA000301 /* Fraunces72pt-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = BB000301 /* Fraunces72pt-Regular.ttf */; };
+		AA000302 /* Fraunces72pt-Italic.ttf in Resources */ = {isa = PBXBuildFile; fileRef = BB000302 /* Fraunces72pt-Italic.ttf */; };
+		AA000303 /* KinrowsIllustration.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000303 /* KinrowsIllustration.swift */; };
+		AA000304 /* RowanMotionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000304 /* RowanMotionView.swift */; };
+		AA000305 /* rowan-wave.mov in Resources */ = {isa = PBXBuildFile; fileRef = BB000305 /* rowan-wave.mov */; };
+		AA000306 /* rowan-idle.mov in Resources */ = {isa = PBXBuildFile; fileRef = BB000306 /* rowan-idle.mov */; };
+		AA000307 /* rowan-celebrating.mov in Resources */ = {isa = PBXBuildFile; fileRef = BB000307 /* rowan-celebrating.mov */; };
+		AA000308 /* rowan-grateful.mov in Resources */ = {isa = PBXBuildFile; fileRef = BB000308 /* rowan-grateful.mov */; };
+		AA000309 /* rowan-on-it.mov in Resources */ = {isa = PBXBuildFile; fileRef = BB000309 /* rowan-on-it.mov */; };
+		AA00030A /* rowan-thinking.mov in Resources */ = {isa = PBXBuildFile; fileRef = BB00030A /* rowan-thinking.mov */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -311,8 +322,19 @@
 		BB000231 /* WidgetDataStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetDataStore.swift; sourceTree = "<group>"; };
 		BB000232 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		BB000233 /* KinrowsWidget.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = KinrowsWidget.entitlements; sourceTree = "<group>"; };
-		CC000002 /* KinrowsWidgetExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = KinrowsWidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		CC000001 /* FamilyLife.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = FamilyLife.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		CC000002 /* KinrowsWidgetExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = KinrowsWidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		BB000300 /* Fraunces72pt-SemiBold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = Fraunces72pt-SemiBold.ttf; sourceTree = "<group>"; };
+		BB000301 /* Fraunces72pt-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = Fraunces72pt-Regular.ttf; sourceTree = "<group>"; };
+		BB000302 /* Fraunces72pt-Italic.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = Fraunces72pt-Italic.ttf; sourceTree = "<group>"; };
+		BB000303 /* KinrowsIllustration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KinrowsIllustration.swift; sourceTree = "<group>"; };
+		BB000304 /* RowanMotionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RowanMotionView.swift; sourceTree = "<group>"; };
+		BB000305 /* rowan-wave.mov */ = {isa = PBXFileReference; lastKnownFileType = video.quicktime; path = rowan-wave.mov; sourceTree = "<group>"; };
+		BB000306 /* rowan-idle.mov */ = {isa = PBXFileReference; lastKnownFileType = video.quicktime; path = rowan-idle.mov; sourceTree = "<group>"; };
+		BB000307 /* rowan-celebrating.mov */ = {isa = PBXFileReference; lastKnownFileType = video.quicktime; path = rowan-celebrating.mov; sourceTree = "<group>"; };
+		BB000308 /* rowan-grateful.mov */ = {isa = PBXFileReference; lastKnownFileType = video.quicktime; path = rowan-grateful.mov; sourceTree = "<group>"; };
+		BB000309 /* rowan-on-it.mov */ = {isa = PBXFileReference; lastKnownFileType = video.quicktime; path = rowan-on-it.mov; sourceTree = "<group>"; };
+		BB00030A /* rowan-thinking.mov */ = {isa = PBXFileReference; lastKnownFileType = video.quicktime; path = rowan-thinking.mov; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -340,16 +362,6 @@
 				EE000030 /* KinrowsWidget */,
 				EE000003 /* Products */,
 			);
-			sourceTree = "<group>";
-		};
-		EE000030 /* KinrowsWidget */ = {
-			isa = PBXGroup;
-			children = (
-				BB000230 /* KinrowsWidget.swift */,
-				BB000232 /* Info.plist */,
-				BB000233 /* KinrowsWidget.entitlements */,
-			);
-			path = KinrowsWidget;
 			sourceTree = "<group>";
 		};
 		EE000002 /* FamilyLife */ = {
@@ -456,6 +468,8 @@
 			children = (
 				BB00000D /* Assets.xcassets */,
 				BB000047 /* PrivacyInfo.xcprivacy */,
+				EE000040 /* Fonts */,
+				EE000041 /* Motion */,
 			);
 			path = Resources;
 			sourceTree = "<group>";
@@ -596,6 +610,8 @@
 				BB000044 /* LiquidGlassComponents.swift */,
 				BB000071 /* ShareWithSection.swift */,
 				BB0000A1 /* TabBarChrome.swift */,
+				BB000303 /* KinrowsIllustration.swift */,
+				BB000304 /* RowanMotionView.swift */,
 			);
 			path = Components;
 			sourceTree = "<group>";
@@ -661,6 +677,16 @@
 			path = Onboarding;
 			sourceTree = "<group>";
 		};
+		EE000030 /* KinrowsWidget */ = {
+			isa = PBXGroup;
+			children = (
+				BB000230 /* KinrowsWidget.swift */,
+				BB000232 /* Info.plist */,
+				BB000233 /* KinrowsWidget.entitlements */,
+			);
+			path = KinrowsWidget;
+			sourceTree = "<group>";
+		};
 		GG000001 /* Care */ = {
 			isa = PBXGroup;
 			children = (
@@ -685,6 +711,29 @@
 				BB00004E /* FamilyGroupsView.swift */,
 			);
 			path = Family;
+			sourceTree = "<group>";
+		};
+		EE000040 /* Fonts */ = {
+			isa = PBXGroup;
+			children = (
+				BB000300 /* Fraunces72pt-SemiBold.ttf */,
+				BB000301 /* Fraunces72pt-Regular.ttf */,
+				BB000302 /* Fraunces72pt-Italic.ttf */,
+			);
+			path = Fonts;
+			sourceTree = "<group>";
+		};
+		EE000041 /* Motion */ = {
+			isa = PBXGroup;
+			children = (
+				BB000305 /* rowan-wave.mov */,
+				BB000306 /* rowan-idle.mov */,
+				BB000307 /* rowan-celebrating.mov */,
+				BB000308 /* rowan-grateful.mov */,
+				BB000309 /* rowan-on-it.mov */,
+				BB00030A /* rowan-thinking.mov */,
+			);
+			path = Motion;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -767,6 +816,15 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				AA00030A /* rowan-thinking.mov in Resources */,
+				AA000309 /* rowan-on-it.mov in Resources */,
+				AA000308 /* rowan-grateful.mov in Resources */,
+				AA000307 /* rowan-celebrating.mov in Resources */,
+				AA000306 /* rowan-idle.mov in Resources */,
+				AA000305 /* rowan-wave.mov in Resources */,
+				AA000302 /* Fraunces72pt-Italic.ttf in Resources */,
+				AA000301 /* Fraunces72pt-Regular.ttf in Resources */,
+				AA000300 /* Fraunces72pt-SemiBold.ttf in Resources */,
 				AA00000D /* Assets.xcassets in Resources */,
 				AA000047 /* PrivacyInfo.xcprivacy in Resources */,
 			);
@@ -804,6 +862,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				AA000304 /* RowanMotionView.swift in Sources */,
+				AA000303 /* KinrowsIllustration.swift in Sources */,
 				AA000001 /* FamilyLifeApp.swift in Sources */,
 				AA000002 /* ContentView.swift in Sources */,
 				AA000003 /* LoginView.swift in Sources */,
@@ -969,7 +1029,7 @@
 				CODE_SIGN_ENTITLEMENTS = FamilyLife/FamilyLifeDebug.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 239;
+				CURRENT_PROJECT_VERSION = 241;
 				DEVELOPMENT_ASSET_PATHS = "";
 				DEVELOPMENT_TEAM = Z58XSBM78S;
 				ENABLE_PREVIEWS = YES;
@@ -1014,7 +1074,7 @@
 				CODE_SIGN_ENTITLEMENTS = FamilyLife/FamilyLife.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 239;
+				CURRENT_PROJECT_VERSION = 241;
 				DEVELOPMENT_ASSET_PATHS = "";
 				DEVELOPMENT_TEAM = Z58XSBM78S;
 				ENABLE_PREVIEWS = YES;
@@ -1176,8 +1236,6 @@
 			};
 			name = Release;
 		};
-/* End XCBuildConfiguration section */
-
 		FF000035 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -1185,7 +1243,7 @@
 				CODE_SIGN_ENTITLEMENTS = KinrowsWidget/KinrowsWidget.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 239;
+				CURRENT_PROJECT_VERSION = 240;
 				DEVELOPMENT_TEAM = Z58XSBM78S;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = KinrowsWidget/Info.plist;
@@ -1214,7 +1272,7 @@
 				CODE_SIGN_ENTITLEMENTS = KinrowsWidget/KinrowsWidget.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 239;
+				CURRENT_PROJECT_VERSION = 240;
 				DEVELOPMENT_TEAM = Z58XSBM78S;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = KinrowsWidget/Info.plist;
@@ -1248,20 +1306,20 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		FF000034 /* Build configuration list for PBXNativeTarget "KinrowsWidgetExtension" */ = {
-			isa = XCConfigurationList;
-			buildConfigurations = (
-				FF000035 /* Debug */,
-				FF000036 /* Release */,
-			);
-			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
-		};
 		FF000020 /* Build configuration list for PBXProject "FamilyLife" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				FF000021 /* Debug */,
 				FF000022 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		FF000034 /* Build configuration list for PBXNativeTarget "KinrowsWidgetExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				FF000035 /* Debug */,
+				FF000036 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

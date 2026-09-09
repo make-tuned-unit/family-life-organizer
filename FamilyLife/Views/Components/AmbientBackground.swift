@@ -1,7 +1,8 @@
 import SwiftUI
 
 /// Warm gradient backgrounds that give Liquid Glass surfaces something to refract through.
-/// Inspired by the aurora/photo/paper variants from the design prototype.
+/// Oat base with soft orbs of the Kinrows support colours (sage / river / clay / sun tints) —
+/// every colour here resolves to a KinrowsBrand token or WarmPalette role.
 struct AmbientBackground: View {
     var style: AmbientStyle = .home
 
@@ -45,16 +46,16 @@ struct AmbientBackground: View {
 
     private var baseGradientStops: [Gradient.Stop] {
         let colors: [Color] = switch style {
-        case .home:                [WarmPalette.cream1, WarmPalette.cream2, WarmPalette.sunset.opacity(0.3)]
+        case .home:                [WarmPalette.cream1, WarmPalette.cream2, KinrowsBrand.sage.opacity(0.18)]
         case .calendar, .cook, .care: [WarmPalette.cream1, WarmPalette.cream2.opacity(0.8)]
         case .pantry:              [WarmPalette.cream1, WarmPalette.cream2, WarmPalette.cream3.opacity(0.4)]
         case .expenses:            [WarmPalette.cream1, WarmPalette.peach.opacity(0.4), WarmPalette.sunset.opacity(0.2)]
-        case .trips:               [WarmPalette.cream1, Color(hex: "#8eaec4").opacity(0.2)]
+        case .trips:               [WarmPalette.cream1, KinrowsBrand.river.opacity(0.18)]
         case .rivalries:           [WarmPalette.cream1, WarmPalette.rose.opacity(0.15)]
         case .decisions:           [WarmPalette.cream1, WarmPalette.mauve.opacity(0.12)]
         case .gifts:               [WarmPalette.cream1, WarmPalette.peach.opacity(0.3)]
         case .settings:            [WarmPalette.cream1, WarmPalette.cream2]
-        case .login:               [Color(hex: "#1a0f0a"), Color(hex: "#2a1810"), Color(hex: "#1a0d0a")]
+        case .login:               [Color(hex: "#0A2622"), KinrowsBrand.evergreen, Color(hex: "#0A2622")]
         }
         return colors.enumerated().map { i, color in
             Gradient.Stop(color: color, location: CGFloat(i) / CGFloat(max(colors.count - 1, 1)))
@@ -63,41 +64,41 @@ struct AmbientBackground: View {
 
     private var orbColor1: Color {
         switch style {
-        case .home:       WarmPalette.peach
+        case .home:       KinrowsBrand.sage
         case .calendar:   WarmPalette.peach.opacity(0.5)
-        case .pantry:     Color(hex: "#d4a574")
+        case .pantry:     KinrowsBrand.river.opacity(0.6)
         case .expenses:   WarmPalette.sunset
-        case .trips:      Color(hex: "#5a87a0")
+        case .trips:      KinrowsBrand.river
         case .cook:       WarmPalette.peach
         case .rivalries:  WarmPalette.rose
         case .decisions:  WarmPalette.mauve
         case .gifts:      WarmPalette.peach
         case .settings:   WarmPalette.cream3
-        case .login:      Color(hex: "#5a2e1a")
+        case .login:      KinrowsBrand.sage.opacity(0.5)
         case .care:       AccentTheme.sage.soft
         }
     }
 
     private var orbColor2: Color {
         switch style {
-        case .home:       WarmPalette.rose
+        case .home:       WarmPalette.peach
         case .calendar:   WarmPalette.mauve.opacity(0.4)
-        case .pantry:     Color(hex: "#a87560")
+        case .pantry:     KinrowsBrand.sage
         case .expenses:   WarmPalette.peach
-        case .trips:      Color(hex: "#8eaec4")
+        case .trips:      Color(hex: "#A9BFD3")
         case .cook:       WarmPalette.sunset
         case .rivalries:  WarmPalette.sunset
-        case .decisions:  Color(hex: "#b89cb4")
+        case .decisions:  Color(hex: "#A9BFD3")
         case .gifts:      WarmPalette.sunset
         case .settings:   WarmPalette.cream2
-        case .login:      Color(hex: "#4a2818")
+        case .login:      KinrowsBrand.river.opacity(0.4)
         case .care:       AccentTheme.sage.color
         }
     }
 
     private var orbColor3: Color {
         switch style {
-        case .home:       WarmPalette.mauve
+        case .home:       KinrowsBrand.river
         case .calendar:   WarmPalette.cream3
         case .pantry:     WarmPalette.peach
         case .expenses:   AccentTheme.terracotta.color
@@ -107,7 +108,7 @@ struct AmbientBackground: View {
         case .decisions:  WarmPalette.cream3
         case .gifts:      WarmPalette.mauve
         case .settings:   WarmPalette.cream3
-        case .login:      Color(hex: "#3a1c1a")
+        case .login:      KinrowsBrand.sageDeep
         case .care:       WarmPalette.cream3
         }
     }
