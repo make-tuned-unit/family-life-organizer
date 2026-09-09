@@ -58,14 +58,19 @@ struct ContentView: View {
         #endif
     }
 
+    /// DEBUG: keep the launch screen up (UITEST_HOLD_LAUNCH=1) to review the crew animation.
+    private var holdLaunch: Bool {
+        #if DEBUG
+        ScreenshotHarness.holdLaunch
+        #else
+        false
+        #endif
+    }
+
     @ViewBuilder
     private var content: some View {
-        if authService.isRestoringSession {
-            ZStack {
-                AmbientBackground(style: .home)
-                ProgressView()
-                    .tint(WarmPalette.ink2)
-            }
+        if holdLaunch || authService.isRestoringSession {
+            KinrowsLaunchView()
         } else if authService.isAuthenticated {
             MainTabView()
         } else {
@@ -114,6 +119,8 @@ enum ScreenshotHarness {
     }
 
     static var initialChat: Bool { env["UITEST_SHEET"] == "chat" }
+
+    static var holdLaunch: Bool { env["UITEST_HOLD_LAUNCH"] == "1" }
 
     static var initialChatThread: ChatSheet.ChatThread? {
         guard let v = env["UITEST_CHAT_DM"] else { return nil }

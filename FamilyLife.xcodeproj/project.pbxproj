@@ -157,6 +157,8 @@
 		AA000308 /* rowan-grateful.mov in Resources */ = {isa = PBXBuildFile; fileRef = BB000308 /* rowan-grateful.mov */; };
 		AA000309 /* rowan-on-it.mov in Resources */ = {isa = PBXBuildFile; fileRef = BB000309 /* rowan-on-it.mov */; };
 		AA00030A /* rowan-thinking.mov in Resources */ = {isa = PBXBuildFile; fileRef = BB00030A /* rowan-thinking.mov */; };
+		AA00030B /* KinrowsLaunchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00030B /* KinrowsLaunchView.swift */; };
+		AA00030C /* PaddlingCrewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00030C /* PaddlingCrewView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -335,6 +337,8 @@
 		BB000308 /* rowan-grateful.mov */ = {isa = PBXFileReference; lastKnownFileType = video.quicktime; path = rowan-grateful.mov; sourceTree = "<group>"; };
 		BB000309 /* rowan-on-it.mov */ = {isa = PBXFileReference; lastKnownFileType = video.quicktime; path = rowan-on-it.mov; sourceTree = "<group>"; };
 		BB00030A /* rowan-thinking.mov */ = {isa = PBXFileReference; lastKnownFileType = video.quicktime; path = rowan-thinking.mov; sourceTree = "<group>"; };
+		BB00030B /* KinrowsLaunchView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KinrowsLaunchView.swift; sourceTree = "<group>"; };
+		BB00030C /* PaddlingCrewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaddlingCrewView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -612,6 +616,8 @@
 				BB0000A1 /* TabBarChrome.swift */,
 				BB000303 /* KinrowsIllustration.swift */,
 				BB000304 /* RowanMotionView.swift */,
+				BB00030B /* KinrowsLaunchView.swift */,
+				BB00030C /* PaddlingCrewView.swift */,
 			);
 			path = Components;
 			sourceTree = "<group>";
@@ -862,6 +868,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				AA00030C /* PaddlingCrewView.swift in Sources */,
+				AA00030B /* KinrowsLaunchView.swift in Sources */,
 				AA000304 /* RowanMotionView.swift in Sources */,
 				AA000303 /* KinrowsIllustration.swift in Sources */,
 				AA000001 /* FamilyLifeApp.swift in Sources */,

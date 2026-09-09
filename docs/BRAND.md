@@ -51,6 +51,10 @@ Take notes from the first run: `rowan-on-it` needed the magenta backdrop bleed r
 
 Playback: `RowanMotionView` (iOS) plays once and holds the last frame (loops only for thinking/idle), pauses when `isActive` is false, and falls back to the still under Reduce Motion or when the clip is missing. On the web, `assets/app.js` applies the same rules to `video.rowan` (`prefers-reduced-motion`, IntersectionObserver pause).
 
+### The paddling crew (launch screen)
+
+`PaddlingCrewView` is native, not video: the illustrated logo's crew was split into `CrewBody` + `CrewOar1…3` (same canvas, hull repaired where the oars crossed it — see `brand/logos/dehaloed/kinrows-crew-*.png` and `kinrows-crew-layers.json` for the pivots). Each oar rotates about the rower's hand on a 2 s stroke while the boat rolls and bobs, driven by `TimelineView`, so it loops with no seam and stops under Reduce Motion. `KinrowsLaunchView` shows it during session restore; `UITEST_HOLD_LAUNCH=1` (DEBUG) keeps it on screen for review. AI takes of this scene were rejected: every model either redrew the crew's faces or hallucinated the wordmark.
+
 ## Deliberate deviations from the handoff
 
 - Tab bar keeps SF Symbols (selected/unselected fills, Dynamic Type, accessibility) — the kit's product icons are used in onboarding, empty states and marketing instead of the nav cluster.

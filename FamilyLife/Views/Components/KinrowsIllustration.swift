@@ -25,6 +25,7 @@ enum KinrowsAsset: Hashable {
         case wordmark = "BrandWordmark"      // dense UI (min 120pt wide)
         case boatMark = "BrandBoatMark"      // dense UI (min 28pt)
         case lettermark = "BrandLettermark"
+        case crew = "BrandCrew"              // the illustrated crew alone (launch screen, brand moments)
     }
 
     /// Rowan poses. Suggested mapping (brand/docs/CLAUDE_CODEX_HANDOFF.md):

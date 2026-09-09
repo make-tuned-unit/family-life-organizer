@@ -22,19 +22,45 @@ struct RowanMotionView: View {
     var maxHeight: CGFloat? = nil
     var accessibility: KinrowsIllustration.Accessibility = .decorative
 
+    var body: some View {
+        KinrowsClipView(
+            clipName: pose.motionClipName,
+            still: .mascot(pose),
+            loops: loops,
+            isActive: isActive,
+            maxWidth: maxWidth,
+            maxHeight: maxHeight,
+            accessibility: accessibility
+        )
+    }
+}
+
+/// The generic player behind RowanMotionView: any bundled HEVC-alpha clip
+/// layered over its own still. Use directly for non-Rowan brand motion (the
+/// crew paddling on the launch screen).
+struct KinrowsClipView: View {
+    /// Bundle resource name without extension (`.mov`); nil renders the still only.
+    let clipName: String?
+    let still: KinrowsAsset
+    var loops: Bool = false
+    var isActive: Bool = true
+    var maxWidth: CGFloat? = nil
+    var maxHeight: CGFloat? = nil
+    var accessibility: KinrowsIllustration.Accessibility = .decorative
+
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var player = RowanClipPlayer()
 
     private var clipURL: URL? {
-        guard let name = pose.motionClipName else { return nil }
-        return Bundle.main.url(forResource: name, withExtension: "mov")
+        guard let clipName else { return nil }
+        return Bundle.main.url(forResource: clipName, withExtension: "mov")
     }
 
     var body: some View {
         ZStack {
             // The still is always underneath: it is the first paint and the
             // fallback, so there is never a blank box while the clip decodes.
-            KinrowsIllustration(.mascot(pose), accessibility: accessibility, maxWidth: maxWidth, maxHeight: maxHeight)
+            KinrowsIllustration(still, accessibility: accessibility, maxWidth: maxWidth, maxHeight: maxHeight)
                 .opacity(player.isShowingVideo ? 0 : 1)
 
             if !reduceMotion, let clipURL {
