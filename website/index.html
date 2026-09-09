@@ -27,8 +27,9 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,400&family=Inter:wght@400;450;500;600&display=swap" rel="stylesheet" />
 
-<link rel="stylesheet" href="assets/style.css?v=202609092006" />
+<link rel="stylesheet" href="assets/style.css?v=202609092009" />
 <!-- Preload the hero screenshot (the LCP element) so it isn't discovered late -->
+<link rel="preload" as="image" href="assets/brand/patterns/hero-lake.jpg" fetchpriority="high" />
 <link rel="preload" as="image" href="assets/shots/home.png" fetchpriority="high" />
 
 <script type="application/ld+json">
@@ -604,7 +605,12 @@
   <section class="cta" id="notify">
     <div class="cta-ambient" aria-hidden="true"></div>
     <div class="container center reveal">
-      <img class="cta-logo" src="assets/brand/logos/kinrows-primary.png" alt="Kinrows — kin that rows together" width="1200" height="926" loading="lazy" decoding="async" />
+      <div class="rowan-wrap cta-rowan" aria-hidden="true">
+          <video class="rowan" muted playsinline preload="none" poster="assets/brand/mascot/rowan-celebrating.png" width="480" height="480"
+                 data-mov="assets/brand/motion/rowan-celebrating.mov" data-webm="assets/brand/motion/rowan-celebrating.webm">
+            <img src="assets/brand/mascot/rowan-celebrating.png" alt="" width="555" height="494" loading="lazy" decoding="async">
+          </video>
+      </div>
       <h2 class="display">Coming to iPhone this September.</h2>
       <p class="muted narrow center">
         Leave your email and we'll let you know the day Kinrows is on the App Store.
@@ -619,12 +625,6 @@
         <span><small>Coming soon to the</small><strong>App Store</strong></span>
       </div>
       <p class="cta-fine">Free on the App Store · Concierge optional add-on · iOS 18+</p>
-      <div class="rowan-wrap cta-rowan" aria-hidden="true">
-          <video class="rowan" muted playsinline preload="none" poster="assets/brand/mascot/rowan-celebrating.png" width="480" height="480"
-                 data-mov="assets/brand/motion/rowan-celebrating.mov" data-webm="assets/brand/motion/rowan-celebrating.webm">
-            <img src="assets/brand/mascot/rowan-celebrating.png" alt="" width="555" height="494" loading="lazy" decoding="async">
-          </video>
-        </div>
     </div>
   </section>
 

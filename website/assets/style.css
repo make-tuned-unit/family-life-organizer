@@ -147,21 +147,15 @@ a:focus-visible, button:focus-visible, input:focus-visible,
    ============================================================ */
 .hero{
   position:relative;padding:120px 0 76px;overflow:hidden;
-  background:var(--cream-1);
+  /* The lake scene is the section background: empty sky top-left for the copy,
+     water and shore along the bottom. Cover, anchored to the bottom edge. */
+  background:var(--cream-1) url('brand/patterns/hero-lake.jpg') no-repeat center bottom / cover;
 }
-/* ambient brand illustration: a small sun + cloud up top, waves along the bottom edge */
+/* A soft Oat veil behind the copy column so the lede stays readable where the
+   hills rise into it on mid-size screens. */
 .hero-ambient{
   position:absolute;inset:0;z-index:0;pointer-events:none;
-  background:
-    radial-gradient(60% 50% at 70% 30%, rgba(143,174,143,.18), transparent 70%),
-    url('brand/illustrations/kinrows-sun.png') no-repeat right 6% top 96px / 116px auto,
-    url('brand/illustrations/kinrows-cloud.png') no-repeat right 28% top 150px / 120px auto;
-}
-.hero-ambient::after{
-  content:"";position:absolute;left:0;right:0;bottom:-6px;height:96px;opacity:.16;
-  background:url('brand/illustrations/kinrows-waves-strip.png') repeat-x left bottom / 260px auto;
-  -webkit-mask-image:linear-gradient(90deg,transparent,#000 12%,#000 88%,transparent);
-  mask-image:linear-gradient(90deg,transparent,#000 12%,#000 88%,transparent);
+  background:linear-gradient(100deg, rgba(247,243,233,.55) 0%, rgba(247,243,233,.28) 40%, rgba(247,243,233,0) 62%);
 }
 /* Rowan waving hello beside the phone */
 .rowan-wrap{position:relative;display:block;line-height:0}
@@ -512,8 +506,7 @@ a:focus-visible, button:focus-visible, input:focus-visible,
    ============================================================ */
 .cta{position:relative;padding:120px 0;overflow:hidden;text-align:center}
 .cta-ambient{display:none}
-.cta-logo{margin:0 auto 18px;width:min(230px,64vw);height:auto;display:block}
-.cta-rowan{width:120px;margin:26px auto 0}
+.cta-rowan{width:150px;margin:0 auto 12px}
 .cta h2{margin-bottom:6px}
 .notify-form{display:flex;gap:10px;max-width:440px;margin:30px auto 0}
 .notify-form input{flex:1;padding:.9em 1.2em;border-radius:999px;border:1px solid var(--line);
@@ -664,7 +657,9 @@ a:focus-visible, button:focus-visible, input:focus-visible,
 .itin-row .ic{margin-left:auto;width:16px;height:16px;color:var(--ocean)}
 
 @media (max-width:900px){
-  .hero-ambient{background:radial-gradient(60% 40% at 70% 20%, rgba(143,174,143,.16), transparent 70%)}
+  /* narrow screens: keep the right of the scene (house, trees, sun) in frame */
+  .hero{background-image:url('brand/patterns/hero-lake-1024.jpg');background-position:right bottom}
+  .hero-ambient{background:linear-gradient(180deg, rgba(247,243,233,.78) 0%, rgba(247,243,233,.62) 45%, rgba(247,243,233,0) 80%)}
   .hero-rowan{position:static;width:150px;margin:18px auto 0}
   .phone-pair{max-width:380px;min-height:650px}
   .phone-pair .phone.back{transform:scale(.84) translate(58px,-40px) rotate(3deg)}
