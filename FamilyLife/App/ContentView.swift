@@ -231,7 +231,7 @@ struct MainTabView: View {
                                 .font(.system(size: 20))
                                 .foregroundStyle(.white)
                                 .frame(width: 52, height: 52)
-                                .background(TabAccent.home.color, in: Circle())
+                                .background(KinrowsBrand.evergreen, in: Circle())   // chat launcher wears Evergreen
                                 .shadow(color: .black.opacity(0.15), radius: 8, y: 4)
 
                             if unreadCount > 0 {
@@ -239,7 +239,7 @@ struct MainTabView: View {
                                     .font(.flCaption2.weight(.bold))
                                     .foregroundStyle(.white)
                                     .frame(minWidth: 18, minHeight: 18)
-                                    .background(AccentTheme.rose.color, in: Circle())
+                                    .background(KinrowsBrand.clay, in: Circle())
                                     .offset(x: 4, y: -4)
                             }
                         }
