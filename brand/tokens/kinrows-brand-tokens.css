@@ -1,0 +1,14 @@
+:root {
+  --kinrows-evergreen: #0F3D37;
+  --kinrows-sage: #8FAE8F;
+  --kinrows-oat: #F7F3E9;
+  --kinrows-clay: #C76F4F;
+  --kinrows-river: #6B8FB0;
+  --kinrows-sun: #F2C94C;
+  --kinrows-ink: #1F2A24;
+  --kinrows-mist: #E8EEE9;
+  --kinrows-font-display: "Fraunces", Georgia, serif;
+  --kinrows-font-ui: "Inter", system-ui, -apple-system, sans-serif;
+  --kinrows-radius-card: 24px;
+  --kinrows-motion-standard: 280ms cubic-bezier(0.22,1,0.36,1);
+}

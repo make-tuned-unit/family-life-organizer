@@ -1,0 +1,1 @@
+Kit logo PNGs with the translucent grey halo (alpha 1–120) that the raw exports carry removed via an alpha remap, then trimmed. Nothing in the artwork itself was changed. iOS `Brand/` imagesets and the website logos are built from these.

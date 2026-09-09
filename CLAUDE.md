@@ -12,6 +12,7 @@ FamilyLife/                 # iOS app (SwiftUI, iOS 18+, Xcode 16+)
 ├── Views/<Feature>/        # 17 feature areas: Calendar, Care, Concierge, Cook, Decisions,
 │                           #   Expenses, Family, Gifts, Home, Lists, Messages, Pantry,
 │                           #   People, Rivalries, Routines, Trips + shared Components/
+├── Resources/              # Assets.xcassets (Brand/, Rowan/, Illustrations/, ProductIcons/), Fonts/ (Fraunces), Motion/ (Rowan HEVC-alpha clips)
 ├── Models/                 # Codable DTOs mirroring API JSON (snake_case) — NO SwiftData anywhere
 └── Services/               # APIService (the REST client, ~200 methods), AuthService (device-token
                             #   auth), CalendarService (EventKit), HealthKitManager, HouseholdService,
@@ -27,19 +28,24 @@ services/                   # anthropic.js, concierge{Chat,Tools,Brief,Context,N
 push.js                     # Raw APNs over HTTP/2 (env-configured, silently off if unset)
 test/                       # node --test suites (npm test) — boot real servers on ports 3995-3999
 scripts/                    # demo seeds + concierge-tool-eval.js (structural + live tool-routing eval)
-website/                    # kinrows.com static marketing site + llms.txt/llms-full.txt
+website/                    # kinrows.com static marketing site + llms.txt/llms-full.txt (brand assets in assets/brand/)
+brand/                      # Kinrows Brand Kit v2 (tokens, logos, Rowan mascot sources + motion masters, docs) — see docs/BRAND.md
 ```
 
 - Bundle ID: `com.kinrows.app` · App name: **Kinrows** · Team `Z58XSBM78S` (renamed from `com.mylauft.kinrows`/`GANM22MFCH` when the app moved to its own developer account)
 - API base: DEBUG → `http://localhost:3456` · RELEASE → hardcoded prod URL (see `AppConfig.swift`; the `server_url` UserDefaults override is DEBUG-only by design)
 - Deploy: **Railway** (prod URL in `AppConfig.swift`). Required env vars documented in `.env.example`
 
+## Brand: Kinrows Direction 2.0 ("Kin that rows together")
+
+`brand/` is the imported brand kit and the source of truth for colour/type/mascot; `docs/BRAND.md` explains how it is wired in. Eight tokens — Evergreen `#0F3D37` · Sage `#8FAE8F` · Oat `#F7F3E9` · Clay `#C76F4F` · River `#6B8FB0` · Sun `#F2C94C` · Ink `#1F2A24` · Mist `#E8EEE9` — live in `KinrowsBrand` (iOS) and `--kinrows-*` (web). No colour literals outside those token files; no second green; Sun is celebration only. Fraunces (`Font.flDisplay*`) for onboarding/auth/empty-state headings only. Rowan the mascot goes through `KinrowsIllustration` / `RowanMotionView` — high density on onboarding and milestones, medium on empty states and Concierge, none on grids/forms/settings, and never without accompanying text.
+
 ## iOS: the design system is LAW
 
 `FamilyLife/Views/Components/` is a real, complete design system. Never hand-roll what it provides:
 
 - **Typography**: `Font.fl*` semantic scale on Dynamic Type (`flScreenTitle`, `flTitle`, `flHeadline`, `flBody`, `flSubheadline`, `flFootnote`, `flCaption`, `flCaption2`, `flOverline`, `flHero`, `flStat`). **Never hardcode point sizes on text** — icon glyph sizes, monospaced invite codes, and geometry-derived sizes are the only exemptions.
-- **Colors**: `WarmPalette` (cream/ink), `AccentTheme`, `TabAccent` (per-feature), `PersonPalette.color(for: fullName)` for per-person identity colors (pass full names to `FamilyAvatar(initial:size:name:)`). App is deliberately light-mode-only.
+- **Colors**: `KinrowsBrand` tokens underneath `WarmPalette` (oat/ink roles), `AccentTheme`, `TabAccent` (per-feature), `PersonPalette.color(for: fullName)` for per-person identity colors (pass full names to `FamilyAvatar(initial:size:name:)`). App is deliberately light-mode-only.
 - **Surfaces**: `.flCard(tint:)` for cards; corner radii ONLY via `DesignTokens.CornerRadius` (card 22 / cardLarge 28 / tile 18 / small 12); spacing via `DesignTokens.Spacing`.
 - **Patterns**: `FLScreenHeader(eyebrow:title:subtitle:accent:)` opens every screen; `.buttonStyle(.flCTA)` is THE primary action; `.flCardPress` on tappable cards; `WarmEmptyState` (possibility-framed copy + `actionLabel:` + optional `conciergePrompt:`); `FLLoadingState` instead of bare spinners; `.inlineError(_:onDismiss:)` for failures — never alerts.
 - **Icons**: SF Symbols only, one canonical symbol per feature (calendar/list.bullet.rectangle/house/creditcard/sparkles/chart.bar/flag.2.crossed/person.2/arrow.triangle.swap/fork.knife/note.text/airplane/cabinet/gift/repeat/bubble.left.and.text.bubble.right/gearshape). `.fill` in selected/accent chips, outline in content.
@@ -61,4 +67,4 @@ website/                    # kinrows.com static marketing site + llms.txt/llms-
 5. **No third-party dependencies** on either side unless strictly necessary (backend deps: express, sqlite3, bcryptjs, helmet, connect-sqlite3 — keep it that way).
 6. **Route order matters in dashboard.js** — specific paths before `/:param` siblings (e.g. `/api/budget/stats` before `/api/budget/:month`).
 7. **iPhone first**; iPad is secondary.
-8. Docs: `docs/PRD.md` (vision), `docs/DEVELOPER_API.md` (public `/v1` agent API — update with `website/developers.html` when the tool surface or auth changes), `docs/SECURITY_AUDIT.md` + `docs/PROD_READINESS.md` (posture/checklists — keep them current when you change auth/security).
+8. Docs: `docs/PRD.md` (vision), `docs/BRAND.md` (brand tokens, Rowan, motion pipeline), `docs/DEVELOPER_API.md` (public `/v1` agent API — update with `website/developers.html` when the tool surface or auth changes), `docs/SECURITY_AUDIT.md` + `docs/PROD_READINESS.md` (posture/checklists — keep them current when you change auth/security).
