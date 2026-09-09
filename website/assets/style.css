@@ -663,9 +663,13 @@ a:focus-visible, button:focus-visible, input:focus-visible,
 
 @media (max-width:900px){
   /* narrow screens: keep the right of the scene (house, trees, sun) in frame */
-  .hero{background-image:url('brand/patterns/hero-lake-portrait.jpg');background-position:center top}
+  /* portrait scene sized to the viewport width and pinned to the top, so the
+     mountains and lake are on screen on landing; the foliage runs under the phone */
+  .hero{background-image:url('brand/patterns/hero-lake-portrait.jpg');background-size:100% auto;background-position:center 52%;
+    background-color:var(--cream-1)}
+  .hero-link{background:rgba(247,243,233,.85);padding:6px 12px;border-radius:999px;margin-top:14px}
   .hero-ambient{background:none}   /* the portrait scene keeps its sky clear for the copy */
-  .hero-rowan{position:static;width:150px;margin:18px auto 0}
+  .hero-rowan{position:absolute;left:0;bottom:-10px;width:124px;margin:0}   /* bottom-left corner of the phone */
   .phone-pair{max-width:380px;min-height:650px}
   .phone-pair .phone.back{transform:scale(.84) translate(58px,-40px) rotate(3deg)}
   .phone-pair .phone.front{transform:translate(-40px,28px) rotate(-2deg)}
