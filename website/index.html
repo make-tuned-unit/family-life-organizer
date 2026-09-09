@@ -27,7 +27,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,400&family=Inter:wght@400;450;500;600&display=swap" rel="stylesheet" />
 
-<link rel="stylesheet" href="assets/style.css?v=202609092014" />
+<link rel="stylesheet" href="assets/style.css?v=202609092016" />
 <!-- Preload the hero screenshot (the LCP element) so it isn't discovered late -->
 <link rel="preload" as="image" href="assets/brand/patterns/hero-lake.jpg" media="(min-width: 901px)" fetchpriority="high" />
 <link rel="preload" as="image" href="assets/brand/patterns/hero-lake-portrait.jpg" media="(max-width: 900px)" fetchpriority="high" />
@@ -573,7 +573,10 @@
 
   <!-- ───────────────────────── Further together ───────────────────────── -->
   <section class="further" aria-labelledby="further-title">
-    <img class="further-bg" src="assets/brand/patterns/kinrows-scenic-family-row-v2.jpg" srcset="assets/brand/patterns/kinrows-scenic-family-row-v2-1200.jpg 1200w, assets/brand/patterns/kinrows-scenic-family-row-v2.jpg 2043w" sizes="100vw" alt="An illustrated family and their dog rowing a green canoe together across a calm lake at golden hour" width="2043" height="670" loading="lazy" decoding="async" />
+    <picture class="further-pic">
+      <source media="(max-width: 720px)" srcset="assets/brand/patterns/kinrows-scenic-family-row-portrait.jpg" width="941" height="1672" />
+      <img class="further-bg" src="assets/brand/patterns/kinrows-scenic-family-row-v2.jpg" srcset="assets/brand/patterns/kinrows-scenic-family-row-v2-1200.jpg 1200w, assets/brand/patterns/kinrows-scenic-family-row-v2.jpg 2043w" sizes="100vw" alt="An illustrated family and their dog rowing a green canoe together across a calm lake at golden hour" width="2043" height="670" loading="lazy" decoding="async" />
+    </picture>
     <div class="container further-copy">
       <div class="center reveal">
         <p class="band-kicker">Kin that rows together</p>
