@@ -18,7 +18,7 @@ FamilyLife brings the full household dashboard to iPhone and iPad: calendar, bud
 1. Open `FamilyLife.xcodeproj` in Xcode with the iOS 26 SDK or newer and select the shared **FamilyLife** scheme.
 2. For a simulator, select an iOS 18+ destination and use **Product → Build** (⌘B). Debug uses `http://localhost:3456`; start the backend with `npm ci` then `npm start`.
 3. For a production device/TestFlight archive, select **Any iOS Device (arm64)** and use **Product → Archive**. The shared scheme archives Release, which uses the production Railway API.
-4. Automatic signing uses team `Z58XSBM78S`. The app and widget are both set to version **1.0**, build **243**. Xcode needs your signing account/profiles to create a distributable archive.
+4. Automatic signing uses team `Z58XSBM78S`. The app and widget are both set to version **1.0**, build **1789085837**. The legacy timestamp-override script has been removed, so both targets use this Build setting consistently. Increment both targets together for subsequent uploads. Xcode needs your signing account/profiles to create a distributable archive.
 
 For a physical-device Debug run, point the debug server override at your Mac's reachable LAN address; `localhost` on the phone is the phone itself. No QA credentials or simulator launch overrides are stored in the shared scheme.
 

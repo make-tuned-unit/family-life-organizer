@@ -8,6 +8,9 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('path');
 
+// Match dashboard.js's default even when the test runner uses UTC (CI).
+process.env.TZ = process.env.TZ || 'America/Halifax';
+
 const PORT = 3977;
 const BASE = `http://127.0.0.1:${PORT}`;
 let server;
