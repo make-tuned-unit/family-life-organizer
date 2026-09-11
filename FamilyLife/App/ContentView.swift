@@ -345,6 +345,7 @@ struct MainTabView: View {
                 await handleDeepLink(type: type)
             }
         }
+        .onConciergeDataChange { await syncRoutineReminders() }
         .onChange(of: aiConciergeEnabled) {
             Task { try? await api.setConciergeEnabled(aiConciergeEnabled) }
         }
@@ -363,6 +364,12 @@ struct MainTabView: View {
 
     private let healthKit = HealthKitManager()
 
+    private func syncRoutineReminders() async {
+        guard let routines = try? await api.fetchRoutines() else { return }
+        await NotificationService.shared.reconcileRoutineNotifications(
+            activeIDs: Set(routines.filter { $0.active != 0 }.map(\.id)))
+    }
+
     private func pollUnread() async {
         var locationReportCounter = 0
         var stepSyncCounter = 18  // trigger on the second poll cycle, not the first
@@ -377,6 +384,7 @@ struct MainTabView: View {
         defer { pathMonitor.cancel() }
         while !Task.isCancelled {
             unreadCount = (try? await api.fetchUnreadMessageCount()) ?? 0
+            if locationReportCounter % 20 == 0 { await syncRoutineReminders() }
 
             // Report location every ~5 minutes (every 20th poll cycle) — ONLY
             // if the user explicitly opted into household presence sharing.

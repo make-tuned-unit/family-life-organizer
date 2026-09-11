@@ -10,6 +10,11 @@ struct RoutinesView: View {
     @State private var isLoading = true
     @State private var errorMessage: String?
     @State private var showingNew = false
+    @State private var showingArchived = false
+
+    private var visibleRoutines: [RoutineResponse] {
+        routines.filter { showingArchived ? $0.active == 0 : $0.active != 0 }
+    }
 
     private let accent = TabAccent.routines.color
 
@@ -17,26 +22,34 @@ struct RoutinesView: View {
         ScrollView(showsIndicators: false) {
             VStack(spacing: 0) {
                 FLScreenHeader(
-                    eyebrow: routines.isEmpty ? "Track what repeats" : "\(routines.count) active",
+                    eyebrow: "\(visibleRoutines.count) \(showingArchived ? "archived" : "active")",
                     title: "Routines",
                     subtitle: "Kids' chores, baby sleep, cycles, and the rhythms of family life.",
                     accent: accent
                 )
 
+                Picker("Routine status", selection: $showingArchived) {
+                    Text("Active").tag(false)
+                    Text("Archived").tag(true)
+                }
+                .pickerStyle(.segmented)
+                .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
+                .padding(.bottom, DesignTokens.Spacing.cardGap)
+
                 if isLoading {
                     FLLoadingState(message: "Loading your routines…")
                         .padding(.top, 40)
-                } else if routines.isEmpty {
+                } else if visibleRoutines.isEmpty {
                     WarmEmptyState(
-                        title: "No routines yet",
+                        title: showingArchived ? "No archived routines" : "No active routines",
                         systemImage: "repeat",
-                        description: "Start a child's chores with an age-by-age program, track a baby's sleep or a menstrual cycle, or follow the guided sleep-training program.",
+                        description: showingArchived ? "Routines you archive will appear here with their history preserved." : "Start a routine, or open Archived to restore one you tracked before.",
                         actionLabel: "New routine",
                         action: { showingNew = true }
                     )
                 } else {
                     LazyVStack(spacing: 12) {
-                        ForEach(routines) { routine in
+                        ForEach(visibleRoutines) { routine in
                             NavigationLink {
                                 RoutineDetailView(routineId: routine.id)
                             } label: {
@@ -70,6 +83,7 @@ struct RoutinesView: View {
             NewRoutineView { Task { await load() } }
         }
         .task { await load() }
+        .onAppear { Task { await load() } }
         .refreshable { await load() }
         .onConciergeDataChange { await load() }
     }
@@ -138,7 +152,7 @@ private struct RoutineCard: View {
     private var subtitle: String {
         let count = routine.entry_count ?? 0
         if count == 0 { return "No entries yet — tap to start" }
-        if let last = routine.last_entry_date { return "\(count) entries · last \(last)" }
+        if let last = routine.last_entry_date { return "\(count) \(count == 1 ? "entry" : "entries") · last \(last)" }
         return "\(count) entries"
     }
 }

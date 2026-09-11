@@ -213,6 +213,18 @@ final class NotificationService {
             .removePendingNotificationRequests(withIdentifiers: ["routine-confirm-\(routineId)-\(date)"])
     }
 
+    /// Reconcile reminders after archiving locally, through AI, or on another device.
+    func reconcileRoutineNotifications(activeIDs: Set<Int>) async {
+        let center = UNUserNotificationCenter.current()
+        let pending = await center.pendingNotificationRequests()
+        let stale = pending.filter { request in
+            guard request.identifier.hasPrefix("routine-"),
+                  let id = request.content.userInfo["ref_id"] as? Int else { return false }
+            return !activeIDs.contains(id)
+        }.map(\.identifier)
+        center.removePendingNotificationRequests(withIdentifiers: stale)
+    }
+
     // MARK: - Pantry expiry alerts
 
     func schedulePantryExpiryAlert(id: Int, itemName: String, expiryDate: String) {

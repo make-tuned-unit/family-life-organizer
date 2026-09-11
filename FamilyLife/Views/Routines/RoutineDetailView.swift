@@ -44,6 +44,13 @@ struct RoutineDetailView: View {
                     )
 
                     VStack(spacing: 16) {
+                        if detail.active == 0 {
+                            Text("Archived · All entries are preserved. Restore this routine to resume tracking.")
+                                .font(.flSubheadline)
+                                .foregroundStyle(WarmPalette.ink3)
+                                .padding()
+                                .flCard()
+                        }
                         shareCard(detail)
 
                         if let guidance = detail.guidance {
@@ -55,19 +62,19 @@ struct RoutineDetailView: View {
                         if let achievements = detail.achievements {
                             ActivityAchievementCard(achievements: achievements)
                         }
-                        if detail.type.isActivity, let occ = occurrences, !(occ.pending ?? []).isEmpty {
+                        if detail.active != 0, detail.type.isActivity, let occ = occurrences, !(occ.pending ?? []).isEmpty {
                             ConfirmAttendanceCard(pending: occ.pending ?? [], activity: detail.name) { date, attended in
                                 Task { await confirm(date: date, attended: attended) }
                             }
                         }
 
-                        if detail.type == .babySleep || detail.type == .sleepTraining {
+                        if detail.active != 0 && (detail.type == .babySleep || detail.type == .sleepTraining) {
                             liveSleepCard(detail)
                             nextSleepCard(detail)
                             bedtimeCard(detail)
                         }
 
-                        if detail.type.isChores, let summary = choreSummary {
+                        if detail.active != 0, detail.type.isChores, let summary = choreSummary {
                             ChoreWeekCard(summary: summary, accent: accent,
                                           onToggle: { choreId, slot, date in Task { await toggleChore(choreId, slot: slot, date: date) } },
                                           onManage: { showingManageChores = true })
@@ -81,7 +88,7 @@ struct RoutineDetailView: View {
                             }
                         }
 
-                        if !detail.type.isChores {
+                        if detail.active != 0 && !detail.type.isChores {
                             quickLog(for: detail.type)
                         }
 
@@ -118,6 +125,9 @@ struct RoutineDetailView: View {
             if detail == nil || detail?.created_by == nil || detail?.created_by == auth.currentUser?.id {
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu {
+                        Button { Task { await toggleArchive() } } label: {
+                            Label(detail?.active == 0 ? "Restore routine" : "Archive routine", systemImage: detail?.active == 0 ? "arrow.uturn.backward" : "archivebox")
+                        }
                         Button(role: .destructive) { showingDeleteConfirm = true } label: {
                             Label("Delete routine", systemImage: "trash")
                         }
@@ -219,6 +229,11 @@ struct RoutineDetailView: View {
     /// the last wake, and dropped while a sleep is actually running — they're
     /// already down, so a reminder to put them down is noise.
     private func syncNapPrepNotification(_ detail: RoutineDetailResponse) async {
+        guard detail.active != 0 else {
+            NotificationService.shared.cancelNapPrep(routineId: routineId)
+            NotificationService.shared.cancelBedtimePrep(routineId: routineId)
+            return
+        }
         guard await NotificationService.shared.isAuthorized() else { return }
 
         if openSleep(detail) == nil, let next = detail.next_sleep, let at = next.prepareDate {
@@ -613,7 +628,7 @@ struct RoutineDetailView: View {
                 sleepStats = try? await api.fetchSleepStats(routineId: routineId)
                 await syncNapPrepNotification(d)
             }
-            if d.type.isActivity {
+            if d.active != 0, d.type.isActivity {
                 let occ = try? await api.fetchRoutineOccurrences(id: routineId)
                 occurrences = occ
                 // Schedule a "did you go?" nudge for each upcoming linked event.
@@ -704,6 +719,21 @@ struct RoutineDetailView: View {
             await load()
         } catch {
             errorMessage = "Couldn't delete that entry."
+        }
+    }
+
+    private func toggleArchive() async {
+        guard let detail else { return }
+        do {
+            try await api.updateRoutine(id: routineId, data: ["active": detail.active == 0 ? 1 : 0])
+            NotificationService.shared.cancelNapPrep(routineId: routineId)
+            NotificationService.shared.cancelBedtimePrep(routineId: routineId)
+            let routines = try await api.fetchRoutines()
+            await NotificationService.shared.reconcileRoutineNotifications(
+                activeIDs: Set(routines.filter { $0.active != 0 }.map(\.id)))
+            dismiss()
+        } catch {
+            errorMessage = "Couldn't change this routine's archive status. Please try again."
         }
     }
 
