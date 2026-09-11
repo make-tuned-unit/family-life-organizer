@@ -19,7 +19,7 @@ struct PaywallView: View {
 
     @State private var period: SubscriptionService.Period = .yearly
 
-    private let accent = AccentTheme.saffron.color
+    private let accent = KinrowsBrand.evergreen
 
     private let perks: [(String, String)] = [
         ("bubble.left.and.bubble.right.fill", "Chat with your concierge — ask anything about your household"),

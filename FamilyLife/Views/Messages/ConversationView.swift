@@ -245,7 +245,7 @@ struct ConversationView: View {
                     Button(action: send) {
                         Image(systemName: "arrow.up.circle.fill")
                             .font(.system(size: 28))
-                            .foregroundStyle(canSend ? TabAccent.home.color : WarmPalette.ink4)
+                            .foregroundStyle(canSend ? KinrowsBrand.evergreen : WarmPalette.ink4)
                     }
                     .accessibilityLabel("Send message")
                     .help("Send message")
@@ -542,7 +542,7 @@ struct MessageBubble: View {
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
             .background(
-                isOwn ? AnyShapeStyle(TabAccent.home.color) : AnyShapeStyle(WarmPalette.cardSurface),
+                isOwn ? AnyShapeStyle(KinrowsBrand.evergreen) : AnyShapeStyle(WarmPalette.cardSurface),
                 in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.tile)
             )
             .messageActionsMenu(onAsk: onAskConcierge, onReport: onReport)

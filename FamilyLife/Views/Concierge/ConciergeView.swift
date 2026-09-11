@@ -316,7 +316,7 @@ struct ConciergeView: View {
         }
         .padding(DesignTokens.Spacing.cardPadding)
         .frame(maxWidth: .infinity)
-        .flCard(tint: AccentTheme.sage.color)
+        .flCard(tint: KinrowsBrand.sageDeep)
     }
 
     private var loadingCard: some View {
@@ -343,12 +343,12 @@ struct ConciergeView: View {
         }
         .padding(DesignTokens.Spacing.cardPadding)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .flCard(tint: AccentTheme.terracotta.color)
+        .flCard(tint: KinrowsBrand.clayDeep)
     }
 
     // MARK: - Helpers
 
-    private var accent: Color { AccentTheme.saffron.color }
+    private var accent: Color { KinrowsBrand.evergreen }
 
     private var greeting: String {
         let name = auth.currentUser?.name.split(separator: " ").first.map(String.init) ?? ""
@@ -359,14 +359,14 @@ struct ConciergeView: View {
 
     private func tint(for kind: String) -> Color {
         switch kind {
-        case "task":        AccentTheme.sage.color
+        case "task":        KinrowsBrand.sageDeep
         case "appointment": TabAccent.calendar.color
-        case "budget":      AccentTheme.terracotta.color
-        case "decision":    AccentTheme.mauve.color
-        case "coverage":    AccentTheme.ocean.color
-        case "event":       AccentTheme.saffron.color
-        case "pantry":      AccentTheme.ocean.color
-        default:            AccentTheme.saffron.color
+        case "budget":      KinrowsBrand.clayDeep
+        case "decision":    KinrowsBrand.riverDeep
+        case "coverage":    KinrowsBrand.riverDeep
+        case "event":       KinrowsBrand.evergreen
+        case "pantry":      KinrowsBrand.riverDeep
+        default:            KinrowsBrand.evergreen
         }
     }
 }

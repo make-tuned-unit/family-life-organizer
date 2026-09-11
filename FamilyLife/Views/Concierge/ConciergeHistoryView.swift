@@ -13,7 +13,7 @@ struct ConciergeHistoryView: View {
     @State private var loading = true
     @State private var errorMessage: String?
 
-    private let accent = AccentTheme.saffron.color
+    private let accent = KinrowsBrand.evergreen
 
     var body: some View {
         NavigationStack {

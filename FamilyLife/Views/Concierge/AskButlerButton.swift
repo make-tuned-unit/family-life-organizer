@@ -326,7 +326,7 @@ struct AskButlerButton: View {
             Button { launch.ask(prompt) } label: {
                 Image(systemName: "sparkles")
                     .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(AccentTheme.saffron.color)
+                    .foregroundStyle(KinrowsBrand.evergreen)
             }
             .accessibilityLabel("Ask your concierge")
         }
@@ -346,7 +346,7 @@ struct ConciergeIntroView: View {
                 VStack(alignment: .leading, spacing: 10) {
                     Image(systemName: "sparkles")
                         .font(.system(size: 32, weight: .semibold))
-                        .foregroundStyle(AccentTheme.saffron.color)
+                        .foregroundStyle(KinrowsBrand.evergreen)
                     Text("AI Concierge")
                         .font(.flScreenTitle)
                         .foregroundStyle(WarmPalette.ink1)
@@ -367,7 +367,7 @@ struct ConciergeIntroView: View {
                             .foregroundStyle(WarmPalette.ink3)
                     }
                 }
-                .tint(AccentTheme.saffron.color)
+                .tint(KinrowsBrand.evergreen)
                 .padding(14)
                 .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
 

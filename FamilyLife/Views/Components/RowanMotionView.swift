@@ -69,7 +69,10 @@ struct KinrowsClipView: View {
                     .frame(maxWidth: maxWidth, maxHeight: maxHeight)
                     .opacity(player.isShowingVideo ? 1 : 0)
                     .accessibilityHidden(true)
-                    .task(id: clipURL) { player.load(clipURL, loops: loops) }
+                    .task(id: clipURL) {
+                        player.load(clipURL, loops: loops)
+                        if isActive { player.play() }
+                    }
                     .onChange(of: isActive, initial: true) { _, active in
                         active ? player.play() : player.pause()
                     }

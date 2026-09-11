@@ -701,7 +701,7 @@ struct FloatingTabBar: View {
         case .calendar:  TabAccent.calendar.color
         case .lists:     TabAccent.home.color
         case .home:      TabAccent.home.color
-        case .concierge: AccentTheme.saffron.color
+        case .concierge: KinrowsBrand.evergreen
         case .budget:    AccentTheme.terracotta.color
         case .more:      WarmPalette.ink2
         }

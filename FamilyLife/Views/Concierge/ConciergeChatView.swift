@@ -5,6 +5,7 @@ import SwiftUI
 struct ConciergeChatView: View {
     @Environment(APIService.self) private var api
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var initialPrompt: String? = nil
     /// When true, the composer opens straight into voice dictation (long-press launch).
@@ -20,15 +21,16 @@ struct ConciergeChatView: View {
     @State private var didAutoSend = false
     @State private var draftFromVoice = false
     @State private var showingHistory = false
+    @State private var followsReply = true
     @FocusState private var inputFocused: Bool
 
     private let suggestions = ["What's on today?", "Add a task", "How's our budget?", "What's expiring soon?"]
-    private let accent = AccentTheme.saffron.color
+    private let accent = KinrowsBrand.evergreen
 
     var body: some View {
         NavigationStack {
             ZStack {
-                AmbientBackground(style: .home)
+                KinrowsBrand.oat.ignoresSafeArea()
 
                 VStack(spacing: 0) {
                     ScrollViewReader { proxy in
@@ -38,7 +40,8 @@ struct ConciergeChatView: View {
                                 ForEach(viewModel.messages) { message in
                                     messageRow(message).id(message.id)
                                 }
-                                if viewModel.isSending || viewModel.isLoading { typingIndicator.id("typing") }
+                                if viewModel.isLoading || (viewModel.isSending && viewModel.messages.last?.role != .assistant) { typingIndicator }
+                                Color.clear.frame(height: 1).id("bottom")
                                 if let error = viewModel.errorMessage { errorRow(error) }
                             }
                             .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
@@ -46,11 +49,28 @@ struct ConciergeChatView: View {
                         }
                         .onChange(of: viewModel.messages.count) { scrollToBottom(proxy) }
                         .onChange(of: viewModel.isSending) { scrollToBottom(proxy) }
+                        .onChange(of: viewModel.messages.last?.text) {
+                            if followsReply { proxy.scrollTo("bottom", anchor: .bottom) }
+                        }
+                        .simultaneousGesture(DragGesture().onChanged { _ in followsReply = false })
+                        .overlay(alignment: .bottomTrailing) {
+                            if !followsReply {
+                                Button("Latest", systemImage: "arrow.down") {
+                                    followsReply = true
+                                    scrollToBottom(proxy)
+                                }
+                                .font(.flFootnote)
+                                .padding(10)
+                                .background(KinrowsBrand.mist, in: Capsule())
+                                .padding(12)
+                            }
+                        }
                     }
 
                     inputBar
                 }
             }
+            .tint(accent)
             .navigationTitle("Concierge")
             .navigationBarTitleDisplayMode(.inline)
             .onAppear {
@@ -67,7 +87,7 @@ struct ConciergeChatView: View {
                 speech.setContextualStrings(names)
                 if autoSend, let initialPrompt, !initialPrompt.isEmpty, !didAutoSend {
                     didAutoSend = true
-                    await viewModel.send(initialPrompt, api: api, source: .chatExtract)
+                    await viewModel.send(initialPrompt, api: api, source: .chatExtract, reduceMotion: reduceMotion)
                     return
                 }
                 // Long-press launch: jump straight into listening so the user can
@@ -88,12 +108,13 @@ struct ConciergeChatView: View {
                     }
                     .accessibilityLabel("Conversation history")
                     .help("Conversation history")
+                    .disabled(viewModel.isSending || viewModel.isLoading)
                     Button { viewModel.startNew(); draft = "" } label: {
                         Image(systemName: "square.and.pencil")
                     }
                     .accessibilityLabel("New conversation")
                     .help("New conversation")
-                    .disabled(viewModel.messages.isEmpty)
+                    .disabled(viewModel.messages.isEmpty || viewModel.isSending || viewModel.isLoading)
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Done") { dismiss() }
@@ -127,22 +148,31 @@ struct ConciergeChatView: View {
         case .assistant:
             VStack(alignment: .leading, spacing: 8) {
                 HStack(alignment: .top, spacing: 10) {
-                    KinrowsIllustration(.mascot(.idleSmile), maxWidth: 28, maxHeight: 32)
-                        .frame(width: 28, height: 32)
-                    Text(message.text)
+                    RowanMotionView(pose: .idleSmile, loops: true,
+                                    isActive: viewModel.isSending && message.id == viewModel.messages.last?.id,
+                                    maxWidth: 36, maxHeight: 42)
+                        .frame(width: 36, height: 42)
+                    VStack(alignment: .leading, spacing: 8) {
+                        if viewModel.isSending && message.id == viewModel.messages.last?.id {
+                            Text(message.text.isEmpty ? "Rowan is working…" : "Rowan is replying…")
+                                .font(.flCaption)
+                                .foregroundStyle(KinrowsBrand.evergreen)
+                        }
+                        ConciergeResponseBody(text: message.text)
+                    }
                         .font(.flBody)
                         .foregroundStyle(WarmPalette.ink1)
                         .padding(.horizontal, 14)
                         .padding(.vertical, 10)
                         .background(WarmPalette.cardSurface, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.tile, style: .continuous))
                         .fixedSize(horizontal: false, vertical: true)
-                    Spacer(minLength: 24)
+                    Spacer(minLength: 0)
                 }
                 if !message.actions.isEmpty {
                     VStack(alignment: .leading, spacing: 4) {
                         HStack(spacing: 6) {
                             KinrowsIllustration(.mascot(.celebrating), maxWidth: 22, maxHeight: 22)
-                            Label("Task complete", systemImage: "checkmark.circle.fill")
+                            Label("Saved changes", systemImage: "checkmark.circle.fill")
                         }
                         .font(.flFootnote.weight(.bold))
                         ForEach(message.actions, id: \.self) { action in
@@ -150,7 +180,7 @@ struct ConciergeChatView: View {
                                 .font(.flCaption.weight(.medium))
                         }
                     }
-                    .foregroundStyle(AccentTheme.sage.color)
+                    .foregroundStyle(KinrowsBrand.evergreen)
                     .padding(.leading, 38)
                     .accessibilityElement(children: .combine)
                 }
@@ -175,7 +205,7 @@ struct ConciergeChatView: View {
     private func errorRow(_ message: String) -> some View {
         Label(message, systemImage: "exclamationmark.triangle")
             .font(.flFootnote)
-            .foregroundStyle(AccentTheme.terracotta.color)
+            .foregroundStyle(KinrowsBrand.clayDeep)
     }
 
     private var emptyState: some View {
@@ -217,7 +247,7 @@ struct ConciergeChatView: View {
                     .focused($inputFocused)
                     .padding(.horizontal, 14)
                     .padding(.vertical, 10)
-                    .background(WarmPalette.cardSurface, in: Capsule())
+                    .background(KinrowsBrand.oatLight, in: RoundedRectangle(cornerRadius: KinrowsBrand.Radius.lg))
                     .onSubmit { Task { await submit() } }
 
                 Button {
@@ -277,7 +307,7 @@ struct ConciergeChatView: View {
     }
 
     private var canSend: Bool {
-        !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !viewModel.isSending
+        !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !viewModel.isSending && !viewModel.isLoading
     }
 
     private func submit() async {
@@ -285,21 +315,81 @@ struct ConciergeChatView: View {
             let final = await speech.finish()
             draft = micBase + final
         }
+        followsReply = true
         let text = draft
         let source: ConciergeMessageSource = draftFromVoice ? .voice : .text
         draft = ""
         draftFromVoice = false
-        await viewModel.send(text, api: api, source: source)
+        await viewModel.send(text, api: api, source: source, reduceMotion: reduceMotion)
     }
 
     private func scrollToBottom(_ proxy: ScrollViewProxy) {
-        withAnimation {
-            if viewModel.isSending {
-                proxy.scrollTo("typing", anchor: .bottom)
-            } else if let lastId = viewModel.messages.last?.id {
-                proxy.scrollTo(lastId, anchor: .bottom)
+        guard followsReply else { return }
+        withAnimation(.easeOut(duration: 0.18)) {
+            proxy.scrollTo("bottom", anchor: .bottom)
+        }
+    }
+}
+
+/// Native hanging bullets and inline emphasis stay legible as new words arrive.
+struct ConciergeResponseBody: View {
+    let text: String
+
+    private struct Block {
+        var marker: String?
+        var text: String
+        var heading = false
+    }
+
+    private var blocks: [Block] {
+        var result: [Block] = []
+        var newParagraph = true
+        for raw in text.components(separatedBy: "\n") {
+            let line = raw.trimmingCharacters(in: .whitespaces)
+            if line.isEmpty { newParagraph = true; continue }
+            var content = line
+            var marker: String?
+            let heading = line.hasPrefix("#")
+            if ["- ", "* ", "• "].contains(where: line.hasPrefix) {
+                marker = "•"
+                content = String(line.dropFirst(2))
+            } else if let range = line.range(of: #"^\d+[.)]\s+"#, options: .regularExpression) {
+                marker = String(line[range]).trimmingCharacters(in: .whitespaces)
+                content = String(line[range.upperBound...])
+            } else if heading {
+                content = String(line.drop(while: { $0 == "#" || $0 == " " }))
+            }
+            if !newParagraph, marker == nil, !heading, let last = result.indices.last,
+               !result[last].heading {
+                result[last].text += " " + content
+            } else {
+                result.append(Block(marker: marker, text: content, heading: heading))
+            }
+            newParagraph = false
+        }
+        return result
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            ForEach(Array(blocks.enumerated()), id: \.offset) { _, block in
+                HStack(alignment: .firstTextBaseline, spacing: 10) {
+                    if let marker = block.marker {
+                        Text(marker)
+                            .foregroundStyle(KinrowsBrand.evergreen)
+                            .frame(minWidth: 12, alignment: .leading)
+                    }
+                    Text((try? AttributedString(markdown: block.text,
+                         options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace))) ?? AttributedString(block.text))
+                        .font(block.heading ? .flHeadline : .flBody)
+                        .lineSpacing(4)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
         }
+        .textSelection(.enabled)
+        .tint(KinrowsBrand.riverDeep)
     }
 }
 
@@ -317,7 +407,7 @@ private struct FlowChips: View {
                         .foregroundStyle(WarmPalette.ink1)
                         .padding(.horizontal, 14)
                         .padding(.vertical, 8)
-                        .background(WarmPalette.cardSurface, in: Capsule())
+                        .background(KinrowsBrand.oatLight, in: RoundedRectangle(cornerRadius: KinrowsBrand.Radius.lg))
                 }
                 .buttonStyle(.plain)
             }

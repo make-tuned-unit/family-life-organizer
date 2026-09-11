@@ -39,10 +39,10 @@ struct ChatSheet: View {
                             VStack(spacing: 4) {
                                 Image(systemName: "plus")
                                     .font(.system(size: 18, weight: .semibold))
-                                    .foregroundStyle(AccentTheme.mauve.color)
+                                    .foregroundStyle(KinrowsBrand.evergreen)
                                     .frame(width: 44, height: 44)
-                                    .background(AccentTheme.mauve.color.opacity(0.12), in: Circle())
-                                    .overlay(Circle().strokeBorder(AccentTheme.mauve.color.opacity(0.35), style: StrokeStyle(lineWidth: 1, dash: [3])))
+                                    .background(KinrowsBrand.evergreen.opacity(0.12), in: Circle())
+                                    .overlay(Circle().strokeBorder(KinrowsBrand.evergreen.opacity(0.35), style: StrokeStyle(lineWidth: 1, dash: [3])))
                                 Text("New")
                                     .font(.flCaption)
                                     .foregroundStyle(WarmPalette.ink3)
@@ -100,7 +100,7 @@ struct ChatSheet: View {
                                                 .frame(width: 44, height: 44)
                                                 .clipShape(Circle())
                                                 .overlay {
-                                                    Circle().stroke(isSelected ? TabAccent.home.color : .clear, lineWidth: 2)
+                                                    Circle().stroke(isSelected ? KinrowsBrand.evergreen : .clear, lineWidth: 2)
                                                 }
                                         } else {
                                             FamilyAvatar(
@@ -120,7 +120,7 @@ struct ChatSheet: View {
                                     }
                                     Text(member.name.components(separatedBy: " ").first ?? member.name)
                                         .font(.flCaption.weight(isSelected ? .bold : .regular))
-                                        .foregroundStyle(isSelected ? TabAccent.home.color : WarmPalette.ink3)
+                                        .foregroundStyle(isSelected ? KinrowsBrand.evergreen : WarmPalette.ink3)
                                         .lineLimit(1)
                                 }
                                 .frame(width: 60)
@@ -218,9 +218,9 @@ struct ChatSheet: View {
 
     private func groupColor(_ type: String) -> Color {
         switch type {
-        case "household": TabAccent.home.color
-        case "family": AccentTheme.mauve.color
-        case "tribe": AccentTheme.ocean.color
+        case "household": KinrowsBrand.evergreen
+        case "family": KinrowsBrand.evergreen
+        case "tribe": KinrowsBrand.riverDeep
         default: WarmPalette.ink2
         }
     }
@@ -365,7 +365,7 @@ struct GroupChatView: View {
                     Button(action: send) {
                         Image(systemName: "arrow.up.circle.fill")
                             .font(.system(size: 28))
-                            .foregroundStyle(canSend ? TabAccent.home.color : WarmPalette.ink4)
+                            .foregroundStyle(canSend ? KinrowsBrand.evergreen : WarmPalette.ink4)
                     }
                     .accessibilityLabel("Send message")
                     .help("Send message")
@@ -556,11 +556,11 @@ struct InlinePollCard: View {
                             Spacer()
                             Text("\(count)")
                                 .font(.flFootnote.weight(.bold))
-                                .foregroundStyle(TabAccent.home.color)
+                                .foregroundStyle(KinrowsBrand.evergreen)
                             if myVote == idx {
                                 Image(systemName: "checkmark.circle.fill")
                                     .font(.system(size: 12))
-                                    .foregroundStyle(TabAccent.home.color)
+                                    .foregroundStyle(KinrowsBrand.evergreen)
                             }
                         }
                         .padding(.horizontal, 8)
@@ -682,7 +682,7 @@ struct GroupMessageBubble: View {
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
             .background(
-                isOwn ? AnyShapeStyle(TabAccent.home.color) : AnyShapeStyle(WarmPalette.cardSurface),
+                isOwn ? AnyShapeStyle(KinrowsBrand.evergreen) : AnyShapeStyle(WarmPalette.cardSurface),
                 in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.tile)
             )
             .messageActionsMenu(onAsk: onAskConcierge, onReport: onReport)
