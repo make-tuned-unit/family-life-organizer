@@ -359,7 +359,7 @@ struct SettingsView: View {
                 HStack {
                     Spacer()
                     VStack(spacing: 6) {
-                        KinrowsIllustration(.logo(.lockup), accessibility: .label("Kinrows"), maxWidth: 180)
+                        KinrowsIllustration(.logo(.crew), accessibility: .label("Kinrows"), maxWidth: 180)
                         Text("Kin that rows together.")
                             .font(.flDisplayItalic)
                             .foregroundStyle(WarmPalette.ink2)

@@ -36,6 +36,7 @@ final class HomeViewModel {
     /// Today's Concierge brief for the dedicated Home section (nil when the
     /// household hasn't opted in or no brief has been written yet).
     var dailyBrief: APIService.DailyBriefPost?
+    var homeCustomization: HomeCustomization?
     var isLoading = false
     var error: String?
     var visibleFeedCount = 15
@@ -100,6 +101,7 @@ final class HomeViewModel {
         sleepNow = home.sleep
         choresToday = home.chores
         dailyBrief = home.daily_brief
+        homeCustomization = home.home_customization
         publishWidgetSnapshot(home)
     }
 
@@ -122,8 +124,16 @@ final class HomeViewModel {
             eventsTodayCount: home.appointments_today.count,
             nextEventTitle: next?.title,
             nextEventTime: next?.appointment_time.map { String($0.prefix(5)) },
-            updatedAt: Date()
+            updatedAt: Date(),
+            pinnedCards: home.home_customization?.cards
         ))
+    }
+
+    func saveHomePins(_ pins: [String], api: APIService, userId: Int?) async throws {
+        try await api.setHomePins(pins)
+        let home = try await api.fetchHome()
+        applyBootstrap(home, dismissed: dismissedHeroIds)
+        if let userId { HomeDiskCache.save(home, userId: userId) }
     }
 
     func reloadTrips(api: APIService) async {

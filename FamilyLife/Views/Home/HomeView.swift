@@ -5,6 +5,7 @@ struct HomeView: View {
     @Binding var pendingListName: String?
     @Environment(APIService.self) private var api
     @Environment(AuthService.self) private var auth
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(CalendarService.self) private var calendarService
     @State private var viewModel = HomeViewModel()
     @State private var showingAddTask = false
@@ -12,6 +13,7 @@ struct HomeView: View {
     @State private var showingNewEvent = false
     @State private var showingNewPost = false
     @State private var showingSettings = false
+    @State private var showingHomeCustomization = false
     @State private var onThisDay: [MilestoneResponse] = []
     @State private var eventRange = 0 // 0=today, 1=week, 2=month
     enum FeedFilter: Equatable {
@@ -41,6 +43,81 @@ struct HomeView: View {
     /// beat before they poof away.
     @State private var completingTaskIds: Set<Int> = []
 
+    private var pinnedHomeCards: some View {
+        VStack(alignment: .leading, spacing: DesignTokens.Spacing.cardGap) {
+            HStack {
+                Text("Your Home").font(.flHeadline)
+                Spacer()
+                Button("Customize", systemImage: "slider.horizontal.3") { showingHomeCustomization = true }
+                    .font(.flFootnote)
+                    .disabled(viewModel.homeCustomization == nil)
+            }
+            .foregroundStyle(WarmPalette.ink2)
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: DesignTokens.Spacing.cardGap), count: dynamicTypeSize.isAccessibilitySize ? 1 : 2), spacing: DesignTokens.Spacing.cardGap) {
+                ForEach(viewModel.homeCustomization?.cards ?? []) { card in
+                    pinnedCardLink(card)
+                }
+            }
+        }
+        .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
+        .padding(.vertical, DesignTokens.Spacing.cardGap)
+    }
+
+    @ViewBuilder
+    private func pinnedCardLink(_ card: HomePinnedCard) -> some View {
+        switch card.id {
+        case "trips":
+            NavigationLink { ItineraryListView() } label: { pinnedCardLabel(card) }.buttonStyle(.flCardPress)
+        case "routines":
+            NavigationLink { RoutinesView() } label: { pinnedCardLabel(card) }.buttonStyle(.flCardPress)
+        case "pantry":
+            NavigationLink { PantryView() } label: { pinnedCardLabel(card) }.buttonStyle(.flCardPress)
+        case "people":
+            NavigationLink { PeopleView() } label: { pinnedCardLabel(card) }.buttonStyle(.flCardPress)
+        default:
+            Button {
+                switch card.id {
+                case "budget": selectedTab = .budget
+                case "calendar": selectedTab = .calendar
+                case "tasks": pendingListName = "Tasks"; selectedTab = .lists
+                default: selectedTab = .lists
+                }
+            } label: { pinnedCardLabel(card) }
+            .buttonStyle(.flCardPress)
+        }
+    }
+
+    private func pinnedCardLabel(_ card: HomePinnedCard) -> some View {
+        VStack(alignment: .leading, spacing: DesignTokens.Spacing.sectionTop) {
+            HStack(spacing: 6) {
+                Image(systemName: card.icon).foregroundStyle(TabAccent.home.color)
+                Text(card.title).foregroundStyle(WarmPalette.ink3)
+                Spacer(minLength: 0)
+                Image(systemName: card.status == "attention" ? "exclamationmark.circle" : "chevron.right")
+                    .foregroundStyle(WarmPalette.ink3)
+            }
+            .font(.flCaption)
+            Text(card.headline).font(.flSubheadline.weight(.semibold)).foregroundStyle(WarmPalette.ink1).lineLimit(3)
+            Text(card.detail).font(.flCaption).foregroundStyle(WarmPalette.ink2).lineLimit(4)
+            Spacer(minLength: 0)
+        }
+        .multilineTextAlignment(.leading)
+        .frame(maxWidth: .infinity, minHeight: 148, alignment: .topLeading)
+        .padding(DesignTokens.Spacing.cardPadding)
+        .flCard()
+    }
+
+    private var settingsButton: some View {
+        Button { showingSettings = true } label: {
+            ProfileAvatar(size: 36, borderWidth: 0)
+                .frame(width: 44, height: 44)
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Settings")
+        .help("Settings")
+    }
+
     private var greeting: String {
         let hour = Calendar.current.component(.hour, from: Date())
         if hour < 12 { return "Good morning" }
@@ -63,6 +140,7 @@ struct HomeView: View {
             VStack(spacing: 0) {
                 greetingSection
                 firstWeekCard
+                pinnedHomeCards
                 presenceRow
                 sleepBarSection
                 choreBarSection
@@ -90,12 +168,11 @@ struct HomeView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackgroundVisibility(.hidden, for: .navigationBar)
         .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
-                Button { showingSettings = true } label: {
-                    ProfileAvatar(size: 36)
-                }
-                .accessibilityLabel("Settings")
-                .help("Settings")
+            if #available(iOS 26.0, *) {
+                ToolbarItem(placement: .topBarLeading) { settingsButton }
+                    .sharedBackgroundVisibility(.hidden)
+            } else {
+                ToolbarItem(placement: .topBarLeading) { settingsButton }
             }
             ToolbarItem(placement: .principal) {
                 VStack(spacing: 3) {
@@ -133,6 +210,13 @@ struct HomeView: View {
                 }
                 .accessibilityLabel("New item")
                 .help("New item")
+            }
+        }
+        .sheet(isPresented: $showingHomeCustomization) {
+            if let customization = viewModel.homeCustomization {
+                HomeCustomizationSheet(customization: customization) { pins in
+                    try await viewModel.saveHomePins(pins, api: api, userId: auth.currentUser?.id)
+                }
             }
         }
         .sheet(isPresented: $showingAddTask) {
@@ -1018,4 +1102,68 @@ struct HomeView: View {
 /// and a bare Bool + separate id pair drops the id on fast re-taps.
 struct FeedRoutineTarget: Identifiable {
     let id: Int
+}
+
+
+private struct HomeCustomizationSheet: View {
+    let customization: HomeCustomization
+    let onSave: ([String]) async throws -> Void
+    @Environment(\.dismiss) private var dismiss
+    @State private var pins: [String] = []
+    @State private var errorMessage: String?
+    @State private var saving = false
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section {
+                    Text("Choose what matters to you and arrange it in priority order. Your first card leads the small iPhone widget; the first two appear in the medium widget. Widgets update when Kinrows refreshes.")
+                        .font(.flSubheadline)
+                        .foregroundStyle(WarmPalette.ink2)
+                }
+                Section("Pinned · drag to reorder") {
+                    ForEach(pins, id: \.self) { id in
+                        if let option = customization.options.first(where: { $0.id == id }) {
+                            Label(option.title, systemImage: option.icon)
+                        }
+                    }
+                    .onMove { pins.move(fromOffsets: $0, toOffset: $1) }
+                    .onDelete { pins.remove(atOffsets: $0) }
+                }
+                Section("Add to Home") {
+                    ForEach(customization.options.filter { !pins.contains($0.id) }) { option in
+                        Button { pins.append(option.id) } label: {
+                            Label(option.title, systemImage: option.icon)
+                        }
+                    }
+                }
+            }
+            .environment(\.editMode, .constant(.active))
+            .disabled(saving)
+            .navigationTitle("Customize Home")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() }.disabled(saving) }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(saving ? "Saving…" : "Save") {
+                        saving = true
+                        Task {
+                            do { try await onSave(pins); dismiss() }
+                            catch { errorMessage = "Couldn't save your Home. Please try again." }
+                            saving = false
+                        }
+                    }.disabled(saving)
+                }
+            }
+            .inlineError(errorMessage) { errorMessage = nil }
+            .onAppear { pins = customization.pins }
+        }
+    }
+}
+
+#Preview("Customize Home") {
+    HomeCustomizationSheet(customization: HomeCustomization(pins: ["budget"], cards: [], options: [
+        HomeCardOption(id: "budget", title: "Budget", icon: "creditcard"),
+        HomeCardOption(id: "trips", title: "Trips", icon: "airplane")
+    ])) { _ in }
 }

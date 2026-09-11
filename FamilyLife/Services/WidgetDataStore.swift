@@ -15,6 +15,28 @@ struct WidgetDaySnapshot: Codable {
     var nextEventTitle: String?
     var nextEventTime: String?       // "HH:MM" or display string
     var updatedAt: Date
+    var pinnedCards: [HomePinnedCard]? = nil
+}
+
+struct HomePinnedCard: Codable, Identifiable {
+    let id: String
+    let title: String
+    let icon: String
+    let headline: String
+    let detail: String
+    let status: String
+}
+
+struct HomeCardOption: Codable, Identifiable {
+    let id: String
+    let title: String
+    let icon: String
+}
+
+struct HomeCustomization: Codable {
+    var pins: [String]
+    var cards: [HomePinnedCard]
+    let options: [HomeCardOption]
 }
 
 enum WidgetDataStore {

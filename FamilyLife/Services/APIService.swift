@@ -214,6 +214,7 @@ final class APIService {
         /// Today's Concierge brief — rendered as its own Home section that
         /// updates in place, never as activity-feed rows.
         let daily_brief: DailyBriefPost?
+        var home_customization: HomeCustomization? = nil
     }
 
     struct DailyBriefPost: Codable {
@@ -225,6 +226,10 @@ final class APIService {
 
     func fetchHome() async throws -> HomeBootstrap {
         try await get("/api/home")
+    }
+
+    func setHomePins(_ pins: [String]) async throws {
+        let _: SuccessResponse = try await put("/api/home/preferences", body: ["pins": pins])
     }
 
     // MARK: - Tasks

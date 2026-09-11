@@ -45,7 +45,7 @@ struct KinrowsDayAheadWidget: Widget {
                 }
         }
         .configurationDisplayName("Day ahead")
-        .description("Your Concierge's brief, today's chores, and what's next.")
+        .description("Your pinned Home priorities, or your day ahead when no cards are pinned.")
         .supportedFamilies([.systemSmall, .systemMedium])
     }
 }
@@ -56,9 +56,13 @@ struct DayAheadWidgetView: View {
 
     var body: some View {
         if let snapshot = entry.snapshot {
-            switch family {
-            case .systemSmall: SmallDayAheadView(snapshot: snapshot)
-            default: MediumDayAheadView(snapshot: snapshot)
+            if let cards = snapshot.pinnedCards, !cards.isEmpty {
+                PinnedHomeWidgetView(cards: Array(cards.prefix(family == .systemSmall ? 1 : 2)), updatedAt: snapshot.updatedAt)
+            } else {
+                switch family {
+                case .systemSmall: SmallDayAheadView(snapshot: snapshot)
+                default: MediumDayAheadView(snapshot: snapshot)
+                }
             }
         } else {
             VStack(spacing: 6) {
@@ -71,6 +75,29 @@ struct DayAheadWidgetView: View {
                     .multilineTextAlignment(.center)
             }
         }
+    }
+}
+
+private struct PinnedHomeWidgetView: View {
+    let cards: [HomePinnedCard]
+    let updatedAt: Date
+
+    var body: some View {
+        HStack(alignment: .top, spacing: DesignTokens.Spacing.cardGap) {
+            ForEach(cards) { card in
+                VStack(alignment: .leading, spacing: 6) {
+                    Label(card.title, systemImage: card.icon)
+                        .font(.flCaption.weight(.semibold))
+                        .foregroundStyle(TabAccent.home.color)
+                    Text(card.headline).font(.flSubheadline.weight(.semibold)).lineLimit(2)
+                    Text(card.detail).font(.flCaption2).foregroundStyle(WarmPalette.ink2).lineLimit(3)
+                    Spacer(minLength: 0)
+                    Text(updatedAt, style: .relative).font(.flCaption2).foregroundStyle(WarmPalette.ink3)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+        .widgetURL(URL(string: "kinrows://home"))
     }
 }
 

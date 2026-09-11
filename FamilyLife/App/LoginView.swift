@@ -22,7 +22,7 @@ struct LoginView: View {
                 Spacer(minLength: 80)
 
                 VStack(spacing: DesignTokens.Spacing.rowVertical) {
-                    KinrowsIllustration(.logo(.lockup), accessibility: .label("Kinrows"), maxWidth: 220)
+                    KinrowsIllustration(.logo(.crew), accessibility: .label("Kinrows"), maxWidth: 220)
                     Text("Kin that rows together.")
                         .font(.flDisplayItalic)
                         .foregroundStyle(WarmPalette.ink2)

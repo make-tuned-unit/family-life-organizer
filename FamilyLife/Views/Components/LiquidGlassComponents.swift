@@ -35,22 +35,34 @@ struct ProfileAvatar: View {
     var borderWidth: CGFloat = 2
 
     var body: some View {
-        if let source = auth.profileUIImage {
-            Image(uiImage: Self.preRenderedCircle(
-                source, diameter: size,
-                borderColor: UIColor(borderColor),
-                borderWidth: borderWidth
-            ))
-        } else {
-            Circle()
-                .fill(Color.green.opacity(0.6))
-                .frame(width: size, height: size)
-                .overlay {
-                    Text(auth.currentUser?.name.prefix(1).uppercased() ?? "?")
-                        .font(.system(size: size * 0.42, weight: .bold))
-                        .foregroundStyle(.white)
-                }
-                .overlay(Circle().stroke(borderColor, lineWidth: borderWidth))
+        Image(uiImage: Self.preRenderedCircle(
+            auth.profileUIImage ?? initialsImage,
+            diameter: size,
+            borderColor: UIColor(borderColor),
+            borderWidth: borderWidth
+        ))
+        .renderingMode(.original)
+        .resizable()
+        .scaledToFit()
+        .frame(width: size, height: size)
+        .fixedSize()
+    }
+
+    // Render the fallback just like a photo: a toolbar must not reinterpret
+    // the Circle + text layers as its own glass button shape.
+    private var initialsImage: UIImage {
+        let name = auth.currentUser?.name ?? "?"
+        let initial = String(name.prefix(1)).uppercased()
+        return UIGraphicsImageRenderer(size: CGSize(width: size, height: size)).image { _ in
+            UIColor(PersonPalette.color(for: name)).setFill()
+            UIBezierPath(rect: CGRect(x: 0, y: 0, width: size, height: size)).fill()
+            let attributes: [NSAttributedString.Key: Any] = [
+                .font: UIFont.systemFont(ofSize: size * 0.42, weight: .semibold),
+                .foregroundColor: UIColor.white
+            ]
+            let text = initial as NSString
+            let textSize = text.size(withAttributes: attributes)
+            text.draw(at: CGPoint(x: (size - textSize.width) / 2, y: (size - textSize.height) / 2), withAttributes: attributes)
         }
     }
 
