@@ -16,6 +16,7 @@ struct FamilyListsView: View {
     @State private var tasksSelected = false
     #endif
     @State private var activeTaskCount = 0
+    @State private var listCounts: [Int: Int] = [:]
 
     private static let tasksReservedName = "Tasks"
 
@@ -30,7 +31,10 @@ struct FamilyListsView: View {
             if tasksSelected {
                 TasksDetailSection(api: api) { count in activeTaskCount = count }
             } else if let selected = selectedList {
-                ListDetailSection(list: selected, api: api)
+                ListDetailSection(list: selected, api: api) { count in
+                    listCounts[selected.id] = count
+                }
+                .id(selected.id)
             } else if lists.isEmpty && !isLoading {
                 WarmEmptyState(
                     title: "Start your first list",
@@ -165,7 +169,7 @@ struct FamilyListsView: View {
                                 .font(.system(size: 12))
                             Text(list.name)
                                 .font(.flFootnote.weight(.semibold))
-                            if let count = list.active_count, count > 0 {
+                            if let count = listCounts[list.id] ?? list.active_count, count > 0 {
                                 Text("\(count)")
                                     .font(.flOverline.weight(.bold))
                                     .foregroundStyle(isActive ? WarmPalette.cream1.opacity(0.7) : WarmPalette.ink3)
@@ -228,9 +232,12 @@ struct FamilyListsView: View {
 struct ListDetailSection: View {
     let list: APIService.ListResponse
     let api: APIService
+    var onCountChange: (Int) -> Void = { _ in }
     @State private var items: [APIService.ListItemResponse] = []
     @State private var newItem = ""
     @State private var isLoading = false
+    @State private var errorMessage: String?
+    @State private var togglingIds: Set<Int> = []
     @State private var showCompleted = false
     @State private var editingItemId: Int?
     @State private var editingText = ""
@@ -249,9 +256,10 @@ struct ListDetailSection: View {
 
     // Group active items by category for grocery lists
     private var categorizedActiveItems: [(category: String, items: [APIService.ListItemResponse])] {
+        if !list.isGrocery { return activeItems.isEmpty ? [] : [(category: "Items", items: activeItems)] }
         let grouped = Dictionary(grouping: activeItems) { $0.category ?? "Other" }
         let order = ["Produce", "Dairy", "Meat & Seafood", "Bakery", "Deli", "Frozen", "Pantry", "Beverages", "Snacks", "Household", "Personal Care", "Baby & Kids", "Pet", "Other"]
-        return order.compactMap { cat in
+        return (order + grouped.keys.filter { !order.contains($0) }.sorted()).compactMap { cat in
             guard let items = grouped[cat], !items.isEmpty else { return nil }
             return (category: cat, items: items)
         }
@@ -306,78 +314,15 @@ struct ListDetailSection: View {
             .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
             .padding(.bottom, 14)
 
-            if list.isGrocery {
-                groceryContent
-            } else {
-                flatListContent
-            }
+            groceryContent
         }
+        .inlineError(errorMessage) { errorMessage = nil }
+        .onChange(of: items.filter { !$0.isDone }.count) { _, count in onCountChange(count) }
         .task(id: list.id) { await loadItems() }
         .onConciergeDataChange { await loadItems() }
     }
 
-    // MARK: - Flat List with Drag Reorder
-
-    private var flatListContent: some View {
-        List {
-            if activeItems.isEmpty && doneItems.isEmpty && !isLoading {
-                WarmEmptyState(
-                    title: "List is empty",
-                    systemImage: list.icon ?? "list.bullet",
-                    description: "Add items above to get started"
-                )
-                .listRowBackground(Color.clear)
-                .listRowSeparator(.hidden)
-            }
-
-            if !activeItems.isEmpty {
-                Section {
-                    ForEach(activeItems) { item in
-                        itemRowContent(item)
-                            .listRowBackground(WarmPalette.cardSurface)
-                    }
-                    .onMove(perform: moveItems)
-                }
-            }
-
-            if !doneItems.isEmpty {
-                Section {
-                    Button {
-                        withAnimation(.easeInOut(duration: 0.2)) { showCompleted.toggle() }
-                    } label: {
-                        HStack {
-                            Text("Completed")
-                                .font(.flFootnote.weight(.semibold))
-                                .foregroundStyle(WarmPalette.ink3)
-                            Text("\(doneItems.count)")
-                                .font(.flCaption.weight(.bold))
-                                .foregroundStyle(WarmPalette.ink4)
-                            Spacer()
-                            Image(systemName: "chevron.right")
-                                .font(.system(size: 12, weight: .semibold))
-                                .foregroundStyle(WarmPalette.ink4)
-                                .rotationEffect(.degrees(showCompleted ? 90 : 0))
-                        }
-                    }
-                    .listRowBackground(Color.clear)
-                    .listRowSeparator(.hidden)
-
-                    if showCompleted {
-                        ForEach(doneItems) { item in
-                            itemRowContent(item)
-                                .listRowBackground(WarmPalette.cardSurface.opacity(0.6))
-                        }
-                    }
-                }
-            }
-        }
-        .listStyle(.plain)
-        .scrollContentBackground(.hidden)
-        .environment(\.editMode, .constant(.active))
-        .flMinimizesTabBar()
-    }
-
-    // MARK: - Grocery Grouped (ScrollView, no reorder)
+    // All named lists share the same cards and item interactions.
 
     private var groceryContent: some View {
         ScrollView(showsIndicators: false) {
@@ -462,81 +407,6 @@ struct ListDetailSection: View {
         .flMinimizesTabBar()
     }
 
-    // MARK: - Item Row (used in List for flat lists)
-
-    @ViewBuilder
-    private func itemRowContent(_ item: APIService.ListItemResponse) -> some View {
-        let isEditing = editingItemId == item.id
-        HStack(spacing: 12) {
-            Button {
-                Task { await toggleItem(item.id) }
-            } label: {
-                Image(systemName: item.isDone ? "checkmark.circle.fill" : "circle")
-                    .font(.system(size: 22))
-                    .foregroundStyle(item.isDone ? WarmPalette.good : WarmPalette.ink4)
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel(item.isDone ? "Mark \(item.title) as not done" : "Mark \(item.title) as done")
-            .help(item.isDone ? "Mark as not done" : "Mark as done")
-
-            if isEditing {
-                TextField("Item name", text: $editingText)
-                    .font(.flSubheadline)
-                    .foregroundStyle(WarmPalette.ink1)
-                    .focused($isEditFocused)
-                    .onSubmit { commitEdit(item) }
-            } else {
-                Text(item.title)
-                    .font(.flSubheadline)
-                    .foregroundStyle(item.isDone ? WarmPalette.ink3 : WarmPalette.ink1)
-                    .strikethrough(item.isDone)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .contentShape(Rectangle())
-                    .onTapGesture {
-                        guard !item.isDone else { return }
-                        editingItemId = item.id
-                        editingText = item.title
-                        isEditFocused = true
-                    }
-            }
-
-            if isEditing {
-                Button { commitEdit(item) } label: {
-                    Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 20))
-                        .foregroundStyle(WarmPalette.good)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Save item")
-                .help("Save item")
-                Button { editingItemId = nil } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 20))
-                        .foregroundStyle(WarmPalette.ink4)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Cancel editing")
-                .help("Cancel editing")
-            }
-        }
-        .contextMenu {
-            if !item.isDone {
-                Button {
-                    editingItemId = item.id
-                    editingText = item.title
-                    isEditFocused = true
-                } label: {
-                    Label("Edit", systemImage: "pencil")
-                }
-            }
-            Button(role: .destructive) {
-                Task { await deleteItem(item.id) }
-            } label: {
-                Label("Delete", systemImage: "trash")
-            }
-        }
-    }
-
     // MARK: - Grocery Item Row (used in ScrollView for grocery lists)
 
     @ViewBuilder
@@ -550,6 +420,7 @@ struct ListDetailSection: View {
                     .font(.system(size: 22))
                     .foregroundStyle(item.isDone ? WarmPalette.good : WarmPalette.ink4)
             }
+            .disabled(togglingIds.contains(item.id) || item.id < 0)
             .accessibilityLabel(item.isDone ? "Mark \(item.title) as not done" : "Mark \(item.title) as done")
             .help(item.isDone ? "Mark as not done" : "Mark as done")
 
@@ -608,6 +479,14 @@ struct ListDetailSection: View {
                     Label("Edit", systemImage: "pencil")
                 }
             }
+            if !item.isDone, let index = activeItems.firstIndex(where: { $0.id == item.id }) {
+                Button("Move up", systemImage: "arrow.up") {
+                    moveItems(from: IndexSet(integer: index), to: index - 1)
+                }.disabled(index == 0)
+                Button("Move down", systemImage: "arrow.down") {
+                    moveItems(from: IndexSet(integer: index), to: index + 2)
+                }.disabled(index == activeItems.count - 1)
+            }
             Button(role: .destructive) {
                 Task { await deleteItem(item.id) }
             } label: {
@@ -622,8 +501,10 @@ struct ListDetailSection: View {
         isLoading = true
         do {
             items = try await api.fetchListItems(listId: list.id)
+            errorMessage = nil
         } catch {
             guard !error.isCancellation else { return }
+            errorMessage = "Couldn't load this list. Please try again."
         }
         isLoading = false
     }
@@ -648,12 +529,16 @@ struct ListDetailSection: View {
             } catch {
                 guard !error.isCancellation else { return }
                 items.removeAll { $0.id == temp.id }
+                newItem = title
+                errorMessage = "Couldn’t add this item. Please try again."
             }
         }
     }
 
     private func toggleItem(_ id: Int) async {
-        guard let idx = items.firstIndex(where: { $0.id == id }) else { return }
+        guard !togglingIds.contains(id), let idx = items.firstIndex(where: { $0.id == id }) else { return }
+        togglingIds.insert(id)
+        defer { togglingIds.remove(id) }
         let wasDone = items[idx].isDone
 
         // Keep item in its current section during animation
@@ -681,6 +566,7 @@ struct ListDetailSection: View {
             guard !error.isCancellation else { return }
             // Roll back to server truth on failure.
             await loadItems()
+            errorMessage = "Couldn’t update this item. Please try again."
         }
     }
 
@@ -691,7 +577,7 @@ struct ListDetailSection: View {
         } catch {
             guard !error.isCancellation else { return }
             // Item stays visible (server truth); at least signal the failure.
-            UINotificationFeedbackGenerator().notificationOccurred(.error)
+            errorMessage = "Couldn’t delete this item. Please try again."
         }
     }
 
@@ -710,6 +596,7 @@ struct ListDetailSection: View {
                 guard !error.isCancellation else { return }
                 if let i = items.firstIndex(where: { $0.id == item.id }) {
                     items[i].title = previousTitle
+                    errorMessage = "Couldn’t save this item. Please try again."
                 }
             }
         }
@@ -723,7 +610,11 @@ struct ListDetailSection: View {
         // Persist to server
         let orderedIds = active.map(\.id)
         Task {
-            try? await api.reorderListItems(listId: list.id, orderedIds: orderedIds)
+            do { try await api.reorderListItems(listId: list.id, orderedIds: orderedIds) }
+            catch {
+                await loadItems()
+                errorMessage = "Couldn’t reorder this list. Please try again."
+            }
         }
     }
 }
