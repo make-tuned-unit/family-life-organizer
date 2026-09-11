@@ -1,6 +1,6 @@
-# FamilyLife iOS
+# Kinrows iOS
 
-Native iOS companion app for the Family Life Organizer — a household management system for Jesse and Melissa.
+Native SwiftUI app and Express/SQLite backend for the Kinrows family organizer.
 
 ## Overview
 
@@ -8,16 +8,21 @@ FamilyLife brings the full household dashboard to iPhone and iPad: calendar, bud
 
 ## Tech Stack
 
-- **SwiftUI** + **SwiftData** (iOS 18+)
+- **SwiftUI** with Codable API models (iOS 18+)
 - MVVM architecture
 - iPhone-first, iPad-compatible
-- Bundle ID: `com.atlasatlantic.familylife`
+- Bundle ID: `com.kinrows.app`
 
 ## Getting Started
 
-1. Open `FamilyLife.xcodeproj` in Xcode 16+
-2. Select a simulator or device running iOS 18+
-3. Build and run
+1. Open `FamilyLife.xcodeproj` in Xcode with the iOS 26 SDK or newer and select the shared **FamilyLife** scheme.
+2. For a simulator, select an iOS 18+ destination and use **Product → Build** (⌘B). Debug uses `http://localhost:3456`; start the backend with `npm ci` then `npm start`.
+3. For a production device/TestFlight archive, select **Any iOS Device (arm64)** and use **Product → Archive**. The shared scheme archives Release, which uses the production Railway API.
+4. Automatic signing uses team `Z58XSBM78S`. The app and widget are both set to version **1.0**, build **243**. Xcode needs your signing account/profiles to create a distributable archive.
+
+For a physical-device Debug run, point the debug server override at your Mac's reachable LAN address; `localhost` on the phone is the phone itself. No QA credentials or simulator launch overrides are stored in the shared scheme.
+
+Backend validation: `npm test`; AI action regressions: `npm run test:ai`; model routing: `npm run test:ai:routing` (live checks require `ANTHROPIC_API_KEY`). See [AI management test coverage](docs/AI_MANAGEMENT_TESTING.md).
 
 ## Project Structure
 
@@ -30,8 +35,8 @@ FamilyLife/
 │   ├── Pantry/     # Pantry inventory & receipt scanning
 │   ├── Expenses/   # Budget tracking & receipts
 │   └── Cook/       # AI cooking assistant
-├── Models/         # SwiftData models & data types
-├── Services/       # API client, sync engine, AI service
+├── Models/         # Codable models & data types
+├── Services/       # API client, auth, calendar sync, widget snapshots
 └── Resources/      # Assets, colors, fonts
 ```
 
