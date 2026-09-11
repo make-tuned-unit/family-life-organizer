@@ -114,7 +114,7 @@
         <ul>
           <li>Open the app → <strong>Settings → Account → Developer API</strong> → <strong>Create key</strong>. Copy it — it is shown once.</li>
           <li>Send it as <code>Authorization: Bearer kr_live_…</code> to the <code>/v1</code> endpoints below, or point any MCP-capable agent at <code>/v1/mcp</code>.</li>
-          <li>Your agent gets <strong>23 focused MCP tools covering all 117 Concierge actions</strong> — tasks, lists, calendar, budget, pantry, polls, trips, messages, baby sleep, and more.</li>
+          <li>Your agent gets <strong>25 focused MCP tools covering all 123 Concierge actions</strong> — tasks, lists, calendar, budget, pantry, polls, trips, messages, baby sleep, and more.</li>
           <li>A key only ever acts on <strong>your</strong> household. Choose <strong>read-only</strong> if you just want your agent to see, not touch.</li>
           <li>Revoke a key any time; lapsed subscriptions switch keys off instantly.</li>
         </ul>
@@ -166,14 +166,16 @@
           <div class="tbl-wrap"><table>
             <thead><tr><th>Tool</th><th>Actions</th></tr></thead>
             <tbody>
-              <tr><td><code>calendar</code></td><td>list · add · update · delete</td></tr>
+              <tr><td><code>history</code></td><td>search · dated records, receipt items, archived routines and other retained history</td></tr>
+              <tr><td><code>home</code></td><td>get · set ordered personal Home cards and iPhone widget priorities</td></tr>
+              <tr><td><code>calendar</code></td><td>lookup_place · list · add · update · delete (including recurrence)</td></tr>
               <tr><td><code>tasks</code></td><td>list · add · complete · update · delete</td></tr>
               <tr><td><code>lists</code></td><td>list_all · get · add · check_off · create · rename · delete · update_item · delete_item · move_item</td></tr>
               <tr><td><code>budget</code></td><td>get · list_expenses · log_expense · delete_expense · add/update/delete_category</td></tr>
               <tr><td><code>pantry</code></td><td>list · add · update · delete</td></tr>
               <tr><td><code>decisions</code></td><td>list · create · vote · comment · delete</td></tr>
               <tr><td><code>trips</code> / <code>itineraries</code></td><td>live ETA trips; multi-day itineraries with stays and expenses</td></tr>
-              <tr><td><code>routines</code></td><td>list · get · log_sleep · start_sleep · end_sleep · set_start · stats · analyze · log_entry · <strong>chores</strong> · setup_chores · update_chores · log_chore · chore_bonus · chore_payout</td></tr>
+              <tr><td><code>routines</code></td><td>archive · restore · list · get · log_sleep · start_sleep · end_sleep · set_start · stats · analyze · log_entry · <strong>chores</strong> · setup_chores · update_chores · log_chore · chore_bonus · chore_payout</td></tr>
               <tr><td><code>people</code>, <code>gifts</code>, <code>special_events</code>, <code>coverage</code>, <code>notes</code>, <code>contacts</code>, <code>rivalries</code>, <code>projects</code>, <code>recurring_payments</code>, <code>feed</code></td><td>the rest of the app</td></tr>
               <tr><td><code>send_message</code>, <code>remember</code>, <code>get_addresses</code>, <code>update_my_name</code></td><td>standalone tools</td></tr>
             </tbody>
@@ -204,7 +206,7 @@
           <div class="tbl-wrap"><table>
             <thead><tr><th>Capability</th><th>Available through Kinrows MCP</th></tr></thead>
             <tbody>
-              <tr><td>Tools</td><td>23 model-friendly tools covering all 117 internal Concierge actions. Related operations are grouped behind a required <code>action</code> field.</td></tr>
+              <tr><td>Tools</td><td>25 model-friendly tools covering all 123 internal Concierge actions. Related operations are grouped behind a required <code>action</code> field.</td></tr>
               <tr><td>Resources</td><td><code>kinrows://account/me</code>, <code>kinrows://household/snapshot</code>, <code>kinrows://developer/audit</code>, and <code>kinrows://household/snapshot/{section}</code>.</td></tr>
               <tr><td>Prompts</td><td><code>morning-brief</code>, <code>plan-week</code>, <code>household-check-in</code>, <code>trip-readiness</code>, and <code>chores-review</code>.</td></tr>
               <tr><td>Results</td><td>Every tool returns human-readable content plus structured JSON in <code>structuredContent.result</code>.</td></tr>

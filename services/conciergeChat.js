@@ -53,6 +53,12 @@ Guidelines:
 - Before editing, completing, or deleting anything, first look it up with the matching list/get tool to find the correct id. Never guess an id.
 - CURRENT STATE, NOT MEMORY: the user may add or delete things outside this chat. Do NOT assume something still exists — or is already handled — just because it came up earlier in this conversation. When asked to add something, add it, even if you added a similar item earlier; if in doubt whether it already exists, check with a list/get tool rather than declining.
 - Most tools are grouped by domain and take an "action" (e.g. the calendar tool with action "add"/"update"/"list"/"delete"). Pick the domain, then the action, and pass that action's fields.
+- HISTORY: For past events, purchases, notes or routine history, use history search with the requested date range. For "did I buy lemons at Costco last week", inspect Costco receipt notes; scanned items are saved there. Distinguish receipts from checked shopping-list items, and missing data from a definite no. Paginate all matching results before concluding nothing is recorded. For past budget spending use budget get with YYYY-MM; explain that limits are current settings.
+- HOME: Users can pin, unpin and reorder Home cards with the home tool. Read existing pins first. Their first priorities drive the iPhone widget too.
+- RECURRENCE: For every week/weekly set recurrence_rule="weekly" on the event; use the requested first date and 24-hour time (9:20 AM = 09:20). Preserve any requested end date. Never silently create a one-off when asked to repeat. If frequency or first date is ambiguous, ask. Updating/deleting a repeating event affects the whole series; clarify if the user means one occurrence.
+- VENUES: Before saving a named public school/business without its street address, use calendar lookup_place with only its name and known city/region. Save the venue name AND verified full address in location. Never guess the address or select an ambiguous branch. If lookup fails, ask for the address and say it remains unresolved.
+- ARCHIVING: When a routine is no longer needed, use routines archive to preserve history; use list with status="archived" then restore to resume.
+- ACCURACY: Check tool results before claiming success. Confirm the saved date, time, recurrence, attendee and location for events. Report unresolved fields and failed actions explicitly.
 - ATTENDEES: an event's "with_person" field is who it is with or who is invited/attending. When the user names who an event is for or asks to invite/add someone to it (e.g. "invite Sophie"), set with_person on the calendar tool (action "add", or "update" for an existing event).
 - PEOPLE LINKS: When the user says a key date, milestone, or gift is "for" or "about" a named person, it MUST be attached to that person's People card. Call the people tool with action "list" first, then pass the matching person_id (and person_name for a key date). Never create it as an unlinked household item. If no unique person matches, ask which person they mean instead of writing anything.
 - NOTES: "take a note", "make a note", "jot down", or "write down …" means the notes tool with action "add" (private by default). Don't use 'remember' (that's for lasting facts) or the feed for this.
@@ -126,6 +132,7 @@ async function handleChat(db, { userId, userName, message, conversationId, sourc
       toolResults.push({
         type: 'tool_result',
         tool_use_id: block.id,
+        is_error: !!out.result?.error,
         content: JSON.stringify(out.result ?? out),
       });
     }
@@ -136,8 +143,8 @@ async function handleChat(db, { userId, userName, message, conversationId, sourc
   // tool-use turns mid-task. Don't imply completion in the latter case.
   if (!reply) {
     reply = actions.length
-      ? "I've taken care of those updates. Ask me to continue if there's more to do."
-      : "Done — let me know if there's anything else.";
+      ? `Saved changes: ${actions.map(a => a.summary).join('; ')}. I reached the action limit before checking the whole request. Please ask me to continue.`
+      : "I couldn't finish this request, and no changes were confirmed. Please ask me to try again.";
   }
 
   await db.addConciergeMessage(conversationId, 'assistant', reply);
@@ -215,6 +222,7 @@ async function handleChatStream(db, { userId, userName, message, conversationId,
       toolResults.push({
         type: 'tool_result',
         tool_use_id: block.id,
+        is_error: !!out.result?.error,
         content: JSON.stringify(out.result ?? out),
       });
     }
@@ -225,8 +233,8 @@ async function handleChatStream(db, { userId, userName, message, conversationId,
   // tool-use turns mid-task. Don't imply completion in the latter case.
   if (!reply) {
     reply = actions.length
-      ? "I've taken care of those updates. Ask me to continue if there's more to do."
-      : "Done — let me know if there's anything else.";
+      ? `Saved changes: ${actions.map(a => a.summary).join('; ')}. I reached the action limit before checking the whole request. Please ask me to continue.`
+      : "I couldn't finish this request, and no changes were confirmed. Please ask me to try again.";
   }
 
   await db.addConciergeMessage(conversationId, 'assistant', reply);

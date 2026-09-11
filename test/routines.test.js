@@ -1067,3 +1067,25 @@ test('routines: sleep-stats explains a 4am waking that comes every second night'
   }
   assert.match(stats.recommendations.note, /not medical advice/i);
 });
+
+test('archive removes sleep tracking from Home, preserves history and restores; creator only', async () => {
+  const [owner, invite] = await member('archive_owner', 'Archive Owner');
+  const [peer] = await member('archive_peer', 'Archive Peer', invite);
+  const [stranger] = await member('archive_stranger', 'Archive Stranger');
+  const created = await owner('POST', '/api/routines', { name: 'Naps', routine_type: 'baby_sleep', subject_name: 'Rowan', shared_scope: 'household' });
+  const id = created.body.id;
+  await owner('POST', `/api/routines/${id}/entries`, { entry_date: '2026-09-01', entry_type: 'nap', value: { duration_minutes: 90 } });
+  const original = (await owner('GET', `/api/routines/${id}`)).body.entries;
+  assert.equal((await peer('PUT', `/api/routines/${id}`, { active: 0 })).status, 403);
+  assert.equal((await stranger('PUT', `/api/routines/${id}`, { active: 0 })).status, 403);
+  for (const invalid of [null, '0', -1, 2, false]) assert.equal((await owner('PUT', `/api/routines/${id}`, { active: invalid })).status, 400);
+  for (const active of [0, 0, 1, 1]) {
+    assert.equal((await owner('PUT', `/api/routines/${id}`, { active })).status, 200);
+    const detail = (await owner('GET', `/api/routines/${id}`)).body;
+    assert.equal(detail.active, active);
+    assert.deepEqual(detail.entries, original);
+    const sleep = (await owner('GET', '/api/routines/sleep-now')).body;
+    assert.equal(sleep.some(r => r.routine_id === id), active === 1);
+    assert.equal((await owner('GET', '/api/routines')).body.find(r => r.id === id).active, active);
+  }
+});

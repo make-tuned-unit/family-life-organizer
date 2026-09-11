@@ -46,7 +46,7 @@ Error statuses across `/v1`: `401` missing/invalid/revoked key · `402` no activ
 
 ### 3.1 Tool catalog shape
 
-Tools are grouped by domain, each with an `action` enum — `calendar`, `tasks`, `lists`, `budget`, `pantry`, `decisions`, `trips`, `itineraries`, `rivalries`, `gifts`, `coverage`, `notes`, `routines`, `people`, `contacts`, `recurring_payments`, `projects`, `feed`, `special_events` — plus four standalone tools: `get_addresses`, `remember`, `update_my_name`, `send_message`. The catalog is generated from `services/conciergeTools.js`, so it is always identical to what the in-app Concierge sees. Read-only classification (`isReadOnly`) is by handler name prefix: `get_`, `list_`, `analyze_`.
+Tools are grouped by domain, each with an `action` enum — `history`, `home`, `calendar`, `tasks`, `lists`, `budget`, `pantry`, `decisions`, `trips`, `itineraries`, `rivalries`, `gifts`, `coverage`, `notes`, `routines`, `people`, `contacts`, `recurring_payments`, `projects`, `feed`, `special_events` — plus four standalone tools: `get_addresses`, `remember`, `update_my_name`, `send_message`. The catalog is generated from `services/conciergeTools.js`, so it is always identical to what the in-app Concierge sees. Read-only classification (`isReadOnly`) is by handler name prefix: `get_`, `list_`, `analyze_`.
 
 **Kids' chores** live under `routines` (one `chores` routine per child; see `services/chores.js`). Actions:
 
@@ -126,7 +126,7 @@ The browser consent screen grants `kinrows:read` and, when requested, `kinrows:w
 
 ### 3.3 MCP capabilities
 
-- **Tools:** all 23 consolidated Concierge tools, JSON Schema input validation, read/destructive/open-world annotations, a structured `{result: …}` alongside text fallback, and read/write scope enforcement.
+- **Tools:** all 25 consolidated Concierge tools, JSON Schema input validation, read/destructive/open-world annotations, a structured `{result: …}` alongside text fallback, and read/write scope enforcement.
 - **Destructive confirmation:** `delete` and `cancel` actions return `confirmation_required` unless the MCP caller retries with `confirm: true` after user approval. REST behavior is unchanged.
 - **Resources:** `kinrows://account/me`, `kinrows://household/snapshot`, `kinrows://developer/audit`, and `kinrows://household/snapshot/{section}`.
 - **Prompts:** `morning-brief`, `plan-week`, `household-check-in`, `trip-readiness`, and `chores-review`.
@@ -189,3 +189,14 @@ for (;;) {
 - `test/developer-api.test.js`, `test/mcp-modern.test.js`, `test/mcp-oauth.test.js`, `test/mcp-load.test.js` — legacy, modern SDK, OAuth, and bounded-concurrency coverage.
 - `npm run test:mcp:conformance` — official conformance smoke sweep for initialize, ping, and capability listings.
 - `website/developers.html` — public docs.
+
+
+### Calendar accuracy, history and Home priorities
+
+The catalog now exposes 25 tools / 123 actions. Each action validates its own schema, including direct-handler calls; unknown fields, invalid types and enums are returned as errors before execution.
+
+- `calendar add/update` accepts `recurrence_rule` (`daily`, `weekly`, `biweekly`, `monthly`, `yearly`, or null to clear), `recurrence_end`, description, category and person_tags. Times are `HH:MM`. Listing a date range expands recurring occurrences, including long-running series. Series updates affect all occurrences.
+- `calendar lookup_place` searches saved household addresses first, then uses [Anthropic web search](https://platform.claude.com/docs/en/agents-and-tools/tool-use/web-search-tool) for cited public venue addresses. Requires the existing Anthropic key and web-search availability. Ambiguous branches or unavailable evidence require clarification; never fabricate a street address.
+- `history search` accepts source, literal query, merchant, date_from/date_to, limit (1–100), and offset. Results include source, record id, date, detail and evidence label, plus next_offset. Sources include calendar, receipts, lists, tasks, notes, routines, itineraries, milestones, decisions, special_events, messages, contacts, trips, pantry, gifts and project_expenses. Household, owner and explicit group-sharing boundaries remain enforced. Archived routine entries are searchable. Deleted records cannot be recovered. Receipt notes contain scanned line items; checked lists and pantry inventory are not proof of purchase. Historical budget spending uses `budget get` with month; limits reflect current settings, not an original historical budget snapshot.
+- `routines archive/restore` preserves entries and uses creator authorization. `routines list` defaults to active; pass status archived or all for retained history.
+- `home get/set` reads or replaces ordered per-user pins. Supported cards: budget, trips, calendar, lists, tasks, routines, pantry, people. Set takes pins; empty unpins all. REST app route: `PUT /api/home/preferences`; `GET /api/home` includes home_customization. Trips includes only personal or explicitly group-shared itineraries. The small WidgetKit widget shows the first priority; medium shows two. The app publishes the snapshot on Home refresh; the extension does not fetch server data independently.

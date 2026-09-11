@@ -4010,35 +4010,7 @@ app.delete('/api/receipts/:id', requireAuth, async (req, res) => {
 
 // Helper: normalize date to YYYY-MM-DD for SQLite strftime
 // Expand a recurrence rule into dates within [rangeStart, rangeEnd)
-function expandRecurrence(rule, origin, rangeStart, rangeEnd, endDate) {
-  const dates = [];
-  const originDate = new Date(origin);
-  const anchorDay = originDate.getDate();
-  const step = { daily: 1, weekly: 7, biweekly: 14 }[rule];
-  for (let i = 1; i <= 400; i++) {
-    let cursor;
-    if (step) {
-      cursor = new Date(originDate.getTime() + i * step * 86400000);
-    } else if (rule === 'monthly' || rule === 'yearly') {
-      // Anchor each occurrence to the origin's day-of-month rather than mutating
-      // a cursor: setMonth on Jan 31 overflows to Mar 2/3 and the drift compounds
-      // forever. Shift from day 1 to avoid overflow, then clamp the anchor day to
-      // the target month's length so Jan 31 -> Feb 28/29 -> Mar 31, as expected.
-      const monthsToAdd = rule === 'monthly' ? i : i * 12;
-      cursor = new Date(originDate);
-      cursor.setDate(1);
-      cursor.setMonth(originDate.getMonth() + monthsToAdd);
-      const daysInMonth = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 0).getDate();
-      cursor.setDate(Math.min(anchorDay, daysInMonth));
-    } else {
-      break;
-    }
-    if (endDate && cursor > endDate) break;
-    if (cursor >= rangeEnd) break;
-    if (cursor >= rangeStart) dates.push(new Date(cursor));
-  }
-  return dates;
-}
+const { expandRecurrence } = require('./services/calendarRecurrence');
 
 function normalizeDate(dateStr) {
   if (!dateStr) return todayLocal();
@@ -6973,6 +6945,18 @@ app.get('/api/routines/sleep-now', requireAuth, async (req, res) => {
   finally { db.close(); }
 });
 
+const homeCards = require('./services/homeCards');
+app.put('/api/home/preferences', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const pins = await homeCards.setPins(db, req.session.user.id, req.body.pins);
+    res.json({ success: true, pins });
+  } catch (err) {
+    if (err.message === 'Choose unique supported Home cards') return res.status(400).json({ error: err.message });
+    sendServerError(res, err);
+  } finally { db.close(); }
+});
+
 // Cold-launch bootstrap for Home: one round trip instead of nine GETs.
 // Same household / owner scoping as the per-resource routes it replaces.
 // No base64. Register this exact path BEFORE any `/api/home/:param` sibling.
@@ -6998,6 +6982,7 @@ app.get('/api/home', requireAuth, async (req, res) => {
       presence,
       groups,
       dailyBrief,
+      homeCustomization,
     ] = await Promise.all([
       db.getDailySummary(userId),
       db.getGroceries('needed', userId),
@@ -7010,6 +6995,7 @@ app.get('/api/home', requireAuth, async (req, res) => {
       db.getHouseholdPresence(userId),
       db.getGroupsByUser(userId),
       db.getLatestBriefPost(userId),
+      homeCards.buildCards(db, userId, householdId, today),
     ]);
 
     const appointmentsToday = monthAppointments.filter(a => a.appointment_date === today);
@@ -7033,6 +7019,7 @@ app.get('/api/home', requireAuth, async (req, res) => {
       // The Concierge's daily brief lives in its own Home section (updated in
       // place each day) instead of stacking up in the activity feed.
       daily_brief: dailyBrief,
+      home_customization: homeCustomization,
     });
   } catch (err) {
     sendServerError(res, err);
@@ -7090,6 +7077,11 @@ app.put('/api/routines/:id', requireAuth, async (req, res) => {
   try {
     if (!(await requireRoutineAccess(db, req.params.id, req, res))) return;
     const updates = { ...req.body };
+    if (Object.hasOwn(updates, 'active')) {
+      if (updates.active !== 0 && updates.active !== 1) return res.status(400).json({ error: 'active must be 0 or 1' });
+      const routine = await db.getRoutineById(req.params.id);
+      if (routine.created_by !== req.session.user?.id) return res.status(403).json({ error: 'Only the creator can archive or restore this routine' });
+    }
     if (updates.subject_birthdate) updates.subject_birthdate = normalizeDate(updates.subject_birthdate);
     if (updates.start_date) updates.start_date = normalizeDate(updates.start_date);
     await db.updateRoutine(req.params.id, updates);

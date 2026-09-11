@@ -1088,3 +1088,9 @@ CREATE TABLE IF NOT EXISTS jobs (
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_jobs_drain ON jobs(status, available_at, id);
+
+-- Personal Home priorities also drive the data published to WidgetKit.
+CREATE TABLE IF NOT EXISTS home_preferences (
+    user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    pins TEXT NOT NULL DEFAULT '[]'
+);

@@ -405,3 +405,222 @@ test('routines: analyse is refused on a housemate\'s private sleep log', async (
   const out = await tools.run('routines', ctx, { action: 'analyze', routine_id: created.lastID });
   assert.ok(out.result.ok !== true && !out.result.wakings, 'analysing it is refused');
 });
+
+test('calendar: Rowan weekly violin persists time, attendee, address and future occurrences', async () => {
+  const input = { action: 'add', title: 'Violin', appointment_date: '2026-09-12', appointment_time: '09:20',
+    with_person: 'Rowan', person_tags: 'Rowan', location: 'Example Music School, 123 Test Street, Halifax',
+    recurrence_rule: 'weekly', recurrence_end: '2026-10-03' };
+  const saved = await tools.run('calendar', { ...ctx, push: null }, input);
+  assert.equal(saved.result.ok, true, JSON.stringify(saved));
+  const row = await get('SELECT * FROM appointments WHERE id = ?', [saved.result.id]);
+  for (const key of ['appointment_time', 'with_person', 'person_tags', 'location', 'recurrence_rule', 'recurrence_end']) assert.equal(row[key], input[key]);
+  const upcoming = await tools.run('calendar', ctx, { action: 'list', date_from: '2026-09-19', date_to: '2026-10-10' });
+  assert.deepEqual(upcoming.result.filter(e => e.id === row.id).map(e => e.date), ['2026-09-19', '2026-09-26', '2026-10-03']);
+  const update = await tools.run('calendar', ctx, { action: 'update', id: row.id, appointment_time: '10:20', recurrence_rule: 'biweekly' });
+  assert.equal(update.result.ok, true);
+  const unchanged = await get('SELECT * FROM appointments WHERE id = ?', [row.id]);
+  assert.equal(unchanged.location, input.location);
+  assert.equal(unchanged.recurrence_rule, 'biweekly');
+  assert.equal((await tools.run('calendar', ctx, { action: 'update', id: row.id, recurrence_rule: null })).result.ok, true);
+  const single = await get('SELECT * FROM appointments WHERE id = ?', [row.id]);
+  assert.equal(single.recurrence_rule, null);
+  assert.equal(single.recurrence_end, null);
+  assert.equal((await tools.run('calendar', ctx, { action: 'delete', id: row.id })).result.ok, true);
+});
+
+test('calendar: invalid times, dates, frequencies and unknown fields never write', async () => {
+  const before = await get('SELECT COUNT(*) AS count FROM appointments');
+  for (const patch of [
+    { appointment_time: '25:20' }, { appointment_time: '9:20 AM' }, { appointment_date: '2026-02-30' },
+    { recurrence_rule: 'fortnightly' }, { recurrence_rule: 'weekly', recurrence_end: '2026-09-01' },
+    { recurrence_end: '2026-10-01' }, { address: 'silently dropped field' }, { recurring: true },
+  ]) {
+    const result = await tools.run('calendar', ctx, { action: 'add', title: 'Invalid', appointment_date: '2026-09-12', ...patch });
+    assert.equal(result.result.ok, false, JSON.stringify(patch));
+    assert.ok(result.result.error);
+  }
+  assert.deepEqual(await get('SELECT COUNT(*) AS count FROM appointments'), before);
+});
+
+test('routines: archive and restore preserve entries and respect creator ownership', async () => {
+  const r = await db.createRoutine({ group_id: ctx.groupId, created_by: ctx.userId, name: 'Retired naps', routine_type: 'baby_sleep', shared_scope: 'household' });
+  await db.addRoutineEntry(r.id, { entry_date: '2026-09-01', entry_type: 'nap', value: { duration_minutes: 90 } });
+  const original = await db.getRoutineEntries(r.id);
+  const housemate = { ...ctx, userId: quinnId };
+  assert.equal((await tools.run('routines', housemate, { action: 'archive', routine_id: r.id })).result.ok, false);
+  for (const operation of ['archive', 'archive', 'restore', 'restore']) {
+    assert.equal((await tools.run('routines', ctx, { action: operation, routine_id: r.id })).result.ok, true);
+    assert.deepEqual(await db.getRoutineEntries(r.id), original);
+    const active = await tools.run('routines', ctx, { action: 'list' });
+    const archived = await tools.run('routines', ctx, { action: 'list', status: 'archived' });
+    assert.equal(active.result.some(v => v.id === r.id), operation === 'restore');
+    assert.equal(archived.result.some(v => v.id === r.id), operation === 'archive');
+  }
+});
+
+test('venue lookup uses household saved address and excludes other households', async () => {
+  await db.addFamilyAddress({ name: 'Example Music School', address: '123 Test Street, Halifax', lat: 44.6, lng: -63.5, group_id: ctx.groupId });
+  const found = await tools.run('calendar', ctx, { action: 'lookup_place', query: 'Example Music School Halifax' });
+  assert.equal(found.result.matches[0].address, '123 Test Street, Halifax');
+  const noHousehold = await tools.run('calendar', { ...ctx, groupId: null }, { action: 'lookup_place', query: 'Example Music School Halifax' });
+  assert.ok(noHousehold.result.error);
+});
+
+test('venue lookup requires cited evidence and returns provider failure honestly', async () => {
+  const ai = require('../services/anthropic');
+  const original = ai.callClaudeRaw;
+  try {
+    ai.callClaudeRaw = async () => ({ content: [{ type: 'text', text: 'An invented address' }] });
+    assert.equal((await tools.run('calendar', ctx, { action: 'lookup_place', query: 'Unlisted Academy' })).result.ok, false);
+    ai.callClaudeRaw = async () => { throw new Error('Search unavailable'); };
+    assert.equal((await tools.run('calendar', ctx, { action: 'lookup_place', query: 'Unlisted Academy' })).result.error, 'Search unavailable');
+    ai.callClaudeRaw = async request => {
+      assert.equal(request.tools[0].max_uses, 2);
+      assert.equal(request.messages[0].content, 'Unlisted Academy Halifax');
+      return { content: [{ type: 'text', text: 'Unlisted Academy, 2 Fixture Road, Halifax', citations: [{ url: 'https://example.org/location', title: 'School address' }] }] };
+    };
+    const found = await tools.run('calendar', ctx, { action: 'lookup_place', query: 'Unlisted Academy Halifax' });
+    assert.equal(found.result.evidence[0].sources[0].url, 'https://example.org/location');
+  } finally { ai.callClaudeRaw = original; }
+});
+
+test('history: July date-night venue and Costco scanned line items are searchable', async () => {
+  await db.addAppointment({ group_id: ctx.groupId, title: 'Date night', appointment_date: '2026-07-18', location: 'Fixture Bistro, 45 Example Road' });
+  await db.addReceipt({ group_id: ctx.groupId, merchant: 'Costco', amount: 67.89, date: '2026-09-02', notes: 'Lemons — $6.99\nMilk — $5.49' });
+  await db.addReceipt({ group_id: ctx.groupId, merchant: 'Costco', amount: 30, date: '2026-08-01', notes: 'Lemons — $6.99' });
+  const events = await tools.run('history', ctx, { action: 'search', source: 'calendar', query: 'date night', date_from: '2026-07-01', date_to: '2026-07-31' });
+  assert.equal(events.result.records.length, 1);
+  assert.match(events.result.records[0].detail, /Fixture Bistro/);
+  const lemons = await tools.run('history', ctx, { action: 'search', source: 'receipts', merchant: 'Costco', query: 'lemons', date_from: '2026-09-01', date_to: '2026-09-07' });
+  assert.equal(lemons.result.records.length, 1);
+  assert.match(lemons.result.records[0].detail, /6.99/);
+  assert.equal(lemons.result.records[0].date, '2026-09-02');
+  assert.match(lemons.result.purchase_guidance, /not proof/);
+  const noMatch = await tools.run('history', ctx, { action: 'search', query: '%', source: 'receipts' });
+  assert.equal(noMatch.result.records.length, 0, 'wildcards are literal');
+});
+
+test('history: all sources execute, pagination is stable, private records never leak', async () => {
+  await run("INSERT INTO notes (user_id,title,body) VALUES (?, 'Fixture private note', 'secret')", [quinnId]);
+  const secret = await db.createRoutine({ group_id: ctx.groupId, created_by: quinnId, name: 'Fixture private cycle', routine_type: 'period' });
+  await db.addRoutineEntry(secret.id, { entry_date: '2026-09-01', entry_type: 'period_start', notes: 'Fixture private record' });
+  for (const source of ['all', ...require('../services/historySearch').SOURCES]) {
+    const result = await tools.run('history', ctx, { action: 'search', source, query: 'Fixture private' });
+    assert.ok(Array.isArray(result.result.records), JSON.stringify(result));
+    assert.equal(result.result.records.length, 0, source);
+  }
+  const first = await tools.run('history', ctx, { action: 'search', source: 'receipts', merchant: 'Costco', limit: 1 });
+  assert.equal(first.result.next_offset, 1);
+  const second = await tools.run('history', ctx, { action: 'search', source: 'receipts', merchant: 'Costco', limit: 1, offset: first.result.next_offset });
+  assert.notEqual(first.result.records[0].id, second.result.records[0].id);
+  const foreign = await tools.run('history', { ...ctx, groupId: -1 }, { action: 'search', source: 'receipts', merchant: 'Costco' });
+  assert.equal(foreign.result.records.length, 0);
+});
+
+test('Home pins are ordered, personal, reversible and report actual budget spending', async () => {
+  const set = await tools.run('home', ctx, { action: 'set', pins: ['budget', 'trips', 'routines', 'lists', 'calendar', 'tasks', 'pantry', 'people'] });
+  assert.equal(set.result.ok, true);
+  const home = await tools.run('home', ctx, { action: 'get' });
+  assert.equal(home.result.cards.length, 8, JSON.stringify(home));
+  assert.deepEqual(home.result.cards.map(c => c.id), set.result.pins);
+  assert.match(home.result.cards[0].detail, /spent/);
+  const peer = await tools.run('home', { ...ctx, userId: quinnId }, { action: 'get' });
+  assert.deepEqual(peer.result.pins, []);
+  assert.equal((await tools.run('home', ctx, { action: 'set', pins: ['trips', 'trips'] })).result.ok, false);
+  assert.equal((await tools.run('home', ctx, { action: 'set', pins: [] })).result.ok, true);
+  assert.deepEqual((await tools.run('home', ctx, { action: 'get' })).result.cards, []);
+});
+
+test('domain lifecycles: pantry, contacts, subscriptions, notes and travel', async () => {
+  const call = async (name, input) => {
+    const out = await tools.run(name, { ...ctx, push: null }, input);
+    assert.equal(out.result.error, undefined, `${name} ${input.action}: ${JSON.stringify(out)}`);
+    return out.result;
+  };
+  for (const scenario of [
+    { domain: 'pantry', table: 'pantry', add: { item: 'Fixture rice', quantity: '2' }, update: { quantity: '3', location: 'pantry' }, check: ['quantity', '3'] },
+    { domain: 'contacts', table: 'contacts', add: { name: 'Fixture Tutor', phone: '5550100' }, update: { phone: '5550101' }, check: ['phone', '5550101'] },
+    { domain: 'recurring_payments', table: 'recurring_payments', add: { name: 'Fixture music', amount: 20 }, update: { amount: 25 }, check: ['amount', 25] },
+    { domain: 'notes', table: 'notes', add: { title: 'Fixture note', body: 'Original' }, update: { body: 'Updated' }, check: ['body', 'Updated'] },
+  ]) {
+    await call(scenario.domain, { action: 'add', ...scenario.add });
+    const row = await get(`SELECT * FROM ${scenario.table} ORDER BY id DESC LIMIT 1`);
+    await call(scenario.domain, { action: 'list' });
+    await call(scenario.domain, { action: 'update', id: row.id, ...scenario.update });
+    const edited = await get(`SELECT * FROM ${scenario.table} WHERE id = ?`, [row.id]);
+    assert.equal(String(edited[scenario.check[0]]), String(scenario.check[1]));
+    await call(scenario.domain, { action: 'delete', id: row.id });
+    assert.equal(await get(`SELECT id FROM ${scenario.table} WHERE id = ?`, [row.id]), undefined);
+  }
+  await call('trips', { action: 'add', traveler: 'Pam Tool', destination: 'Fixture school' });
+  const trip = await get('SELECT id FROM trips ORDER BY id DESC LIMIT 1');
+  await call('trips', { action: 'update', id: trip.id, destination: 'Fixture home' });
+  await call('trips', { action: 'arrive', id: trip.id });
+  assert.equal((await get('SELECT status FROM trips WHERE id=?', [trip.id])).status, 'arrived');
+  await call('trips', { action: 'delete', id: trip.id });
+});
+
+test('Home Trips includes explicitly shared clan itineraries, excludes other households', async () => {
+  const clan = await run("INSERT INTO groups (name,group_type,invite_code,created_by) VALUES ('Fixture Clan','family','CLANFIX',?)", [ctx.userId]);
+  await run("INSERT INTO group_members (group_id,user_id,role) VALUES (?,?,'member')", [clan.lastID, ctx.userId]);
+  const stranger = await run("INSERT INTO users (username,name,password_hash) VALUES ('trip_outsider','Outsider','x')");
+  await db.createItinerary({ title: 'Visible clan camping', traveler_id: stranger.lastID, traveler_name: 'Outsider', group_id: clan.lastID, start_date: '2026-08-01', end_date: '2026-08-05' });
+  await db.createItinerary({ title: 'Secret outsider holiday', traveler_id: stranger.lastID, traveler_name: 'Outsider', group_id: null, start_date: '2026-08-02', end_date: '2026-08-07' });
+  await tools.run('home', ctx, { action: 'set', pins: ['trips'] });
+  const result = await tools.run('home', ctx, { action: 'get' });
+  assert.match(result.result.cards[0].detail, /Visible clan camping/);
+  assert.match(result.result.cards[0].detail, /Clan/);
+  assert.doesNotMatch(result.result.cards[0].detail, /Secret outsider/);
+});
+
+test('chat and streaming paths execute multiple actions and expose errors without false completion', async () => {
+  const ai = require('../services/anthropic');
+  const chat = require('../services/conciergeChat');
+  const saved = { enabled: ai.isAIEnabled, raw: ai.callClaudeRaw, stream: ai.streamClaudeRaw };
+  try {
+    ai.isAIEnabled = () => true;
+    for (const method of ['handleChat', 'handleChatStream']) {
+      for (const source of ['text', 'voice', 'chat_extract']) {
+        let turn = 0;
+        const model = async ({ messages }) => {
+          if (turn++ === 0) return { stop_reason: 'tool_use', content: [
+            { type: 'tool_use', id: 'a', name: 'notes', input: { action: 'add', title: `${method} ${source}`, body: 'Persist this note' } },
+            { type: 'tool_use', id: 'b', name: 'calendar', input: { action: 'add', title: 'Bad date', appointment_date: 'not-a-date' } },
+          ] };
+          const outputs = messages.at(-1).content;
+          assert.equal(outputs[0].is_error, false);
+          assert.equal(outputs[1].is_error, true);
+          return { stop_reason: 'end_turn', content: [{ type: 'text', text: 'Saved your note; the event date needs clarification.' }] };
+        };
+        ai.callClaudeRaw = model; ai.streamClaudeRaw = model;
+        const response = await chat[method](db, { userId: ctx.userId, userName: ctx.userName, message: 'Save a note and event', source });
+        assert.equal(response.actions.length, 1);
+        assert.match(response.reply, /clarification/);
+      }
+      const looping = async () => ({ stop_reason: 'tool_use', content: [{ type: 'tool_use', id: 'failed', name: 'calendar', input: { action: 'add' } }] });
+      ai.callClaudeRaw = looping; ai.streamClaudeRaw = looping;
+      const response = await chat[method](db, { userId: ctx.userId, userName: ctx.userName, message: 'Create something' });
+      assert.equal(response.actions.length, 0);
+      assert.match(response.reply, /no changes were confirmed/);
+      assert.doesNotMatch(response.reply, /Done|taken care/);
+    }
+  } finally { ai.isAIEnabled = saved.enabled; ai.callClaudeRaw = saved.raw; ai.streamClaudeRaw = saved.stream; }
+});
+
+test('Budget Home card distinguishes no limit, monthly pace and overspending', async () => {
+  const user = await run("INSERT INTO users (username,name,password_hash) VALUES ('pace_fixture','Pace','x')");
+  const household = await run("INSERT INTO groups (name,group_type,invite_code,created_by) VALUES ('Pace','household','PACEFIX',?)", [user.lastID]);
+  await run("INSERT INTO group_members (group_id,user_id,role) VALUES (?,?,'admin')", [household.lastID,user.lastID]);
+  const pace = { ...ctx, userId: user.lastID, groupId: household.lastID, today: '2099-09-10' };
+  await tools.run('home', pace, { action: 'set', pins: ['budget'] });
+  const card = async () => (await tools.run('home', pace, { action: 'get' })).result.cards[0];
+  assert.equal((await card()).headline, 'Set a monthly budget');
+  await db.addBudgetCategory('Living', 300, null, pace.groupId);
+  const receipt = await db.addReceipt({ group_id: pace.groupId, merchant: 'Fixture store', date: '2099-09-01', amount: 90, category: 'Uncategorized' });
+  assert.equal((await card()).headline, 'On track this month');
+  assert.match((await card()).detail, /90.00/, 'spending outside named categories is still counted');
+  await run('UPDATE receipts SET amount=150 WHERE id=?', [receipt.id]);
+  assert.equal((await card()).headline, 'Above this month’s pace');
+  await run('UPDATE receipts SET amount=310 WHERE id=?', [receipt.id]);
+  assert.equal((await card()).headline, 'Over monthly budget');
+});

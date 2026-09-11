@@ -23,6 +23,13 @@ const MODEL = 'claude-haiku-4-5';
 // action(s). For update/complete/delete intents the model may legitimately read
 // first (look up the id), so those accept the domain's list action too.
 const CASES = [
+  { say: 'Where did we go for date night back in July?', tool: 'history', actions: ['search'] },
+  { say: 'What did I buy last week at Costco, did I get lemons?', tool: 'history', actions: ['search'] },
+  { say: 'Pin Budget and Trips to my Home, with Budget first.', tool: 'home', actions: ['get', 'set'] },
+  { say: 'Create weekly Violin for Rowan starting Saturday July 4 2026 at 9:20 AM at Example Music School, 123 Test Street, Halifax.', tool: 'calendar', actions: ['add'], fields: { recurrence_rule: 'weekly', appointment_time: '09:20', appointment_date: '2026-07-04', with_person: 'Rowan' } },
+  { say: 'Find the street address of the Maritime Conservatory of Performing Arts in Halifax for a calendar event.', tool: 'calendar', actions: ['lookup_place'] },
+  { say: 'My son is sleeping well now. Archive his nap routine and keep all its history.', tool: 'routines', actions: ['list', 'archive'] },
+  { say: 'Restore my archived nap routine.', tool: 'routines', actions: ['list', 'restore'] },
   { say: 'add a dentist appointment for Rowan next Tuesday at 3pm', tool: 'calendar', actions: ['add'] },
   { say: "what's on the calendar this week?", tool: 'calendar', actions: ['list'] },
   { say: 'invite Sophie to the birthday dinner on the calendar', tool: 'calendar', actions: ['update', 'list', 'add'] },
@@ -118,7 +125,7 @@ async function callModel(say) {
   if (!res.ok) throw new Error(`API ${res.status}: ${(await res.text()).slice(0, 200)}`);
   const data = await res.json();
   const tu = (data.content || []).find(b => b.type === 'tool_use');
-  return tu ? { name: tu.name, action: tu.input && tu.input.action } : { name: '(no tool)', action: undefined };
+  return tu ? { name: tu.name, action: tu.input && tu.input.action, input: tu.input } : { name: '(no tool)', action: undefined };
 }
 
 async function live() {
@@ -130,7 +137,8 @@ async function live() {
     catch (e) { console.log('  ERR ', c.say, '::', e.message); continue; }
     const toolOk = got.name === c.tool;
     const actionOk = !c.actions || c.actions.includes(got.action);
-    const good = toolOk && actionOk;
+    const fieldsOk = !c.fields || Object.entries(c.fields).every(([key, value]) => got.input?.[key] === value);
+    const good = toolOk && actionOk && fieldsOk;
     if (good) pass++;
     console.log(`  ${good ? 'PASS' : 'FAIL'}  "${c.say}"`);
     if (!good) console.log(`        expected ${c.tool}${c.actions ? ' (' + c.actions.join('/') + ')' : ''}, got ${got.name}${got.action ? ' (' + got.action + ')' : ''}`);

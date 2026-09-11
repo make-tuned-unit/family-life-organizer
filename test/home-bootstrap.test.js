@@ -222,3 +222,18 @@ test('GET /api/home does not leak another household\'s feed, events, or tasks', 
   assert.ok(!bobToday.includes(secretEvent));
   assert.ok(bobToday.includes('BOB_OWN_EVENT_ZX9'));
 });
+
+test('Home customization persists priority, isolates accounts and rejects invalid cards', async () => {
+  const alice = makeClient(), bob = makeClient();
+  await alice('POST', '/api/auth/register', { username: 'pins_a', password: 'password123', name: 'Pins A' });
+  await bob('POST', '/api/auth/register', { username: 'pins_b', password: 'password123', name: 'Pins B' });
+  assert.equal((await alice('PUT', '/api/home/preferences', { pins: ['trips', 'budget'] })).status, 200);
+  const home = (await alice('GET', '/api/home')).body;
+  assert.deepEqual(home.home_customization.pins, ['trips', 'budget']);
+  assert.deepEqual(home.home_customization.cards.map(c => c.id), ['trips', 'budget']);
+  assert.deepEqual((await bob('GET', '/api/home')).body.home_customization.pins, []);
+  for (const pins of [null, 'budget', ['unknown'], ['budget','budget']]) assert.equal((await alice('PUT', '/api/home/preferences', { pins })).status, 400);
+  assert.equal((await makeClient()('PUT', '/api/home/preferences', { pins: [] })).status, 401);
+  assert.equal((await alice('PUT', '/api/home/preferences', { pins: [] })).status, 200);
+  assert.deepEqual((await alice('GET', '/api/home')).body.home_customization.cards, []);
+});

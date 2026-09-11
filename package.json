@@ -9,7 +9,9 @@
   "scripts": {
     "start": "node dashboard.js",
     "test": "node --test test/*.test.js",
-    "test:mcp:conformance": "node scripts/verify-mcp-conformance.js"
+    "test:mcp:conformance": "node scripts/verify-mcp-conformance.js",
+    "test:ai": "node --test test/concierge-*.test.js test/calendar-recurrence.test.js",
+    "test:ai:routing": "node scripts/concierge-tool-eval.js"
   },
   "keywords": [],
   "author": "",
