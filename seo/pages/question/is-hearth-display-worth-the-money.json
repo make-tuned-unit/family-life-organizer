@@ -1,0 +1,44 @@
+{
+  "slug": "is-hearth-display-worth-the-money",
+  "pageType": "question",
+  "query": "is Hearth Display worth it / worth $700",
+  "searchIntent": "commercial",
+  "title": "Is Hearth Display Worth the Money?",
+  "description": "What Hearth Display costs in hardware and subscription, what stops working if you cancel, and what its own reviewers say after a year of ownership.",
+  "h1": "Is Hearth Display Worth the Money?",
+  "eyebrow": "Questions",
+  "directAnswer": "Hearth Display costs around $700 for the hardware, and roughly $84 a year on top of that to keep basic functions like to-do lists working, according to its own reviewers. Several of those reviewers describe the device becoming, in effect, an expensive picture frame once the subscription lapses, since core organizing features stop working without it rather than just losing extras. It's worth the money mainly for households confident they'll keep paying the subscription indefinitely; for anyone unsure of that, the ongoing cost is worth weighing against the hardware price before buying.",
+  "sections": [
+    { "heading": "What Hearth Display costs, hardware and subscription", "html": "<p>Reviewers consistently cite the hardware at around $700, with a subscription reported at roughly $84 a year (about $9 a month) required to keep certain features working past an initial trial period.</p>" },
+    { "heading": "What stops working if you cancel", "html": "<p>The subscription isn't framed by Hearth's own reviewers as unlocking extras on top of a complete product — it's described as required for basic functions. One reviewer wrote, in a review titled \"Overly expensive\": <strong>\"We have owned the hearth for a year now, and truly have enjoyed it. Our subscription is up in September so we decided to cancel it since it's 84$ a year. In this economy we just don't have that. Because of canceling we cannot do any of the basic stuff. Like the to dos. For the price of it and the lack of 'perks' I can honestly say I regret buying this. Such a waste of money and scam\"</strong> (an App Store reviewer, 1-star, App Store US, 2025).</p>" },
+    { "heading": "What reviewers say after a year of ownership", "html": "<p>A separate reviewer, after roughly a year, described the device without an active subscription this way: <strong>\"It's the most expensive frame that's just hung on our wall. It hasn't been used in almost a year\"</strong> (an App Store reviewer, 1-star, \"Expensive calendar display,\" App Store US, 2025). That framing — hardware that becomes decorative once the subscription lapses — recurs across more than one reviewer and is the central risk to weigh before buying.</p>" },
+    { "heading": "What to weigh it against", "html": "<p>Before buying, it's worth pricing the total cost over a few years — hardware plus subscription — against a phone-first household organizer that doesn't require dedicated hardware at all, and separately against Hearth's own competitors in the wall-display category to see whether the same always-on visibility is available without a comparable ongoing toll on basic features. A related reviewer complaint is worth weighing too: one wrote, <strong>\"It seems odd that you pay a lot for the calendar that then wants you to subscribe to use its features. Seems like the price point of the calendar should come down significantly if they want to charge you monthly/annually just to use it\"</strong> (an App Store reviewer, 2-star, \"Scam,\" App Store US, 2026) — a fair summary of the core tension anyone considering the purchase should go in expecting.</p>" },
+    { "heading": "What Hearth does well, according to its own reviewers", "html": "<p>It's worth being fair to the product alongside the complaints: reviewers do credit Hearth with genuinely consolidating whiteboards and multiple calendars into one visible household hub, and its AI photo-import of events (snapping a photo of a school flyer or permission slip to add it as an event) is repeatedly cited as a real time-saver. Several reviewers also note that task lists, when the subscription is active, measurably cut down on kids' nagging about what needs doing. The complaint isn't that the product doesn't work — it's that a meaningful share of what makes it work stops the moment the subscription lapses, on top of an already substantial hardware purchase.</p>" }
+  ],
+  "faq": [
+    { "q": "What happens to Hearth Display if I cancel the subscription?", "a": "Per its own reviewers, basic organizing functions such as to-do lists stop working once the subscription lapses, leaving the device functioning mainly as a photo display and calendar rather than the fuller household tool it's marketed as." },
+    { "q": "Is Hearth Display worth $700?", "a": "That depends on whether you're confident you'll keep paying the roughly $84/year subscription indefinitely, since reviewers report core features stop working without it. If that ongoing cost is uncertain, the $700 hardware spend carries more risk than the sticker price alone suggests." },
+    { "q": "What's a cheaper alternative to Hearth Display?", "a": "A phone-first household organizer that doesn't require dedicated hardware, such as Kinrows, delivers similar underlying organizing functions without an upfront hardware purchase, though it can't replicate an always-on wall display the way Hearth's hardware does." }
+  ],
+  "productFit": {
+    "heading": "Organizing that doesn't stop if you don't keep paying for hardware",
+    "html": "<p>Kinrows' core household organizer — calendar, lists, budget, chores, and more — is free on the iPhone your household already owns, with no hardware purchase and nothing that stops working if you decide not to pay for the optional Concierge add-on later. That's a different model than a hardware-plus-subscription display: there's no upfront cost that becomes a sunk cost if the ongoing subscription lapses.</p>",
+    "screenshot": { "src": "website/assets/shots/home.png", "alt": "Kinrows home dashboard on an iPhone" }
+  },
+  "cta": {
+    "heading": "Household organizing with no hardware to buy",
+    "body": "Kinrows' calendar, lists, and chores are free on the phone you already have — nothing stops working if you skip the optional Concierge add-on.",
+    "label": "Join the waitlist"
+  },
+  "relatedPages": [
+    { "href": "/how-to/get-a-family-command-center-without-buying-hardware", "label": "A Family Command Center Without Buying Hardware" },
+    { "href": "/alternatives/skylight", "label": "Best Skylight Calendar Alternatives (2026)" },
+    { "href": "/questions/is-skylight-calendar-worth-it", "label": "Is Skylight Calendar Worth It?" }
+  ],
+  "sources": [
+    { "title": "Hearth Display App Store customer reviews (US)", "url": "https://itunes.apple.com/us/rss/customerreviews/id=6498717775/sortBy=mostRecent/page=1/json" }
+  ],
+  "datePublished": "2026-09-15",
+  "lastReviewed": "2026-09-15",
+  "indexStatus": "index"
+}

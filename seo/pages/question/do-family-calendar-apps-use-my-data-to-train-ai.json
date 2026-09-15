@@ -1,0 +1,46 @@
+{
+  "slug": "do-family-calendar-apps-use-my-data-to-train-ai",
+  "pageType": "question",
+  "query": "do family calendar apps use my data to train AI",
+  "searchIntent": "informational",
+  "title": "Do Family Calendar Apps Use My Data to Train AI?",
+  "description": "How to check whether a calendar app trains AI on your data: what App Privacy labels and privacy policies actually say, and what to ask before trusting one.",
+  "h1": "Do Family Calendar Apps Use My Data to Train AI?",
+  "eyebrow": "Questions",
+  "directAnswer": "It depends on the specific app, and the only way to know is to read its App Store privacy label and its actual privacy policy, not its marketing page. Look for the words \"train,\" \"model,\" or \"machine learning\" in the policy itself — an opt-out toggle in the app isn't the same thing as a policy that says data is never used for training. Some TimeTree reviewers say its AI features used their calendar data regardless of opting out, while TimeTree's current published policy states user information will not be used to train large language models. Kinrows' own policy is that it does not train AI models on household content.",
+  "sections": [
+    { "heading": "What TimeTree reviewers are reporting", "html": "<p>A cluster of TimeTree's own App Store reviewers describe a specific complaint about the app's AI rollout in 2026. One reviewer wrote, in a 1-star review titled \"added AI\": <strong>\"i realized that the ai trains off your calendar data anyway. i'm deleting my account and moving to another app\"</strong> (an App Store reviewer, App Store US, August 2026). Another, in a review titled \"AI Ruined the App,\" wrote: <strong>\"Another app forcing AI onto their users. Not only did nobody ask for this, but when you opt out of personalized ai features, it just doesn't save your preferences!\"</strong> (an App Store reviewer, 1-star, App Store US, August 2026). These are reviewer accounts of their own experience, not an independent audit of TimeTree's systems.</p>" },
+    { "heading": "What TimeTree's own published policy says", "html": "<p>TimeTree's privacy policy, updated in January 2026, states that for users outside Japan and South Korea it is adding \"the use of AI technologies, such as Large Language Models, to the purposes of use\" in order to enable more personalized recommendations and action suggestions. On the specific question of training, the same update states plainly: <strong>\"User information will not be used to train LLMs.\"</strong> The policy separately permits using AI models, including LLMs, to analyze account attributes and behavioral history for personalization — a different purpose than training a model on user content. It does not describe a dedicated opt-out for this AI use beyond a general right to withdraw consent, and the update itself asks users to reconfirm agreement to the policy to keep using the app.</p><p>That leaves a real gap between what some reviewers reported experiencing in mid-to-late 2026 and what the company's own current policy states. Neither this page nor Kinrows can independently verify which reflects TimeTree's actual practice; both are stated here with their source so you can judge for yourself.</p>" },
+    { "heading": "Why an opt-out toggle isn't the same as a no-training policy", "html": "<p>An in-app toggle labeled \"opt out of AI\" or \"personalization\" is a product setting, and product settings can have bugs, get reset by updates, or simply not cover every purpose described in the legal policy underneath them. A genuine no-training policy is a statement in the privacy policy itself — the document the company is legally bound by — saying user content is not used to train models, full stop. If a policy allows AI \"analysis\" of your data for one purpose but is silent on whether that data also feeds model training, an opt-out toggle for the first purpose won't necessarily touch the second.</p>" },
+    { "heading": "How to check any app yourself", "html": "<ul><li><strong>Read the App Store's \"App Privacy\" section</strong> on the app's listing page, specifically any \"Data Used to Train Machine Learning\" or \"Data Used to Improve the App\" category Apple requires developers to disclose.</li><li><strong>Search the actual privacy policy for \"train,\" \"model,\" and \"machine learning,\"</strong> not just \"AI\" — vague AI mentions without the word \"train\" often mean the policy hasn't committed to anything specific either way.</li><li><strong>Check whether the no-training language has a carve-out</strong> by region, user type, or feature — TimeTree's own policy, for example, applies its no-training statement to users outside Japan and South Korea specifically.</li><li><strong>Look for a stated stance on data sale and ad personalization</strong> alongside AI training — the two often travel together in how a company treats user data generally.</li></ul>" }
+  ],
+  "faq": [
+    { "q": "Do TimeTree's AI features train on my calendar data?", "a": "TimeTree's own privacy policy, updated January 2026, states user information will not be used to train LLMs for users outside Japan and South Korea. Separately, some of TimeTree's own App Store reviewers reported in 2026 that calendar data was used for AI purposes regardless of their opt-out choice. Both are documented here with sources; neither is independently verified against TimeTree's actual practice." },
+    { "q": "Does opting out of AI actually stop an app from using my data?", "a": "Not necessarily. An opt-out toggle is a product setting, not the underlying legal policy. Check the privacy policy itself for a specific no-training statement rather than trusting an in-app switch, since some TimeTree reviewers reported their opt-out preference didn't persist." },
+    { "q": "What's a family calendar app with a clear no-data-training policy?", "a": "Look for a stated policy, not just an AI opt-out toggle. Kinrows' own documentation states it does not train AI models on household content, does not run ads, and does not sell data — a policy stance rather than a feature you have to switch on." },
+    { "q": "What does \"used to train AI\" actually mean?", "a": "It means your content becomes part of the data a company uses to improve or build a machine learning model, which can affect other users' results later, not just yours. That's different from a company using AI to analyze your own data to give you a recommendation, which stays scoped to you." }
+  ],
+  "productFit": {
+    "heading": "An AI add-on with a stated no-training policy",
+    "html": "<p>Kinrows' optional AI Concierge runs on top of the free household app, and Kinrows states plainly that it does not train AI models on household content, run ads, or sell data — the household's data is isolated at the database level, not just hidden in the interface. The Concierge's daily brief runs on-device on newer iPhones for anything that can be summarized privately and offline. This is a stated policy in Kinrows' own product documentation, presented here the same way TimeTree's policy is above, for you to weigh against any app you're considering.</p>",
+    "screenshot": { "src": "website/assets/shots/concierge-ask.png", "alt": "Kinrows Concierge chat answering a household question" }
+  },
+  "cta": {
+    "heading": "An AI layer with a stated no-training policy",
+    "body": "Kinrows' optional Concierge never trains on your household's content, and the core app has no ads and no data sale.",
+    "label": "Join the waitlist"
+  },
+  "relatedPages": [
+    { "href": "/alternatives/timetree", "label": "Best TimeTree Alternatives (2026)" },
+    { "href": "/compare/kinrows-vs-timetree", "label": "Kinrows vs TimeTree: Which Should You Choose?" },
+    { "href": "/questions/is-there-an-ai-that-can-manage-my-family-calendar", "label": "Is There an AI That Can Actually Manage My Family Calendar?" }
+  ],
+  "sources": [
+    { "title": "TimeTree: Updates to Our Privacy Policy (January 2026)", "url": "https://timetreeapp.com/intl/en/newsroom/2026-01-15/change-privacy-policy-202601" },
+    { "title": "TimeTree Privacy Policy", "url": "https://timetreeapp.com/intl/en/terms/privacy?country=other" },
+    { "title": "TimeTree App Store customer reviews (US)", "url": "https://itunes.apple.com/us/rss/customerreviews/id=952578473/sortBy=mostRecent/page=1/json" }
+  ],
+  "datePublished": "2026-09-15",
+  "lastReviewed": "2026-09-15",
+  "indexStatus": "index"
+}

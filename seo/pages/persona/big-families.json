@@ -1,0 +1,58 @@
+{
+  "slug": "big-families",
+  "pageType": "persona",
+  "query": "organizer app for a big family with several kids",
+  "searchIntent": "informational",
+  "title": "For Big Families With Several Kids",
+  "description": "A calendar with five kids on it needs more structure than one with two. Here is how per-person color coding and profiles keep it readable.",
+  "h1": "For Big Families With Several Kids",
+  "eyebrow": "For you",
+  "directAnswer": "The more kids in a household, the faster a single shared calendar or list turns into an unreadable wall of entries, unless each person has their own color and their own profile to tell entries apart at a glance. Third-party reviewers of hardware family displays consistently credit them with centralizing multiple kids' schedules for exactly this reason, and the same per-person structure works on a phone. Kinrows gives every family member their own color coding and profile, without requiring a wall-mounted screen to get it.",
+  "keyTakeaway": "Readability at scale is a design problem, not a hardware problem.",
+  "sections": [
+    {
+      "heading": "Why a big family's calendar gets unreadable fast",
+      "html": "<p>A calendar with one or two kids on it is easy to scan even without much structure. Add a third, fourth or fifth kid's practices, appointments and school events, and every entry starts looking the same unless there's a fast way to tell whose event is whose. This is exactly the gap that third-party reviewers credit wall-mounted family displays for closing — reviewers of Skylight, for instance, are described as consistently praising it for centralizing multiple kids' schedules — and it's a readability problem before it's a feature problem.</p>"
+    },
+    {
+      "heading": "Per-person color coding and profiles at scale",
+      "html": "<p>Kinrows' shared household calendar uses per-person color coding, so a glance tells you whose event is whose without reading every entry. People profiles give each family member their own space for milestones, key dates and gift ideas, which matters more as the number of kids grows — several kids' worth of \"first steps\" and birthday ideas need somewhere that isn't one long undifferentiated list.</p>"
+    },
+    {
+      "heading": "Splitting chores and allowance across several kids without it becoming a spreadsheet",
+      "html": "<p>Each child gets one chores routine — their own tappable morning/evening grid, their own fixed weekly allowance, their own payout ledger and non-punitive streak. Because it's per-child rather than one shared chart, adding a third or fourth kid to the system doesn't mean redesigning anything; it means adding another profile with its own age-appropriate suggested tasks from the same age-banded program, 2-3 through 13+.</p>"
+    },
+    {
+      "heading": "Keeping the family feed useful when there's a lot happening",
+      "html": "<p>The Home feed shows a family presence row (who's where), an up-next strip with one-tap task check-off, and a social feed with per-group filters — which matters more in a big family, where the volume of activity across several kids can otherwise bury what actually needs attention today. Filtering by group and person keeps that volume from becoming noise.</p>"
+    }
+  ],
+  "productFit": {
+    "heading": "Per-person structure that scales with the number of kids",
+    "html": "<p>The shared calendar's per-person color coding and each child's own People profile and chores routine mean adding another kid to the household doesn't make the existing structure harder to read — it just adds another color and another profile. The Home feed's up-next strip and per-group filters help surface what matters today across several kids' worth of activity, rather than requiring everyone to scroll the same undifferentiated list.</p>",
+    "screenshot": { "src": "website/assets/shots/calendar.png", "alt": "Kinrows Calendar screen showing multiple family members' events in different colors" }
+  },
+  "faq": [
+    { "q": "How do you keep a family calendar readable with four or five kids on it?", "a": "Per-person color coding is the main lever — being able to tell whose event is whose at a glance matters more as the number of kids grows. Kinrows applies this to the shared household calendar automatically, and pairs it with individual People profiles so each kid's milestones and details don't get mixed into one long list." },
+    { "q": "Can chores and allowance work differently for each kid?", "a": "Yes. Each child has their own chores routine, their own fixed weekly allowance, and their own payout ledger, drawn from the same age-banded program (2-3 through 13+) but applied individually. Adding another kid means adding another profile with age-appropriate suggested tasks, not redesigning a shared chart." },
+    { "q": "Is there a family organizer built for larger households specifically?", "a": "Kinrows doesn't document a specific cap on the number of people or profiles a household can have, so the per-person structure — color coding, individual chores routines, individual People profiles — is built to scale rather than sized for a particular family count. It's a general household organizer that happens to hold up well as the number of kids grows." }
+  ],
+  "cta": {
+    "heading": "One color per kid, one profile per kid",
+    "body": "A shared calendar and chores system built to scale past two or three kids.",
+    "label": "Join the waitlist"
+  },
+  "relatedPages": [
+    { "href": "/how-to/turn-family-group-chat-into-a-plan", "label": "Getting Logistics Out of a Chaotic Family Group Chat" },
+    { "href": "/for/parents-of-toddlers", "label": "For Parents of Toddlers" },
+    { "href": "/for/parents-of-teens", "label": "For Parents of Teens" }
+  ],
+  "sources": [
+    { "title": "Skylight Calendar Review 2026: Is It Worth It? — CyberNews", "url": "https://cybernews.com/reviews/skylight-calendar-review/" }
+  ],
+  "persona": "big families with several kids",
+  "problem": "calendar and chores readability at scale",
+  "datePublished": "2026-09-15",
+  "lastReviewed": "2026-09-15",
+  "indexStatus": "index"
+}

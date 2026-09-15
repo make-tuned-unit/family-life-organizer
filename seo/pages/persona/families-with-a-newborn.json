@@ -1,0 +1,56 @@
+{
+  "slug": "families-with-a-newborn",
+  "pageType": "persona",
+  "query": "family organizer for new parents",
+  "searchIntent": "informational",
+  "title": "For Families With a Newborn",
+  "description": "The newborn stage runs on a dozen small logistics, not one big feature. Here is how care coverage, shared notes and milestone logging cover it.",
+  "h1": "For Families With a Newborn",
+  "eyebrow": "For you",
+  "directAnswer": "The first months with a newborn aren't defined by one big decision but by a dozen small logistics: who's covering the next feeding shift, when the last diaper change happened, what a grandparent staying over needs to know. A newborn-stage household gets more from shared care coverage and living notes than from a dedicated \"baby app.\" Kinrows lets you post a coverage window for a night shift or a sitter, keep a note current for whoever's helping, and log milestones as they happen.",
+  "keyTakeaway": "The newborn stage is a logistics problem, not a features problem.",
+  "sections": [
+    {
+      "heading": "What actually changes in the first months",
+      "html": "<p>Sleep gets fragmented, help arrives from more directions than usual — a partner, a grandparent, a postpartum doula, a friend dropping off meals — and the information that matters (feeding times, what's normal, what to watch for) changes week to week. Most of the friction isn't about tracking data for its own sake; it's about making sure whoever is holding the baby right now has what they need without a phone call to whoever isn't there.</p>"
+    },
+    {
+      "heading": "Sharing night-shift and care coverage without 30 texts",
+      "html": "<p>Instead of a group text asking who's up for the 2am feed, Care coverage lets you post a proposed time window — a shift, an evening, a stretch while you nap — and whoever's helping approves it, either in the app or through a share link that doesn't require them to install anything. Approved windows land on both calendars, so there's a record of who covered what without anyone having to remember or re-ask.</p>"
+    },
+    {
+      "heading": "A living version of \"here's what the baby needs\" for helpers",
+      "html": "<p>A grandparent staying over for a week or a sitter covering an evening needs the same kind of information a babysitter sheet tries to capture — feeding schedule, what soothes the baby, what to do if something's off — except it changes almost daily in the newborn stage. A shared Note that takes a minute to update beats a sheet that's already out of date by the second visit, and it's visible to whoever in the household needs it, not just whoever wrote it down.</p>"
+    },
+    {
+      "heading": "Logging the small things that matter later (milestones)",
+      "html": "<p>First smile, first time sleeping through the night, first solid food — the newborn stage produces a lot of small firsts that are easy to lose track of when you're exhausted. People profiles let you log milestones and key dates as they happen, alongside a year-in-review recap later, so the record exists without needing a separate baby-book app or a notes-app scroll nobody can search.</p>"
+    }
+  ],
+  "productFit": {
+    "heading": "Care coverage that doesn't need a group text",
+    "html": "<p>Care coverage is built for exactly this kind of ask: propose a window — a night shift, an afternoon, a week a grandparent is staying — and the person helping approves it, through the app if they have it or a share link if they don't. Approved windows show up on both calendars automatically, so there's no separate tracking of who agreed to what. It's built for logistics and scheduling, not as a substitute for medical guidance or a formal caregiving plan.</p>",
+    "screenshot": { "src": "website/assets/shots/care.png", "alt": "Kinrows Care screen showing a proposed coverage window awaiting approval" }
+  },
+  "faq": [
+    { "q": "What's the best way to organize help in the first months with a newborn?", "a": "Separate the logistics — who's covering which shift, what a helper needs to know — from the general family group chat, since the two get tangled together fast. A shared coverage request for shifts and a living note for what helpers need to know covers most of what a newborn-stage household actually needs, without a dedicated baby-tracking app." },
+    { "q": "How do I coordinate night shifts and visitors without a group chat?", "a": "Post a proposed time window through Care coverage rather than asking in chat, and let the person helping approve it directly, through the app or a share link if they don't have it installed. That keeps the ask, the approval and the calendar entry in one place instead of scattered across a thread." },
+    { "q": "Does this replace a sleep-training plan?", "a": "No. Kinrows' Routines feature includes a separate guided, research-backed sleep-training program with age-banded phases from newborn to four years, and that's the right place for sleep-specific guidance. Care coverage and notes are for day-to-day logistics — who's covering what, and what a helper needs to know — not a training method on their own." }
+  ],
+  "cta": {
+    "heading": "One place for the newborn-stage logistics",
+    "body": "Care coverage, shared notes and milestone logging, free for the whole household.",
+    "label": "Join the waitlist"
+  },
+  "relatedPages": [
+    { "href": "/blog/how-to-sleep-train-a-baby", "label": "How to Sleep Train a Baby" },
+    { "href": "/how-to/babysitter-information-sheet", "label": "Building a Babysitter Information Sheet People Actually Use" },
+    { "href": "/for/single-parents", "label": "For Single Parents Running a Household Solo" },
+    { "href": "/best-family-organizer-apps", "label": "Best Family Organizer Apps" }
+  ],
+  "persona": "families with a newborn",
+  "problem": "newborn-stage logistics and care coordination",
+  "datePublished": "2026-09-15",
+  "lastReviewed": "2026-09-15",
+  "indexStatus": "index"
+}

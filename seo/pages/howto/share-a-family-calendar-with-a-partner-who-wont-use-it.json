@@ -1,0 +1,61 @@
+{
+  "slug": "share-a-family-calendar-with-a-partner-who-wont-use-it",
+  "pageType": "howto",
+  "query": "shared calendar my partner won't use",
+  "searchIntent": "informational",
+  "title": "Sharing a Calendar With a Partner Who Won't Use It",
+  "description": "A partner who won't check a shared calendar usually isn't being difficult — the calendar is asking them to change habits. Here's a fix that doesn't.",
+  "h1": "How to share a calendar with a partner who won't use it",
+  "eyebrow": "How-to",
+  "directAnswer": "A shared calendar usually fails because it asks your partner to open a new app and change a habit before it can help them. The fix is to stop sharing a personal calendar by permission and instead set up two-way sync, so events flow both ways between whatever calendar app each of you already opens by default. Your partner never has to switch apps, and you never have to wonder whether they saw what you added. A weekly two-minute check-in together closes the rest of the gap.",
+  "keyTakeaway": "Sync into the calendar your partner already opens — don't ask them to open a new one.",
+  "sections": [
+    {
+      "heading": "Why \"just share your calendar\" usually fails",
+      "html": "<p>The standard advice is to share your personal Google or Apple calendar with your partner. On paper this works. In practice, people report exactly the failure you'd expect: a Google Calendar Community thread is literally titled <strong>\"My family can't see my events I added to shared calendar. I can see theirs.\"</strong> Sharing settings are asymmetric, permissions get set once and never revisited, and updates can show up on the web but not on a phone. None of this is your partner being careless — it's what happens when \"shared\" means \"one person's calendar with a guest added,\" not a calendar built to be joint from the start.</p><p>There's also a second, harder truth worth naming honestly: a calendar that technically syncs doesn't fix an imbalance in who does the planning. As one widely read essay on the topic puts it, \"relationship problems can masquerade as logistical problems, and no calendar feature is going to cure a partner of [not sharing the load].\" A sync fix removes the technical excuse. It doesn't do the rest of the work for you.</p>"
+    },
+    {
+      "heading": "What actually gets a reluctant partner to look at it",
+      "html": "<p>People who've solved this describe the same pattern: the calendar that gets checked is the one that was already open. If your partner glances at their phone's built-in calendar app before work each day, that's the calendar to put events into — not a second app they have to remember exists. One Reddit comment on this, reported by uninfluencedreview.com, put the incentive problem bluntly: \"if your husband won't use a free shared calendar, why would he use the expensive shared calendar?\" Adding a paid or more elaborate tool rarely fixes an adoption problem; meeting someone where they already look does.</p>"
+    },
+    {
+      "heading": "Two-way sync vs. permission-sharing (the real difference)",
+      "html": "<p>These sound similar and behave very differently:</p><ul><li><strong>Permission-sharing</strong> gives someone view or edit access to your personal calendar. It depends on a setting staying correctly configured on both ends, and it usually only flows one direction in practice — your events reach them, but their existing phone events don't reach you.</li><li><strong>Two-way sync</strong> treats both calendars as sources of truth. An event added on either side appears on the other automatically, and each person keeps using the calendar app already installed on their phone.</li></ul><p>If your current setup is the first kind and it isn't working, that's not a settings problem to keep troubleshooting — it's the wrong mechanism for what you're trying to do.</p>"
+    },
+    {
+      "heading": "A 10-minute setup that doesn't require their buy-in first",
+      "html": "<p>You can start this without a conversation:</p><ol><li>Pick one shared calendar as the household's source of truth — a new Google Calendar works fine, or a family organizer app built for this.</li><li>Turn on two-way sync so it reads from and writes to each phone's default calendar automatically, rather than asking either of you to check a separate screen.</li><li>Add the next two weeks of known events yourself, so there's something real to look at.</li><li>Set a five-minute weekly time — Sunday evening works for a lot of households — to look at the week together and add anything missing.</li></ol><p>The goal isn't to get your partner to adopt a new habit on day one. It's to make the calendar show up somewhere they were already going to look.</p>"
+    }
+  ],
+  "productFit": {
+    "heading": "How Kinrows helps",
+    "html": "<p>Kinrows' household calendar syncs both ways with each person's own phone calendar, so events added in Kinrows appear on a partner's existing iPhone calendar automatically, and events already on their phone can be shared into the household view — no separate app-checking habit required. Each person's events get their own colour, so at a glance it's clear who has what, without opening anything up to ask. It doesn't fix an unequal planning load by itself; it removes the excuse that the calendar technology is what's in the way.</p>",
+    "screenshot": { "src": "website/assets/shots/calendar.png", "alt": "Kinrows shared household calendar with per-person colour coding" }
+  },
+  "faq": [
+    { "q": "Why can't my partner see events I add to our shared calendar?", "a": "Most often this is a permission-sharing setup rather than true two-way sync: your calendar is shared with them, but their phone's own calendar isn't syncing back, or the sharing permission has quietly reset. A Google Calendar Community thread titled \"My family can't see my events I added to shared calendar. I can see theirs\" describes exactly this asymmetry. Switching to a calendar built for two-way sync, rather than one-directional sharing, usually resolves it." },
+    { "q": "Do we both have to use the same app?", "a": "No, as long as whatever you use supports two-way sync with each phone's built-in calendar. That way you can keep using different apps day to day and still see the same events, because updates flow automatically in both directions instead of depending on one person opening a second app." },
+    { "q": "What if my partner just won't look at any calendar?", "a": "Start by putting events on the calendar app already on their phone, via sync, rather than a new one — that removes the most common excuse. If they still won't look, that's usually a planning-load conversation rather than a tool problem; as one essay on the topic notes, a calendar feature can't fix a partner not sharing the load, only make the technical side stop getting in the way." },
+    { "q": "Is a shared calendar enough to fix an unequal mental load?", "a": "On its own, no. A shared calendar removes the technical barrier — both people can see the same events without extra effort — but who remembers to add things, follows up, and plans ahead is a separate, human problem. Treat the calendar as removing one obstacle, not as a fix for how the planning work is divided." }
+  ],
+  "cta": {
+    "heading": "A calendar that shows up where your partner already looks",
+    "body": "Kinrows syncs two ways with each person's own phone calendar, so nobody has to open a second app to see what's planned.",
+    "label": "Join the waitlist"
+  },
+  "relatedPages": [
+    { "href": "/questions/why-does-my-shared-calendar-not-show-on-my-partners-phone", "label": "Why doesn't my shared calendar show on my partner's phone?" },
+    { "href": "/blog/sharing-the-mental-load", "label": "Sharing the mental load" },
+    { "href": "/blog/family-calendar-organization", "label": "Family calendar organization" },
+    { "href": "/best-family-calendar-app", "label": "Best family calendar app" },
+    { "href": "/for/families-who-tried-cozi-and-quit", "label": "For families who tried Cozi and quit" }
+  ],
+  "sources": [
+    { "title": "Google Calendar Community: \"My family can't see my events I added to shared calendar\"", "url": "https://support.google.com/calendar/thread/17626208" },
+    { "title": "Sophie Hines, \"The tyranny of the shared calendar\"", "url": "https://sophiehines.substack.com/p/the-tyranny-of-the-shared-calendar" },
+    { "title": "AnandTech forum: Google Calendar events disappear from phone, show up fine on website", "url": "https://forums.anandtech.com/threads/google-calendar-events-disappear-from-phone-show-up-fine-on-website.2168205" }
+  ],
+  "datePublished": "2026-09-15",
+  "lastReviewed": "2026-09-15",
+  "indexStatus": "index"
+}

@@ -1,0 +1,55 @@
+{
+  "slug": "caregivers-of-ageing-parents",
+  "pageType": "persona",
+  "query": "help aging parents from a distance",
+  "searchIntent": "informational",
+  "title": "For Caregivers of Ageing Parents From a Distance",
+  "description": "Kinrows has no medication tracking or health monitoring. Here is what it does have for long-distance caregiving logistics, and where the gap honestly is.",
+  "h1": "For Caregivers of Ageing Parents From a Distance",
+  "eyebrow": "For you",
+  "directAnswer": "Long-distance caregiving is underserved by dedicated apps relative to how often people search for it, and Kinrows doesn't close that gap with a medical feature — it has no medication tracking, health monitoring, or elder-care-specific tool of any kind. What it offers instead is a separate Clan for a parent's care circle and shared Notes that can hold the practical, non-medical information a distant adult child actually needs: who's visiting when, a neighbour's phone number, where the insurance documents are.",
+  "keyTakeaway": "Be clear about what this doesn't do before it can be useful for what it does.",
+  "sections": [
+    {
+      "heading": "What long-distance caregiving actually requires day to day",
+      "html": "<p>Most of the practical burden in long-distance caregiving isn't medical — it's logistics that go stale fast: who visited this week, what a neighbour's contact information is, where insurance and legal documents live, when the next scheduled call is. Common caregiving guidance recommends things like meeting a parent's neighbours and getting their contact information, gathering copies of insurance cards and medical history, and setting a specific day and time each week for a video call — none of which requires a medical app, just a shared, current place to keep it.</p>"
+    },
+    {
+      "heading": "What Kinrows does not do (be upfront about this)",
+      "html": "<p>Kinrows has no medication tracking, no health monitoring, and no elder-care-specific feature. Care coverage — the feature that lets a household ask for babysitting, pet or house coverage — is built for scheduling logistics, not for coordinating medical care or safety monitoring for an ageing parent. If what's needed is medication reminders or health tracking, that requires a dedicated tool built for it.</p>"
+    },
+    {
+      "heading": "A separate circle for a parent's care network",
+      "html": "<p>A Clan — a separate, unlimited group joined by invite code — can hold a parent's circle: siblings, a nearby neighbour, a home-care aide, without merging any of it into your own household's budget or private notes. Everyone in the clan sees the same shared updates and feed, which matters when more than one sibling is trying to stay informed from different distances.</p>"
+    },
+    {
+      "heading": "Practical information worth keeping in one shared place",
+      "html": "<p>A shared Note — visible to whoever's in the clan, co-editable, and easy to update in a minute — can hold a neighbour's number, the pharmacy's address, the alarm code, the name of the visiting home-care worker this month. A shared calendar can track visits and scheduled calls so siblings aren't duplicating check-ins or leaving gaps. None of this replaces a care plan from a doctor or agency, but it gives a distant adult child one place to look instead of a scattered set of texts and memory.</p>"
+    }
+  ],
+  "productFit": {
+    "heading": "A shared circle for practical caregiving logistics",
+    "html": "<p>A Clan lets siblings, a neighbour, or a hired aide share updates about a parent's care without any of it touching your own household's private data. Shared Notes hold the practical details — contacts, document locations, routines — and stay current because anyone in the clan can update them. This is a logistics layer, not a medical one: it has no medication tracking or health monitoring, and shouldn't be treated as a substitute for a doctor's or agency's care plan.</p>",
+    "screenshot": { "src": "website/assets/shots/home.png", "alt": "Kinrows Home screen showing a shared family feed for a group" }
+  },
+  "faq": [
+    { "q": "What's the best way to help an aging parent from a distance?", "a": "Start with the practical basics recommended by long-distance caregiving guides: get a neighbour's contact information, gather copies of insurance and medical documents, and set a specific weekly time for a check-in call. Keeping that information current in one shared place, like a note or a shared calendar, matters more than any single app feature." },
+    { "q": "Does Kinrows track medications or health information?", "a": "No. Kinrows has no medication tracking, health monitoring, or elder-care-specific feature. It can hold practical logistics, such as contacts, visit schedules and shared notes, in a separate group for a parent's care circle, but medical tracking needs a tool built specifically for that." },
+    { "q": "How do I coordinate with siblings or other caregivers?", "a": "A Clan gives everyone involved — siblings, a neighbour, a hired aide — one shared feed and calendar without merging any of it into your own household's private data. Everyone in the clan sees the same updates, which helps when caregiving responsibility is split across people in different places." }
+  ],
+  "cta": {
+    "heading": "One shared place for the practical side",
+    "body": "A Clan and shared Notes keep a parent's care circle informed, without a medical claim Kinrows can't back.",
+    "label": "Join the waitlist"
+  },
+  "relatedPages": [
+    { "href": "/for/grandparents-in-the-loop", "label": "For Keeping Grandparents in the Loop" },
+    { "href": "/how-to/keep-grandparents-in-the-loop-without-sharing-everything", "label": "Sharing Family Updates With Grandparents Without Merging Everything" },
+    { "href": "/for/blended-and-co-parenting-families", "label": "For Blended and Co-Parenting Families" }
+  ],
+  "persona": "caregivers of ageing parents",
+  "problem": "long-distance caregiving logistics, explicitly not medical",
+  "datePublished": "2026-09-15",
+  "lastReviewed": "2026-09-15",
+  "indexStatus": "index"
+}

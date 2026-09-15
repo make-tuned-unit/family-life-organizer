@@ -1,0 +1,56 @@
+{
+  "slug": "blended-and-co-parenting-families",
+  "pageType": "persona",
+  "query": "app for co-parenting schedule across two homes",
+  "searchIntent": "commercial",
+  "title": "For Blended and Co-Parenting Families",
+  "description": "Kinrows has no custody-record feature. What it doesn't do, what a shared calendar across two homes helps with, and when to use a dedicated co-parenting tool instead.",
+  "h1": "For Blended and Co-Parenting Families",
+  "eyebrow": "For you",
+  "directAnswer": "Kinrows is not a custody-record or legal-communication tool — it has no court-admissible logging, expense-reimbursement tracking, or documented-communication feature the way OurFamilyWizard, TalkingParents or 2houses do, and if a custody arrangement requires that kind of record, one of those purpose-built tools is the right choice. For co-parents on cooperative terms who mainly need a shared calendar and lists visible across two homes without merging every other part of family life, Kinrows' household and clan structure can help.",
+  "keyTakeaway": "Cooperative co-parenting and court-monitored custody are different problems, and Kinrows only fits one of them.",
+  "sections": [
+    {
+      "heading": "What a dedicated co-parenting app does that Kinrows doesn't",
+      "html": "<p>Apps built specifically for custody arrangements — OurFamilyWizard, TalkingParents, 2houses, KidCal, Pairently, Kidtime — exist because some co-parenting situations need a documented, sometimes court-admissible record: logged messages, expense-reimbursement tracking, and calendars built around custody-day tracking designed to hold up if things get contentious. One category leader's own positioning is that it \"handles complex custody schedules that other family calendar apps can't manage\" — a real, specific capability, and not one Kinrows has.</p><p>Kinrows has no custody-record feature, no court-admissible message log, and no legal-communication tool. If a custody order requires documented communication, or a mediator or court has recommended a specific app, use that app for that purpose.</p>"
+    },
+    {
+      "heading": "Where a shared calendar across two homes still helps",
+      "html": "<p>For co-parents coordinating cooperatively — not adversarially — a shared household calendar with two-way phone sync means school events, appointments and pickups show up on both parents' phones without one person re-typing what the other already entered. Recurring events and per-person color coding help when a kid's schedule is split across two homes with different routines.</p>"
+    },
+    {
+      "heading": "Keeping each home's other data (budget, notes) separate",
+      "html": "<p>A household in Kinrows is a private inner circle — budgets, private notes and the full calendar live there and aren't visible outside it. Two co-parenting households don't need to merge into one household to share a calendar; each can keep its own household for its own home's data, while a separate Clan (an unlimited, invite-code group) is where the things that genuinely need to be shared across both homes, like a kid's milestones or a shared events calendar, actually live.</p>"
+    },
+    {
+      "heading": "When to use a court-recommended co-parenting app instead",
+      "html": "<p>If a custody arrangement is contentious, court-monitored, or requires a documented paper trail of communication and expenses, a purpose-built tool designed for exactly that is the right call, not a general household organizer. Kinrows is built for the logistics of running a home, not for the legal and evidentiary needs of a custody dispute, and being honest about that distinction is more useful than implying otherwise.</p>"
+    }
+  ],
+  "productFit": {
+    "heading": "A shared calendar without merging everything else",
+    "html": "<p>Two-way sync with each parent's own phone calendar means events entered on either side show up for both, without asking either parent to give up their existing calendar habits. Per-person color coding helps distinguish which parent's home a given event belongs to at a glance. This covers the shared-schedule part of co-parenting logistics; it is not a substitute for a custody-record or legal-communication tool where one is needed.</p>",
+    "screenshot": { "src": "website/assets/shots/calendar.png", "alt": "Kinrows Calendar screen showing a shared household calendar with per-person color coding" }
+  },
+  "faq": [
+    { "q": "Is Kinrows good for co-parenting or custody schedules?", "a": "It depends on what kind of co-parenting. Kinrows has no custody-record, court-admissible logging, or legal-communication feature, so it isn't a substitute for OurFamilyWizard, TalkingParents or similar tools where a custody arrangement requires that. For cooperative co-parents who mainly need a shared calendar and lists across two homes, Kinrows' household and clan structure can help." },
+    { "q": "What's the difference between Kinrows and a dedicated co-parenting app?", "a": "Dedicated co-parenting apps are built around documented, sometimes court-admissible communication and custody-day tracking designed to hold up if a situation becomes contentious. Kinrows is a general household organizer — a shared calendar, lists, chores and budget — with no custody-specific record-keeping at all. A household in an adversarial custody situation should use the purpose-built tool." },
+    { "q": "Can two households share a calendar without merging everything else?", "a": "Yes. A Clan is a separate, unlimited group joined by invite code that overlaps with a household only through the people added to it, so two co-parenting households can share a calendar or updates through a clan while each keeps its own household's budget and private notes to itself." }
+  ],
+  "cta": {
+    "heading": "Know before you switch",
+    "body": "Kinrows is upfront about what it isn't — read this before choosing it for a co-parenting schedule.",
+    "label": "Join the waitlist"
+  },
+  "relatedPages": [
+    { "href": "/how-to/share-a-family-calendar-with-a-partner-who-wont-use-it", "label": "Sharing a Calendar With a Partner Who Won't Use It" },
+    { "href": "/for/grandparents-in-the-loop", "label": "For Keeping Grandparents in the Loop" },
+    { "href": "/for/single-parents", "label": "For Single Parents Running a Household Solo" },
+    { "href": "/best-family-calendar-app", "label": "Best Family Calendar App" }
+  ],
+  "persona": "blended and co-parenting families",
+  "problem": "co-parenting across two homes, honest about no custody-record feature",
+  "datePublished": "2026-09-15",
+  "lastReviewed": "2026-09-15",
+  "indexStatus": "index"
+}

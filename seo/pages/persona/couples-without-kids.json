@@ -1,0 +1,55 @@
+{
+  "slug": "couples-without-kids",
+  "pageType": "persona",
+  "query": "shared calendar and grocery list app for couples",
+  "searchIntent": "informational",
+  "title": "For Couples Without Kids",
+  "description": "A two-person household doesn't need chore charts or sleep-training tools. Here is the narrower set of features that actually matters for couples.",
+  "h1": "For Couples Without Kids",
+  "eyebrow": "For you",
+  "directAnswer": "A two-person household running shared logistics doesn't need chore charts, sleep-training programs, or kids' allowance tracking — the actual list is narrower: one calendar both people see, one grocery list that stays in sync, and a shared view of what's being spent on the household. Kinrows covers that core without requiring you to set up or ignore a dozen kid-specific features to get there.",
+  "keyTakeaway": "The answer for a two-person household is narrower, not bigger.",
+  "sections": [
+    {
+      "heading": "What actually matters for a two-person household",
+      "html": "<p>Most \"family organizer\" marketing assumes kids, chores, and school schedules. A couple without kids typically needs a smaller set of things done well: a calendar both people actually check, a grocery list that doesn't duplicate items or show different contents on each phone, and a shared sense of what's being spent on rent, groceries, or a trip. Anything built specifically around kids — chores, allowance, sleep training — simply doesn't apply, and shouldn't need to be worked around.</p>"
+    },
+    {
+      "heading": "Calendar and lists without the kid-specific noise",
+      "html": "<p>Kinrows' Calendar and Lists work the same for two people as for six — a shared household calendar with two-way phone sync, and unlimited named lists with automatic grocery categorization. Nothing about setting them up requires adding children or configuring features you don't use; the kid-specific tools (Chores, Routines' sleep-training program) simply sit unused if there's no one to apply them to.</p>"
+    },
+    {
+      "heading": "Splitting or tracking shared expenses",
+      "html": "<p>Budget categories with monthly limits, expense and receipt logging, and six-month spending stats give a couple one place to see what's being spent on the shared household — rent, groceries, a joint trip — without requiring either partner to fully merge personal accounts or open a separate finance app. It's built for tracking shared costs in one visible place, not for full personal-finance planning.</p>"
+    },
+    {
+      "heading": "When it's worth adding more (moving in, planning a family)",
+      "html": "<p>The same household can grow into the rest of the app later — Trips for shared travel planning, Decisions for polls when a choice needs input from both people, Rivalries if a step-count competition sounds fun, and eventually Chores and Routines if kids come into the picture. Nothing about starting with just a calendar, lists and budget locks a couple out of the rest later.</p>"
+    }
+  ],
+  "productFit": {
+    "heading": "Lists and a calendar built for the whole household, right-sized for two",
+    "html": "<p>Lists stay in sync because every device reads from one server-scoped list rather than a best-effort copy, which matters as much for a two-person grocery list as a six-person one. The shared calendar, with two-way sync to each partner's own phone calendar, means an event either person adds shows up for both without a separate invite step. Decisions (polls with expiry) gives a couple a lightweight way to settle a choice — where to eat, which weekend to travel — without it turning into a long text thread.</p>",
+    "screenshot": { "src": "website/assets/shots/lists.png", "alt": "Kinrows Lists screen showing a shared grocery list with automatic categorization" }
+  },
+  "faq": [
+    { "q": "What's the best shared calendar and grocery list app for couples?", "a": "Look for one where the calendar is natively shared, not a personal calendar with sharing bolted on, and the grocery list is server-scoped, so both partners always see the same current version. Kinrows' Calendar and Lists work this way for a two-person household exactly as they do for a larger one." },
+    { "q": "Do we need a full family organizer if it's just the two of us?", "a": "Not the kid-specific parts. A couple typically only needs the calendar, lists, and budget — chores, Routines' sleep-training program, and allowance tracking simply don't apply and can be ignored rather than configured around." },
+    { "q": "How do couples track shared expenses in the same app as everything else?", "a": "Budget categories with monthly limits, expense and receipt logging (including AI receipt scanning), and six-month spending stats sit alongside the calendar and lists, so shared costs are visible in the same place as the rest of household logistics rather than in a separate finance app." }
+  ],
+  "cta": {
+    "heading": "The narrower version, done well",
+    "body": "Calendar, lists and budget for a two-person household, free, with nothing kid-specific to configure around.",
+    "label": "Join the waitlist"
+  },
+  "relatedPages": [
+    { "href": "/how-to/keep-a-shared-grocery-list-in-sync", "label": "Fixing a Shared Grocery List That Won't Sync" },
+    { "href": "/blog/family-budgeting-without-friction", "label": "Family Budgeting Without Friction" },
+    { "href": "/best-shared-shopping-list-app", "label": "Best Shared Shopping List App" }
+  ],
+  "persona": "couples without kids",
+  "problem": "narrower feature set for a two-person household",
+  "datePublished": "2026-09-15",
+  "lastReviewed": "2026-09-15",
+  "indexStatus": "index"
+}

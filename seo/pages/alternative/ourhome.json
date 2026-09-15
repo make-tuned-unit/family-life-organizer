@@ -1,0 +1,82 @@
+{
+  "slug": "ourhome",
+  "pageType": "alternative",
+  "query": "OurHome alternative",
+  "searchIntent": "switching",
+  "title": "Best OurHome Alternatives (2026)",
+  "description": "The original OurHome chores app appears abandoned since 2022 with broken points sync. Here are actively maintained alternatives, ranked, plus what to know.",
+  "h1": "Best OurHome Alternatives (2026)",
+  "eyebrow": "Alternatives",
+  "directAnswer": "People searching for an OurHome alternative are usually reacting to abandonment rather than a feature gap: the original OurHome chores app appears to have received no updates since 2022, and its points-and-rewards system is reported to have stopped syncing reliably between family members' phones, with kids losing motivation when their progress disappeared. A confusing second \"OurHome by Elusios\" listing with a different developer adds to the uncertainty about which app is current. The strongest alternatives are simply chores-and-allowance apps that are actively maintained today. Kinrows is one such option, though it is iPhone-only and launches September 2026.",
+  "keyTakeaway": "OurHome's main problem is abandonment and broken sync, not a missing feature — look for an actively maintained app instead.",
+  "sections": [
+    {
+      "heading": "What happened to OurHome",
+      "html": "<p>The original \"OurHome: chores and rewards\" app (once by BecomingMom Inc.) let families assign chores, track points and rewards, and share a shopping list and calendar. Its App Store listing no longer resolves via lookup, and a competitor comparison page describes it plainly as having received no updates recorded since 2022 (paraphrased, choresplit.com/compare/ourhome, accessed 2026-09-15). Verbatim App Store reviews could not be retrieved for this page since the original listing is gone; the picture below is built from that secondary source and aggregated web search, flagged wherever it is paraphrase rather than a direct quote.</p><p>Its Google Play listing shows a much lower 3.1 out of 5 from roughly 4,510 reviews under a 2025-era relaunch by a developer called \"Elusios,\" and a separate, unrelated app also called \"OurHome by Elusios\" exists on the App Store (id 6753957205, 4.1 stars) — a shopping-list and task app, not the original chores-and-points product. That naming overlap is itself a source of user confusion about which app is current.</p>"
+    },
+    {
+      "heading": "What OurHome did well when it was active",
+      "html": "<p>In its heyday, OurHome earned real goodwill: it was free, combined chores, points and rewards with a shared shopping list and calendar in one place, and was picked up as an \"App of the Week\" for making gamified chore tracking simple for kids. That combination — chores plus lists plus calendar, for free — is exactly the gap its abandonment leaves behind, which is why the alternatives below are judged on covering that same ground while still being maintained.</p>"
+    },
+    {
+      "heading": "Ranked alternatives",
+      "html": "<p>Since the core OurHome problem is abandonment and broken sync rather than a missing feature, this ranking weighs, in order: whether the app is actively maintained today, whether chores and points sync reliably between household members' phones, and whether it charges to dock or use the reward system.</p><ul><li><strong>Kinrows.</strong> An actively developed household organizer with one chores routine per child, a fixed weekly allowance that is never docked for a missed chore, optional bonuses, a payout ledger, and an age-banded program from ages 2 through teens, alongside a calendar, lists and pantry. It is iPhone-only and launches September 2026, so it cannot help a family that needs a working chores app today.</li><li><strong>FamilyWall.</strong> A broader, currently maintained hub with task and chore lists alongside a calendar, photos and finance tracking; its own reviewers report frequent crashes after updates and a subscription requirement to add family members, so reliability is a real tradeoff here too.</li><li><strong>Maple.</strong> An AI-forward organizer with a chore tracker and an email-to-task feature; its own users report new paywalls appearing on previously free features and general instability, which echoes the trust problem OurHome users are trying to leave behind.</li><li><strong>Cozi.</strong> Not a dedicated chores-and-points app, but a free, decade-plus-tenured calendar and to-do list that a lot of families already trust for the logistics side, if a gamified rewards system isn't the main requirement.</li></ul>"
+    },
+    {
+      "heading": "A note on other family apps that have shut down (Picniic)",
+      "html": "<p>OurHome is not the only well-regarded family app to go quiet. Picniic, an all-in-one family organizer that received notable press coverage around its 2016 launch, has since shut down entirely: the app has been discontinued, and the site no longer works (paraphrased secondary-source summary, accessed 2026-09-15). It is worth keeping in mind as a pattern, not just a one-off: a polished, well-funded family app can still disappear, which is a reasonable thing to weigh alongside features and price when choosing where to put years of chore and calendar history.</p>"
+    }
+  ],
+  "comparisonTable": {
+    "caption": "OurHome vs. four alternatives",
+    "columns": ["", "OurHome (original)", "FamilyWall", "Maple", "Cozi", "Kinrows"],
+    "rows": [
+      ["Actively maintained", "no — no updates recorded since 2022 (paraphrased, choresplit.com)", "yes", "yes", "yes", "yes"],
+      ["Chore points/allowance system", "yes, historically — reported sync failures", "yes, task/chore lists", "yes, chore tracker", "no, calendar/lists only", "yes, with a payout ledger and non-punitive streak"],
+      ["Allowance ever docked for a missed chore", "not documented", "not documented", "not documented", "not applicable", "no, by design"],
+      ["Free to use", "yes, historically", "freemium, ~$5/mo per third-party sources", "free tier plus a paid subscription for some features", "free core; Gold $39 per cozi.com (period not stated)", "free core; optional Concierge $4.99–$9.99/mo"],
+      ["Platform", "iOS and Android (original)", "iOS and Android", "iOS and Android", "iOS, Android, web", "iPhone only (iOS 18+)"]
+    ]
+  },
+  "productFit": {
+    "heading": "An allowance system that doesn't depend on abandoned sync",
+    "html": "<p>The pattern behind most OurHome complaints — points that stop syncing between phones, kids losing motivation when progress disappears — is a server-sync problem, not a chores-app-concept problem. Kinrows runs chores and allowance through the same server-scoped household data as the rest of the app: one chores routine per child with a tappable morning/evening grid, a fixed weekly allowance that is never docked for a missed chore, optional weekly bonuses, and a payout ledger, grounded in the age-by-age research already cited in Kinrows' own program (Rossmann 2002; White et al. 2019; Warneken & Tomasello 2008; Deci, Koestner & Ryan 1999). Chores also surface on the child's own profile card, not just a separate screen.</p>",
+    "screenshot": { "src": "website/assets/shots/tasks.png", "alt": "Kinrows chores screen showing a child's tappable weekly chore grid" }
+  },
+  "faq": [
+    {
+      "q": "Is OurHome still supported or being updated?",
+      "a": "Reporting on this is limited since OurHome's original App Store listing no longer resolves, but a competitor comparison page describes it as having received no updates recorded since 2022 (paraphrased, choresplit.com/compare/ourhome, accessed 2026-09-15). A separate app, \"OurHome by Elusios,\" has since appeared but is a different product from a different developer, not a continuation of the original. Treat the original OurHome as unsupported unless you can confirm otherwise directly with its listing."
+    },
+    {
+      "q": "Why isn't OurHome syncing between phones?",
+      "a": "This page could not retrieve verbatim reviews describing the cause, but secondary sources report that the points and rewards system stopped syncing between phones, with kids losing motivation when their progress disappeared, and that the app needs an active connection, with poor connectivity causing white-screen errors (paraphrased, aggregated via web search, accessed 2026-09-15). Treat this as a reported pattern rather than a confirmed, independently verified bug."
+    },
+    {
+      "q": "Is there more than one OurHome app?",
+      "a": "Yes. The original \"OurHome: chores and rewards\" listing no longer resolves and is described by third parties as abandoned. A separate app, \"OurHome by Elusios\" (App Store id 6753957205, 4.1 stars), also exists, but it is a different product from a different developer focused on shopping lists and tasks, not the classic chores-and-points system. Confirm which listing you're looking at before installing."
+    },
+    {
+      "q": "What's a good free chore and allowance app for families?",
+      "a": "Look for one that is actively maintained, syncs chores and points reliably between phones, and doesn't dock pay for a missed chore, since that approach is better supported by child-development research than punitive deductions. Kinrows offers a fixed weekly allowance that's never docked, an age-banded chores program from ages 2 through teens, and a payout ledger, alongside a calendar and lists — though it's iPhone-only and doesn't launch until September 2026."
+    }
+  ],
+  "cta": {
+    "heading": "Chores and allowance that keep working",
+    "body": "Kinrows syncs chores and allowance through the same household data as the rest of the app, with a fixed weekly allowance never docked for a missed chore. Join the waitlist to hear when it launches on iPhone.",
+    "label": "Join the waitlist"
+  },
+  "relatedPages": [
+    { "href": "/how-to/decide-whether-to-tie-allowance-to-chores", "label": "Should Allowance Be Tied to Chores?" },
+    { "href": "/questions/how-much-allowance-should-i-give-my-kid-by-age", "label": "How Much Allowance Should I Give My Kid, by Age?" },
+    { "href": "/best-chore-app-for-families", "label": "Best Chore App for Families" }
+  ],
+  "sources": [
+    { "title": "ChoreSplit: OurHome comparison", "url": "https://choresplit.com/compare/ourhome" },
+    { "title": "OurHome by Elusios, App Store listing", "url": "https://apps.apple.com/us/app/ourhome-by-elusios/id6753957205" },
+    { "title": "Picniic, AlternativeTo listing", "url": "https://alternativeto.net/software/picniic/" }
+  ],
+  "datePublished": "2026-09-15",
+  "lastReviewed": "2026-09-15",
+  "indexStatus": "index"
+}

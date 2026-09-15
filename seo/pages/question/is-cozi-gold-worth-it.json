@@ -1,0 +1,44 @@
+{
+  "slug": "is-cozi-gold-worth-it",
+  "pageType": "question",
+  "query": "is Cozi Gold worth it",
+  "searchIntent": "commercial",
+  "title": "Is Cozi Gold Worth It?",
+  "description": "What Cozi Gold's $39/year unlocks, what the free tier still limits, and how that compares to free-forever family organizer apps.",
+  "h1": "Is Cozi Gold Worth It?",
+  "eyebrow": "Questions",
+  "directAnswer": "Cozi Gold costs $39 a year, per Cozi's own website, and removes ads while unlocking the full calendar view, a birthday tracker, and other features that are otherwise limited or ad-supported on the free tier. Whether it's worth it mainly depends on how much the free tier's 30-day calendar view limit and ads bother you day to day. For households that want the same kind of shared calendar and lists functionality with no paid tier at all, that's worth comparing against free-forever alternatives before paying for Gold.",
+  "sections": [
+    { "heading": "What Cozi Gold actually unlocks", "html": "<p>Per Cozi's own product page, Cozi Gold is a $39-a-year, single-household subscription that removes ads and unlocks the full calendar month view, a birthday tracker, and other features gated on the free tier. It covers every family member on the account across devices for that one price, rather than charging per person.</p>" },
+    { "heading": "What the free tier still limits", "html": "<p>Cozi's free tier runs ads and, per its own reviewers, caps how far ahead you can view or plan on the calendar. One reviewer's 1-star review, titled \"Bad,\" put it plainly: <strong>\"Charges you to plan 30 days in advance\"</strong> (an App Store reviewer, App Store US, 2026). Another reviewer described the broader frustration with paying and still feeling nickel-and-dimed: <strong>\"I was really disappointed with this app. Even after paying for the...\"</strong> in a review titled \"Requires $80/yr subscription to use\" (an App Store reviewer, 2-star, App Store US, 2026) — a figure that appears to refer to a different, possibly legacy or bundled tier than the $39/year currently listed on Cozi's own site, which is a discrepancy worth being aware of rather than a confirmed current price.</p><p>For a household that mainly wants to see more than 30 days out without paying, the free tier's limit is the single biggest reason people search for whether Gold is worth it in the first place.</p>" },
+    { "heading": "How this compares to apps with no paid calendar tier at all", "html": "<p>The core comparison worth making before paying for Cozi Gold isn't just \"is $39 a lot,\" it's \"does this feature need to be paid at all.\" Some family organizer apps, Kinrows among them, keep the entire calendar and lists experience — including full calendar range, no ads — in the free tier for the whole household, and charge only for an optional AI layer on top. If the specific things Gold unlocks (ad removal, full calendar view) are what's driving the search, it's worth checking whether an app gives you those for free before deciding Gold is the fix.</p>" },
+    { "heading": "What Cozi's own reviewers say about long-term value", "html": "<p>Cozi's reviewer base skews toward long-tenure users, which is itself informative: one reviewer wrote <strong>\"I have used this app for probably 10 years\"</strong> in a review titled \"Used to be great\" (an App Store reviewer, 2-star, App Store US, 2026), going on to describe how recent changes eroded that loyalty rather than an app that failed outright. That pattern — long-time trust, softening as the paywall and feature set shifted — is a different signal than a brand-new user deciding whether to pay for Gold on day one. If you're new to Cozi, weigh Gold's $39 against what you need today rather than against a decade of goodwill you haven't built up yet.</p>" }
+  ],
+  "faq": [
+    { "q": "What does Cozi Gold include that the free version doesn't?", "a": "Per Cozi's own site, Gold removes ads and unlocks the full calendar month view and a birthday tracker, among other features, for $39 a year covering the whole household." },
+    { "q": "How much does Cozi Gold cost?", "a": "Cozi's own website lists Cozi Gold at $39 per year as of this writing. Some reviewers have cited an $80/year figure, which appears to reference a different or older tier rather than the current listed price — verify directly on cozi.com before paying." },
+    { "q": "Is there a free alternative to Cozi Gold?", "a": "Yes, in the sense that some family organizer apps keep the full calendar and lists experience free for the whole household and charge only for an optional AI add-on. Kinrows is built this way — worth comparing against Cozi Gold's $39/year if ads and the calendar view limit are the main draw." }
+  ],
+  "productFit": {
+    "heading": "A full calendar and lists experience with no paid tier",
+    "html": "<p>Kinrows keeps its shared household calendar, unlimited lists, budget, chores, trips, and family feed entirely free, with no ads and no time-limited calendar view. There's nothing equivalent to Cozi Gold to unlock — the only paid layer is the optional AI Concierge add-on, which is a separate feature on top of the free app rather than a gate on the calendar itself.</p>",
+    "screenshot": { "src": "website/assets/shots/home.png", "alt": "Kinrows home feed showing the free household dashboard" }
+  },
+  "cta": {
+    "heading": "A calendar and lists that are free, full stop",
+    "body": "Kinrows' calendar, lists, budget, and more are free for the whole household — no ads, no view limit, no Gold tier to unlock.",
+    "label": "Join the waitlist"
+  },
+  "relatedPages": [
+    { "href": "/alternatives/cozi", "label": "Best Cozi Alternatives (2026)" },
+    { "href": "/compare/kinrows-vs-cozi", "label": "Kinrows vs Cozi: Which Should You Choose?" },
+    { "href": "/for/families-who-tried-cozi-and-quit", "label": "For Families Who Tried Cozi and Quit" }
+  ],
+  "sources": [
+    { "title": "Cozi Gold pricing page", "url": "https://www.cozi.com/cozi-gold/" },
+    { "title": "Cozi App Store customer reviews (US)", "url": "https://itunes.apple.com/us/rss/customerreviews/id=407108860/sortBy=mostRecent/page=1/json" }
+  ],
+  "datePublished": "2026-09-15",
+  "lastReviewed": "2026-09-15",
+  "indexStatus": "index"
+}

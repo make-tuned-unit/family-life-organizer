@@ -1,0 +1,44 @@
+{
+  "slug": "how-much-allowance-should-i-give-my-kid-by-age",
+  "pageType": "question",
+  "query": "how much allowance by age",
+  "searchIntent": "informational",
+  "title": "How Much Allowance Should I Give My Kid, by Age?",
+  "description": "Commonly cited allowance ranges by age, per-task vs. fixed weekly pay, and what the research says about docking allowance for missed chores.",
+  "h1": "How Much Allowance Should I Give My Kid, by Age?",
+  "eyebrow": "Questions",
+  "directAnswer": "Commonly cited ranges run roughly $0.50 to $1.00 per task for ages 6 to 8, $1.00 to $2.50 for ages 9 to 11, and $2.00 to $5.00 for ages 12 and up, drawn from parenting and chore-chart content rather than a single authority. There's no single correct number for any age. What matters more than the exact dollar figure is consistency: whether it's paid on a predictable schedule and not docked for an occasionally missed chore, which is closer to what the child-development research on motivation actually supports.",
+  "sections": [
+    { "heading": "Commonly cited allowance ranges by age", "html": "<table><tr><th>Age</th><th>Commonly cited range</th></tr><tr><td>6–8</td><td>$0.50–$1.00 per task</td></tr><tr><td>9–11</td><td>$1.00–$2.50 per task</td></tr><tr><td>12 and up</td><td>$2.00–$5.00 per task or a larger weekly amount</td></tr></table><p>These figures are aggregated from multiple parenting and chore-chart sources rather than a single study, and they vary by household income, region, and how many tasks are expected. Treat them as a starting reference point, not a rule.</p>" },
+    { "heading": "Per-task vs. a fixed weekly amount", "html": "<p>Paying per completed task ties the dollar amount directly to effort and is easy for a young child to understand, but it also means allowance fluctuates week to week and can feel like piecework rather than a stable amount to plan around. A fixed weekly allowance, independent of exactly how many chores got done, is simpler to budget on both sides and is the more common structure once a family settles into a routine, with occasional bonuses layered on for extra effort rather than the base amount itself changing.</p>" },
+    { "heading": "What the research says about docking pay for a missed chore", "html": "<p>A body of child-development research generally favors paying a fixed allowance that isn't reduced when a required chore is missed, using non-punitive consequences or separate bonuses instead. The reasoning, drawn from research on intrinsic motivation (Deci, Koestner & Ryan, 1999) and children's helping behaviour (Warneken & Tomasello, 2008), is that docking pay reframes a household contribution as a transaction that can be bought out of, which tends to undermine the habit rather than reinforce it. Other research on family chore practices (Rossmann, 2002; White et al., 2019) informs the broader picture of how chore participation develops over childhood. This is one defensible position, not a universal rule — plenty of families dock allowance for missed chores and it works fine for them.</p>" },
+    { "heading": "How the amount should change as a child gets older", "html": "<p>The jump in these ranges by age band tracks two things at once: kids take on more, and harder, tasks as they get older, and they also want more independent spending money as their social life and interests expand. A common, low-friction pattern is to hold the amount steady between ages rather than adjusting it every few months, then revisit it once — around a birthday, paired with a track record of the current chores being handled consistently — rather than renegotiating on demand.</p>" }
+  ],
+  "faq": [
+    { "q": "How much allowance should a 6-year-old get?", "a": "Commonly cited figures run about $0.50 to $1.00 per completed task at this age, though many families use a smaller flat weekly amount instead. There's no fixed correct number; consistency in paying it matters more than the exact figure." },
+    { "q": "How much allowance is normal for a 9 to 11-year-old?", "a": "Roughly $1.00 to $2.50 per task is a commonly cited range, or an equivalent flat weekly amount in that ballpark. Households vary widely based on income and local cost of living." },
+    { "q": "Should allowance go up automatically with age?", "a": "Most families increase it gradually as kids take on bigger responsibilities and want more independent spending money, rather than on a fixed schedule. Tying an increase to a birthday plus a track record of consistency is a common, low-friction approach." },
+    { "q": "Should I dock allowance for a missed chore?", "a": "Research on intrinsic motivation generally favors not docking a fixed allowance for an occasional missed chore, using a separate consequence or bonus system instead, because docking pay can turn a household responsibility into something that feels transactional. It's a defensible stance, not the only correct one — some families do dock pay and it works for them." }
+  ],
+  "productFit": {
+    "heading": "An age-banded chores and allowance program", "html": "<p>Kinrows' chores feature runs one routine per child with a tappable weekly grid, a fixed weekly allowance that is never docked for a missed chore, and optional weekly behaviour bonuses layered on top. It includes an age-by-age program (2–3, 4–5, 6–8, 9–12, 13+) with suggested chores and allowance guidance grounded in the same research base cited above (Rossmann 2002; White et al. 2019; Warneken & Tomasello 2008; Deci, Koestner & Ryan 1999), plus a payout ledger and a non-punitive streak. This reflects one specific stance in the fixed-vs-docked debate, not the only correct answer.</p>",
+    "screenshot": { "src": "website/assets/shots/tasks.png", "alt": "Kinrows chores grid showing a child's weekly tasks and allowance" }
+  },
+  "cta": {
+    "heading": "An allowance system that doesn't punish a missed chore",
+    "body": "Kinrows' chores feature pairs a fixed weekly allowance with an age-banded program from toddler to teen, grounded in the same research cited above.",
+    "label": "Join the waitlist"
+  },
+  "relatedPages": [
+    { "href": "/how-to/decide-whether-to-tie-allowance-to-chores", "label": "Should Allowance Be Tied to Chores?" },
+    { "href": "/for/parents-of-toddlers", "label": "For Parents of Toddlers" },
+    { "href": "/for/parents-of-teens", "label": "For Parents of Teens" },
+    { "href": "/best-chore-app-for-families", "label": "Best Chore App for Families" }
+  ],
+  "sources": [
+    { "title": "Kinrows product specification: chores research citations", "url": "https://kinrows.com/llms-full.txt" }
+  ],
+  "datePublished": "2026-09-15",
+  "lastReviewed": "2026-09-15",
+  "indexStatus": "index"
+}

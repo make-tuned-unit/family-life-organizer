@@ -1,0 +1,55 @@
+{
+  "slug": "parents-of-teens",
+  "pageType": "persona",
+  "query": "allowance and chores for teenagers",
+  "searchIntent": "informational",
+  "title": "For Parents of Teens",
+  "description": "By the teen years, chores and allowance look more like real responsibility and real money. Here is how the ranges, bonuses and tracking change.",
+  "h1": "For Parents of Teens",
+  "eyebrow": "For you",
+  "directAnswer": "By the teen years, chores and allowance stop being about building a habit and start looking more like real responsibility and real money: bigger allowance ranges, optional bonuses for consistency rather than a fixed reward for every task, and enough autonomy that it doesn't feel like a toddler's chart with higher numbers. Commonly cited ranges run around $2.00 to $5.00 per task for ages 12 and up, though the right amount depends more on consistency than on hitting a specific number.",
+  "keyTakeaway": "The system should mature with the kid, not just the dollar amount.",
+  "sections": [
+    {
+      "heading": "How chores and allowance change by the teen years",
+      "html": "<p>Kinrows' chores program treats 13+ as its own age band, with suggested chores and allowance guidance distinct from the 6-8 and 9-12 bands that come before it. The shift by the teen years is less about the chores themselves — most teens can handle more complex or infrequent tasks — and more about the relationship: less daily oversight, more trust that the routine will get done, and a payout that reflects that.</p>"
+    },
+    {
+      "heading": "What's a reasonable allowance range at this age",
+      "html": "<p>Chore-chart and parenting guidance commonly cites ranges around $2.00 to $5.00 per task for ages 12 and up, up from roughly $1.00 to $2.50 for 9-to-11-year-olds — though these figures vary widely across sources and households, and there's no single correct number. What matters more consistently across the research is paying it on a fixed schedule rather than docking it for a missed chore, which Kinrows' own program follows at every age band, teens included.</p>"
+    },
+    {
+      "heading": "Behaviour bonuses vs. a fixed base amount",
+      "html": "<p>Rather than renegotiating the base allowance, Kinrows' program adds optional weekly behaviour bonuses — for something like a good bedtime routine or consistency over the week — on top of a fixed amount that stays the same whether or not a chore was missed. For teens specifically, this tends to work better than either docking pay or constantly raising the base rate, since it rewards extra effort without turning every missed chore into a negotiation.</p>"
+    },
+    {
+      "heading": "Money and gift tracking as teens start to have more of both",
+      "html": "<p>Teens tend to accumulate more of their own money and a longer list of things they want, which is where the payout ledger (a running record of what's been paid) and People &amp; gifts (gift ideas per person with purchased/wrapped/given tracking) start to matter more than they did at younger ages. Rivalries — family competitions synced automatically from Apple Health — can also keep a teenager engaged with the household beyond chores, through step or activity challenges rather than another chart.</p>"
+    }
+  ],
+  "productFit": {
+    "heading": "A chores program built to mature with the kid",
+    "html": "<p>The 13+ age band in Kinrows' chores program comes with its own suggested chores and allowance guidance, distinct from younger bands, plus optional weekly behaviour bonuses layered on top of a fixed allowance that's never docked for a missed chore. A payout ledger keeps a running record, and a nudge waits for both a birthday and a steady record before suggesting the next stage, so the system changes with the teen rather than staying fixed at whatever it was set to at nine.</p>",
+    "screenshot": { "src": "website/assets/shots/tasks.png", "alt": "Kinrows Chores screen showing the payout ledger and weekly bonuses" }
+  },
+  "faq": [
+    { "q": "How much allowance should a teenager get?", "a": "Commonly cited ranges run around $2.00 to $5.00 per task for ages 12 and up, though the figures vary across sources and there's no single correct amount. What tends to matter more than the exact number is paying it consistently and not docking it for a missed chore." },
+    { "q": "Should teenage chores work differently than younger kids'?", "a": "Yes, at least in degree. Kinrows' chores program treats 13+ as its own band with different suggested chores and allowance guidance than younger age bands, reflecting less daily oversight and more trust that a routine gets handled. The mechanics, a fixed weekly allowance and optional bonuses, stay consistent across ages; what changes is the specific tasks and the amount." },
+    { "q": "What's a fair way to add bonuses without turning it into a negotiation every week?", "a": "Keep the base allowance fixed and never docked, and layer optional weekly behaviour bonuses on top for something specific and consistent, like a good bedtime routine, rather than renegotiating the base rate itself. That keeps the predictable part predictable and confines the negotiation to the bonus, not the whole allowance." }
+  ],
+  "cta": {
+    "heading": "An allowance system that grows up with them",
+    "body": "The 13+ chores band comes with its own guidance, bonuses and payout ledger.",
+    "label": "Join the waitlist"
+  },
+  "relatedPages": [
+    { "href": "/questions/how-much-allowance-should-i-give-my-kid-by-age", "label": "How Much Allowance Should I Give My Kid, by Age?" },
+    { "href": "/how-to/decide-whether-to-tie-allowance-to-chores", "label": "Should Allowance Be Tied to Chores?" },
+    { "href": "/for/parents-of-toddlers", "label": "For Parents of Toddlers" }
+  ],
+  "persona": "parents of teens",
+  "problem": "teen allowance ranges, bonuses, and engagement beyond chores",
+  "datePublished": "2026-09-15",
+  "lastReviewed": "2026-09-15",
+  "indexStatus": "index"
+}

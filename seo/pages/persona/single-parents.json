@@ -1,0 +1,56 @@
+{
+  "slug": "single-parents",
+  "pageType": "persona",
+  "query": "app to help single parents manage the household",
+  "searchIntent": "informational",
+  "title": "For Single Parents Running a Household Solo",
+  "description": "With one adult tracking everything by default, the fix isn't a bigger to-do list. Here is how to build a care network without handing over the whole household.",
+  "h1": "For Single Parents Running a Household Solo",
+  "eyebrow": "For you",
+  "directAnswer": "Running a household without a co-parent to split logistics with means there's only one person tracking appointments, chores, groceries and money by default, so the leverage isn't a bigger to-do list, it's pulling in help for specific things without handing over the whole household. Kinrows lets a single parent build a care network for babysitting or pet coverage, keep a separate group for family or friends who help out, and still run kids' chores and allowance solo.",
+  "keyTakeaway": "The fix isn't doing more alone, it's structuring the help you already have.",
+  "sections": [
+    {
+      "heading": "Why the mental-load problem looks different with one adult in the house",
+      "html": "<p>In a two-parent household, the standard advice is to make invisible work visible so a partner can pick some of it up. That advice doesn't apply the same way when there's one adult holding the calendar, the grocery list, the chores chart and the budget — the \"who's tracking this\" question has one answer by default. The useful move isn't a system that redistributes work between two people; it's one that makes it faster to run and easier to hand pieces off to whoever else is around.</p>"
+    },
+    {
+      "heading": "Building a care network without merging your whole household",
+      "html": "<p>Care coverage lets you post a specific ask — a babysitting window, a pet-sitting stretch while you're out, coverage for a school pickup — to whoever's helping, and they approve it through the app or a share link with no install required. That's different from adding a helper to your household outright: they see the coverage request, not your budget or private notes.</p>"
+    },
+    {
+      "heading": "What to share with helpers, and what stays private",
+      "html": "<p>A grandparent, a friend, or a co-parent who isn't part of your day-to-day household can join a separate Clan instead — an unlimited, invite-code group that overlaps with your household only through the people you choose to add. Milestones, key dates and select plans can live there, while your household's budget, private notes and full calendar stay inside the household itself.</p>"
+    },
+    {
+      "heading": "Kids' chores and routines when there's one parent running them",
+      "html": "<p>The chores program — a tappable morning/evening grid per child, a fixed weekly allowance that isn't docked for a missed chore, and optional behaviour bonuses — runs the same whether there's one adult managing it or two. It's designed to reduce ongoing negotiation over chores, which matters more, not less, when there's only one person available to have that conversation every day.</p>"
+    }
+  ],
+  "productFit": {
+    "heading": "Care coverage as a support network, not a co-parent",
+    "html": "<p>Care coverage turns \"can someone take Saturday morning\" into a specific, approvable ask instead of a string of texts to whoever might be free. Propose a window, and the helper — a grandparent, a friend, a hired sitter — approves it via the app or a share link if they don't have it installed. Approved windows land on both calendars, so there's a clear record of coverage without a single parent having to hold it all in memory.</p>",
+    "screenshot": { "src": "website/assets/shots/care.png", "alt": "Kinrows Care screen showing a coverage request awaiting a helper's approval" }
+  },
+  "faq": [
+    { "q": "What's the best way for a single parent to organize household logistics?", "a": "Keep the household's calendar, lists, chores and budget in one shared place so nothing depends on memory, and use Care coverage to turn specific asks for help — a sitter, a pickup, pet coverage — into approvable requests instead of open-ended texts. The goal is reducing how much has to be tracked in your head, not adding another system to maintain." },
+    { "q": "How do I get help from family or friends without giving them full access to my household?", "a": "Add them to a separate Clan instead of your household. Clans are unlimited, invite-code groups that only overlap with your household through the members you choose to add, so a helper can see what you share in that clan, like milestones, plans and updates, without seeing your budget or private notes." },
+    { "q": "Can kids' chores and allowance still work with one parent managing it?", "a": "Yes. The chores program is built around one routine per child with a tappable weekly grid and a fixed allowance that doesn't get docked for a missed chore, which works the same whether one adult or two are running it. It's designed to cut down on daily negotiation, which is useful with any number of parents in the house." }
+  ],
+  "cta": {
+    "heading": "Get help without giving up the whole household",
+    "body": "Care coverage and separate Clans let a single parent bring in support on their own terms.",
+    "label": "Join the waitlist"
+  },
+  "relatedPages": [
+    { "href": "/blog/sharing-the-mental-load", "label": "Sharing the Mental Load" },
+    { "href": "/how-to/babysitter-information-sheet", "label": "Building a Babysitter Information Sheet People Actually Use" },
+    { "href": "/for/grandparents-in-the-loop", "label": "For Keeping Grandparents in the Loop" },
+    { "href": "/for/families-with-a-newborn", "label": "For Families With a Newborn" }
+  ],
+  "persona": "single parents",
+  "problem": "solo household logistics and building a care network",
+  "datePublished": "2026-09-15",
+  "lastReviewed": "2026-09-15",
+  "indexStatus": "index"
+}
