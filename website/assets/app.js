@@ -286,14 +286,24 @@ function initNotifyForm(form) {
     setStatus('', '');
 
     try {
+      const source = form.dataset.source || 'site';
+      const landing = window.permagent && window.permagent.landing ? window.permagent.landing() : null;
       const res = await fetch('/api/waitlist', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: input.value.trim(), source: form.dataset.source || 'site', ref: REF || undefined }),
+        body: JSON.stringify({
+          email: input.value.trim(),
+          source,
+          ref: REF || undefined,
+          landing: landing ? landing.slice(0, 200) : undefined,
+        }),
       });
       const data = await res.json().catch(() => ({}));
 
       if (res.ok && data.success) {
+        if (window.permagent && window.permagent.event) {
+          window.permagent.event('waitlist_signup', { source, landing });
+        }
         if (data.ref_code) {
           renderReferral(form, status, data);
         } else {

@@ -920,6 +920,7 @@ CREATE TABLE IF NOT EXISTS waitlist (
     welcomed INTEGER DEFAULT 0,
     ref_code TEXT,                 -- this signup's shareable referral code
     referred_by TEXT,              -- the ref_code of whoever referred them
+    landing_path TEXT,             -- root-relative path of the page that converted them
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 CREATE UNIQUE INDEX IF NOT EXISTS idx_waitlist_ref_code ON waitlist(ref_code);

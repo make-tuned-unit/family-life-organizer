@@ -7,37 +7,37 @@
     <priority>1.0</priority>
   </url>
   <url>
-    <loc>https://kinrows.com/subscribe.html</loc>
+    <loc>https://kinrows.com/subscribe</loc>
     <lastmod>2026-08-26</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://kinrows.com/compare.html</loc>
+    <loc>https://kinrows.com/compare</loc>
     <lastmod>2026-07-11</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://kinrows.com/best-family-organizer-apps.html</loc>
+    <loc>https://kinrows.com/best-family-organizer-apps</loc>
     <lastmod>2026-06-25</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://kinrows.com/best-family-calendar-app.html</loc>
+    <loc>https://kinrows.com/best-family-calendar-app</loc>
     <lastmod>2026-06-25</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://kinrows.com/best-chore-app-for-families.html</loc>
+    <loc>https://kinrows.com/best-chore-app-for-families</loc>
     <lastmod>2026-06-25</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://kinrows.com/best-shared-shopping-list-app.html</loc>
+    <loc>https://kinrows.com/best-shared-shopping-list-app</loc>
     <lastmod>2026-06-25</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
@@ -49,81 +49,111 @@
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://kinrows.com/blog/family-calendar-organization.html</loc>
+    <loc>https://kinrows.com/blog/family-calendar-organization</loc>
     <lastmod>2026-06-24</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.6</priority>
   </url>
   <url>
-    <loc>https://kinrows.com/blog/how-to-sleep-train-a-baby.html</loc>
+    <loc>https://kinrows.com/blog/how-to-sleep-train-a-baby</loc>
     <lastmod>2026-08-08</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://kinrows.com/blog/what-is-emotional-labour.html</loc>
+    <loc>https://kinrows.com/blog/what-is-emotional-labour</loc>
     <lastmod>2026-06-25</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.6</priority>
   </url>
   <url>
-    <loc>https://kinrows.com/blog/emotional-labour-vs-mental-load.html</loc>
+    <loc>https://kinrows.com/blog/emotional-labour-vs-mental-load</loc>
     <lastmod>2026-06-25</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.6</priority>
   </url>
   <url>
-    <loc>https://kinrows.com/blog/signs-too-much-emotional-labour.html</loc>
+    <loc>https://kinrows.com/blog/signs-too-much-emotional-labour</loc>
     <lastmod>2026-06-25</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.6</priority>
   </url>
   <url>
-    <loc>https://kinrows.com/blog/divide-emotional-labour-fairly.html</loc>
+    <loc>https://kinrows.com/blog/divide-emotional-labour-fairly</loc>
     <lastmod>2026-06-25</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.6</priority>
   </url>
   <url>
-    <loc>https://kinrows.com/blog/emotional-labour-parenting.html</loc>
+    <loc>https://kinrows.com/blog/emotional-labour-parenting</loc>
     <lastmod>2026-06-25</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.6</priority>
   </url>
   <url>
-    <loc>https://kinrows.com/blog/sharing-the-mental-load.html</loc>
+    <loc>https://kinrows.com/blog/sharing-the-mental-load</loc>
     <lastmod>2026-06-24</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.6</priority>
   </url>
   <url>
-    <loc>https://kinrows.com/blog/family-budgeting-without-friction.html</loc>
+    <loc>https://kinrows.com/blog/family-budgeting-without-friction</loc>
     <lastmod>2026-06-24</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.6</priority>
   </url>
   <url>
-    <loc>https://kinrows.com/developers.html</loc>
+    <loc>https://kinrows.com/developers</loc>
     <lastmod>2026-08-30</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url>
   <url>
-    <loc>https://kinrows.com/privacy.html</loc>
+    <loc>https://kinrows.com/privacy</loc>
     <lastmod>2026-08-27</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.3</priority>
   </url>
   <url>
-    <loc>https://kinrows.com/terms.html</loc>
+    <loc>https://kinrows.com/terms</loc>
     <lastmod>2026-06-24</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.3</priority>
   </url>
   <url>
-    <loc>https://kinrows.com/support.html</loc>
+    <loc>https://kinrows.com/support</loc>
     <lastmod>2026-08-27</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.4</priority>
+  </url>
+  <url>
+    <loc>https://kinrows.com/how-to/</loc>
+    <lastmod>2026-09-15</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://kinrows.com/alternatives/</loc>
+    <lastmod>2026-09-15</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://kinrows.com/compare/</loc>
+    <lastmod>2026-09-15</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://kinrows.com/for/</loc>
+    <lastmod>2026-09-15</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://kinrows.com/questions/</loc>
+    <lastmod>2026-09-15</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.6</priority>
   </url>
 </urlset>

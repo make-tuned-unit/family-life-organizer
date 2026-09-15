@@ -19,7 +19,7 @@ Kinrows is a single, private home organizer for the whole household. It brings t
 
 ## Pricing model
 - Core app: Free, for the entire household, with no ads.
-- Concierge add-on: two tiers, per household, one subscription unlocks it for everyone in that household. Lite is $4.99/month (or $49.99/year) with up to 10 concierge chats per day; Premium is $9.99/month (or $99.99/year) with up to 40 chats per day. Both tiers include every Concierge feature and the daily brief — they differ only in daily chat volume. Yearly plans are priced at two months free versus monthly. Billed through Apple (iPhone) or Stripe (web at kinrows.com/subscribe.html); auto-renews until cancelled.
+- Concierge add-on: two tiers, per household, one subscription unlocks it for everyone in that household. Lite is $4.99/month (or $49.99/year) with up to 10 concierge chats per day; Premium is $9.99/month (or $99.99/year) with up to 40 chats per day. Both tiers include every Concierge feature and the daily brief — they differ only in daily chat volume. Yearly plans are priced at two months free versus monthly. Billed through Apple (iPhone) or Stripe (web at kinrows.com/subscribe); auto-renews until cancelled.
 
 ## Coverage / scope
 - Platform: iPhone (iOS 18+). There is no Android or standalone web app.
@@ -61,21 +61,26 @@ Rowan — the small sprout mascot with two evergreen leaves — is the face of t
 - Safety: credentials are household-bound and either read-only or read/write. Every request rechecks credential validity, household entitlement, and scope. Delete and cancel operations require explicit confirmation through MCP.
 - Privacy: API keys, OAuth access tokens, and rotating refresh tokens are stored only as hashes. The developer activity audit records operation metadata and outcome, not household request or response payloads.
 - REST endpoints remain available at https://kinrows.com/v1/ for account context, household snapshot, tool discovery, and direct tool execution.
-- Full setup documentation: https://kinrows.com/developers.html
+- Full setup documentation: https://kinrows.com/developers
 
 ## Security
 Bank-style session security: revocable per-device tokens that rotate on every use (no password is stored on the phone); optional email two-factor authentication; changing your password signs out every other device; and all server writes are household-scoped and validated.
 
 ## URL structure (stable, predictable)
 - https://kinrows.com/ — homepage
-- https://kinrows.com/compare.html — comparison vs other family-organizer apps
+- https://kinrows.com/compare — comparison vs other family-organizer apps
 - https://kinrows.com/blog/ — blog index
-- https://kinrows.com/blog/{slug}.html — individual articles (e.g. /blog/family-calendar-organization.html)
-- https://kinrows.com/subscribe.html — web Concierge billing (Stripe Checkout)
-- https://kinrows.com/developers.html — Developer API (bring-your-own-agent keys)
-- https://kinrows.com/privacy.html — privacy policy
-- https://kinrows.com/terms.html — terms of use
-- https://kinrows.com/developers.html — Developer API and MCP setup for bringing your own agent
+- https://kinrows.com/blog/{slug} — individual articles (e.g. /blog/family-calendar-organization)
+- https://kinrows.com/subscribe — web Concierge billing (Stripe Checkout)
+- https://kinrows.com/developers — Developer API (bring-your-own-agent keys)
+- https://kinrows.com/how-to/ — how-to guides for family organization
+- https://kinrows.com/alternatives/ — Kinrows vs specific other apps
+- https://kinrows.com/compare/ — feature and pricing comparisons
+- https://kinrows.com/for/ — Kinrows for specific family situations
+- https://kinrows.com/questions/ — short answers to common questions
+- https://kinrows.com/privacy — privacy policy
+- https://kinrows.com/terms — terms of use
+- https://kinrows.com/developers — Developer API and MCP setup for bringing your own agent
 - /app, /login, /api/ — the authenticated application and API; not for indexing.
 
 ## Structured data summary

@@ -1,0 +1,40 @@
+{
+  "slug": "sample-howto",
+  "pageType": "howto",
+  "query": "how to split chores fairly as a family",
+  "searchIntent": "informational",
+  "title": "How to split chores fairly as a family",
+  "description": "A simple, fair way to split household chores across a family so the load doesn't quietly land on one person.",
+  "h1": "How to split chores fairly as a family",
+  "eyebrow": "How-to",
+  "directAnswer": "Splitting chores fairly starts with picking one shared system everyone can see, not a private list living in one parent's head. Give each child an age-appropriate chore, post it somewhere the whole family checks every morning, and review the split together once a week so the load never quietly slides back onto a single person carrying it alone.",
+  "keyTakeaway": "A visible system beats a fair-sounding rule nobody can see.",
+  "sections": [
+    { "heading": "Start with one visible list", "html": "<p>Move the chore list out of your head and into a place the whole household actually looks at each day.</p>" },
+    { "heading": "Match chores to age", "html": "<p>Younger children can handle small, concrete jobs; older kids can own a whole routine end to end.</p>" }
+  ],
+  "productFit": {
+    "heading": "How Kinrows helps",
+    "html": "<p>Kinrows gives each child a chore chart you can tick from the home screen, with an age-by-age program built in.</p>",
+    "screenshot": { "src": "website/assets/shots/sample.png", "alt": "Kinrows chore chart on the home screen" }
+  },
+  "faq": [
+    { "q": "What age should chores start at?", "a": "Most families can start simple chores around age two or three, with tasks growing alongside the child." }
+  ],
+  "cta": {
+    "heading": "Make pitching in part of family life",
+    "body": "Kinrows gives each child an age-appropriate chore chart, ticked from the home screen.",
+    "label": "Join the waitlist"
+  },
+  "relatedPages": [
+    { "href": "/", "label": "Kinrows home" },
+    { "href": "/blog/", "label": "The Kinrows blog" },
+    { "href": "/alternatives/", "label": "Alternatives" }
+  ],
+  "sources": [
+    { "title": "Warneken & Tomasello, 2008", "url": "https://example.com/warneken-tomasello-2008" }
+  ],
+  "datePublished": "2026-09-01",
+  "lastReviewed": "2026-09-01",
+  "indexStatus": "index"
+}

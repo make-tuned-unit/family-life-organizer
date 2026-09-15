@@ -11,7 +11,9 @@
     "test": "node --test test/*.test.js",
     "test:mcp:conformance": "node scripts/verify-mcp-conformance.js",
     "test:ai": "node --test test/concierge-*.test.js test/calendar-recurrence.test.js",
-    "test:ai:routing": "node scripts/concierge-tool-eval.js"
+    "test:ai:routing": "node scripts/concierge-tool-eval.js",
+    "seo:build": "node seo/build.js",
+    "seo:check": "node seo/build.js --check"
   },
   "keywords": [],
   "author": "",
