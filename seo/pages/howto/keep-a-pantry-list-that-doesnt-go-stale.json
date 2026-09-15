@@ -1,0 +1,52 @@
+{
+  "slug": "keep-a-pantry-list-that-doesnt-go-stale",
+  "pageType": "howto",
+  "query": "pantry expiry tracker app",
+  "searchIntent": "transactional",
+  "title": "Keeping a Pantry List That Doesn't Go Stale",
+  "description": "A pantry spreadsheet stops getting updated after week one. Here's how to track inventory in a way that actually keeps up with real life.",
+  "h1": "How to keep a pantry list that doesn't go stale",
+  "eyebrow": "How-to",
+  "directAnswer": "A pantry list only stays useful if it gets updated at the exact moments food goes in and comes out — when groceries are put away and when meals are cooked — rather than as a one-time inventory or a separate spreadsheet nobody remembers to open. The fix isn't a better initial list, it's picking a tracker that lives wherever you're already putting groceries away and logging meals, so updating it is a byproduct of things you're doing anyway rather than an extra task.",
+  "keyTakeaway": "Track it where you already put groceries away, or it won't stay current.",
+  "sections": [
+    {
+      "heading": "Why pantry spreadsheets stop getting updated after week one",
+      "html": "<p>A spreadsheet or notes-app list is easy to set up once and hard to maintain, because updating it is a separate action from the actual behaviour — putting groceries away, using something up while cooking. The first week, motivation is high and the list stays accurate. By week two or three, one missed update leads to another, and the list quietly diverges from what's actually in the pantry until it's more misleading than useful. This is a general pattern with any tracking system that isn't built into an existing habit: the update has to be nearly free, or it stops happening.</p>"
+    },
+    {
+      "heading": "Tracking by location (pantry, fridge, freezer) instead of one long list",
+      "html": "<p>One long undifferentiated list is harder to scan and easier to let drift than a list split by where things actually live. Splitting inventory into pantry, fridge, and freezer sections mirrors how you actually shop and cook — you're rarely thinking about all three at once, so a section-specific view is faster to check and faster to update after a shopping trip or a meal. It also makes expiry patterns more obvious: fridge items generally need closer attention than pantry staples, and separating them keeps that distinction visible instead of buried in one long scroll.</p>"
+    },
+    {
+      "heading": "Expiry alerts that don't get ignored",
+      "html": "<p>An expiry alert only works if it doesn't become background noise. A flood of low-priority notifications trains people to dismiss all of them, including the ones that matter. What holds up better is a smaller number of alerts tied to items actually close to their date, surfaced somewhere you're already looking — rather than a separate notification channel competing with everything else on your phone.</p>"
+    },
+    {
+      "heading": "Closing the loop from pantry to dinner",
+      "html": "<p>The most reliable way to keep a pantry list current isn't a stricter rule about logging every change — it's connecting the list to something you're already doing. If deciding what to cook naturally draws from the pantry inventory, and finishing a meal naturally marks ingredients as used, the list updates itself as a side effect of cooking rather than as a separate chore. That loop — shop, log, cook from it, mark it used — is what keeps a pantry tracker accurate past the first week.</p>"
+    }
+  ],
+  "productFit": {
+    "heading": "How Kinrows helps",
+    "html": "<p>Kinrows' Pantry tracks food inventory by location — pantry, fridge, freezer — with quantities and expiry alerts, and connects directly to Cook, which builds recipe ideas from what's actually logged. Finishing a recipe in Cooking Mode marks the ingredients used off in the pantry automatically, so the inventory updates as a byproduct of cooking rather than a separate step you have to remember. This doesn't replace good judgment about food safety — Kinrows doesn't provide specific shelf-life guidance for individual foods — it's a structure for keeping track of what you have and when it needs using.</p>",
+    "screenshot": { "src": "website/assets/shots/lists.png", "alt": "Kinrows pantry inventory organized by pantry, fridge, and freezer" }
+  },
+  "faq": [
+    { "q": "What's the easiest way to track pantry and fridge inventory?", "a": "Split it by location (pantry, fridge, freezer) rather than one long list, and pick a tracker that connects to something you already do — like deciding what to cook — so updating it happens as a byproduct of normal use rather than a separate task you have to remember." },
+    { "q": "Is there an app that tracks food expiration dates?", "a": "Yes, pantry-tracking apps typically let you log items with a location and expiry date and surface alerts as things get close. The main thing to look for is whether updating the list is built into another habit you already have (putting groceries away, cooking), since that's what determines whether the list stays accurate past the first week or two." },
+    { "q": "How do I stop wasting food that expires before I use it?", "a": "Track inventory by location so items near expiry are easy to scan rather than buried in a long list, keep expiry alerts limited to items that actually need attention so they don't get tuned out, and connect the pantry list to meal decisions so ingredients close to expiring naturally surface as options rather than being forgotten at the back of a shelf." } ],
+  "cta": {
+    "heading": "A pantry list that updates itself",
+    "body": "Kinrows tracks pantry, fridge, and freezer inventory and connects it directly to Cook, so cooking a meal keeps the list current.",
+    "label": "Join the waitlist"
+  },
+  "relatedPages": [
+    { "href": "/how-to/turn-whats-in-the-fridge-into-tonights-dinner", "label": "Turning what's in the fridge into tonight's dinner" },
+    { "href": "/best-shared-shopping-list-app", "label": "Best shared shopping list app" },
+    { "href": "/blog/family-budgeting-without-friction", "label": "Family budgeting without friction" }
+  ],
+  "datePublished": "2026-09-15",
+  "lastReviewed": "2026-09-15",
+  "indexStatus": "index"
+}

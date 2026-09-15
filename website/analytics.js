@@ -13,6 +13,17 @@
       sessionStorage.setItem("_pa_sid", S);
     }
   } catch (e) { /* private mode: sessions degrade, pageviews still count */ }
+  // Landing page attribution: the first path seen this session, captured once
+  // and kept for the life of the tab so a later conversion (e.g. waitlist
+  // signup) can be credited back to the page that brought the visitor in.
+  var LANDING = null;
+  try {
+    LANDING = sessionStorage.getItem("_pa_landing");
+    if (!LANDING) {
+      LANDING = location.pathname;
+      sessionStorage.setItem("_pa_landing", LANDING);
+    }
+  } catch (e) { /* private mode: landing attribution degrades gracefully */ }
   function send(kind, name, props, ref) {
     var body = JSON.stringify({
       k: kind,
@@ -43,6 +54,7 @@
   addEventListener("popstate", pageview);
   window.permagent = window.permagent || {};
   window.permagent.event = function (name, props) { send("ev", name, props, null); };
+  window.permagent.landing = function () { return LANDING || location.pathname; };
   window.permagent.autocapture = function () {
     addEventListener("click", function (e) {
       var a = e.target && e.target.closest && e.target.closest("a[href]");

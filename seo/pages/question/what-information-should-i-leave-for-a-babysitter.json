@@ -1,0 +1,41 @@
+{
+  "slug": "what-information-should-i-leave-for-a-babysitter",
+  "pageType": "question",
+  "query": "what information to leave for a babysitter",
+  "searchIntent": "informational",
+  "title": "What Information Should I Leave for a Babysitter?",
+  "description": "The core information every babysitter needs, what changes evening to evening, and why a printable sheet often isn't enough.",
+  "h1": "What Information Should I Leave for a Babysitter?",
+  "eyebrow": "Questions",
+  "directAnswer": "At minimum, a babysitter needs emergency contacts (you, a backup adult, and the pediatrician), any allergies or medications and how to handle them, the house and wifi basics, bedtime and routine notes, and a clear way to reach you. A fixed printed list covers one evening well, but it goes stale the moment plans change — a later pickup, a new allergy, a different bedtime — which is the main reason people search for something better than a printable template. This is a logistics checklist, not medical or safety advice; use your own judgment and any relevant emergency guidance alongside it.",
+  "sections": [
+    { "heading": "The core information every sitter needs", "html": "<ul><li><strong>Emergency contacts:</strong> you, a backup adult who can respond quickly, and the pediatrician's number.</li><li><strong>Allergies and medications:</strong> what they are, what to do if a reaction happens, and any medication timing.</li><li><strong>House basics:</strong> wifi password, alarm code, where the first-aid kit is, and any doors or areas that are off-limits.</li><li><strong>Bedtime and routine:</strong> the actual sequence a child expects, not just a bedtime, since routine deviations are often what cause an evening to go sideways.</li><li><strong>How and when to reach you:</strong> your expected return time and how you'd like to be contacted for something non-urgent versus urgent.</li></ul>" },
+    { "heading": "Why printable templates go stale", "html": "<p>Search results for this topic are dominated by printable templates — titles like <strong>\"Free Printable Babysitter's Information Guide,\"</strong> <strong>\"Babysitting Checklist (Free Printable),\"</strong> and <strong>\"The Ultimate Grandparents' Emergency Babysitting Checklist\"</strong> recur across many sites, which shows how strongly people want a fill-in-the-blank sheet rather than a philosophy of what to include. The problem with a printed sheet is that it's accurate exactly once: the day it's printed. A new allergy, a changed pickup time, or a different emergency contact means either re-printing or, more often, telling the sitter verbally and hoping it's remembered.</p>" },
+    { "heading": "Making it something the sitter can actually check mid-visit", "html": "<p>The fix isn't a better template, it's a living version of the same information that updates the moment something changes and that the sitter can check on their own without a phone call. That means the sitter needs access to current information without necessarily needing to install an app themselves — a share link they can open once is a lower-friction ask than an account signup for someone helping out for one evening.</p>" },
+    { "heading": "How grandparents fit in differently than a paid sitter", "html": "<p>A grandparent or regular family helper covering care is a different case than a one-off paid sitter: they're likely to help repeatedly, so a durable, always-current version of the same information is worth more to them than a one-time printout, and they may already know the house and routine well enough that only the changed details (a new allergy, a schedule shift) actually need flagging each time. The search pattern around this topic includes dedicated grandparent-specific checklists for exactly this reason — a distinct document called out separately from the general babysitter sheet, because a grandparent covering a weekend is doing something closer to running the household than watching it for three hours.</p>" }
+  ],
+  "faq": [
+    { "q": "What should be on a babysitter information sheet?", "a": "Emergency contacts, allergies and medications with instructions, house basics like wifi and alarm codes, the actual bedtime routine, and how to reach you. Treat it as a logistics checklist, not a substitute for your own judgment or emergency guidance." },
+    { "q": "What do I need to tell a new babysitter before they arrive?", "a": "Beyond the written sheet, walk through anything that's easy to miss in writing: where things physically are (first-aid kit, flashlight, fuse box), any household quirks, and what counts as an emergency worth calling you immediately about versus waiting." },
+    { "q": "Is a printable babysitter sheet good enough?", "a": "For a single evening with no last-minute changes, yes. The gap shows up when something changes after it's printed — a new allergy, a later pickup — since the sitter is then working from outdated information unless someone remembers to tell them verbally." }
+  ],
+  "productFit": {
+    "heading": "Care coverage the sitter can check without installing anything",
+    "html": "<p>Kinrows lets you ask your care network for babysitting, pet, or house coverage with proposed time windows, which helpers can approve via a share link with no app install required, or in-app if they're already a household member. Combined with People profiles and shareable Notes, the same information a printed sheet would carry — routines, contacts, current details — stays current and reachable without a fresh printout each time. This organizes logistics and approvals; it isn't a safety-critical system and doesn't replace your own emergency planning.</p>",
+    "screenshot": { "src": "website/assets/shots/care.png", "alt": "Kinrows care coverage request with an approved time window" }
+  },
+  "cta": {
+    "heading": "Care coverage that stays current, not a printout",
+    "body": "Kinrows lets a sitter or helper approve a coverage window from a share link, no app required, with the household's current information behind it.",
+    "label": "Join the waitlist"
+  },
+  "relatedPages": [
+    { "href": "/how-to/babysitter-information-sheet", "label": "Building a Babysitter Information Sheet People Actually Use" },
+    { "href": "/for/single-parents", "label": "For Single Parents Running a Household Solo" },
+    { "href": "/best-family-organizer-apps", "label": "Best Family Organizer Apps" }
+  ],
+  "sources": [],
+  "datePublished": "2026-09-15",
+  "lastReviewed": "2026-09-15",
+  "indexStatus": "index"
+}

@@ -1,0 +1,23 @@
+{
+  "slug": "soft-issue",
+  "pageType": "howto",
+  "query": "soft issue fixture",
+  "searchIntent": "informational",
+  "title": "Soft issue fixture page",
+  "description": "A fixture page whose directAnswer is deliberately too short to test the soft-issue noindex path.",
+  "h1": "Soft issue fixture heading",
+  "eyebrow": "How-to",
+  "directAnswer": "This direct answer is deliberately far too short for the gate.",
+  "sections": [
+    { "heading": "Section one", "html": "<p>Placeholder section content for the soft-issue fixture.</p>" }
+  ],
+  "cta": { "heading": "CTA heading", "body": "CTA body copy.", "label": "Join the waitlist" },
+  "relatedPages": [
+    { "href": "/", "label": "Kinrows home" },
+    { "href": "/blog/", "label": "The Kinrows blog" },
+    { "href": "/how-to/", "label": "How-to guides" }
+  ],
+  "datePublished": "2026-09-01",
+  "lastReviewed": "2026-09-01",
+  "indexStatus": "index"
+}

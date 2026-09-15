@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<script>document.documentElement.classList.add('js')</script>
+<title>Fixing a Shared Grocery List That Won&#39;t Sync | Kinrows</title>
+<meta name="description" content="Duplicate items, ghost items, and things that won&#39;t cross off usually mean your grocery list app is guessing instead of reading from one shared source." />
+<meta name="theme-color" content="#0F3D37" />
+<meta name="robots" content="index,follow" />
+<link rel="canonical" href="https://kinrows.com/how-to/keep-a-shared-grocery-list-in-sync" />
+
+<meta property="og:title" content="Fixing a Shared Grocery List That Won&#39;t Sync | Kinrows" />
+<meta property="og:description" content="Duplicate items, ghost items, and things that won&#39;t cross off usually mean your grocery list app is guessing instead of reading from one shared source." />
+<meta property="og:type" content="article" />
+<meta property="og:url" content="https://kinrows.com/how-to/keep-a-shared-grocery-list-in-sync" />
+<meta property="og:image" content="https://kinrows.com/assets/og-image.jpg?v=3" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="Fixing a Shared Grocery List That Won&#39;t Sync | Kinrows" />
+<meta name="twitter:description" content="Duplicate items, ghost items, and things that won&#39;t cross off usually mean your grocery list app is guessing instead of reading from one shared source." />
+<meta name="twitter:image" content="https://kinrows.com/assets/og-image.jpg?v=3" />
+
+<link rel="icon" href="/favicon.ico?v=3" sizes="any" />
+<link rel="icon" type="image/png" sizes="32x32" href="/assets/brand/favicon-32.png?v=3" />
+<link rel="icon" type="image/png" sizes="192x192" href="/assets/brand/favicon-192.png?v=3" />
+<link rel="apple-touch-icon" sizes="180x180" href="/assets/brand/apple-touch-icon.png?v=3" />
+<link rel="manifest" href="/site.webmanifest" />
+
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,400&family=Inter:wght@400;450;500;600&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="/assets/style.css?v=202609092032" />
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {
+      "@type": "ListItem",
+      "position": 1,
+      "name": "Home",
+      "item": "https://kinrows.com/"
+    },
+    {
+      "@type": "ListItem",
+      "position": 2,
+      "name": "How-to guides",
+      "item": "https://kinrows.com/how-to/"
+    },
+    {
+      "@type": "ListItem",
+      "position": 3,
+      "name": "How to fix a shared grocery list that keeps getting out of sync",
+      "item": "https://kinrows.com/how-to/keep-a-shared-grocery-list-in-sync"
+    }
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "Why does my grocery list show different items on each phone?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "This usually means the app keeps a separate local copy of the list on each device and reconciles them in the background rather than having every phone read one shared list from a server. When two people edit around the same time, or a sync cycle is interrupted, the copies can drift apart. A list built to be server-scoped from the start avoids this because there's only ever one copy to read."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Why do items get crossed off on one phone but not another?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "An AnyList reviewer described this exactly: items crossed off on one phone still appearing as unpurchased on another. It happens when \"crossed off\" is stored per device rather than as one shared field everyone reads. A list where every device writes to the same record doesn't have two versions of \"crossed off\" to disagree about."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Why does my shared list keep making duplicates?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Duplicates usually happen when an add action gets applied more than once during a sync retry, which is more likely when the list is being reconciled between separate local copies rather than written directly to one shared list. A FamilyWall reviewer reported this exact pattern: adding one item and getting three."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Is there a shared grocery list app that actually stays in sync?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Look for one built around a server-scoped list rather than local copies synced after the fact — that architecture choice, not a specific settings toggle, is what prevents duplicate and ghost items. Ask specifically how the app handles two people editing the list at the same time, since that's when sync problems usually surface."
+      }
+    }
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Article",
+  "headline": "Fixing a Shared Grocery List That Won't Sync",
+  "description": "Duplicate items, ghost items, and things that won't cross off usually mean your grocery list app is guessing instead of reading from one shared source.",
+  "image": "https://kinrows.com/assets/og-image.jpg?v=3",
+  "datePublished": "2026-09-15",
+  "dateModified": "2026-09-15",
+  "inLanguage": "en",
+  "url": "https://kinrows.com/how-to/keep-a-shared-grocery-list-in-sync",
+  "mainEntityOfPage": {
+    "@type": "WebPage",
+    "@id": "https://kinrows.com/how-to/keep-a-shared-grocery-list-in-sync"
+  },
+  "author": {
+    "@type": "Organization",
+    "name": "Kinrows",
+    "url": "https://kinrows.com/"
+  },
+  "publisher": {
+    "@type": "Organization",
+    "name": "Kinrows",
+    "logo": {
+      "@type": "ImageObject",
+      "url": "https://kinrows.com/assets/brand/app-icon-512.png"
+    }
+  },
+  "speakable": {
+    "@type": "SpeakableSpecification",
+    "cssSelector": [
+      "h1",
+      ".lead"
+    ]
+  }
+}
+</script>
+<script>window.permagentCollectUrl='/api/permagent-analytics/collect';</script>
+<script src="/analytics.js" defer></script>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
+    <symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></symbol>
+  </defs>
+</svg>
+
+<header class="nav" id="nav">
+  <div class="nav-inner">
+    <a class="brand" href="/#top" aria-label="Kinrows home">
+      <img class="brand-mark" src="/assets/brand/logos/kinrows-boat-mark.png" alt="" width="47" height="34" />
+      <span class="brand-name">Kinrows</span></a>
+    <nav class="nav-links" id="primary-nav" aria-label="Primary">
+      <a href="/#plan">The app</a>
+      <a href="/#everything">Everything inside</a>
+      <a href="/compare">Compare</a>
+      <a href="/blog/">Blog</a>
+      <a href="/#assist">Concierge</a>
+    </nav>
+    <a href="/#notify" class="btn btn-pill">Join the waitlist</a>
+    <button class="nav-toggle" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="primary-nav">
+      <svg class="ic ic-menu" aria-hidden="true"><use href="#i-menu"/></svg>
+      <svg class="ic ic-close" aria-hidden="true"><use href="#i-close"/></svg>
+    </button>
+  </div>
+</header>
+
+<main id="top">
+  <section class="legal-hero">
+    <div class="legal-wrap">
+      <p class="eyebrow eyebrow-accent" style="--ac:var(--ocean)">How-to</p>
+      <h1>How to fix a shared grocery list that keeps getting out of sync</h1>
+    </div>
+  </section>
+
+  <section class="legal-body">
+    <div class="legal-wrap">
+      <div class="legal-prose">
+
+<p class="lead">A shared grocery list that shows different items on different phones almost always means the app is trying to merge separate local copies rather than having every phone read the same list from one server. That&#39;s what causes duplicates, items that reappear after being deleted, and things crossed off on one phone but still sitting there on another. The fix isn&#39;t a setting to toggle — it&#39;s a list architecture where there&#39;s one list, not several copies being reconciled after the fact.</p>
+<p class="lb-row lead" style="padding:12px 16px;border-radius:12px"><strong>Key takeaway:</strong> Duplicate and ghost items are a sign of copies being merged, not one shared list.</p>
+<p class="article-meta">Last reviewed <time datetime="2026-09-15">2026-09-15</time></p>
+
+<h2>What &quot;not syncing&quot; actually means under the hood</h2>
+<p>Most shopping list apps started as single-user apps and had sharing added afterward. Under the hood, each phone often keeps its own local copy of the list, then tries to reconcile changes with everyone else's copy in the background. Most of the time that works well enough that you don't notice. The failures show up specifically when two people edit around the same time, or when a sync cycle gets interrupted — which is exactly when a shared grocery list gets used, since it's often edited by more than one person while actually at the store.</p>
+
+<h2>The three failure patterns (duplicate items, ghost items, items that don&#39;t cross off)</h2>
+<p>These show up constantly in App Store reviews for popular list apps, and they map to the reconciliation problem above:</p><ul><li><strong>Duplicates:</strong> a FamilyWall reviewer described adding an item and getting three copies of it: "When we try to Add anything it makes three of the same items and gets rid of the category."</li><li><strong>Ghost items and lost data:</strong> an AnyList reviewer wrote that "Updates will occasionally erase list memory," and another described a list flickering and disappearing entirely mid-edit.</li><li><strong>Items that won't cross off everywhere:</strong> a different AnyList reviewer described the exact symptom: "Purchased items are crossed off the list on one phone but still appear as unpurchased on the other."</li></ul><p>None of these are the same bug, but they share a cause: two devices each holding their own version of the truth.</p>
+
+<h2>What a server-scoped list looks like instead</h2>
+<p>The alternative is a list that lives on a server, where every phone reads and writes the same record rather than keeping a local copy to reconcile later. Practically, that means: an item you add shows up on your partner's phone within a second or two, not after a background sync cycle; crossing something off updates it everywhere at once, because there was only ever one "off" to set; and there's no local copy that can drift out of step, because there's nothing local to drift. This is a structural choice made when the app is built, not something you can configure your way into on top of a locally-stored list.</p>
+
+<h2>Moving your list over without losing what&#39;s on it</h2>
+<p>If you're switching apps because of sync problems, don't start from zero. Before you migrate: take a screenshot or export of your current list categories (produce, dairy, household) if the old app supports it; add your regular staples first in the new list, since those are the items you'll notice missing fastest; and give the new list a week of real grocery trips before fully retiring the old one, so you have a fallback if something's missing. Most of the friction in switching is re-typing recurring items, not the switch itself.</p>
+
+
+
+<h2>How Kinrows helps</h2>
+<p>Kinrows lists are server-scoped and validated against your household on every write, so there's one list, not a copy per phone being merged. An item added by one person shows up for everyone, crossing it off updates it everywhere at once, and grocery items get sorted into categories automatically. You can keep unlimited named lists, pin the ones you check daily to the home screen, and move items between lists without retyping them. This doesn't promise a list can never have a bug — it means the underlying design isn't the kind that causes duplicate or ghost items in the first place.</p>
+<img class="app-shot" src="/assets/shots/lists.png" alt="Kinrows shared grocery list with automatic categorization" width="1206" height="2622" loading="lazy" decoding="async">
+
+<h2>Frequently asked questions</h2>
+<h3>Why does my grocery list show different items on each phone?</h3>
+<p>This usually means the app keeps a separate local copy of the list on each device and reconciles them in the background rather than having every phone read one shared list from a server. When two people edit around the same time, or a sync cycle is interrupted, the copies can drift apart. A list built to be server-scoped from the start avoids this because there&#39;s only ever one copy to read.</p>
+<h3>Why do items get crossed off on one phone but not another?</h3>
+<p>An AnyList reviewer described this exactly: items crossed off on one phone still appearing as unpurchased on another. It happens when &quot;crossed off&quot; is stored per device rather than as one shared field everyone reads. A list where every device writes to the same record doesn&#39;t have two versions of &quot;crossed off&quot; to disagree about.</p>
+<h3>Why does my shared list keep making duplicates?</h3>
+<p>Duplicates usually happen when an add action gets applied more than once during a sync retry, which is more likely when the list is being reconciled between separate local copies rather than written directly to one shared list. A FamilyWall reviewer reported this exact pattern: adding one item and getting three.</p>
+<h3>Is there a shared grocery list app that actually stays in sync?</h3>
+<p>Look for one built around a server-scoped list rather than local copies synced after the fact — that architecture choice, not a specific settings toggle, is what prevents duplicate and ghost items. Ask specifically how the app handles two people editing the list at the same time, since that&#39;s when sync problems usually surface.</p>
+
+<h2>Sources</h2>
+<ul>
+<li><a href="https://itunes.apple.com/us/rss/customerreviews/id=522167641/sortBy=mostRecent/page=1/json" rel="nofollow noopener" target="_blank">AnyList App Store customer reviews (US)</a></li>
+<li><a href="https://itunes.apple.com/us/rss/customerreviews/id=496889629/sortBy=mostRecent/page=2/json" rel="nofollow noopener" target="_blank">FamilyWall App Store customer reviews (US)</a></li>
+</ul>
+      </div>
+
+      <aside class="post-cta">
+        <h3>One list, not a copy per phone</h3>
+        <p>Kinrows lists are server-scoped, so everyone&#39;s phone reads the same list — no duplicates to clean up, no items stuck unsynced.</p>
+        <form class="notify-form" data-source="seo:howto:keep-a-shared-grocery-list-in-sync" aria-label="Join the waitlist">
+        <input type="email" name="email" placeholder="you@email.com" aria-label="Email address" autocomplete="email" inputmode="email" required />
+        <button type="submit" class="btn btn-primary">Join the waitlist</button>
+      </form>
+      <p class="cta-fine">Free on iPhone · iOS 18+ · Concierge optional</p>
+      </aside>
+
+      <div class="legal-foot-links">
+        <a href="/questions/why-is-my-shared-grocery-list-not-syncing">Why is my shared grocery list not syncing?</a>
+        <a href="/compare/kinrows-vs-anylist">Kinrows vs AnyList</a>
+        <a href="/best-shared-shopping-list-app">Best shared shopping list app</a>
+        <a href="/how-to/keep-a-pantry-list-that-doesnt-go-stale">Keeping a pantry list that doesn&#39;t go stale</a>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="footer">
+  <div class="container footer-inner">
+    <div class="footer-brand">
+      <a class="brand" href="/#top"><img class="brand-lockup" src="/assets/brand/logos/kinrows-lockup.png" alt="Kinrows — kin that rows together" width="200" height="72" /></a>
+      <p class="footer-tag">One calm place for the whole household.</p>
+    </div>
+    <nav class="footer-cols" aria-label="Footer">
+      <div><p class="fc-head">App</p><a href="/#plan">The app</a><a href="/#everything">Everything inside</a><a href="/#assist">Concierge</a></div>
+      <div><p class="fc-head">Explore</p><a href="/compare">Compare</a><a href="/blog/">Blog</a><a href="/#notify">Join the waitlist</a></div>
+      <div><p class="fc-head">Legal</p><a href="/privacy">Privacy Policy</a><a href="/terms">Terms of Use</a></div>
+    </nav>
+  </div>
+  <div class="container footer-bottom">
+    <span>© 2026 Atlas Atlantic. Made for families.</span>
+    <span>iPhone · iOS 18+ · September 2026</span>
+  </div>
+</footer>
+
+<script src="/assets/app.js"></script>
+</body>
+</html>

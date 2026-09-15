@@ -1,0 +1,23 @@
+{
+  "slug": "dup-a",
+  "pageType": "howto",
+  "query": "dup query a",
+  "searchIntent": "informational",
+  "title": "Duplicate title for testing",
+  "description": "First page using a duplicate title, used only to test that the build aborts on duplicates.",
+  "h1": "Duplicate title heading A",
+  "eyebrow": "How-to",
+  "directAnswer": "This fixture exists only to trigger the duplicate-title hard error in the build's quality gates, so its content does not need to be meaningfully different from its sibling fixture beyond the fields the uniqueness check inspects across every generated and hand-written page in the site.",
+  "sections": [
+    { "heading": "Section one", "html": "<p>Placeholder section content for the duplicate-title fixture.</p>" }
+  ],
+  "cta": { "heading": "CTA heading", "body": "CTA body copy.", "label": "Join the waitlist" },
+  "relatedPages": [
+    { "href": "/", "label": "Kinrows home" },
+    { "href": "/blog/", "label": "The Kinrows blog" },
+    { "href": "/how-to/", "label": "How-to guides" }
+  ],
+  "datePublished": "2026-09-01",
+  "lastReviewed": "2026-09-01",
+  "indexStatus": "index"
+}

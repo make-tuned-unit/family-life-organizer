@@ -1,0 +1,4 @@
+[
+  { "url": "/", "file": "index.html", "lastmod": "2026-08-01", "changefreq": "monthly", "priority": "1.0" },
+  { "url": "/blog/", "file": "blog/index.html", "lastmod": "2026-08-01", "changefreq": "weekly", "priority": "0.7" }
+]

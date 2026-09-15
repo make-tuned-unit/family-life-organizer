@@ -1,0 +1,35 @@
+{
+  "slug": "sample-alternative",
+  "pageType": "alternative",
+  "query": "cozi alternative",
+  "searchIntent": "commercial",
+  "title": "The best Cozi alternative for families in 2026",
+  "description": "Looking for a Cozi alternative? Here is an honest look at what Cozi does well and where a newer, all-in-one option fits.",
+  "h1": "The best Cozi alternative for families",
+  "eyebrow": "Alternatives",
+  "directAnswer": "Cozi is a solid free family calendar and list app, but it stops at scheduling and does not cover budgets, trips, or an AI assistant that can act for you. If you want a single private app that also handles money, chores, and travel, Kinrows is the closest all-in-one alternative, launching on iPhone this fall.",
+  "sections": [
+    { "heading": "What Cozi does well", "html": "<p>Cozi is free, simple, and covers the calendar and shopping-list basics most families need first.</p>" }
+  ],
+  "comparisonTable": {
+    "caption": "At a glance",
+    "columns": ["", "Kinrows", "Cozi"],
+    "rows": [
+      ["Calendar", "yes", "yes"],
+      ["Budget & expenses", "yes", "no"]
+    ]
+  },
+  "cta": {
+    "heading": "See the whole household in one app",
+    "body": "Kinrows brings the calendar, lists, budget and chores into one private app.",
+    "label": "Join the waitlist"
+  },
+  "relatedPages": [
+    { "href": "/", "label": "Kinrows home" },
+    { "href": "/blog/", "label": "The Kinrows blog" },
+    { "href": "/how-to/sample-howto", "label": "How to split chores fairly" }
+  ],
+  "datePublished": "2026-09-01",
+  "lastReviewed": "2026-09-01",
+  "indexStatus": "index"
+}

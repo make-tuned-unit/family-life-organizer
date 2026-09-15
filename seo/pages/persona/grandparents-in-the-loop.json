@@ -1,0 +1,55 @@
+{
+  "slug": "grandparents-in-the-loop",
+  "pageType": "persona",
+  "query": "keep grandparents updated on the family",
+  "searchIntent": "informational",
+  "title": "For Keeping Grandparents in the Loop",
+  "description": "Grandparents usually want milestones and photos, not household budgets. Here is why a separate Clan fits better than adding them to your household.",
+  "h1": "For Keeping Grandparents in the Loop",
+  "eyebrow": "For you",
+  "directAnswer": "Grandparents usually don't need, or want, access to a household's budget or private notes — what they actually want is milestones, photos and a few key dates. Adding them to the household itself overshares everything just to share a little; a separate Clan does the opposite, sharing only what you choose while keeping the household's other data untouched. Kinrows' clan model is built around that boundary, rather than an all-or-nothing invite.",
+  "keyTakeaway": "The right question isn't whether to share, it's which group to share it in.",
+  "sections": [
+    {
+      "heading": "Why adding grandparents to the household overshares",
+      "html": "<p>A household in Kinrows holds the sensitive, day-to-day data — budgets, private notes, the full calendar — and adding someone to it gives them the same visibility as anyone else in it. That's the wrong shape for a grandparent who wants to see the kids' milestones and an upcoming visit, not the household's monthly spending or a private note about a doctor's appointment.</p>"
+    },
+    {
+      "heading": "What a clan is instead",
+      "html": "<p>A Clan is a separate, unlimited group joined by invite code, with its own feed. It overlaps with your household only through the members you choose to add to it — a grandparent in the clan sees what's shared into that clan, and nothing from your household that you haven't put there. Each side of an extended family can have its own clan, walled off from the others.</p>"
+    },
+    {
+      "heading": "What's worth sharing (milestones, photos, key dates)",
+      "html": "<p>People profiles hold milestones (\"first steps\"), key dates, and a year-in-review recap — exactly the kind of update a grandparent actually wants, shared into a clan feed where they can see it and react. Gift ideas per person, with purchased/wrapped/given tracking, can also live in a shared clan ahead of a birthday, without spoiling anything for the kids who are also in the household.</p>"
+    },
+    {
+      "heading": "Making it easy for a grandparent who isn't tech-savvy",
+      "html": "<p>Joining a clan still means installing the app and using an invite code — there's no way around that for ongoing access to a shared feed. Where Kinrows removes friction for a less tech-savvy grandparent is narrower: a specific ask, like approving a babysitting or house-coverage window, can be approved through a share link with no app or account needed at all. For everything else — seeing milestones, photos, updates — the clan is the mechanism, and it does still require the app.</p>"
+    }
+  ],
+  "productFit": {
+    "heading": "A separate feed for the people who only need part of the picture",
+    "html": "<p>A Clan gives a grandparent, or any extended-family group, its own invite-code group and feed, sharing only what's posted into it — milestones, key dates, gift ideas, photos — while your household's budget, private notes and full calendar stay where they are. It's a genuinely separate space, not a permission level inside your household, so there's no setting to get wrong that would expose more than intended.</p>",
+    "screenshot": { "src": "website/assets/shots/home.png", "alt": "Kinrows Home screen showing a group feed with milestones and updates" }
+  },
+  "faq": [
+    { "q": "Should grandparents be added to the family household or a separate group?", "a": "A separate group, a Clan, in almost every case. Adding a grandparent to your household gives them the same visibility as any household member, including budget and private notes, which is usually more than they want or need. A clan shares only what's posted into it." },
+    { "q": "What's the easiest way for a grandparent to stay updated without learning a new app?", "a": "Joining a clan to see an ongoing feed does require installing the app and using an invite code, and there's no way around that part. What doesn't require an app is a specific ask, like approving a babysitting or house-coverage window, which can be approved through a share link with no install needed." },
+    { "q": "Can grandparents see budgets or private notes by accident?", "a": "No. A clan overlaps with your household only through the members you add to it, and has no visibility into your household's budget, private notes, or full calendar unless you separately share something into the clan itself. The two are structurally separate groups, not one group with different permission levels." }
+  ],
+  "cta": {
+    "heading": "Share what matters, keep the rest private",
+    "body": "Clans give grandparents their own feed for milestones and updates, no household access required.",
+    "label": "Join the waitlist"
+  },
+  "relatedPages": [
+    { "href": "/how-to/keep-grandparents-in-the-loop-without-sharing-everything", "label": "Sharing Family Updates With Grandparents Without Merging Everything" },
+    { "href": "/for/caregivers-of-ageing-parents", "label": "For Caregivers of Ageing Parents From a Distance" },
+    { "href": "/for/big-families", "label": "For Big Families With Several Kids" }
+  ],
+  "persona": "grandparents in the loop",
+  "problem": "sharing model (clans) for extended-family visibility",
+  "datePublished": "2026-09-15",
+  "lastReviewed": "2026-09-15",
+  "indexStatus": "index"
+}

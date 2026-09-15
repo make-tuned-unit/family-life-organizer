@@ -1,0 +1,35 @@
+{
+  "slug": "kinrows-vs-sample",
+  "pageType": "compare",
+  "query": "kinrows vs sample app",
+  "searchIntent": "commercial",
+  "title": "Kinrows vs Sample: which family app fits?",
+  "description": "A side-by-side look at Kinrows and Sample, so you can pick the right family organizer for your household.",
+  "h1": "Kinrows vs Sample",
+  "eyebrow": "Compare",
+  "directAnswer": "Kinrows and Sample both help families organize their week, but they aim at different problems. Sample focuses on a shared calendar, while Kinrows bundles the calendar with budgets, chores, trips, and an AI Concierge that can act on your behalf, inside one private household app launching on iPhone this fall.",
+  "sections": [
+    { "heading": "Where they differ", "html": "<p>Sample is calendar-first; Kinrows treats the calendar as one part of a wider household hub.</p>" }
+  ],
+  "comparisonTable": {
+    "caption": "At a glance",
+    "columns": ["", "Kinrows", "Sample"],
+    "rows": [
+      ["Calendar", "yes", "yes"],
+      ["AI assistant", "yes", "no"]
+    ]
+  },
+  "cta": {
+    "heading": "See how Kinrows compares",
+    "body": "One private app for the calendar, chores, budget and more.",
+    "label": "Join the waitlist"
+  },
+  "relatedPages": [
+    { "href": "/", "label": "Kinrows home" },
+    { "href": "/blog/", "label": "The Kinrows blog" },
+    { "href": "/alternatives/sample-alternative", "label": "Cozi alternative" }
+  ],
+  "datePublished": "2026-09-01",
+  "lastReviewed": "2026-09-01",
+  "indexStatus": "index"
+}

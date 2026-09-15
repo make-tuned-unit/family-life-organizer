@@ -1,0 +1,28 @@
+{
+  "slug": "sample-persona",
+  "pageType": "persona",
+  "query": "family organizer for blended families",
+  "searchIntent": "informational",
+  "title": "Kinrows for blended families",
+  "description": "How a blended family can keep two households, two calendars and one set of kids organized without duplicate lists.",
+  "h1": "Kinrows for blended families",
+  "eyebrow": "For you",
+  "directAnswer": "Blended families juggle two households, two calendars, and often two sets of rules, which makes a single shared source of truth more useful, not less. Kinrows lets each household keep its own space while sharing the calendar, lists, and updates that matter for the kids across both homes, without either parent losing visibility.",
+  "sections": [
+    { "heading": "One shared calendar, two homes", "html": "<p>Custody schedules, school events and appointments live in one calendar both households can see.</p>" }
+  ],
+  "persona": "blended family",
+  "cta": {
+    "heading": "Keep both households in sync",
+    "body": "Kinrows keeps the calendar and lists visible across every household that needs them.",
+    "label": "Join the waitlist"
+  },
+  "relatedPages": [
+    { "href": "/", "label": "Kinrows home" },
+    { "href": "/blog/", "label": "The Kinrows blog" },
+    { "href": "/questions/", "label": "Questions" }
+  ],
+  "datePublished": "2026-09-01",
+  "lastReviewed": "2026-09-01",
+  "indexStatus": "index"
+}

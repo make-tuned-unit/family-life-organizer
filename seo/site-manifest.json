@@ -1,0 +1,23 @@
+[
+  { "url": "/", "file": "index.html", "lastmod": "2026-08-26", "changefreq": "monthly", "priority": "1.0" },
+  { "url": "/subscribe", "file": "subscribe.html", "lastmod": "2026-08-26", "changefreq": "monthly", "priority": "0.8" },
+  { "url": "/compare", "file": "compare.html", "lastmod": "2026-07-11", "changefreq": "monthly", "priority": "0.8" },
+  { "url": "/best-family-organizer-apps", "file": "best-family-organizer-apps.html", "lastmod": "2026-06-25", "changefreq": "monthly", "priority": "0.8" },
+  { "url": "/best-family-calendar-app", "file": "best-family-calendar-app.html", "lastmod": "2026-06-25", "changefreq": "monthly", "priority": "0.7" },
+  { "url": "/best-chore-app-for-families", "file": "best-chore-app-for-families.html", "lastmod": "2026-06-25", "changefreq": "monthly", "priority": "0.7" },
+  { "url": "/best-shared-shopping-list-app", "file": "best-shared-shopping-list-app.html", "lastmod": "2026-06-25", "changefreq": "monthly", "priority": "0.7" },
+  { "url": "/blog/", "file": "blog/index.html", "lastmod": "2026-06-24", "changefreq": "weekly", "priority": "0.7" },
+  { "url": "/blog/family-calendar-organization", "file": "blog/family-calendar-organization.html", "lastmod": "2026-06-24", "changefreq": "yearly", "priority": "0.6" },
+  { "url": "/blog/how-to-sleep-train-a-baby", "file": "blog/how-to-sleep-train-a-baby.html", "lastmod": "2026-08-08", "changefreq": "yearly", "priority": "0.7" },
+  { "url": "/blog/what-is-emotional-labour", "file": "blog/what-is-emotional-labour.html", "lastmod": "2026-06-25", "changefreq": "yearly", "priority": "0.6" },
+  { "url": "/blog/emotional-labour-vs-mental-load", "file": "blog/emotional-labour-vs-mental-load.html", "lastmod": "2026-06-25", "changefreq": "yearly", "priority": "0.6" },
+  { "url": "/blog/signs-too-much-emotional-labour", "file": "blog/signs-too-much-emotional-labour.html", "lastmod": "2026-06-25", "changefreq": "yearly", "priority": "0.6" },
+  { "url": "/blog/divide-emotional-labour-fairly", "file": "blog/divide-emotional-labour-fairly.html", "lastmod": "2026-06-25", "changefreq": "yearly", "priority": "0.6" },
+  { "url": "/blog/emotional-labour-parenting", "file": "blog/emotional-labour-parenting.html", "lastmod": "2026-06-25", "changefreq": "yearly", "priority": "0.6" },
+  { "url": "/blog/sharing-the-mental-load", "file": "blog/sharing-the-mental-load.html", "lastmod": "2026-06-24", "changefreq": "yearly", "priority": "0.6" },
+  { "url": "/blog/family-budgeting-without-friction", "file": "blog/family-budgeting-without-friction.html", "lastmod": "2026-06-24", "changefreq": "yearly", "priority": "0.6" },
+  { "url": "/developers", "file": "developers.html", "lastmod": "2026-08-30", "changefreq": "monthly", "priority": "0.5" },
+  { "url": "/privacy", "file": "privacy.html", "lastmod": "2026-08-27", "changefreq": "yearly", "priority": "0.3" },
+  { "url": "/terms", "file": "terms.html", "lastmod": "2026-06-24", "changefreq": "yearly", "priority": "0.3" },
+  { "url": "/support", "file": "support.html", "lastmod": "2026-08-27", "changefreq": "yearly", "priority": "0.4" }
+]

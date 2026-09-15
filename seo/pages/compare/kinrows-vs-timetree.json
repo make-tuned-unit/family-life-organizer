@@ -1,0 +1,77 @@
+{
+  "slug": "kinrows-vs-timetree",
+  "pageType": "compare",
+  "query": "Kinrows vs TimeTree",
+  "searchIntent": "commercial",
+  "title": "Kinrows vs TimeTree: Which Should You Choose?",
+  "description": "A plain comparison of Kinrows and TimeTree on price, ads, AI training and calendar sync, to help you choose the right shared calendar or household app.",
+  "h1": "Kinrows vs TimeTree",
+  "eyebrow": "Compare",
+  "directAnswer": "TimeTree is a free, ad-supported shared calendar popular with couples, with per-event chat and a Premium tier ($4.49/month or $44.99/year) that removes ads. Kinrows is a broader, iPhone-only household organizer launching September 2026, where the calendar, lists, budget, pantry, chores and more are free, and the optional Concierge AI states it never trains on your data. Choose TimeTree for the simplest calendar with a partner; choose Kinrows if ads or forced AI features have you looking for something calmer.",
+  "keyTakeaway": "TimeTree is a free, ad-supported couples' calendar with new AI features many users reject; Kinrows is a wider, opt-in-AI household system that states it never trains on your data.",
+  "sections": [
+    {
+      "heading": "What each app actually is",
+      "html": "<p>TimeTree is a free-first shared calendar built for couples and small families, with per-event chat and comments attached to each entry. The free tier carries ads; TimeTree Premium removes them for $4.49 a month or $44.99 a year and adds file attachments, a vertical calendar view, event pinning and dedicated support (timetreeapp.com). In 2026 it added AI features to the app.</p><p>Kinrows is a broader household organizer — calendar, lists, pantry, budget, trips, family polls, chores and allowance, care coverage, notes, messages and an optional AI Concierge that can create, edit and move things across the app on request. It is iPhone-only, free for the whole household's core features, and launches in September 2026.</p>"
+    },
+    {
+      "heading": "TimeTree's genuine strengths, and where it frustrates people",
+      "html": "<p>Long-time TimeTree users, some with four to six years on the app, credit it with real benefits: one five-star reviewer credits the app with improving her relationship and mental health (an App Store reviewer, App Store US).</p><p>The dominant complaint in 2026 is the app's new AI features. Multiple long-time users describe deleting the app over it — one titled a one-star review “Nobody wants AI” (an App Store reviewer, App Store US, 2026-09-04); another reviewer titled a review “AI Ruined the App” and reported that opt-out preferences don't save properly (1 star, App Store US, 2026-08-31). A reviewer reported deleting her account after concluding TimeTree's calendar data trains its AI regardless of any opt-out setting (1 star, “added AI,” App Store US, 2026-08-22) — this is a reviewer's account, and Kinrows could not independently verify it against TimeTree's own published policy, so treat it as a reported concern rather than a confirmed fact.</p><p>Ads are the second recurring complaint: “The ads at the top make the overall calendar hideous. Money hungry app that forces you to pay if you don't want to see ads.” (an App Store reviewer, 1 star, “100% NOT worth it,” App Store US, 2026-07-06). A smaller number of reviewers report losing calendar data outright: “My entire calendar was randomly wiped out one day! I needed those dates stored on the calendar, they were incredibly important medical appointments and legal due dates and correspondence, and I opened the app one day to find TimeTree deleted all of it! Years of important dates…” (an App Store reviewer, 1 star, “Timetree deleted everything!,” App Store US, 2026-07-22).</p>"
+    },
+    {
+      "heading": "Choose TimeTree if…",
+      "html": "<ul><li>You and a partner want the simplest possible shared calendar, with per-event chat, and don't need lists, budget, pantry or chores in the same app.</li><li>You're on Android, or your household mixes Android and iPhone.</li><li>You're comfortable with the app's current AI features, or plan to pay $4.49/month to remove ads and haven't been affected by the sync issues reviewers describe.</li></ul>"
+    },
+    {
+      "heading": "Choose Kinrows if…",
+      "html": "<ul><li>You want the calendar bundled with lists, budget, pantry, chores and family polls instead of a single-purpose scheduling app.</li><li>You want AI in the app to be strictly optional and paid, never switched on by default — the Concierge only runs if a household subscribes.</li><li>Data training is a dealbreaker for you: Kinrows states plainly that it does not train AI models on your content.</li><li>You want a note in chat to lead somewhere structured, not just a comment on a calendar event — Kinrows' Messages and Decisions are separate, structured tools rather than a comment thread on an event, which is a different shape of feature, not a direct replacement for TimeTree's per-event chat.</li></ul>"
+    }
+  ],
+  "comparisonTable": {
+    "caption": "Kinrows vs TimeTree at a glance",
+    "columns": ["", "Kinrows", "TimeTree"],
+    "rows": [
+      ["Price for the whole household", "Free core app; Concierge add-on $4.99–$9.99/mo", "Free; Premium $4.49/mo or $44.99/yr removes ads (timetreeapp.com)"],
+      ["Ads", "no", "yes on free tier (Premium removes them)"],
+      ["Android app", "no", "yes"],
+      ["Two-way sync with your phone's calendar", "yes", "no — own shared calendar; export not offered per reviewers"],
+      ["Shared lists", "yes", "no — calendar only, no dedicated task or shopping list"],
+      ["Chores / allowance tracking", "yes, fixed weekly allowance, non-punitive", "no"],
+      ["Meal planning / pantry", "yes, pantry-aware recipe ideas", "no"],
+      ["AI assistant that takes actions", "yes, Concierge (paid add-on)", "no — recent AI features are opt-out only, per reviewers"],
+      ["Data used to train AI", "no", "reviewers report training regardless of opt-out; unconfirmed against TimeTree's own policy"],
+      ["Hardware required", "no", "no"],
+      ["Maturity / launch status", "pre-launch, opens September 2026", "established, live today"]
+    ]
+  },
+  "productFit": {
+    "heading": "Ask, don't type, to change the plan",
+    "html": "<p>TimeTree comments live on individual calendar events. Kinrows' Concierge works more like asking a person: “move the dentist appointment to Friday,” “start a poll: pizza or tacos,” or “tell Sophie I'll be home late” all become real changes and real messages, spoken or typed, from anywhere in the app. It's an optional, paid layer — the calendar, lists and everything else work fully without it — and every request stays scoped to your own household's data, never used to train a model.</p>",
+    "screenshot": { "src": "website/assets/shots/concierge-ask.png", "alt": "Kinrows Concierge chat completing a task on request" }
+  },
+  "faq": [
+    { "q": "Does TimeTree use my calendar data to train AI?", "a": "Some reviewers say so: one user reported deleting her account after concluding calendar data trains TimeTree's AI regardless of any opt-out setting (an App Store reviewer, App Store US review, 2026-08-22). Kinrows could not independently confirm this against TimeTree's own published policy, so treat it as a user report rather than a verified fact, and check TimeTree's current privacy policy directly before deciding. Kinrows states plainly that it never trains AI models on your content, and its Concierge is opt-in and paid." },
+    { "q": "Is TimeTree or Kinrows better for couples?", "a": "For a couple who only wants a shared calendar with comments on events, TimeTree is a lighter, purpose-built tool, and it's free and available today. Kinrows adds lists, budget, chores and an optional AI Concierge, which becomes more useful once kids, shared finances or extended coordination enter the picture — but it's iPhone-only and launches in September 2026, so it isn't an option for a couple who needs something right now." },
+    { "q": "Which app has ads?", "a": "TimeTree's free tier shows ads; Premium ($4.49/month or $44.99/year) removes them. Multiple reviewers describe the ads as intrusive. Kinrows has no ads at any tier, on the free core app or the paid Concierge add-on." },
+    { "q": "What happened to users' TimeTree calendars?", "a": "A small number of reviewers report TimeTree deleting their calendar data outright, including one who describes losing years of medical and legal dates in what they experienced as a single event (an App Store reviewer, App Store US, 2026-07-22). This reads as a reported reliability issue rather than a documented, ongoing pattern — worth verifying directly with TimeTree if data permanence matters to your household." }
+  ],
+  "cta": {
+    "heading": "Compare before you commit to another calendar",
+    "body": "Join the waitlist to get Kinrows on iPhone from September 2026 — free core app, AI that's always optional.",
+    "label": "Join the waitlist"
+  },
+  "relatedPages": [
+    { "href": "/alternatives/timetree", "label": "TimeTree alternatives" },
+    { "href": "/questions/do-family-calendar-apps-use-my-data-to-train-ai", "label": "Do family calendar apps use my data to train AI?" },
+    { "href": "/how-to/move-off-a-family-calendar-app-that-deleted-your-events", "label": "How to move off a calendar app that deleted your events" }
+  ],
+  "sources": [
+    { "title": "TimeTree pricing and features", "url": "https://timetreeapp.com/intl/en/" },
+    { "title": "TimeTree customer reviews, App Store US", "url": "https://itunes.apple.com/us/rss/customerreviews/id=952578473/sortBy=mostRecent/page=1/json" },
+    { "title": "TimeTree customer reviews, App Store US, page 2", "url": "https://itunes.apple.com/us/rss/customerreviews/id=952578473/sortBy=mostRecent/page=2/json" }
+  ],
+  "competitor": "TimeTree",
+  "datePublished": "2026-09-15",
+  "lastReviewed": "2026-09-15",
+  "indexStatus": "index"
+}

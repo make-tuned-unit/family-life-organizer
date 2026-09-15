@@ -1,0 +1,55 @@
+{
+  "slug": "parents-of-toddlers",
+  "pageType": "persona",
+  "query": "chore chart for toddlers",
+  "searchIntent": "informational",
+  "title": "For Parents of Toddlers",
+  "description": "Chores at 2 to 5 are about habit, not allowance. Here is what age-appropriate looks like at this stage, and why the payout comes later.",
+  "h1": "For Parents of Toddlers",
+  "eyebrow": "For you",
+  "directAnswer": "Chores for a 2-to-5-year-old aren't about earning money — a toddler doesn't have the concept for it yet — they're about building a habit early: putting toys away, helping set the table, brushing teeth without a fight. A tappable morning/evening routine with a small number of simple, age-appropriate tasks works better at this age than an allowance system, which is why Kinrows' age-banded chores program treats 2-3 and 4-5 differently than it treats older kids.",
+  "keyTakeaway": "At this age, the point is the habit, not the payout.",
+  "sections": [
+    {
+      "heading": "What \"chores\" means at 2 to 5 (habit, not income)",
+      "html": "<p>Developmental research on kids' motivation, cited throughout Kinrows' own chores program and drawing on Warneken &amp; Tomasello (2008) and Deci, Koestner &amp; Ryan (1999), generally supports building a habit of contributing early, before attaching money to it — a toddler helping because it's part of the routine, not because a reward is waiting. The chore itself matters less than the fact that it's small, consistent, and doable without much help.</p>"
+    },
+    {
+      "heading": "Age-appropriate tasks for this stage",
+      "html": "<p>Kinrows' chores program is built in age bands (2-3, 4-5, 6-8, 9-12, 13+), each with suggested chores appropriate to that stage and guidance on how to run them. For a toddler, that means tasks like putting toys in a bin, carrying their own plate to the sink, or helping pick out clothes — small enough to finish without frustration, tracked on a tappable morning/evening grid that's also checkable from the Home screen.</p>"
+    },
+    {
+      "heading": "Why allowance usually starts later",
+      "html": "<p>A fixed weekly allowance works best once a child has some grasp of money as a concept, which is generally later than the toddler years — Kinrows' program builds allowance guidance in from the 6-8 band onward, with the youngest bands focused on the habit itself. Attaching a payout to a task a toddler doesn't fully understand tends to confuse the point rather than reinforce it.</p>"
+    },
+    {
+      "heading": "Keeping it non-punitive at this age",
+      "html": "<p>Kinrows' chores design never docks the fixed allowance for a missed chore at any age, and that matters even more with a toddler, who is going to skip, forget, or refuse tasks regularly as a normal part of being two to five. A non-punitive streak and a nudge that waits for both a birthday and a steady record before suggesting the next chore keep the system from turning into a source of daily conflict.</p>"
+    }
+  ],
+  "productFit": {
+    "heading": "A routine grid built for the habit-building years",
+    "html": "<p>The chores feature gives each child one routine with a tappable morning/evening week grid, also checkable from the Home screen, so a toddler's small tasks are visible and satisfying to mark off without needing to understand money yet. The age-by-age program, starting at 2-3, suggests tasks appropriate to the stage, and a nudge waits for both a birthday and a steady record before suggesting the next chore, so the system grows with the child rather than staying static.</p>",
+    "screenshot": { "src": "website/assets/shots/tasks.png", "alt": "Kinrows Chores screen showing a tappable weekly routine grid" }
+  },
+  "faq": [
+    { "q": "What chores are appropriate for a toddler?", "a": "Small, concrete tasks that don't require much help to finish: putting toys in a bin, carrying a plate to the sink, helping pick out clothes. The point at 2 to 5 is building the habit of contributing, not the specific task, so keep it simple and consistent rather than expanding the list." },
+    { "q": "Should a 3-year-old get an allowance?", "a": "Generally not yet. Most guidance, including the age-banded approach in Kinrows' own chores program, treats the toddler years as habit-building rather than income, with allowance guidance starting later, around age 6-8. A toddler's chores work better tied to routine than to money at this stage." },
+    { "q": "How do I make a chore chart a toddler will actually use?", "a": "Keep the list short, make it tappable rather than requiring writing or checking off on paper, and make it visible in a place the household already looks — Kinrows' chores grid is also checkable right from the Home screen. Consistency matters more than variety at this age." }
+  ],
+  "cta": {
+    "heading": "Start the habit, not the payout",
+    "body": "An age-banded chores program that begins at 2-3 with habit-building, not allowance.",
+    "label": "Join the waitlist"
+  },
+  "relatedPages": [
+    { "href": "/how-to/decide-whether-to-tie-allowance-to-chores", "label": "Should Allowance Be Tied to Chores?" },
+    { "href": "/for/parents-of-teens", "label": "For Parents of Teens" },
+    { "href": "/best-chore-app-for-families", "label": "Best Chore App for Families" }
+  ],
+  "persona": "parents of toddlers",
+  "problem": "age-appropriate chores 2-5, habit not income",
+  "datePublished": "2026-09-15",
+  "lastReviewed": "2026-09-15",
+  "indexStatus": "index"
+}

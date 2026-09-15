@@ -439,35 +439,132 @@ const WEBSITE_CSP = [
 
 // Handler to inject analytics snippet into website HTML files.
 // express.static uses sendFile, not send/write/end, so we need explicit routes.
-function serveWebsiteHtml(filePath) {
-  return (req, res) => {
-    const fullPath = path.join(__dirname, 'website', filePath);
-    fs.readFile(fullPath, 'utf8', (err, html) => {
-      if (err) {
-        // File not found or read error
-        return res.status(404).send('Not found');
-      }
-      
-      // Set CSP header
-      res.set('Content-Security-Policy', WEBSITE_CSP);
-      
-      // The collect path MUST appear in the HTML itself — Permagent's install
-      // verifier greps the document, not /analytics.js. Keep this as a safety
-      // net for any page that was not committed with the snippet.
-      if (!html.includes('/api/permagent-analytics/collect') && html.includes('</head>')) {
-        html = html.replace('</head>',
-          `<script>window.permagentCollectUrl='/api/permagent-analytics/collect';</script>\n` +
-          `<script src="/analytics.js" defer></script>\n</head>`);
-      } else if (!html.includes('analytics.js') && html.includes('</head>')) {
-        html = html.replace('</head>', `<script src="/analytics.js" defer></script>\n</head>`);
-      }
-      
-      // Set correct content type and send
-      res.set('Content-Type', 'text/html; charset=utf-8');
-      res.send(html);
-    });
-  };
+function sendWebsiteHtml(fullPath, res) {
+  fs.readFile(fullPath, 'utf8', (err, html) => {
+    if (err) {
+      // File not found or read error
+      return res.status(404).send('Not found');
+    }
+
+    // Set CSP header
+    res.set('Content-Security-Policy', WEBSITE_CSP);
+
+    // The collect path MUST appear in the HTML itself — Permagent's install
+    // verifier greps the document, not /analytics.js. Keep this as a safety
+    // net for any page that was not committed with the snippet.
+    if (!html.includes('/api/permagent-analytics/collect') && html.includes('</head>')) {
+      html = html.replace('</head>',
+        `<script>window.permagentCollectUrl='/api/permagent-analytics/collect';</script>\n` +
+        `<script src="/analytics.js" defer></script>\n</head>`);
+    } else if (!html.includes('analytics.js') && html.includes('</head>')) {
+      html = html.replace('</head>', `<script src="/analytics.js" defer></script>\n</head>`);
+    }
+
+    // Set correct content type and send
+    res.set('Content-Type', 'text/html; charset=utf-8');
+    res.send(html);
+  });
 }
+function serveWebsiteHtml(filePath) {
+  return (req, res) => sendWebsiteHtml(path.join(__dirname, 'website', filePath), res);
+}
+
+// ── Clean marketing URLs ────────────────────────────────────────────────────
+// One generic resolver replaces the old per-page app.get pairs. It serves any
+// `.html` file under website/ (root, blog/, and the SEO hub directories the
+// build engine emits — how-to/, alternatives/, compare/, for/, questions/)
+// at its extensionless, root-absolute path, and 301s legacy `.html` URLs to
+// the clean form so old links/bookmarks/search results still resolve.
+const WEBSITE_DIR = path.join(__dirname, 'website');
+function scanWebsiteHtmlFiles() {
+  const set = new Set();
+  (function walk(dir, rel) {
+    let entries;
+    try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
+    for (const entry of entries) {
+      if (entry.name.startsWith('.')) continue; // skip .well-known and dotfiles
+      const relPath = rel ? `${rel}/${entry.name}` : entry.name;
+      if (entry.isDirectory()) {
+        walk(path.join(dir, entry.name), relPath);
+      } else if (entry.isFile() && entry.name.toLowerCase().endsWith('.html')) {
+        set.add(relPath);
+      }
+    }
+  })(WEBSITE_DIR, '');
+  return set;
+}
+let websiteHtmlFiles = scanWebsiteHtmlFiles();
+
+// Paths owned by other route groups — the resolver must never shadow them.
+const CLEAN_URL_SHADOW_PREFIXES = ['/api', '/v1', '/c', '/app', '/login'];
+function isShadowedWebsitePath(p) {
+  return CLEAN_URL_SHADOW_PREFIXES.some(prefix => p === prefix || p.startsWith(`${prefix}/`));
+}
+
+// Reject path traversal (literal `..` or percent-encoded `/`/`\`) outright —
+// checked against the raw, still-encoded URL, not the decoded req.path.
+function hasPathTraversal(rawUrl) {
+  const pathname = String(rawUrl || '').split('?')[0];
+  if (pathname.includes('..')) return true;
+  if (/%2e%2e/i.test(pathname)) return true;
+  if (/%2f|%5c/i.test(pathname)) return true;
+  return false;
+}
+
+function queryStringOf(req) {
+  const idx = req.url.indexOf('?');
+  return idx === -1 ? '' : req.url.slice(idx);
+}
+
+// Legacy `.html` URLs (including old blog posts) → 301 to the clean URL.
+// `/index.html` → `/`, `/blog/index.html` → `/blog/`, query string preserved.
+app.get(/^\/[a-z0-9][a-z0-9/_-]*\.html$/, (req, res, next) => {
+  if (hasPathTraversal(req.originalUrl)) return res.status(404).send('Not found');
+  const p = req.path;
+  if (isShadowedWebsitePath(p)) return next();
+  let rel = p.slice(1); // strip leading slash, e.g. "blog/index.html"
+  if (!websiteHtmlFiles.has(rel) && process.env.NODE_ENV !== 'production') {
+    websiteHtmlFiles = scanWebsiteHtmlFiles();
+  }
+  if (!websiteHtmlFiles.has(rel)) return next();
+  const withoutExt = rel.slice(0, -'.html'.length);
+  let target;
+  if (withoutExt === 'index') target = '/';
+  else if (withoutExt.endsWith('/index')) target = `/${withoutExt.slice(0, -'index'.length)}`;
+  else target = `/${withoutExt}`;
+  return res.redirect(301, target + queryStringOf(req));
+});
+
+// Clean, extensionless marketing URLs.
+app.get(/^\/[a-z0-9][a-z0-9/_-]*$/, (req, res, next) => {
+  if (hasPathTraversal(req.originalUrl)) return res.status(404).send('Not found');
+  const p = req.path;
+  if (isShadowedWebsitePath(p)) return next();
+  const trailingSlash = p.endsWith('/');
+  const clean = p.slice(1);
+
+  const lookup = () => {
+    if (trailingSlash) {
+      const idx = `${clean}index.html`;
+      if (websiteHtmlFiles.has(idx)) return { type: 'html', rel: idx };
+      return null;
+    }
+    const htmlRel = `${clean}.html`;
+    if (websiteHtmlFiles.has(htmlRel)) return { type: 'html', rel: htmlRel };
+    const dirIdx = `${clean}/index.html`;
+    if (websiteHtmlFiles.has(dirIdx)) return { type: 'redirect' };
+    return null;
+  };
+
+  let result = lookup();
+  if (!result && process.env.NODE_ENV !== 'production') {
+    websiteHtmlFiles = scanWebsiteHtmlFiles();
+    result = lookup();
+  }
+  if (!result) return next();
+  if (result.type === 'redirect') return res.redirect(301, `${p}/${queryStringOf(req)}`);
+  return sendWebsiteHtml(path.join(WEBSITE_DIR, result.rel), res);
+});
 
 // Explicit routes for website HTML files (must come BEFORE express.static)
 // Apple Pay domain verification (Payment Request / Checkout wallets).
@@ -504,18 +601,8 @@ app.get('/apple-app-site-association', sendAppleAppSiteAssociation);
 
 app.get('/', serveWebsiteHtml('index.html'));
 app.get('/about', serveWebsiteHtml('index.html')); // /about also serves index.html for SPA routing
-app.get('/privacy', serveWebsiteHtml('privacy.html'));
-app.get('/privacy.html', serveWebsiteHtml('privacy.html'));
-app.get('/terms', serveWebsiteHtml('terms.html'));
-app.get('/terms.html', serveWebsiteHtml('terms.html'));
-app.get('/support', serveWebsiteHtml('support.html'));
-app.get('/support.html', serveWebsiteHtml('support.html'));
-app.get('/developers', serveWebsiteHtml('developers.html'));
-app.get('/developers.html', serveWebsiteHtml('developers.html'));
-app.get('/compare', serveWebsiteHtml('compare.html'));
-app.get('/compare.html', serveWebsiteHtml('compare.html'));
-app.get('/subscribe', serveWebsiteHtml('subscribe.html'));
-app.get('/subscribe.html', serveWebsiteHtml('subscribe.html'));
+// /privacy, /terms, /support, /developers, /compare, /subscribe and their
+// legacy .html forms are now handled by the generic clean-URL resolver above.
 
 // Public bounce pages after Stripe Checkout when the purchase started in the
 // iPhone app. Safari does not share the app cookie jar, so these must NOT
@@ -596,14 +683,9 @@ app.get('/open/subscribe-canceled', (req, res) => {
   permagent.trackSale(null, 'sale_return_canceled', { via: 'app' }, { path: '/open/subscribe-canceled', req });
 });
 
-app.get('/best-chore-app-for-families', serveWebsiteHtml('best-chore-app-for-families.html'));
-app.get('/best-chore-app-for-families.html', serveWebsiteHtml('best-chore-app-for-families.html'));
-app.get('/best-family-calendar-app', serveWebsiteHtml('best-family-calendar-app.html'));
-app.get('/best-family-calendar-app.html', serveWebsiteHtml('best-family-calendar-app.html'));
-app.get('/best-family-organizer-apps', serveWebsiteHtml('best-family-organizer-apps.html'));
-app.get('/best-family-organizer-apps.html', serveWebsiteHtml('best-family-organizer-apps.html'));
-app.get('/best-shared-shopping-list-app', serveWebsiteHtml('best-shared-shopping-list-app.html'));
-app.get('/best-shared-shopping-list-app.html', serveWebsiteHtml('best-shared-shopping-list-app.html'));
+// /best-*, blog posts, and the SEO hub pages (how-to/, alternatives/,
+// compare/, for/, questions/) are all handled by the generic clean-URL
+// resolver above — no per-page route needed.
 
 // Public static assets (CSS, JS, images, etc.) — serve after HTML routes
 // so /analytics.js and /assets/* are still available from express.static
@@ -1650,16 +1732,35 @@ app.post('/api/waitlist', waitlistLimiter, async (req, res) => {
     }
 
     const refInput = typeof req.body?.ref === 'string' ? req.body.ref.trim().slice(0, 20) : null;
+    const source = typeof req.body?.source === 'string' ? req.body.source.slice(0, 80) : 'site';
+    // Landing page attribution (from analytics.js's window.permagent.landing()):
+    // a root-relative path only — never a query string or a full URL.
+    const landingInput = typeof req.body?.landing === 'string' ? req.body.landing.slice(0, 200) : null;
+    const landing = landingInput && landingInput.startsWith('/') && !landingInput.includes('?')
+      ? landingInput
+      : null;
     const { created, total, ref_code, position, referrals } = await db.addWaitlistEntry({
       email: raw,
-      source: typeof req.body?.source === 'string' ? req.body.source.slice(0, 80) : 'site',
+      source,
       referrer: (req.get('referer') || '').slice(0, 300) || null,
       user_agent: (req.get('user-agent') || '').slice(0, 300) || null,
       ref: /^[a-f0-9]{6,20}$/.test(refInput || '') ? refInput : null,
+      landing_path: landing,
     });
 
     // Respond immediately; email send is best-effort and must not block/fail the signup.
     res.json({ success: true, already: !created, ref_code, position, referrals, total });
+
+    // Server-side conversion event — never includes the email.
+    const country = req.get('cf-ipcountry') || req.get('x-vercel-ip-country')
+      || req.get('cloudfront-viewer-country') || req.get('x-country-code') || null;
+    await permagent.track(db, {
+      name: 'waitlist_signup',
+      path: landing || '/',
+      properties: { source, landing, created },
+      isBot: permagent.isBotUserAgent(req.get('user-agent')),
+      country: country ? String(country).slice(0, 8) : null,
+    });
 
     if (created && email.isEmailEnabled()) {
       try {
@@ -8512,6 +8613,19 @@ app.get('/api/permagent-analytics/drain', async (req, res) => {
 
 // 404 for unmatched API routes (avoids falling through to static/HTML).
 app.use('/api', (req, res) => res.status(404).json({ error: 'Not found' }));
+
+// Branded 404 for everything else — the very last route. Runs only after
+// every API route, the authenticated /app and /login routes, and the
+// clean-URL/marketing resolvers above have all had a chance to match.
+// Non-HTML requests (fetch/XHR with an explicit non-HTML Accept, tooling,
+// etc.) get a plain 404 instead of the marketing page.
+app.use((req, res, next) => {
+  if (req.method !== 'GET' && req.method !== 'HEAD') return next();
+  if (req.path.startsWith('/api') || req.path.startsWith('/v1')) return next();
+  if (!req.accepts('html')) return next();
+  res.status(404);
+  sendWebsiteHtml(path.join(WEBSITE_DIR, '404.html'), res);
+});
 
 // Centralized error handler — last line of defense. Express 5 forwards rejected
 // async handlers here. Logs server-side, returns an opaque message to clients.

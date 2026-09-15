@@ -1,0 +1,30 @@
+{
+  "slug": "sample-question",
+  "pageType": "question",
+  "query": "is kinrows free",
+  "searchIntent": "informational",
+  "title": "Is Kinrows free to use?",
+  "description": "Whether Kinrows is free, what the AI Concierge add-on costs, and what you get without paying anything.",
+  "h1": "Is Kinrows free to use?",
+  "eyebrow": "Questions",
+  "directAnswer": "Yes — the core Kinrows app is free on iPhone, covering the shared calendar, lists, budget, chores, trips and family feed for the whole household with no ads. The AI Concierge that can take actions for you in plain words is a paid add-on on top of the free app, not a requirement to use it.",
+  "sections": [
+    { "heading": "What is free", "html": "<p>The calendar, lists, chores, budget, trips and family feed are all included at no cost.</p>" }
+  ],
+  "faq": [
+    { "q": "Does the free plan have ads?", "a": "No. Kinrows does not run ads or sell data on the free plan or the paid Concierge add-on." }
+  ],
+  "cta": {
+    "heading": "Try Kinrows free on iPhone",
+    "body": "The core app is free, with the AI Concierge as an optional add-on.",
+    "label": "Join the waitlist"
+  },
+  "relatedPages": [
+    { "href": "/", "label": "Kinrows home" },
+    { "href": "/blog/", "label": "The Kinrows blog" },
+    { "href": "/how-to/sample-howto", "label": "How to split chores fairly" }
+  ],
+  "datePublished": "2026-09-01",
+  "lastReviewed": "2026-09-01",
+  "indexStatus": "index"
+}

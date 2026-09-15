@@ -1,0 +1,77 @@
+{
+  "slug": "kinrows-vs-cozi",
+  "pageType": "compare",
+  "query": "Kinrows vs Cozi",
+  "searchIntent": "commercial",
+  "title": "Kinrows vs Cozi: Which Should You Choose?",
+  "description": "An honest side-by-side of Kinrows and Cozi on price, ads, chores, pantry and AI, so you can pick the right family organizer for your household.",
+  "h1": "Kinrows vs Cozi",
+  "eyebrow": "Compare",
+  "directAnswer": "Cozi is the long-established free family calendar and list app, with an optional Cozi Gold tier ($39 a year) that removes ads and adds search, reminders and a birthday tracker. Kinrows is a newer household organizer launching on iPhone in September 2026, whose entire core — calendar, lists, pantry, budget, chores and more — stays free, with only an optional AI Concierge as a paid add-on that never trains on your data. Choose Cozi for its track record; choose Kinrows for a wider free feature set.",
+  "keyTakeaway": "Cozi is the established free calendar; Kinrows is a newer, wider free household system with an optional AI layer that states it never trains on your data.",
+  "sections": [
+    {
+      "heading": "What each app actually is",
+      "html": "<p>Cozi (“Cozi Family Organizer”) is the best-known free family calendar and list app, built around a shared calendar with per-person colour coding, grocery and to-do lists, a meal planner and recipe box. It has been available for years, and many reviewers describe using it for a decade or more. The core app is free; an optional Cozi Gold tier costs $39 a year and removes ads while adding a month view on mobile, calendar search, up to three reminders per event, change notifications, a birthday tracker and a shopping mode (cozi.com).</p><p>Kinrows is a broader household organizer: a shared calendar, lists, pantry tracking, budget and receipts, pantry-aware recipe ideas, trips, family polls, chores and allowance, care coverage requests, notes, messages and an optional AI Concierge that can create, edit and move things across the app on request. It is iPhone-only (iOS 18+), free for the whole household, and launches in September 2026 — it is not available today.</p>"
+    },
+    {
+      "heading": "Cozi's genuine strengths, and where it frustrates people",
+      "html": "<p>Cozi's core appeal is longevity and simplicity: a calendar and grocery list a whole family, including a grandparent helping with pickups, can learn once and keep using for years. Several long-time reviewers describe relying on it daily for a decade or longer.</p><p>The recurring complaint is that the free tier feels limited once a household leans on it. One reviewer titled a review “Requires $80/yr subscription to use” and wrote: “I was really disappointed with this app. Even after paying for the…” (an App Store reviewer, 2 stars, App Store US, 2026-08-24). Another wrote plainly: “Charges you to plan 30 days in advance” (an App Store reviewer, 1 star, “Bad,” App Store US, 2026-08-16). A long-tenure user summed up the fatigue: “I have used this app for probably 10 years. But they only changes…” (an App Store reviewer, 2 stars, “Used to be great,” App Store US, 2026-07-31).</p>"
+    },
+    {
+      "heading": "Choose Cozi if…",
+      "html": "<ul><li>You want the most established, widely used free family calendar, with a genuine decade-plus track record that a new app launching in 2026 cannot match.</li><li>Your household mixes iPhone and Android — Cozi works on both; Kinrows is iPhone-only.</li><li>A calendar plus grocery and to-do lists covers what you need, and you don't need budgeting, pantry tracking, chores and allowance, or an AI assistant in the same app.</li><li>You're comfortable with ads on the free tier, or paying $39 a year for Cozi Gold to remove them.</li></ul>"
+    },
+    {
+      "heading": "Choose Kinrows if…",
+      "html": "<ul><li>You want the calendar, lists, pantry, budget, chores and allowance, trips, family polls and messaging together, free, rather than paying to unlock pieces of a calendar app.</li><li>You want an app with no ads at any tier, not only after paying for a Gold subscription.</li><li>You want the option — never required — of an AI Concierge that can actually move a task, edit a list or log an expense for you, and that states it does not train on your household's data.</li><li>You're an iPhone household and can wait for a September 2026 launch rather than needing something today.</li></ul>"
+    }
+  ],
+  "comparisonTable": {
+    "caption": "Kinrows vs Cozi at a glance",
+    "columns": ["", "Kinrows", "Cozi"],
+    "rows": [
+      ["Price for the whole household", "Free core app; Concierge add-on $4.99–$9.99/mo", "Free core; Cozi Gold $39/yr (cozi.com)"],
+      ["Ads", "no", "yes on free tier (Gold removes them)"],
+      ["Android app", "no", "yes"],
+      ["Two-way sync with your phone's calendar", "yes", "no — own shared calendar, not synced from device"],
+      ["Shared lists", "yes", "yes"],
+      ["Chores / allowance tracking", "yes, fixed weekly allowance, non-punitive", "no"],
+      ["Meal planning / pantry", "yes, pantry-aware recipe ideas", "recipe box and meal planner; no pantry tracking"],
+      ["AI assistant that takes actions", "yes, Concierge (paid add-on)", "no"],
+      ["Data used to train AI", "no", "not publicly stated"],
+      ["Hardware required", "no", "no"],
+      ["Maturity / launch status", "pre-launch, opens September 2026", "long-established, live today"]
+    ]
+  },
+  "productFit": {
+    "heading": "One dashboard instead of one more app to check",
+    "html": "<p>Cozi's home screen is a calendar and list view. Kinrows' Home screen is a family dashboard: a personal greeting, a presence row showing who's where, an “up next” strip you can tick off in one tap, “on this day” family memories, and a shared feed for the small stuff that would otherwise live only in a group chat. It's built to be the one place a household actually opens each morning, not a fourth tab in an already-busy phone.</p>",
+    "screenshot": { "src": "website/assets/shots/home.png", "alt": "Kinrows Home dashboard showing family presence, up-next tasks and a shared feed" }
+  },
+  "faq": [
+    { "q": "Is Cozi or Kinrows better for families?", "a": "It depends on what the household needs. Cozi is a simple, proven shared calendar and grocery list that works on iPhone and Android and has a long track record. Kinrows adds budget, pantry, chores and allowance, trips and an optional AI Concierge in one free core app, but it is iPhone-only and doesn't launch until September 2026. Families who mainly need a calendar, or who have Android users, tend to be better served by Cozi today." },
+    { "q": "Is Cozi Gold worth it compared to Kinrows' free tier?", "a": "Cozi Gold costs $39 a year and mainly removes ads while adding a month view, search, extra reminders and a birthday tracker (cozi.com). Kinrows' calendar, lists, budget, pantry and chores features are all part of its free core app; only the optional AI Concierge costs money. The two free tiers aren't a fair comparison, since Kinrows' free tier already includes more — but if ad removal and those small conveniences are all you want, Cozi Gold is the cheaper way to get them." },
+    { "q": "Does either app show ads?", "a": "Cozi's free tier shows ads; Cozi Gold ($39/year) removes them (cozi.com). Kinrows has no ads at any tier — its stated policy is no ads and no data sale across the entire free core app." },
+    { "q": "Which app is more established?", "a": "Cozi, without question. It has been available for years, and multiple long-time reviewers describe using it for a decade or more. Kinrows is pre-launch, opening on iPhone in September 2026, so it has no usage history yet to compare." }
+  ],
+  "cta": {
+    "heading": "See whether Kinrows fits your household",
+    "body": "Join the waitlist to get Kinrows the day it launches on iPhone, free for the whole household.",
+    "label": "Join the waitlist"
+  },
+  "relatedPages": [
+    { "href": "/alternatives/cozi", "label": "Cozi alternatives" },
+    { "href": "/questions/is-cozi-gold-worth-it", "label": "Is Cozi Gold worth it?" },
+    { "href": "/compare", "label": "Compare Kinrows to other family organizer apps" },
+    { "href": "/best-family-organizer-apps", "label": "Best family organizer apps" }
+  ],
+  "sources": [
+    { "title": "Cozi Gold pricing", "url": "https://www.cozi.com/cozi-gold/" },
+    { "title": "Cozi customer reviews, App Store US", "url": "https://itunes.apple.com/us/rss/customerreviews/id=407108860/sortBy=mostRecent/page=1/json" }
+  ],
+  "competitor": "Cozi",
+  "datePublished": "2026-09-15",
+  "lastReviewed": "2026-09-15",
+  "indexStatus": "index"
+}

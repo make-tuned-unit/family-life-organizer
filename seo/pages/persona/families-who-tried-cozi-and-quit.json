@@ -1,0 +1,59 @@
+{
+  "slug": "families-who-tried-cozi-and-quit",
+  "pageType": "persona",
+  "query": "quit Cozi, what to use instead",
+  "searchIntent": "switching",
+  "title": "For Families Who Tried Cozi and Quit",
+  "description": "If you left Cozi over a paywall or a broken login, here is what actually changed, what Kinrows keeps free for good, and how to move your calendar over.",
+  "h1": "For Families Who Tried Cozi and Quit",
+  "eyebrow": "For you",
+  "directAnswer": "People who quit Cozi usually left over one of two things: a subscription that crept onto features that used to feel free, or a widget or login that stopped working reliably. One longtime reviewer wrote, \"I have used this app for probably 10 years,\" before describing the changes that finally pushed them out; another said the app now \"requires an $80/yr subscription to use.\" The honest question after that isn't which app has more features — it's which one is free for good. Kinrows keeps the whole household core free; only the optional Concierge add-on is paid.",
+  "keyTakeaway": "Free forever is a specific, checkable claim, not a marketing line.",
+  "sections": [
+    {
+      "heading": "Why people quit Cozi, in their own words",
+      "html": "<p>The complaints that show up most often in Cozi's own App Store reviews aren't about missing features — they're about things that used to work suddenly costing money or not working at all. A 2-star reviewer wrote: \"I was really disappointed with this app. Even after paying for the Gold subscription at $30/yr, most features were still locked and only available at the $80/yr subscription\" (an App Store reviewer, \"Requires $80/yr subscription to use,\" App Store, 2026-08-24). Another described being limited to a 30-day view unless they paid: \"Charges you to plan 30 days in advance\" (an App Store reviewer, App Store, 2026-08-16).</p><p>Longtime users describe a slower kind of frustration — not one dealbreaker, but a sense the product they trusted for years quietly changed shape. \"I have used this app for probably 10 years. But they only changes...\" (an App Store reviewer, App Store, 2026-07-31). Another put it more bluntly: \"It seems like all the update are pushing more AI into this app and...\" (an App Store reviewer, App Store, 2026-09-11).</p>"
+    },
+    {
+      "heading": "What \"free forever\" means at Kinrows, specifically",
+      "html": "<p>The core app — calendar, lists, pantry, budget, cook, trips, decisions, rivalries, people and gifts, routines, chores, care coverage, notes, messages, and the family feed — is free for the whole household, with no ads and no time-limited views. There's nothing in it that switches to a paywall once you've gotten used to it.</p><p>The only paid layer is the Concierge, an optional AI add-on: Lite at $4.99/month (or $49.99/year) with up to 10 chats a day, or Premium at $9.99/month (or $99.99/year) with up to 40 chats a day. One subscription covers the whole household, and if you never subscribe, the rest of the app works exactly the same.</p>"
+    },
+    {
+      "heading": "Bringing your calendar and lists back over",
+      "html": "<p>You don't have to retype years of events by hand. Kinrows syncs two-way with your phone's own calendar, so anything already on your iPhone — including whatever Cozi wrote there — shows up without re-entry. Lists move over the same way: create a new list, add what's still current, and let automatic grocery categorization sort it as you go.</p><p>Start with the calendar and one or two lists rather than migrating everything on day one. The goal is getting the household looking at one shared place again, not perfectly replicating years of Cozi history.</p>"
+    },
+    {
+      "heading": "What Cozi still does well, for households it still fits",
+      "html": "<p>It's fair to say Cozi earned its long tenure. Multiple reviewers describe using it for six, eight, ten years, and it remains one of the simplest, most recognizable shared calendars for parents of school-age kids. If the 30-day view limit and occasional login trouble don't bother your household, and you're not looking for anything beyond a calendar and lists, there's no urgent reason to leave.</p><p>Where the frustration tends to build is when a household outgrows that basic scope — wanting budget tracking, chores, or care coordination in the same place — and finds each of those gated behind Cozi Gold or missing entirely.</p>"
+    }
+  ],
+  "productFit": {
+    "heading": "One free place for what Cozi split across a paywall",
+    "html": "<p>Kinrows keeps the shared calendar, lists, chores and budget — the kinds of things a Cozi Gold subscription partly unlocks — inside the same free household app, so there's no second decision about whether a feature is worth paying for. The calendar syncs both ways with your phone's own calendar, and lists carry over item by item as you re-enter them, so switching doesn't mean starting a household from a blank page.</p>",
+    "screenshot": { "src": "website/assets/shots/home.png", "alt": "Kinrows Home screen showing the shared family feed and up-next tasks" }
+  },
+  "faq": [
+    { "q": "Why do people quit Cozi?", "a": "The two most common reasons in Cozi's own App Store reviews are a subscription that gates features that used to feel free, like planning more than 30 days ahead, and technical issues such as widgets showing signed-out or logins failing. A smaller group describes general feature erosion after years of loyalty, including unwanted AI additions." },
+    { "q": "Is Kinrows really free, or does it paywall things later?", "a": "The core household app — calendar, lists, pantry, budget, chores, care coverage, trips and more — is free with no ads and stays that way. Only the optional Concierge AI add-on is paid, and it's a separate subscription rather than a feature unlock hidden inside the free app." },
+    { "q": "How do I move my Cozi calendar and lists to a new app?", "a": "Two-way sync with your phone's own calendar brings over anything already saved there without manual re-entry. Lists don't transfer automatically between apps, so recreate the ones you still use in Kinrows and let automatic grocery categorization organize them as you add items — most households find it faster to start with what's current than to import everything." }
+  ],
+  "cta": {
+    "heading": "Leave the paywall behind",
+    "body": "Kinrows keeps calendar, lists, chores and budget free for the whole household, with no 30-day limit and no Gold tier.",
+    "label": "Join the waitlist"
+  },
+  "relatedPages": [
+    { "href": "/alternatives/cozi", "label": "Best Cozi Alternatives (2026)" },
+    { "href": "/compare/kinrows-vs-cozi", "label": "Kinrows vs Cozi: Which Should You Choose?" },
+    { "href": "/questions/is-cozi-gold-worth-it", "label": "Is Cozi Gold Worth It?" },
+    { "href": "/best-family-organizer-apps", "label": "Best Family Organizer Apps" }
+  ],
+  "sources": [
+    { "title": "Cozi Family Organizer — App Store customer reviews (US)", "url": "https://itunes.apple.com/us/rss/customerreviews/id=407108860/sortBy=mostRecent/page=1/json" }
+  ],
+  "persona": "families who quit Cozi",
+  "problem": "Cozi paywall creep and technical erosion",
+  "datePublished": "2026-09-15",
+  "lastReviewed": "2026-09-15",
+  "indexStatus": "index"
+}

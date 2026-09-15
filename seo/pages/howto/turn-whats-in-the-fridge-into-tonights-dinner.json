@@ -1,0 +1,53 @@
+{
+  "slug": "turn-whats-in-the-fridge-into-tonights-dinner",
+  "pageType": "howto",
+  "query": "what can I make with what I have",
+  "searchIntent": "transactional",
+  "title": "Turning What's in the Fridge Into Tonight's Dinner",
+  "description": "Skip browsing recipes and hoping the ingredients match. Start from what's actually in the fridge and pantry, and work forward from there.",
+  "h1": "How to turn what's in the fridge into tonight's dinner",
+  "eyebrow": "How-to",
+  "directAnswer": "The fastest way to decide what's for dinner is to start from what's already in the fridge and pantry, rather than browsing recipes first and hoping the ingredients happen to match what you have. List what's on hand, especially anything close to its expiry date, then search or think in terms of that inventory rather than a specific dish name. Decide what you're actually missing before you shop, so a recipe idea doesn't turn into an unplanned grocery run.",
+  "keyTakeaway": "Start from your inventory, not from a recipe you haven't checked against it.",
+  "sections": [
+    {
+      "heading": "Why recipe search is the wrong starting point",
+      "html": "<p>Searching \"easy dinner recipes\" or browsing a recipe site puts the ingredient list last, after you've already committed to a dish emotionally. That's backwards for a weeknight: you end up either making a store run for two or three missing items, or abandoning the recipe and defaulting to something familiar anyway. Starting from what's already in the house — then deciding what to cook — skips the mismatch entirely, because the ingredients were never a variable to check against; they were the starting point.</p>"
+    },
+    {
+      "heading": "Cooking from inventory instead of a recipe",
+      "html": "<p>In practice this means keeping a rough sense of what's in the pantry, fridge, and freezer, and thinking in terms of what combinations are possible rather than a specific dish name. A useful habit is a quick mental (or written) inventory before you decide anything: what proteins are on hand, what vegetables need using soon, what starches or staples are always there. From there, a dish suggests itself, or a search like \"chicken thighs, spinach, rice\" gets you closer to something usable than \"quick dinner ideas\" ever will.</p>"
+    },
+    {
+      "heading": "What to do about the ingredients you're missing",
+      "html": "<p>Almost no recipe matches your pantry exactly, and that's fine — the goal isn't a perfect match, it's knowing what you're actually short before you start cooking. If a recipe needs six ingredients and you have four, decide up front whether to substitute, skip the item, or make a quick note to pick it up next trip, rather than discovering the gap halfway through cooking. Whatever system you use for grocery lists, sending a missing ingredient there directly — rather than remembering it — is the step most people skip and then repeat the same gap the following week.</p>"
+    },
+    {
+      "heading": "A hands-free way to cook once you've decided",
+      "html": "<p>Once you've picked something, the last friction point is usually the phone itself — a recipe app that locks or dims mid-step while your hands are messy. A full-screen cooking view that keeps the display awake, shows the current step clearly, and has large enough tap targets to use without perfectly clean hands removes a small but real annoyance from actually following through on the plan you just made.</p>"
+    }
+  ],
+  "productFit": {
+    "heading": "How Kinrows helps",
+    "html": "<p>Kinrows' Cook feature generates recipe ideas from what's actually logged in your Pantry, showing ingredient availability directly — \"you have 4 of 6\" — so you're choosing from what's realistic rather than guessing. Anything missing can be sent to the grocery list in one tap instead of being remembered and forgotten. A full-screen Cooking Mode keeps the display awake with upcoming steps dimmed and large tap zones for messy hands, and marks ingredients used off in the pantry when you finish. It's a convenience feature built for weeknight decision-making, not a dietary or allergy-safety tool — always check ingredients against any allergy or dietary need yourself.</p>",
+    "screenshot": { "src": "website/assets/shots/lists.png", "alt": "Kinrows Cook screen showing recipe ideas matched against pantry inventory" }
+  },
+  "faq": [
+    { "q": "How do I decide what to cook from what's already in the fridge?", "a": "Take stock of what's on hand first — proteins, vegetables nearing their use-by date, staples you always have — before searching for a specific recipe. Searching or thinking in terms of your actual inventory (\"chicken, spinach, rice\") gets you to something usable faster than browsing general recipe ideas and hoping the ingredients line up." },
+    { "q": "Is there an app that suggests recipes from what I have?", "a": "Yes — pantry-aware recipe tools generate ideas from a logged inventory rather than a general recipe database, often showing how many of the needed ingredients you already have. This flips the usual recipe-search order: the ingredients come first, the dish suggestion comes second." },
+    { "q": "What do I do about the ingredients a recipe needs that I don't have?", "a": "Decide up front whether to substitute something similar, skip the ingredient if it's not essential, or add it directly to your grocery list for next time. The failure point most people hit is noticing the gap mid-recipe rather than before starting — catching it early avoids an unplanned store run or an abandoned dish." }
+  ],
+  "cta": {
+    "heading": "Cook from what's already there",
+    "body": "Kinrows Cook builds recipe ideas from your actual pantry inventory and sends what's missing straight to the grocery list.",
+    "label": "Join the waitlist"
+  },
+  "relatedPages": [
+    { "href": "/how-to/keep-a-pantry-list-that-doesnt-go-stale", "label": "Keeping a pantry list that doesn't go stale" },
+    { "href": "/best-family-organizer-apps", "label": "Best family organizer apps" },
+    { "href": "/blog/family-budgeting-without-friction", "label": "Family budgeting without friction" }
+  ],
+  "datePublished": "2026-09-15",
+  "lastReviewed": "2026-09-15",
+  "indexStatus": "index"
+}

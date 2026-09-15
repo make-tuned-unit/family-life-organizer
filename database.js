@@ -209,6 +209,9 @@ class FamilyDB {
         this.db.run('ALTER TABLE waitlist ADD COLUMN referred_by TEXT', () => {});
         this.db.run('CREATE UNIQUE INDEX IF NOT EXISTS idx_waitlist_ref_code ON waitlist(ref_code)', () => {});
         this.db.run('CREATE INDEX IF NOT EXISTS idx_waitlist_referred_by ON waitlist(referred_by)', () => {});
+        // Landing-page attribution for conversion measurement (which marketing
+        // page the signup actually converted from — see scripts/seo-report.js)
+        this.db.run('ALTER TABLE waitlist ADD COLUMN landing_path TEXT', () => {});
         // Key dates can be personal: a reminder about your own anniversary
         // shouldn't land in your partner's feed. Existing rows keep the old
         // household-wide behaviour; privacy is opt-in per date.
@@ -3357,7 +3360,7 @@ class FamilyDB {
   // whoever referred them (validated to exist). Returns the signup's standing
   // so the site can show "You're #N — invite a friend to move up".
   // Resolves { created, total, ref_code, position, referrals }.
-  addWaitlistEntry({ email, source, referrer, user_agent, ref }) {
+  addWaitlistEntry({ email, source, referrer, user_agent, ref, landing_path }) {
     const dbGet = (sql, p = []) => new Promise((r, j) => this.db.get(sql, p, (e, row) => e ? j(e) : r(row)));
     const dbRun = (sql, p = []) => new Promise((r, j) => this.db.run(sql, p, function (e) { e ? j(e) : r(this); }));
     const genCode = () => require('crypto').randomBytes(5).toString('hex'); // 10 hex chars
@@ -3386,8 +3389,8 @@ class FamilyDB {
           ref_code = genCode();
           try {
             await dbRun(
-              'INSERT INTO waitlist (email, source, referrer, user_agent, ref_code, referred_by) VALUES (?, ?, ?, ?, ?, ?)',
-              [email, source || null, referrer || null, user_agent || null, ref_code, referredBy]);
+              'INSERT INTO waitlist (email, source, referrer, user_agent, ref_code, referred_by, landing_path) VALUES (?, ?, ?, ?, ?, ?, ?)',
+              [email, source || null, referrer || null, user_agent || null, ref_code, referredBy, landing_path || null]);
             break;
           } catch (e) {
             const msg = String(e.message);
