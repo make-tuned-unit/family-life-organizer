@@ -152,6 +152,22 @@ CREATE TABLE IF NOT EXISTS budget_categories (
   UNIQUE(name, group_id)
 );
 
+-- Receipts historically store the category name rather than a category id.
+-- Keep that denormalized value in sync whenever a category is renamed so
+-- existing spending does not disappear from the name-based budget summary.
+-- A trigger makes the category row and all matching receipt rows one atomic
+-- SQLite statement, regardless of whether the rename comes from REST or AI.
+CREATE TRIGGER IF NOT EXISTS budget_category_name_cascade
+AFTER UPDATE OF name ON budget_categories
+FOR EACH ROW
+WHEN LOWER(OLD.name) <> LOWER(NEW.name)
+BEGIN
+  UPDATE receipts
+  SET category = NEW.name
+  WHERE group_id IS OLD.group_id
+    AND LOWER(category) = LOWER(OLD.name);
+END;
+
 -- Default budget categories (inserted at end of schema to avoid blocking table creation)
 
 -- Pantry inventory

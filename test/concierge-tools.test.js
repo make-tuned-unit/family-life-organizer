@@ -113,6 +113,29 @@ test('budget: log expense with $-string, list, delete', async () => {
   assert.equal((await tools.run('budget', ctx, { action: 'delete_expense', id: receipt.id })).result.ok, true);
 });
 
+test('budget: renaming a category keeps existing expenses and updates the allowance', async () => {
+  const category = await db.addBudgetCategory('Gas/Transport', 200, '#4facfe', ctx.groupId);
+  const receipt = await db.addReceipt({
+    group_id: ctx.groupId,
+    merchant: 'Fuel station',
+    date: '2026-07-11',
+    amount: 64.25,
+    category: 'Gas/Transport',
+  });
+
+  await db.updateBudgetCategory(category.id, { name: 'Car', monthly_limit: 300 });
+
+  const stored = await get('SELECT category FROM receipts WHERE id = ?', [receipt.id]);
+  assert.equal(stored.category, 'Car', 'the existing expense follows the category rename');
+
+  const summary = await db.getBudgetSummary('2026-07', ctx.groupId);
+  const car = summary.find(row => row.category === 'Car');
+  assert.ok(car, 'renamed category remains in the budget');
+  assert.equal(car.monthly_limit, 300);
+  assert.equal(car.spent, 64.25);
+  assert.equal(summary.some(row => row.category === 'Gas/Transport'), false);
+});
+
 test('decisions: create poll, delete it', async () => {
   const create = await tools.run('decisions', ctx, { action: 'create', title: 'Pizza or tacos?', options: ['Pizza', 'Tacos'] });
   assert.equal(create.result.ok, true);
