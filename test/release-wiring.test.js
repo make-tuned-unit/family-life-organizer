@@ -316,3 +316,32 @@ test('privacy: a legacy private-note attachment never exposes its title or body 
     assert.ok(!JSON.stringify(viaTool).includes('Private body'));
   } finally { await runSql('DELETE FROM group_members WHERE group_id = ? AND user_id = ?', [ctx.groupId, other.id]); }
 });
+
+test('Concierge full note reads preserve private and shared visibility', async () => {
+  const body = 'Complete note content beyond the preview. '.repeat(30);
+  await act('notes', { action: 'add', title: 'Full private note', body });
+  const note = await new Promise((resolve, reject) => db.db.get('SELECT id FROM notes WHERE title = ?', ['Full private note'], (e, r) => e ? reject(e) : resolve(r)));
+  assert.equal((await act('notes', { action: 'get', id: note.id })).body, body);
+  const other = await db.getUserByUsername('qa_other');
+  const denied = await tools.run('notes', { ...ctx, userId: other.id }, { action: 'get', id: note.id });
+  assert.equal(denied.result.ok, false);
+  await act('notes', { action: 'update', id: note.id, shared: true });
+  assert.equal((await act('notes', { action: 'get', id: note.id })).body, body);
+  assert.equal((await tools.run('notes', { ...ctx, userId: other.id }, { action: 'get', id: note.id })).result.ok, false);
+  await db.addGroupMember(ctx.groupId, { user_id: other.id, role: 'member', added_by: ctx.userId });
+  assert.equal((await tools.run('notes', { ...ctx, userId: other.id }, { action: 'get', id: note.id })).result.body, body);
+  await act('notes', { action: 'update', id: note.id, shared: false });
+  assert.equal((await tools.run('notes', { ...ctx, userId: other.id }, { action: 'get', id: note.id })).result.ok, false, 'privatising retracts access immediately');
+});
+
+test('Native workflow handoffs require user action and never report a saved mutation', async () => {
+  for (const workflow of ['receipt', 'cook', 'calendar', 'trips', 'health', 'groups', 'messages', 'notes', 'routines', 'history']) {
+    const legacy = await tools.run('get_workflow_handoff', ctx, { workflow });
+    assert.equal(legacy.result.status, 'requires_user_action');
+    assert.equal(legacy.action, undefined, 'old clients receive instructions without a saved-changes card');
+    const native = await tools.run('get_workflow_handoff', { ...ctx, nativeHandoffs: true }, { workflow });
+    assert.equal(native.result.status, 'requires_user_action');
+    assert.deepEqual(native.action, { tool: 'open_workflow', workflow, summary: `Continue in ${ { receipt: 'Receipt scanner', cook: 'Cook', calendar: 'Calendar', trips: 'Trips', health: 'Rivalries', groups: 'Family groups', messages: 'Messages', notes: 'Notes', routines: 'Routines', history: 'Conversation history' }[workflow]}` });
+  }
+  assert.equal((await tools.run('get_workflow_handoff', ctx, { workflow: 'settings' })).result.ok, false);
+});

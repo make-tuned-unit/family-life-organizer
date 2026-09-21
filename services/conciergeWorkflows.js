@@ -30,6 +30,23 @@ function createTools({ assertHousehold, assertListAccess, assertRoutineAccess, r
       return { result: { ok: true, ...result, summary }, action: { tool: name, summary } };
     },
   });
+  const destinations = { receipt: 'Receipt scanner', cook: 'Cook', calendar: 'Calendar', trips: 'Trips', health: 'Rivalries', groups: 'Family groups', messages: 'Messages', notes: 'Notes', routines: 'Routines', history: 'Conversation history' };
+  out.push({
+    name: 'get_workflow_handoff',
+    description: 'Offer a native app workflow for receipt/photo capture, cooking, device calendar permissions, trip location, HealthKit, family membership, message images/reporting, notes, routines or conversation history. Requires the user to continue in the app. Does not complete, save, grant permission or send anything.',
+    write: false,
+    input_schema: { type: 'object', properties: { workflow: { type: 'string', enum: Object.keys(destinations) } }, required: ['workflow'] },
+    async run(c, i) {
+      const summary = `Continue in ${destinations[i.workflow]}`;
+      const result = { status: 'requires_user_action', workflow: i.workflow, instruction: `${summary} in the app. Nothing has been changed; follow the native prompts to complete the workflow.` };
+      return c.nativeHandoffs === true ? { result, action: { tool: 'open_workflow', workflow: i.workflow, summary } } : { result };
+    },
+  });
+  add('get_note', 'Read the complete body of an accessible note. Use notes list for the id.', { id }, ['id'], async (c, i) => {
+    const note = await c.db.getNoteById(i.id);
+    if (!note || !(note.user_id === c.userId || (note.shared_scope && note.shared_scope !== 'private' && note.group_id && await c.db.isGroupMember(note.group_id, c.userId)))) throw new Error('Not found');
+    return note;
+  });
   const house = c => { if (!c.groupId) throw new Error('Join a household first'); };
   const ownerRoutine = async (c, rid) => {
     await assertRoutineAccess(c, rid);

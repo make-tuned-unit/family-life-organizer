@@ -11,7 +11,7 @@ final class APIService {
 
     @MainActor
     static func publishConciergeActions(_ actions: [ConciergeAction]) {
-        guard !actions.isEmpty else { return }
+        guard actions.contains(where: { $0.tool != "open_workflow" }) else { return }
         NotificationCenter.default.post(
             name: conciergeDataDidChange,
             object: nil,
@@ -565,7 +565,7 @@ final class APIService {
     ) async throws -> ConciergeChatResponse {
         guard AIConsentManager.hasConciergeConsent else { throw APIError.aiConsentRequired }
         guard cloudAIEnabled else { throw APIError.cloudAIDisabled }
-        var body: [String: Any] = ["message": message, "source": source.rawValue]
+        var body: [String: Any] = ["message": message, "source": source.rawValue, "native_handoffs": true]
         if let conversationId { body["conversation_id"] = conversationId }
         // Tool-calling loop can take a while — generous timeout.
         return try await post("/api/concierge/chat", body: body, timeout: 60)
@@ -602,7 +602,7 @@ final class APIService {
                     request.setValue("application/json", forHTTPHeaderField: "Content-Type")
                     request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
                     request.timeoutInterval = 120
-                    var body: [String: Any] = ["message": message, "source": sourceValue]
+                    var body: [String: Any] = ["message": message, "source": sourceValue, "native_handoffs": true]
                     if let conversationId { body["conversation_id"] = conversationId }
                     request.httpBody = try JSONSerialization.data(withJSONObject: body)
 

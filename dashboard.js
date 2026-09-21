@@ -4751,6 +4751,7 @@ app.post('/api/concierge/chat', requireAuth, conciergeLimiter, requirePremium, c
       message,
       conversationId: req.body.conversation_id || null,
       source: req.body.source || 'text',
+      nativeHandoffs: req.body.native_handoffs === true,
     });
     res.json(result);
   } catch (err) {
@@ -4791,6 +4792,7 @@ app.post('/api/concierge/chat/stream', requireAuth, conciergeLimiter, requirePre
         message,
         conversationId: req.body.conversation_id || null,
         source: req.body.source || 'text',
+        nativeHandoffs: req.body.native_handoffs === true,
       }, {
         onText: (t) => send('delta', { text: t }),
         onAction: (action) => send('action', action),

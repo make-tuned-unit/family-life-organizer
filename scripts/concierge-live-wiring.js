@@ -39,13 +39,18 @@ async function api(method, route, body) {
       { name: 'feed post', say: 'Post this exact message to our household feed now: QA picnic moved to Saturday.', verify: async () => (await api('GET', `/api/groups/${registered.household.id}/feed`)).some(r => r.body === 'QA picnic moved to Saturday.') },
       { name: 'memory create and selective deletion', say: 'Remember that the QA spare key is in the blue box.', followup: 'Forget the fact you just saved about the QA spare key. I confirm deleting that remembered fact.', verify: async () => !(await api('GET', '/api/concierge/memory')).some(r => /spare key/i.test(r.content)), intermediate: async () => (await api('GET', '/api/concierge/memory')).some(r => /spare key/i.test(r.content)) },
     ];
-    for (const c of cases) {
+    const handoffs = ['receipt', 'health', 'groups'].map(workflow => ({
+      name: `native ${workflow} handoff`,
+      say: { receipt: 'I want to take a photo of a receipt and review it before saving. Open the receipt scanner for me.', health: 'Open the HealthKit permission and health sync workflow in the app for me.', groups: 'Open the family group membership and invitations workflow for me.' }[workflow],
+      native: true, verify: async chat => chat.actions?.some(a => a.tool === 'open_workflow' && a.workflow === workflow),
+    }));
+    for (const c of (process.argv.includes('--handoffs-only') ? handoffs : cases)) {
       try {
-        let chat = await api('POST', '/api/concierge/chat', { message: c.say });
+        let chat = await api('POST', '/api/concierge/chat', { message: c.say, native_handoffs: c.native === true });
         const actions = [...(chat.actions || [])];
         if (c.intermediate) assert.ok(await c.intermediate(), 'initial state was actually persisted');
         if (c.followup) { chat = await api('POST', '/api/concierge/chat', { message: c.followup, conversation_id: chat.conversation_id }); actions.push(...(chat.actions || [])); }
-        assert.ok(await c.verify(), `persisted native HTTP state disagrees with response: ${chat.reply}`);
+        assert.ok(await c.verify(chat), `persisted native HTTP state disagrees with response: ${chat.reply}`);
         assert.ok(actions.length, 'successful writes publish refresh actions');
         const row = { scenario: c.name, status: 'PASS', actions: actions.map(a => a.tool) }; results.push(row); console.log(JSON.stringify(row));
       } catch (e) { const row = { scenario: c.name, status: 'FAIL', error: e.message }; results.push(row); console.log(JSON.stringify(row)); }

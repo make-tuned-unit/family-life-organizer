@@ -136,9 +136,10 @@ struct ConciergeAction: Codable, Hashable {
     let entityId: Int?
     let personId: Int?
     let personName: String?
+    let workflow: String?
 
     enum CodingKeys: String, CodingKey {
-        case tool, summary
+        case tool, summary, workflow
         case entityId = "entity_id"
         case personId = "person_id"
         case personName = "person_name"

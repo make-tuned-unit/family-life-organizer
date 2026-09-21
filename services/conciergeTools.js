@@ -3236,9 +3236,10 @@ const GROUPS = {
 };
 
 // Distinct enough to stay on their own rather than wrap in a one-action domain.
-const STANDALONE = ['get_addresses', 'remember', 'update_my_name', 'send_message'];
+const STANDALONE = ['get_workflow_handoff', 'get_addresses', 'remember', 'update_my_name', 'send_message'];
 
 const extendedActions = {
+  notes: { get: 'get_note' },
   budget: { stats: 'get_budget_stats' },
   calendar: { attachments: 'get_event_attachments', attach: 'add_event_attachment', detach: 'delete_event_attachment' },
   lists: { pin: 'pin_list', unpin: 'unpin_list', reorder: 'reorder_list_items' },

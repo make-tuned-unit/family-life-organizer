@@ -1,0 +1,4 @@
+{"scenario":"native receipt handoff","status":"PASS","actions":["open_workflow"]}
+{"scenario":"native health handoff","status":"PASS","actions":["open_workflow"]}
+{"scenario":"native groups handoff","status":"PASS","actions":["open_workflow"]}
+{"passed":3,"total":3}

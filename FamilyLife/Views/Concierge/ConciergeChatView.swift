@@ -21,6 +21,7 @@ struct ConciergeChatView: View {
     @State private var didAutoSend = false
     @State private var draftFromVoice = false
     @State private var showingHistory = false
+    @State private var activeWorkflow: NativeWorkflow?
     @State private var followsReply = true
     @FocusState private var inputFocused: Bool
 
@@ -126,7 +127,46 @@ struct ConciergeChatView: View {
                     Task { await viewModel.resume(conversationId: id, api: api) }
                 }
             }
+            .sheet(item: $activeWorkflow) { workflow in
+                workflowDestination(workflow)
+            }
             .onDisappear { speech.stop() }
+        }
+    }
+
+    private enum NativeWorkflow: String, Identifiable {
+        case receipt, cook, calendar, trips, health, groups, messages, notes, routines, history
+        var id: String { rawValue }
+    }
+
+    @ViewBuilder
+    private func workflowDestination(_ workflow: NativeWorkflow) -> some View {
+        switch workflow {
+        case .receipt:
+            ReceiptScannerView(onReceiptSaved: {
+                NotificationCenter.default.post(name: APIService.conciergeDataDidChange, object: nil)
+            })
+        case .messages: ChatSheet()
+        default:
+            NavigationStack {
+                Group {
+                    switch workflow {
+                    case .cook: CookView()
+                    case .calendar: CalendarView()
+                    case .trips: TripsView()
+                    case .health: RivalriesView()
+                    case .groups: FamilyGroupsView()
+                    case .notes: NotesView()
+                    case .routines: RoutinesView()
+                    default: EmptyView()
+                    }
+                }
+                .toolbar {
+                    ToolbarItem(placement: .topBarLeading) {
+                        Button("Done") { activeWorkflow = nil }
+                    }
+                }
+            }
         }
     }
 
@@ -172,17 +212,25 @@ struct ConciergeChatView: View {
                     VStack(alignment: .leading, spacing: 4) {
                         HStack(spacing: 6) {
                             KinrowsIllustration(.mascot(.celebrating), maxWidth: 22, maxHeight: 22)
-                            Label("Saved changes", systemImage: "checkmark.circle.fill")
+                            Label(message.actions.contains(where: { $0.tool == "open_workflow" }) ? "Actions and next steps" : "Saved changes", systemImage: "checkmark.circle.fill")
                         }
                         .font(.flFootnote.weight(.bold))
                         ForEach(message.actions, id: \.self) { action in
-                            Text(action.summary)
-                                .font(.flCaption.weight(.medium))
+                            if action.tool == "open_workflow", let value = action.workflow, let workflow = NativeWorkflow(rawValue: value) {
+                                Button(action.summary) {
+                                    if workflow == .history { showingHistory = true }
+                                    else { activeWorkflow = workflow }
+                                }
+                                .font(.flBody.weight(.semibold))
+                                .padding(.vertical, 8)
+                            } else {
+                                Text(action.summary).font(.flCaption.weight(.medium))
+                            }
                         }
                     }
                     .foregroundStyle(KinrowsBrand.evergreen)
                     .padding(.leading, 38)
-                    .accessibilityElement(children: .combine)
+                    .accessibilityElement(children: .contain)
                 }
             }
         }

@@ -1,11 +1,11 @@
 {
-  "checkedAt": "2026-09-21T22:28:43.491Z",
+  "checkedAt": "2026-09-21T22:42:17.923Z",
   "clientCalls": 220,
   "serverRoutes": 270,
   "missingRoutes": [],
   "concierge": {
-    "handlers": 166,
-    "modelTools": 28,
+    "handlers": 168,
+    "modelTools": 29,
     "workflows": [
       {
         "workflow": "Home card priorities",
@@ -292,6 +292,7 @@
       {
         "workflow": "Notes",
         "operations": [
+          "get_note",
           "list_notes",
           "add_note",
           "update_note",
@@ -407,7 +408,7 @@
       "HealthKit consent and rivalry health sync",
       "DM/feed image attachments and content reporting",
       "Family/clan creation, membership, invitations and sharing outside Settings",
-      "Conversation-history resume/delete and full note retrieval",
+      "Conversation-history resume/delete (full note retrieval now has an authorized server handler)",
       "Notification/reminder scheduling after server-side writes"
     ]
   }

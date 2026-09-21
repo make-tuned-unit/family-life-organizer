@@ -27,7 +27,7 @@
     { "workflow": "Contacts", "operations": ["get_contacts", "add_contact", "update_contact", "delete_contact"] },
     { "workflow": "Coverage", "operations": ["get_coverage", "create_coverage_request", "cancel_coverage_request", "get_incoming_coverage", "approve_incoming_coverage"] },
     { "workflow": "Coverage detail and blocks", "operations": ["get_coverage_detail", "get_coverage_blocks"], "app": "fetchCoverageDetail/fetchCoverageBlocks" },
-    { "workflow": "Notes", "operations": ["list_notes", "add_note", "update_note", "delete_note"] },
+    { "workflow": "Notes", "operations": ["get_note", "list_notes", "add_note", "update_note", "delete_note"] },
     { "workflow": "Routine lifecycle", "operations": ["list_routines", "get_routine", "create_routine", "update_routine", "delete_routine", "set_routine_shared", "archive_routine", "restore_routine"], "app": "addRoutine/updateRoutine/deleteRoutine/setRoutineShared" },
     { "workflow": "Routine entries", "operations": ["log_routine_entry", "update_routine_entry", "delete_routine_entry", "get_routine_occurrences"], "app": "updateRoutineEntry/deleteRoutineEntry/fetchRoutineOccurrences" },
     { "workflow": "Sleep tracking", "operations": ["log_sleep", "start_sleep", "end_sleep", "set_sleep_start", "get_sleep_stats", "analyze_sleep"] },
@@ -46,7 +46,7 @@
     "HealthKit consent and rivalry health sync",
     "DM/feed image attachments and content reporting",
     "Family/clan creation, membership, invitations and sharing outside Settings",
-    "Conversation-history resume/delete and full note retrieval",
+    "Conversation-history resume/delete (full note retrieval now has an authorized server handler)",
     "Notification/reminder scheduling after server-side writes"
   ],
   "limitations": [

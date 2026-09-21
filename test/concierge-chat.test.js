@@ -38,3 +38,14 @@ test('sanitizeName strips control chars and falls back', () => {
   assert.equal(sanitizeName('Ada\nLovelace'), 'Ada Lovelace');
   assert.equal(sanitizeName(''), 'the user');
 });
+
+
+test('action-limit fallback separates saved changes from native user action', () => {
+  const { incompleteReply } = require('../services/conciergeChat');
+  const pending = { tool: 'open_workflow', summary: 'Continue in Receipt scanner' };
+  assert.doesNotMatch(incompleteReply([pending]), /Saved changes/);
+  assert.match(incompleteReply([pending]), /Still requires your action/);
+  const mixed = incompleteReply([{ tool: 'add_task', summary: 'Added shopping task' }, pending]);
+  assert.match(mixed, /Saved changes: Added shopping task\./);
+  assert.match(mixed, /Still requires your action: Continue in Receipt scanner\./);
+});
