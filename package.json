@@ -13,7 +13,10 @@
     "test:ai": "node --test test/concierge-*.test.js test/calendar-recurrence.test.js",
     "test:ai:routing": "node scripts/concierge-tool-eval.js",
     "seo:build": "node seo/build.js",
-    "seo:check": "node seo/build.js --check"
+    "seo:check": "node seo/build.js --check",
+    "qa:wiring": "node scripts/verify-release-wiring.js",
+    "qa:concierge": "node scripts/verify-release-wiring.js --require-parity",
+    "qa:release": "node scripts/release-qa.js"
   },
   "keywords": [],
   "author": "",

@@ -4,9 +4,8 @@ import StoreKit
 /// Premium upsell for the conversational concierge. The daily brief stays free;
 /// this unlocks the butler you can talk to and that acts on your behalf.
 ///
-/// App-first path: Subscribe opens Safari Checkout (Apple Pay lives there),
-/// then a `kinrows://` return unlocks the household without a second sign-in.
-/// StoreKit remains as Restore / Subscribe with Apple.
+/// In-app purchases use StoreKit in every storefront. Web subscriptions remain
+/// available on the website and unlock the same household entitlement.
 ///
 /// Two tiers — Lite and Premium — each billable monthly or yearly (yearly = two
 /// months free). Both tiers get every feature; they differ only by how many chats
@@ -15,7 +14,6 @@ struct PaywallView: View {
     @Environment(APIService.self) private var api
     @Environment(SubscriptionService.self) private var subscription
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.openURL) private var openURL
 
     @State private var period: SubscriptionService.Period = .yearly
 
@@ -62,7 +60,7 @@ struct PaywallView: View {
                 }
             }
             .inlineError(subscription.lastError) { subscription.clearError() }
-            .task { await subscription.loadCatalog(api: api) }
+            .task { await subscription.loadProducts() }
             .onChange(of: subscription.isPremium) { _, premium in
                 if premium { dismiss() }
             }
@@ -78,9 +76,7 @@ struct PaywallView: View {
             Text("Meet Rowan, your Concierge")
                 .font(.flDisplay)
                 .foregroundStyle(KinrowsBrand.evergreen)
-            Text(subscription.pendingWebCheckout
-                 ? "Finish in Safari, then we will bring you back and unlock Concierge."
-                 : "A personal butler for your family — always organized, always one step ahead.")
+            Text("A personal butler for your family — always organized, always one step ahead.")
                 .font(.flBody)
                 .foregroundStyle(WarmPalette.ink3)
         }
@@ -129,7 +125,7 @@ struct PaywallView: View {
     private var periodToggle: some View {
         Picker("Billing period", selection: $period) {
             Text("Monthly").tag(SubscriptionService.Period.monthly)
-            Text("Yearly · 2 months free").tag(SubscriptionService.Period.yearly)
+            Text("Yearly").tag(SubscriptionService.Period.yearly)
         }
         .pickerStyle(.segmented)
     }
@@ -159,30 +155,18 @@ struct PaywallView: View {
                 .foregroundStyle(WarmPalette.ink3)
 
             Button {
-                Task {
-                    guard let url = await subscription.startWebCheckout(tier: tier, period: period, api: api) else { return }
-                    openURL(url)
-                }
+                guard let storeProduct else { return }
+                Task { await subscription.purchase(storeProduct, api: api) }
             } label: {
                 if subscription.isPurchasing {
                     ProgressView()
-                } else if subscription.pendingWebCheckout {
-                    Text("Opening Safari…")
                 } else {
-                    Text("Subscribe")
+                    Text(storeProduct == nil ? "Currently unavailable" : "Subscribe with Apple")
                 }
             }
             .buttonStyle(.flCTA(fill: recommended ? accent : AccentTheme.sage.color))
-            .disabled(subscription.isPurchasing || subscription.pendingWebCheckout)
+            .disabled(subscription.isPurchasing || storeProduct == nil)
 
-            if let storeProduct {
-                Button("Subscribe with Apple") {
-                    Task { await subscription.purchase(storeProduct, api: api) }
-                }
-                .font(.flCaption)
-                .foregroundStyle(WarmPalette.ink3)
-                .disabled(subscription.isPurchasing || subscription.pendingWebCheckout)
-            }
         }
         .padding(DesignTokens.Spacing.cardPadding)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -193,13 +177,12 @@ struct PaywallView: View {
         if let product {
             return period == .yearly ? "\(product.displayPrice)/yr" : "\(product.displayPrice)/mo"
         }
-        guard let plan = subscription.catalogPlan(tier, period) else { return "—" }
-        return period == .yearly ? "\(plan.displayPrice)/yr" : "\(plan.displayPrice)/mo"
+        return "—"
     }
 
     private var restoreAndLegal: some View {
         VStack(spacing: 12) {
-            Text("You will finish in Safari with Apple Pay, then return here automatically. No second sign-in.")
+            Text("Payment is handled by the App Store. One subscription covers your household.")
                 .font(.flCaption)
                 .foregroundStyle(WarmPalette.ink2)
                 .multilineTextAlignment(.center)
@@ -208,15 +191,17 @@ struct PaywallView: View {
                 Task { await subscription.restore(api: api) }
             }
             .buttonStyle(FLSecondaryButtonStyle())
+            .disabled(subscription.isPurchasing)
 
-            if let error = subscription.lastError {
-                Text(error)
-                    .font(.flCaption)
-                    .foregroundStyle(AccentTheme.terracotta.color)
-                    .multilineTextAlignment(.center)
+            if subscription.products.isEmpty {
+                Button("Retry loading plans") {
+                    Task { await subscription.loadProducts() }
+                }
+                .buttonStyle(FLSecondaryButtonStyle())
+                .disabled(subscription.isPurchasing)
             }
 
-            Text("Billed on the web via Stripe (Apple Pay / card). Cancel anytime in the Stripe Customer Portal. Apple subscriptions restore from Settings. If you buy in the App Store instead: payment is charged to your Apple ID at confirmation and renews unless cancelled at least 24 hours before the period ends.")
+            Text("Payment is charged to your Apple ID at confirmation. Your subscription automatically renews unless cancelled at least 24 hours before the current period ends. Manage or cancel your subscription in your App Store account settings.")
                 .font(.flCaption2)
                 .foregroundStyle(WarmPalette.ink3)
                 .multilineTextAlignment(.center)

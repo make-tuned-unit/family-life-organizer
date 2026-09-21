@@ -146,7 +146,7 @@ async function generateSummary(s, userName, { household = false } = {}) {
 // skipAI=true returns the deterministic summary only and makes NO cloud call —
 // used when the client will summarize on-device (or the user disabled cloud AI),
 // so household data never reaches Anthropic for the brief.
-async function generateBrief(snapshot, userName, { skipAI = false, household = false } = {}) {
+async function generateBrief(snapshot, userName, { skipAI = true, household = false } = {}) {
   const cards = buildCards(snapshot);                       // deterministic, instant
   const summary = skipAI ? fallbackSummary(snapshot)
                          : await generateSummary(snapshot, userName, { household });
@@ -181,7 +181,7 @@ async function runDailyBriefSweep(db) {
         summary.skipped++;
         continue;
       }
-      const brief = await generateBrief(snapshot, h.group_name || 'the family', { household: true });
+      const brief = await generateBrief(snapshot, h.group_name || 'the family', { household: true, skipAI: true });
       await db.addFeedPost({
         group_id: h.group_id,
         author_id: h.user_id,

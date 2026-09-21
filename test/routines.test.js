@@ -13,6 +13,10 @@ const BASE = `http://127.0.0.1:${PORT}`;
 let server;
 let tmpDir;
 
+// Guidance is based on current age, so keep fixtures ten months old.
+const infantBirthdate = new Date(Date.now() - 300 * 86400000).toISOString().slice(0, 10);
+const preschoolBirthdate = new Date(Date.now() - 3.5 * 365.25 * 86400000).toISOString().slice(0, 10);
+
 function makeClient() {
   let cookie = '';
   return async (method, pathname, body) => {
@@ -492,7 +496,7 @@ test('routines: the next-nap window is worked back from the last wake', async ()
   // ~10 months old on the test dates → the 3–4 hour wake-window band.
   const created = await parent('POST', '/api/routines', {
     name: 'Jude windows', routine_type: 'baby_sleep', subject_name: 'Jude',
-    subject_birthdate: '2025-09-20',
+    subject_birthdate: infantBirthdate,
   });
   const id = created.body.id;
 
@@ -532,7 +536,7 @@ test('routines: the next-nap window is worked back from the last wake', async ()
 test('routines: People birthday wins over a stale routine stamp', async () => {
   const [parent] = await member('stale_rt', 'Stale DOB RT');
   // Simulate the old create bug: routine stamped with "today", People later corrected.
-  await parent('POST', '/api/people', { name: 'Rowan', birthday: '2022-10-01' });
+  await parent('POST', '/api/people', { name: 'Rowan', birthday: preschoolBirthdate });
   const created = await parent('POST', '/api/routines', {
     name: "Rowan's chores", routine_type: 'chores', subject_name: 'Rowan',
     subject_birthdate: '2026-09-02',
@@ -540,16 +544,16 @@ test('routines: People birthday wins over a stale routine stamp', async () => {
   });
   assert.equal(created.status, 200, JSON.stringify(created.body));
   const detail = (await parent('GET', `/api/routines/${created.body.id}`)).body;
-  assert.equal(detail.resolved_birthdate, '2022-10-01', 'People card wins');
+  assert.equal(detail.resolved_birthdate, preschoolBirthdate, 'People card wins');
   assert.equal(detail.birthdate_source, 'people');
-  assert.equal(detail.chores.guidance.age_years, 3, 'almost 4 on 2026-09-02 → 3 years old');
+  assert.equal(detail.chores.guidance.age_years, 3, 'three-year-old fixture');
   assert.equal(detail.subject_birthdate, '2026-09-02', 'stale stamp still stored on the row');
 });
 
 test('routines: the age falls back to the child\'s People record', async () => {
   const [parent] = await member('ppl_rt', 'People RT');
   // Jude's birthday lives on his People card, not on the routine.
-  const person = await parent('POST', '/api/people', { name: 'Jude', birthday: '2025-09-20' });
+  const person = await parent('POST', '/api/people', { name: 'Jude', birthday: infantBirthdate });
   assert.equal(person.status, 200, JSON.stringify(person.body));
 
   const created = await parent('POST', '/api/routines', {
@@ -562,7 +566,7 @@ test('routines: the age falls back to the child\'s People record', async () => {
   });
 
   const detail = (await parent('GET', `/api/routines/${id}`)).body;
-  assert.equal(detail.resolved_birthdate, '2025-09-20', 'found via People');
+  assert.equal(detail.resolved_birthdate, infantBirthdate, 'found via People');
   assert.equal(detail.birthdate_source, 'people', 'and says where it came from');
   assert.ok(detail.next_sleep, 'so the nap window can be worked out');
   assert.equal(detail.next_sleep.wake_window_min_minutes, 180);
@@ -577,7 +581,7 @@ test('routines: a birthday key date works, and ambiguous names do not', async ()
   // No birthday on the card — only a birthday key date filed against them.
   const person = await parent('POST', '/api/people', { name: 'Wren' });
   await parent('POST', '/api/gifts/events', {
-    person_id: person.body.id, title: "Wren's birthday", date: '2025-09-20',
+    person_id: person.body.id, title: "Wren's birthday", date: infantBirthdate,
     is_recurring: true, event_type: 'birthday',
   });
 
@@ -589,7 +593,7 @@ test('routines: a birthday key date works, and ambiguous names do not', async ()
     value: { sleep_start: '2026-07-28 13:00', sleep_end: '2026-07-28 14:20', duration_minutes: 80 },
   });
   const detail = (await parent('GET', `/api/routines/${created.body.id}`)).body;
-  assert.equal(detail.resolved_birthdate, '2025-09-20', 'a birthday key date is enough');
+  assert.equal(detail.resolved_birthdate, infantBirthdate, 'a birthday key date is enough');
 
   // Two people called Wren: refuse to guess rather than pick one.
   await parent('POST', '/api/people', { name: 'Wren Cousin', birthday: '2020-01-01' });
@@ -607,7 +611,7 @@ test('routines: a private birthday key date does not leak through the age lookup
   // Sophie records the birthday privately; the person card carries no birthday.
   const person = await jesse('POST', '/api/people', { name: 'Quiet Kid' });
   await sophie('POST', '/api/gifts/events', {
-    person_id: person.body.id, title: 'Quiet Kid birthday', date: '2025-09-20',
+    person_id: person.body.id, title: 'Quiet Kid birthday', date: infantBirthdate,
     is_recurring: true, event_type: 'birthday', shared_scope: 'private',
   });
 
@@ -626,13 +630,13 @@ test('routines: a private birthday key date does not leak through the age lookup
   // Sophie owns it, so for her it resolves — the date is hers to use.
   await jesse('PUT', `/api/routines/${routine.body.id}/share`, { shared_scope: 'household' });
   const forSophie = (await sophie('GET', `/api/routines/${routine.body.id}`)).body;
-  assert.equal(forSophie.resolved_birthdate, '2025-09-20', 'the owner can still use her own key date');
+  assert.equal(forSophie.resolved_birthdate, infantBirthdate, 'the owner can still use her own key date');
 });
 
 test('routines: the bedtime reminder comes from the bedtime actually kept', async () => {
   const [parent] = await member('bed_rt', 'Bedtime RT');
   const created = await parent('POST', '/api/routines', {
-    name: 'Jude bedtime prep', routine_type: 'baby_sleep', subject_birthdate: '2025-09-20',
+    name: 'Jude bedtime prep', routine_type: 'baby_sleep', subject_birthdate: infantBirthdate,
   });
   const id = created.body.id;
 
@@ -688,7 +692,7 @@ test('routines: sleep stats average the window and earn their tips', async () =>
   // ~10 months old, so the 4–12 month band (12–16h) applies.
   const created = await parent('POST', '/api/routines', {
     name: 'Jude sleep', routine_type: 'baby_sleep', subject_name: 'Jude',
-    subject_birthdate: '2025-09-20',
+    subject_birthdate: infantBirthdate,
   });
   const id = created.body.id;
 
@@ -732,7 +736,7 @@ test('routines: the night average ignores days with no night logged', async () =
   // nights plus one nap-only day reported the nights as 7h20m.
   const [parent] = await member('avg_rt', 'Average RT');
   const created = await parent('POST', '/api/routines', {
-    name: 'Jude averages', routine_type: 'baby_sleep', subject_birthdate: '2025-09-20',
+    name: 'Jude averages', routine_type: 'baby_sleep', subject_birthdate: infantBirthdate,
   });
   const id = created.body.id;
 
@@ -762,7 +766,7 @@ test('routines: the night average ignores days with no night logged', async () =
 test('routines: sleep stats flag a short sleeper and a roaming bedtime', async () => {
   const [parent] = await member('shrt_rt', 'Short RT');
   const created = await parent('POST', '/api/routines', {
-    name: 'Short sleeper', routine_type: 'baby_sleep', subject_birthdate: '2025-09-20',
+    name: 'Short sleeper', routine_type: 'baby_sleep', subject_birthdate: infantBirthdate,
   });
   const id = created.body.id;
 
@@ -941,7 +945,7 @@ test('routines: sleep-now reports awake-since and the next nap for Home', async 
   const [parent] = await member('now_rt', 'Now RT');
   const created = await parent('POST', '/api/routines', {
     name: 'Jude sleep', routine_type: 'baby_sleep', subject_name: 'Jude',
-    subject_birthdate: '2025-09-20', // ~10 months → the 3–4 hour band
+    subject_birthdate: infantBirthdate, // ~10 months → the 3–4 hour band
   });
   const id = created.body.id;
 
@@ -977,7 +981,7 @@ test('routines: sleep-now counts awake from the last nap, not last night', async
   const [parent] = await member('now_nap_rt', 'Now Nap RT');
   const created = await parent('POST', '/api/routines', {
     name: 'Jude sleep', routine_type: 'baby_sleep', subject_name: 'Jude',
-    subject_birthdate: '2025-09-20',
+    subject_birthdate: infantBirthdate,
   });
   const id = created.body.id;
 
@@ -1003,7 +1007,7 @@ test('routines: sleep-now does not leak a housemate\'s private routine', async (
   const [partner] = await member('nowq_rt', 'Now Partner RT', invite);
   const created = await owner('POST', '/api/routines', {
     name: 'Private sleep', routine_type: 'baby_sleep', subject_name: 'Quiet',
-    subject_birthdate: '2025-09-20',
+    subject_birthdate: infantBirthdate,
   });
   assert.equal(created.status, 200);
 

@@ -1,5 +1,7 @@
 # AI management and Home regression coverage
 
+> **2026-09-21 update:** 400 backend tests pass, but full app workflow parity FAILS. The 123 handler contracts cover the handlers that exist, not every app workflow: 40 operations are missing from the current surface. See [the release QA DAG](qa/RELEASE_QA_2026-09-21.md) and `npm run qa:concierge`. Live model routing remains unverified without a provider key.
+
 Validated locally on 2026-09-10 against isolated SQLite databases and an isolated iOS simulator. No production household records were modified.
 
 ## Results

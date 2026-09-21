@@ -8,13 +8,8 @@ extension Notification.Name {
 
 /// Manages the Concierge subscription.
 ///
-/// Web Stripe Checkout is the app-first path: the signed-in app opens Safari,
-/// the user pays (Apple Pay works there), then a `kinrows://` return plus a
-/// foreground refresh unlock the household. StoreKit remains available as
-/// "Subscribe with Apple" / Restore. Entitlement is per-HOUSEHOLD and the
-/// backend is authoritative: this device may have no local transaction yet
-/// still be entitled because another household member subscribed — so `refresh`
-/// always reconciles with the server, which also reports the tier.
+/// In-app purchases use StoreKit. Website purchases also unlock the household;
+/// the backend is authoritative for both channels.
 @MainActor
 @Observable
 final class SubscriptionService {
@@ -74,7 +69,13 @@ final class SubscriptionService {
         updatesTask?.cancel()
         updatesTask = Task { [weak self] in
             for await update in Transaction.updates {
-                if case .verified(let txn) = update { await txn.finish() }
+                if case .verified(let txn) = update,
+                   Self.entitlementIDs.contains(txn.productID) {
+                    // Keep unfinished transactions retryable if the backend is offline.
+                    if (try? await api.verifySubscription(signedTransaction: update.jwsRepresentation)) != nil {
+                        await txn.finish()
+                    }
+                }
                 await self?.refresh(api: api)
             }
         }
@@ -92,8 +93,13 @@ final class SubscriptionService {
             let loaded = try await Product.products(for: Self.productIDs)
             // Stable order: Premium before Lite, monthly before yearly.
             products = loaded.sorted { ($0.price, $0.id) > ($1.price, $1.id) }
+            if products.isEmpty {
+                lastError = "Subscriptions are currently unavailable. Please try again later."
+            } else {
+                lastError = nil
+            }
         } catch {
-            // StoreKit catalog is optional — web Checkout is the app-first path.
+            lastError = "Could not load App Store subscriptions. Please try again."
         }
     }
 
@@ -238,12 +244,17 @@ final class SubscriptionService {
                     // otherwise leave it for Transaction.updates to retry.
                     let synced = (try? await api.verifySubscription(signedTransaction: verification.jwsRepresentation)) != nil
                     if synced { await txn.finish() }
+                    else { lastError = "Your purchase is awaiting verification. Please try Restore Purchases when connected." }
+                } else {
+                    lastError = "The App Store purchase could not be verified. Please try again."
                 }
                 await refresh(api: api)
                 if isPremium {
                     NotificationCenter.default.post(name: .kinrowsSubscriptionActivated, object: nil)
                 }
-            case .userCancelled, .pending:
+            case .pending:
+                lastError = "Your purchase is pending approval. Concierge will unlock after the App Store confirms it."
+            case .userCancelled:
                 break
             @unknown default:
                 break
@@ -254,10 +265,19 @@ final class SubscriptionService {
     }
 
     func restore(api: APIService) async {
-        try? await AppStore.sync()
-        await refresh(api: api)
-        if isPremium {
-            NotificationCenter.default.post(name: .kinrowsSubscriptionActivated, object: nil)
+        isPurchasing = true
+        lastError = nil
+        defer { isPurchasing = false }
+        do {
+            try await AppStore.sync()
+            await refresh(api: api)
+            if isPremium {
+                NotificationCenter.default.post(name: .kinrowsSubscriptionActivated, object: nil)
+            } else {
+                lastError = "No active subscription could be confirmed. If you purchased recently, check your connection and try again."
+            }
+        } catch {
+            lastError = error.localizedDescription
         }
     }
 }

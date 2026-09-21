@@ -1,0 +1,115 @@
+{
+  "checkedAt": "2026-09-21T18:54:13.105Z",
+  "decision": "HOLD",
+  "results": [
+    {
+      "id": "A",
+      "name": "Client route inventory",
+      "deps": [],
+      "status": "PASS",
+      "exitCode": 0,
+      "log": "A.log"
+    },
+    {
+      "id": "B",
+      "name": "Backend behavior, isolation and wiring",
+      "deps": [
+        "A"
+      ],
+      "status": "PASS",
+      "exitCode": 0,
+      "log": "B.log"
+    },
+    {
+      "id": "C",
+      "name": "Native Release build (unsigned simulator)",
+      "deps": [
+        "A"
+      ],
+      "status": "PASS",
+      "exitCode": 0,
+      "log": "C-native-summary.log",
+      "rawLog": "/var/folders/hq/nx9hk1515831m37ff_h7zhc40000gn/T/kinrows-release-gates-V8OGwK/C.log",
+      "finalResourceRecheck": "C-native-final.log"
+    },
+    {
+      "id": "D",
+      "name": "ALL non-Settings Concierge workflows",
+      "deps": [
+        "A"
+      ],
+      "status": "FAIL",
+      "exitCode": 1,
+      "log": "D.log"
+    },
+    {
+      "id": "E",
+      "name": "Generated marketing consistency",
+      "deps": [
+        "A"
+      ],
+      "status": "PASS",
+      "exitCode": 0,
+      "log": "E.log"
+    },
+    {
+      "id": "P",
+      "name": "MCP protocol conformance",
+      "deps": [
+        "B"
+      ],
+      "status": "PASS",
+      "exitCode": 0,
+      "log": "P.log"
+    },
+    {
+      "id": "R",
+      "name": "Structural model routing",
+      "deps": [
+        "A"
+      ],
+      "status": "PASS",
+      "exitCode": 0,
+      "log": "R.log"
+    },
+    {
+      "id": "F",
+      "name": "Integrated acceptance",
+      "deps": [
+        "B",
+        "C",
+        "D",
+        "E",
+        "P",
+        "R"
+      ],
+      "status": "BLOCKED",
+      "blockedBy": [
+        "D"
+      ]
+    },
+    {
+      "id": "G",
+      "name": "Physical device, accessibility and live provider acceptance",
+      "deps": [
+        "F"
+      ],
+      "status": "BLOCKED",
+      "blockedBy": [
+        "F"
+      ]
+    },
+    {
+      "id": "H",
+      "name": "App Store Connect and signed distribution acceptance",
+      "deps": [
+        "G"
+      ],
+      "status": "BLOCKED",
+      "blockedBy": [
+        "G"
+      ]
+    }
+  ],
+  "note": "Static routing is not live model verification. Unsigned simulator compilation is not distribution validation. Manual gates cannot pass from this runner."
+}

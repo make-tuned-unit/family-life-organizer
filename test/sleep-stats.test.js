@@ -211,7 +211,7 @@ test('recommendations: under 4 months, no training method is offered', () => {
 // ---------------------------------------------------------------------------
 
 test('nextSleepWindow: a morning nap moves the wake, not last night', () => {
-  const birthdate = '2025-09-20'; // ~10 months → 3–4 hour band
+  const birthdate = new Date(Date.now() - 300 * 86400000).toISOString().slice(0, 10); // ten months → 3–4 hour band
   const night = {
     entry_type: 'night_sleep', entry_date: '2026-08-19',
     value: JSON.stringify({

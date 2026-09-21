@@ -1,0 +1,41 @@
+{
+  "app": {
+    "collectedTypes": [
+      "NSPrivacyCollectedDataTypeName",
+      "NSPrivacyCollectedDataTypeEmailAddress",
+      "NSPrivacyCollectedDataTypeUserID",
+      "NSPrivacyCollectedDataTypeFitness",
+      "NSPrivacyCollectedDataTypePreciseLocation",
+      "NSPrivacyCollectedDataTypePhotosorVideos",
+      "NSPrivacyCollectedDataTypeEmailsOrTextMessages",
+      "NSPrivacyCollectedDataTypeOtherFinancialInfo",
+      "NSPrivacyCollectedDataTypePurchaseHistory",
+      "NSPrivacyCollectedDataTypeOtherUserContent",
+      "NSPrivacyCollectedDataTypePhysicalAddress",
+      "NSPrivacyCollectedDataTypePhoneNumber",
+      "NSPrivacyCollectedDataTypeHealth",
+      "NSPrivacyCollectedDataTypeDeviceID",
+      "NSPrivacyCollectedDataTypeContacts"
+    ],
+    "requiredReasons": [
+      {
+        "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryUserDefaults",
+        "NSPrivacyAccessedAPITypeReasons": [
+          "CA92.1",
+          "1C8F.1"
+        ]
+      }
+    ]
+  },
+  "widget": {
+    "collectedTypes": [],
+    "requiredReasons": [
+      {
+        "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryUserDefaults",
+        "NSPrivacyAccessedAPITypeReasons": [
+          "1C8F.1"
+        ]
+      }
+    ]
+  }
+}

@@ -154,11 +154,18 @@ const reportLimiter = createRateLimiter({ windowMs: 60 * 60 * 1000, max: 20, key
 
 // Regenerate the session to a fresh id and persist the authenticated user on it.
 // Prevents session fixation (an attacker-planted pre-auth session id surviving login).
-function establishSession(req, user) {
+async function establishSession(req, user) {
+  const db = new FamilyDB();
+  let account;
+  try { account = await dbGet(db, 'SELECT password_hash FROM users WHERE id = ?', [user.id]); }
+  finally { db.close(); }
+  if (!account) throw new Error('Account no longer exists');
+  const authStamp = hashAuthToken(account.password_hash);
   return new Promise((resolve, reject) => {
     req.session.regenerate((err) => {
       if (err) return reject(err);
       req.session.user = user;
+      req.session.authStamp = authStamp;
       req.session.save((err2) => err2 ? reject(err2) : resolve());
     });
   });
@@ -410,8 +417,9 @@ app.use((req, res, next) => {
   parser(req, res, next);
 });
 app.use(bodyParser.urlencoded({ extended: true, limit: '1mb' }));
+const sessionStore = new SQLiteStore({ dir: FamilyDB.DB_DIR, db: 'sessions.db', concurrentDB: true });
 app.use(session({
-  store: new SQLiteStore({ dir: FamilyDB.DB_DIR, db: 'sessions.db', concurrentDB: true }),
+  store: sessionStore,
   secret: RESOLVED_SESSION_SECRET,
   resave: false,
   saveUninitialized: false,
@@ -719,18 +727,27 @@ app.get('/healthz', (req, res) => {
 });
 
 // Auth middleware
-function requireAuth(req, res, next) {
+async function requireAuth(req, res, next) {
   if (req.session.user) {
-    next();
-  } else {
-    // Return JSON 401 for API requests, redirect for browser
-    const isApi = req.path.startsWith('/api/');
-    if (isApi) {
-      res.status(401).json({ error: 'Not authenticated' });
-    } else {
-      res.redirect('/login');
-    }
+    const db = new FamilyDB();
+    try {
+      const row = await dbGet(db, 'SELECT password_hash FROM users WHERE id = ?', [req.session.user.id]);
+      // Cookie sessions must die with the account/password, not just refresh tokens.
+      // Legacy sessions re-authenticate once to earn a credential stamp.
+      if (row && req.session.authStamp === hashAuthToken(row.password_hash)) return next();
+    } catch (err) {
+      return sendServerError(res, err);
+    } finally { db.close(); }
+    req.session.destroy(() => {});
   }
+  if (req.path.startsWith('/api/')) return res.status(401).json({ error: 'Not authenticated' });
+  res.redirect('/login');
+}
+
+function eraseUserSessions(userId, exceptSessionId = '') {
+  return new Promise((resolve, reject) => sessionStore.db.run(
+    "DELETE FROM sessions WHERE json_extract(sess, '$.user.id') = ? AND sid != ?",
+    [userId, exceptSessionId], err => err ? reject(err) : resolve()));
 }
 
 function safeReturnTo(value, fallback = '/app') {
@@ -1544,6 +1561,7 @@ app.post('/api/account/delete', requireAuth, loginLimiter, async (req, res) => {
         }
       } catch { /* deletion still proceeds */ }
     }
+    await eraseUserSessions(req.session.user.id);
     await db.deleteUserAccount(req.session.user.id);
     req.session.destroy(() => res.json({ success: true }));
   } catch (err) {
@@ -1620,6 +1638,8 @@ app.post('/api/auth/change-password', requireAuth, loginLimiter, async (req, res
     }
     const password_hash = await bcrypt.hash(new_password, 12);
     await db.updateUserPassword(req.session.user.id, password_hash);
+    req.session.authStamp = hashAuthToken(password_hash);
+    await eraseUserSessions(req.session.user.id, req.sessionID);
     // Password change = sign out every other device: hard-delete all
     // outstanding tokens (no grace), then hand THIS device a fresh one.
     await dbRun(db, 'DELETE FROM auth_tokens WHERE user_id = ?', [req.session.user.id]);
@@ -4221,7 +4241,8 @@ app.get('/api/concierge/brief', requireAuth, conciergeLimiter, async (req, res) 
     const userId = req.session.user.id;
     // skipAI: the client will summarize on-device (or has cloud AI off), so the
     // server makes NO Anthropic call — household data never leaves for the brief.
-    const skipAI = req.query.skipAI === '1' || req.query.skipAI === 'true';
+    // Automatic briefs are deterministic. Visiting Home is not AI consent.
+    const skipAI = true;
     const cacheKey = `${userId}:${skipAI ? 'local' : 'cloud'}`;
     const cached = briefCache.get(cacheKey);
     if (!req.query.refresh && cached && Date.now() - cached.ts < BRIEF_TTL_MS) {

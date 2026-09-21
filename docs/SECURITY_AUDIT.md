@@ -409,3 +409,10 @@ The system moved on substantially since the 2026-06-25 log. Current state:
   images are never stored. Reconcile the copy with the shipped behavior.
 - **Backups are unencrypted** on the same host disk (14-day retention);
   consider app-level encryption of the nightly `VACUUM INTO` snapshots.
+
+
+## 2026-09-21 release QA addendum
+
+See [release QA evidence](qa/RELEASE_QA_2026-09-21.md). Fixed automatic cloud briefs without consent, cross-account consent carryover, credential-cookie survival after password change/deletion, private-health and selected child-row retention during deletion, and the runtime qs advisory. Added storage-level and second-device cookie regressions. Existing sessions reauthenticate once after deployment to acquire a credential stamp.
+
+Still blocking: UGC blocking/filtering, Sign in with Apple authorization revocation, full shared-content/backups/outbox erasure policy and failed Stripe-cancellation handling. Seven install-chain dependency advisories remain. No production configuration or secrets were changed.

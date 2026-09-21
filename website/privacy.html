@@ -102,7 +102,7 @@
           <li>Your household's data — calendar, money, lists, notes, messages — is walled off to the people you've invited. That isolation is enforced in the database, not just hidden in the app.</li>
           <li><strong>We don't sell your data, and we don't run ads.</strong> There's nothing to mine, because the app isn't built to mine it.</li>
           <li>We collect the minimum we need to run the app, keep your account secure, and improve it.</li>
-          <li><strong>Concierge</strong> (our optional AI add-on) is the only part that sends your content to an AI provider — and only when you use it. Your data is never used to train anyone's AI models.</li>
+          <li><strong>Cloud AI</strong> features — Concierge chat, receipt scanning and meal ideas — send relevant content to an AI provider after you allow the feature. Daily briefs do not use cloud AI. Your data is never used to train anyone's AI models.</li>
           <li>You can view, correct, or delete your data — including your whole account — from the app. You can ask us to export a copy by emailing <a href="mailto:kinrows@atlasatlantic.co">kinrows@atlasatlantic.co</a>.</li>
         </ul>
       </div>
@@ -157,6 +157,7 @@
             <li><strong>Account details.</strong> Your name and email address, and a securely hashed version of your password if you create an account with email. If you use Sign in with Apple, we store Apple's stable user identifier and the email Apple provides (which may be a Hide My Email relay address). We never store your password in plain text.</li>
             <li><strong>Household &amp; group setup.</strong> The households and "clans" you create or join, who's in them, and the invitations you send.</li>
             <li><strong>The content you create.</strong> Everything you put into the app to organize your home — appointments and calendar entries, tasks and lists, decisions and votes, budget categories, expenses, recurring payments, receipts, pantry items, trips and itineraries, gift ideas, special dates, notes, messages, and feed posts. When you scan a receipt, its photo is sent to our AI provider to read the details and is <strong>not stored</strong> — we keep only the extracted merchant, total, and category.</li>
+            <li><strong>Health routines.</strong> If you use these features, we store menstrual-cycle and fertility tracking entries, symptoms, and sleep logs and birthdates used for age-based guidance. Private routines are visible to their owner; sharing them is optional. Relevant details may be sent to Anthropic when you permit and use an AI feature that accesses them.</li>
             <li><strong>Family &amp; contact details.</strong> Information you add about family members and contacts, including phone numbers if you choose to add them, and — only if you choose to add them — addresses, which we convert to map coordinates so the app can show locations.</li>
             <li><strong>Location.</strong> While a trip you start is active, the app shares your device location so your family can see your ETA and get an arrival alert; this stops when the trip ends or you cancel it. Separately, <strong>only if you turn on presence sharing</strong> (off by default, and enforced on the server), the app periodically shares your approximate place — home, work, or out — with your household. You can turn this off anytime; we then delete the stored coordinates. Your health/fitness step counts are read (with your permission) only to score fitness challenges you join.</li>
             <li><strong>Website sign-up.</strong> If you ask to be notified at launch, we collect your email address for that single purpose.</li>
@@ -207,14 +208,13 @@
         <section id="ai">
           <h2><span class="h-num">4</span>The Concierge (AI) features</h2>
           <p>
-            Concierge is an <strong>optional</strong> paid add-on. The core app works fully without it,
-            and these features only run when you turn them on and use them.
+            Concierge chat is an <strong>optional</strong> paid add-on. Receipt scanning and meal ideas also use cloud AI and ask for permission separately. You can use the core organizer without cloud AI.
           </p>
           <ul>
-            <li><strong>What happens.</strong> When you use a Concierge feature — the daily brief, asking it a question, asking it to manage something for you, scanning a receipt, or meal ideas — the relevant household information needed to answer is sent securely to our AI provider to generate a response, which is returned to you.</li>
+            <li><strong>What happens.</strong> When you allow and use cloud chat, receipt scanning, or meal ideas, the relevant household information needed to answer is sent securely to our AI provider to generate a response, which is returned to you.</li>
             <li><strong>Who processes it.</strong> Server-side AI is processed by <strong>Anthropic</strong> (the maker of Claude), acting as our processor under contract. Some quick summaries are generated <strong>privately on your own device</strong> and never leave your iPhone.</li>
-            <li><strong>No training.</strong> Your content is <strong>not used to train</strong> our AI provider's models. It is processed to give you a result and is not retained by the provider to improve their models.</li>
-            <li><strong>You stay in control.</strong> When you ask it to, Concierge can create, edit, and delete items across the app on your behalf — and it only ever acts within your own household and groups, never anyone else's data. You can turn it off at any time, and you can clear what it has remembered for you.</li>
+            <li><strong>No training.</strong> Your content is <strong>not used to train</strong> our AI provider's models. Anthropic may retain API inputs and outputs under its <a href="https://privacy.claude.com/en/articles/7996866-how-long-do-you-store-my-organization-s-data">commercial data retention policy</a>, including security and legal exceptions. We do not promise immediate deletion by the provider.</li>
+            <li><strong>You stay in control.</strong> When you ask it to, Concierge can create, edit, and delete items across the app on your behalf — and it only ever acts within your own household and groups, never anyone else's data. You can turn cloud AI off at any time. Deleting your account removes your saved Concierge conversations and memory; contact support for help with selective removal.</li>
             <li><strong>Bring your own agent.</strong> Paid households can mint a Developer API key and point their own AI at Kinrows. That key can read and change the same household data the Concierge can. Treat it like a password. Data those agents send to <em>your</em> model is governed by that provider's policy, not ours.</li>
             <li><strong>It can be wrong.</strong> AI output may contain mistakes. Please review it before relying on it, especially for anything important.</li>
           </ul>

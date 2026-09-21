@@ -130,6 +130,8 @@ test('password change revokes all tokens but re-issues for this device', async (
     current_password: 'password123', new_password: 'newpassword456',
   });
   assert.equal(change.status, 200);
+  assert.equal((await deviceB('GET', '/api/notes')).status, 401, 'the old cookie session is revoked too');
+  assert.equal((await deviceA('GET', '/api/notes')).status, 200, 'current session remains usable');
   const freshA = change.body.refresh_token;
   assert.ok(freshA, 'password change returns a fresh token for this device');
 

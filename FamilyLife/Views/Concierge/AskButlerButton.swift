@@ -350,7 +350,7 @@ struct ConciergeIntroView: View {
                     Text("AI Concierge")
                         .font(.flScreenTitle)
                         .foregroundStyle(WarmPalette.ink1)
-                    Text("A warm daily brief of what needs you across the family, posted to the Feed each morning, plus a chat that can look things up and add to your calendar, lists, and budget.")
+                    Text("A daily brief on Home showing what needs you across the family, plus a chat that can look things up and update your calendar, lists, and budget.")
                         .font(.flSubheadline)
                         .foregroundStyle(WarmPalette.ink3)
                 }
@@ -376,7 +376,7 @@ struct ConciergeIntroView: View {
                         .foregroundStyle(WarmPalette.ink2)
                     Label(subscription.isPremium
                           ? "Concierge chat is active on your household."
-                          : "Concierge chat needs Premium.",
+                          : "Concierge chat needs Lite or Premium.",
                           systemImage: subscription.isPremium ? "checkmark.seal.fill" : "lock.fill")
                         .foregroundStyle(WarmPalette.ink2)
                 }

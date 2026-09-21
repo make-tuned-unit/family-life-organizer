@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		AA009021 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = BB000234 /* PrivacyInfo.xcprivacy */; };
 		AA000001 /* FamilyLifeApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000001 /* FamilyLifeApp.swift */; };
 		AA000002 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000002 /* ContentView.swift */; };
 		AA000003 /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000003 /* LoginView.swift */; };
@@ -186,6 +187,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		BB000234 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		BB000001 /* FamilyLifeApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FamilyLifeApp.swift; sourceTree = "<group>"; };
 		BB000002 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		BB000003 /* LoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
@@ -689,6 +691,7 @@
 				BB000230 /* KinrowsWidget.swift */,
 				BB000232 /* Info.plist */,
 				BB000233 /* KinrowsWidget.entitlements */,
+				BB000234 /* PrivacyInfo.xcprivacy */,
 			);
 			path = KinrowsWidget;
 			sourceTree = "<group>";
@@ -839,6 +842,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				AA009021 /* PrivacyInfo.xcprivacy in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

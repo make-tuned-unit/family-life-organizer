@@ -18,14 +18,10 @@ final class ConciergeViewModel {
     func load(api: APIService, force: Bool = false) async {
         if case .loaded = state {} else { state = .loading }
 
-        // Cloud AI defaults ON. When the brief can be summarized on-device, or the
-        // user turned cloud AI off, ask the server to skip the Anthropic call so no
-        // household data is sent for the brief.
-        let cloudAIEnabled = (UserDefaults.standard.object(forKey: "cloudAIEnabled") as? Bool) ?? true
+        // Automatic briefs never send household data to cloud AI.
         let canSummarizeOnDevice = OnDeviceSummarizer.isAvailable
         let uitest = ProcessInfo.processInfo.environment["UITEST_AUTOLOGIN"] != nil
-        // Screenshot harness wants the server's clean bullet formatting → don't skip.
-        let skipCloud = !uitest && (canSummarizeOnDevice || !cloudAIEnabled)
+        let skipCloud = true
 
         do {
             let brief = try await api.fetchConciergeBrief(forceRefresh: force, skipAI: skipCloud)

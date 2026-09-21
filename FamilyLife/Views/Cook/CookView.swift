@@ -6,7 +6,6 @@ struct CookView: View {
     @Environment(APIService.self) private var api
     @State private var viewModel = CookViewModel()
     @State private var showingAIDisclosure = false
-    @State private var hasAIConsent = AIConsentManager.hasConsented
     @State private var cookingRecipe: RecipeSuggestion?
     @AppStorage("cloudAIEnabled") private var cloudAIEnabled = true
 
@@ -55,7 +54,6 @@ struct CookView: View {
             AIDisclosureView(
                 onAccept: {
                     AIConsentManager.grant()
-                    hasAIConsent = true
                     showingAIDisclosure = false
                     getSuggestions()
                 },
@@ -68,7 +66,7 @@ struct CookView: View {
 
     private func getSuggestions() {
         guard cloudAIEnabled else { return }   // recipe AI sends your pantry to the cloud
-        guard hasAIConsent else {
+        guard AIConsentManager.hasConsented else {
             showingAIDisclosure = true
             return
         }

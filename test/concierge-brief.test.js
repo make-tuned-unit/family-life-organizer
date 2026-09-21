@@ -155,3 +155,21 @@ test('PUT /api/users/me/concierge persists the opt-in; brief feeds the Home sect
   const putOff = await client('PUT', '/api/users/me/concierge', { enabled: false });
   assert.equal(putOff.body.enabled, false);
 });
+
+test('automatic brief generation and household sweep never invoke the AI provider', async () => {
+  const ai = require('../services/anthropic');
+  const { generateBrief } = require('../services/conciergeBrief');
+  const { buildSnapshot } = require('../services/conciergeContext');
+  const enabled = ai.isAIEnabled, call = ai.callClaude;
+  let calls = 0;
+  ai.isAIEnabled = () => true;
+  ai.callClaude = async () => { calls++; throw new Error('unexpected external data transfer'); };
+  try {
+    const h = await seedHousehold('NoCloudBrief', { enabled: true });
+    const snapshot = await buildSnapshot(db, h.userId);
+    const brief = await generateBrief(snapshot, 'NoCloudBrief');
+    assert.equal(brief.ai_enabled, false);
+    await runDailyBriefSweep(db);
+    assert.equal(calls, 0, 'no cloud transfer even with an enabled provider');
+  } finally { ai.isAIEnabled = enabled; ai.callClaude = call; }
+});

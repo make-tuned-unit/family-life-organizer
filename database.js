@@ -3043,6 +3043,17 @@ class FamilyDB {
           // The user's own lists (household-visible but owner-scoped) + items.
           await run('DELETE FROM list_items WHERE list_id IN (SELECT id FROM lists WHERE created_by = ?)', [uid]);
           await run('DELETE FROM lists WHERE created_by = ?', [uid]);
+          // This connection disables FK cascades, so erase private health data
+          // and its children explicitly, even when the household survives.
+          await run(`DELETE FROM routine_entries WHERE routine_id IN
+            (SELECT id FROM routines WHERE created_by = ? AND COALESCE(shared_scope, 'private') != 'household')`, [uid]);
+          await run("DELETE FROM routines WHERE created_by = ? AND COALESCE(shared_scope, 'private') != 'household'", [uid]);
+          await run("DELETE FROM special_events WHERE created_by = ? AND shared_scope = 'private'", [uid]);
+          await run("DELETE FROM milestones WHERE created_by = ? AND shared_scope = 'private'", [uid]);
+          for (const table of ['synced_calendar_events', 'oauth_authorization_codes',
+            'developer_api_audit', 'oauth_tokens', 'home_preferences', 'onboarding_emails']) {
+            await run(`DELETE FROM ${table} WHERE user_id = ?`, [uid]);
+          }
           // Detach authorship from shared content the FAMILY keeps.
           for (const [table, col] of [['feed_posts', 'author_id'], ['appointments', 'created_by'],
             ['trips', 'traveler_id'], ['itinerary_stays', 'host_user_id']]) {
@@ -3060,6 +3071,22 @@ class FamilyDB {
               'SELECT COUNT(*) AS n FROM group_members WHERE group_id = ? AND user_id IS NOT NULL AND user_id != ?',
               [h.id, uid]);
             if ((others?.n || 0) === 0) {
+              // Child tables without group_id cannot be wiped by the household
+              // loop below, and ON DELETE CASCADE is intentionally disabled.
+              for (const [child, foreignKey, parent] of [
+                ['routine_entries', 'routine_id', 'routines'],
+                ['decision_reactions', 'decision_id', 'decisions'],
+                ['decision_comments', 'decision_id', 'decisions'],
+                ['rivalry_entries', 'rivalry_id', 'rivalries'],
+                ['project_expenses', 'project_id', 'budget_projects'],
+                ['itinerary_stays', 'itinerary_id', 'itineraries'],
+                ['event_attachments', 'appointment_id', 'appointments'],
+                ['feed_reactions', 'post_id', 'feed_posts'],
+                ['feed_comments', 'post_id', 'feed_posts'],
+                ['concierge_messages', 'conversation_id', 'concierge_conversations'],
+              ]) {
+                await run(`DELETE FROM ${child} WHERE ${foreignKey} IN (SELECT id FROM ${parent} WHERE group_id = ?)`, [h.id]);
+              }
               for (const t of FamilyDB.HOUSEHOLD_TABLES) {
                 const cols = await all(`PRAGMA table_info(${t})`);
                 if (!cols.some(c => c.name === 'group_id')) continue;

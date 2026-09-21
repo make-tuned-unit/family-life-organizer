@@ -346,6 +346,7 @@ final class AuthService {
         // Per-account preferences — the next person on this phone must not
         // inherit presence, calendar-share, HealthKit watermarks, or AI toggles.
         UserDefaults.standard.removeObject(forKey: "sharePresenceEnabled")
+        AIConsentManager.revokeAll()
         UserDefaults.standard.removeObject(forKey: "cloudAIEnabled")
         UserDefaults.standard.removeObject(forKey: "aiConciergeEnabled")
         UserDefaults.standard.removeObject(forKey: "calendarShareEnabled")

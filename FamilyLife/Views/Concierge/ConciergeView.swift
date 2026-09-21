@@ -144,7 +144,7 @@ struct ConciergeView: View {
                         .font(.system(size: 22))
                         .foregroundStyle(accent)
                 } else {
-                    Label("Premium", systemImage: "lock.fill")
+                    Label("Subscribe", systemImage: "lock.fill")
                         .font(.flCaption.weight(.semibold))
                         .foregroundStyle(accent)
                         .padding(.horizontal, 10)

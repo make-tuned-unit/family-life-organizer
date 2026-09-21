@@ -1,0 +1,468 @@
+{
+  "checkedAt": "2026-09-21T18:56:52.100Z",
+  "clientCalls": 217,
+  "serverRoutes": 267,
+  "missingRoutes": [],
+  "concierge": {
+    "handlers": 123,
+    "modelTools": 25,
+    "workflows": [
+      {
+        "workflow": "Home card priorities",
+        "operations": [
+          "get_home_cards",
+          "set_home_cards"
+        ],
+        "missing": []
+      },
+      {
+        "workflow": "Calendar event lifecycle",
+        "operations": [
+          "get_calendar",
+          "add_appointment",
+          "update_appointment",
+          "delete_appointment"
+        ],
+        "missing": []
+      },
+      {
+        "workflow": "Calendar attachments",
+        "operations": [
+          "get_event_attachments",
+          "add_event_attachment",
+          "delete_event_attachment"
+        ],
+        "app": "fetchEventAttachments/addEventAttachment/deleteEventAttachment",
+        "missing": [
+          "get_event_attachments",
+          "add_event_attachment",
+          "delete_event_attachment"
+        ]
+      },
+      {
+        "workflow": "Tasks",
+        "operations": [
+          "list_tasks",
+          "add_task",
+          "update_task",
+          "complete_task",
+          "delete_task"
+        ],
+        "missing": []
+      },
+      {
+        "workflow": "Lists and items",
+        "operations": [
+          "get_lists",
+          "get_list",
+          "create_list",
+          "rename_list",
+          "delete_list",
+          "add_list_item",
+          "check_off_item",
+          "update_list_item",
+          "delete_list_item",
+          "move_list_item"
+        ],
+        "missing": []
+      },
+      {
+        "workflow": "List presentation and ordering",
+        "operations": [
+          "pin_list",
+          "unpin_list",
+          "reorder_list_items"
+        ],
+        "app": "pinList/unpinList/reorderListItems; updateList also supports more fields than rename",
+        "missing": [
+          "pin_list",
+          "unpin_list",
+          "reorder_list_items"
+        ]
+      },
+      {
+        "workflow": "Budget and expenses",
+        "operations": [
+          "get_budget",
+          "list_receipts",
+          "add_expense",
+          "delete_receipt",
+          "add_budget_category",
+          "update_budget_category",
+          "delete_budget_category"
+        ],
+        "missing": []
+      },
+      {
+        "workflow": "Budget history",
+        "operations": [
+          "get_budget_stats"
+        ],
+        "app": "fetchBudgetStats",
+        "missing": [
+          "get_budget_stats"
+        ]
+      },
+      {
+        "workflow": "Recurring payments",
+        "operations": [
+          "get_recurring_payments",
+          "add_recurring_payment",
+          "update_recurring_payment",
+          "delete_recurring_payment"
+        ],
+        "missing": []
+      },
+      {
+        "workflow": "Budget projects",
+        "operations": [
+          "get_projects",
+          "add_project",
+          "delete_project",
+          "add_project_expense",
+          "delete_project_expense"
+        ],
+        "missing": []
+      },
+      {
+        "workflow": "Read project expenses",
+        "operations": [
+          "get_project_expenses"
+        ],
+        "app": "fetchProjectExpenses",
+        "missing": [
+          "get_project_expenses"
+        ]
+      },
+      {
+        "workflow": "Pantry",
+        "operations": [
+          "list_pantry",
+          "add_pantry_item",
+          "update_pantry_item",
+          "delete_pantry_item"
+        ],
+        "missing": []
+      },
+      {
+        "workflow": "Decisions voting",
+        "operations": [
+          "list_decisions",
+          "add_decision",
+          "vote_decision",
+          "comment_decision",
+          "delete_decision"
+        ],
+        "missing": []
+      },
+      {
+        "workflow": "Decision management and discussion",
+        "operations": [
+          "update_decision",
+          "get_decision_reactions",
+          "get_decision_comments"
+        ],
+        "app": "updateDecision/fetchDecisionReactions/fetchDecisionComments",
+        "missing": [
+          "update_decision",
+          "get_decision_reactions",
+          "get_decision_comments"
+        ]
+      },
+      {
+        "workflow": "Trips",
+        "operations": [
+          "get_trips",
+          "add_trip",
+          "update_trip",
+          "arrive_trip",
+          "cancel_trip",
+          "delete_trip"
+        ],
+        "missing": []
+      },
+      {
+        "workflow": "Saved family addresses",
+        "operations": [
+          "get_addresses",
+          "add_address",
+          "update_address",
+          "delete_address"
+        ],
+        "app": "fetchFamilyAddresses/addFamilyAddress/updateFamilyAddress/deleteFamilyAddress",
+        "missing": [
+          "add_address",
+          "update_address",
+          "delete_address"
+        ]
+      },
+      {
+        "workflow": "Itinerary lifecycle",
+        "operations": [
+          "get_itineraries",
+          "add_itinerary",
+          "update_itinerary",
+          "delete_itinerary",
+          "get_itinerary_stays",
+          "add_itinerary_stay",
+          "update_itinerary_stay",
+          "delete_itinerary_stay",
+          "add_itinerary_expense"
+        ],
+        "missing": []
+      },
+      {
+        "workflow": "Itinerary hosting approvals and expense review",
+        "operations": [
+          "request_stay",
+          "respond_to_stay",
+          "get_pending_stay_requests",
+          "get_itinerary_expenses"
+        ],
+        "app": "requestStay/respondToStay/fetchPendingStayRequests/fetchItineraryExpenses",
+        "missing": [
+          "request_stay",
+          "respond_to_stay",
+          "get_pending_stay_requests",
+          "get_itinerary_expenses"
+        ]
+      },
+      {
+        "workflow": "Rivalries",
+        "operations": [
+          "get_rivalries",
+          "create_rivalry",
+          "log_rivalry_score",
+          "complete_rivalry",
+          "delete_rivalry"
+        ],
+        "missing": []
+      },
+      {
+        "workflow": "Rivalry configuration and results",
+        "operations": [
+          "update_rivalry",
+          "get_rivalry_entries",
+          "get_rivalry_leaderboard"
+        ],
+        "app": "updateRivalry/fetchRivalryEntries/fetchRivalryLeaderboard",
+        "missing": [
+          "update_rivalry",
+          "get_rivalry_entries",
+          "get_rivalry_leaderboard"
+        ]
+      },
+      {
+        "workflow": "Gifts",
+        "operations": [
+          "get_gift_people",
+          "add_gift_person",
+          "get_gift_ideas",
+          "add_gift_idea",
+          "update_gift_idea",
+          "delete_gift_idea"
+        ],
+        "missing": []
+      },
+      {
+        "workflow": "People and milestones",
+        "operations": [
+          "list_people",
+          "add_person",
+          "update_person",
+          "delete_person",
+          "list_milestones",
+          "log_milestone",
+          "update_milestone",
+          "delete_milestone"
+        ],
+        "missing": []
+      },
+      {
+        "workflow": "Key dates",
+        "operations": [
+          "get_special_events",
+          "add_special_event",
+          "update_special_event",
+          "delete_special_event"
+        ],
+        "missing": []
+      },
+      {
+        "workflow": "Contacts",
+        "operations": [
+          "get_contacts",
+          "add_contact",
+          "update_contact",
+          "delete_contact"
+        ],
+        "missing": []
+      },
+      {
+        "workflow": "Coverage",
+        "operations": [
+          "get_coverage",
+          "create_coverage_request",
+          "cancel_coverage_request",
+          "get_incoming_coverage",
+          "approve_incoming_coverage"
+        ],
+        "missing": []
+      },
+      {
+        "workflow": "Coverage detail and blocks",
+        "operations": [
+          "get_coverage_detail",
+          "get_coverage_blocks"
+        ],
+        "app": "fetchCoverageDetail/fetchCoverageBlocks",
+        "missing": [
+          "get_coverage_detail",
+          "get_coverage_blocks"
+        ]
+      },
+      {
+        "workflow": "Notes",
+        "operations": [
+          "list_notes",
+          "add_note",
+          "update_note",
+          "delete_note"
+        ],
+        "missing": []
+      },
+      {
+        "workflow": "Routine lifecycle",
+        "operations": [
+          "list_routines",
+          "get_routine",
+          "create_routine",
+          "update_routine",
+          "delete_routine",
+          "set_routine_shared",
+          "archive_routine",
+          "restore_routine"
+        ],
+        "app": "addRoutine/updateRoutine/deleteRoutine/setRoutineShared",
+        "missing": [
+          "create_routine",
+          "update_routine",
+          "delete_routine",
+          "set_routine_shared"
+        ]
+      },
+      {
+        "workflow": "Routine entries",
+        "operations": [
+          "log_routine_entry",
+          "update_routine_entry",
+          "delete_routine_entry",
+          "get_routine_occurrences"
+        ],
+        "app": "updateRoutineEntry/deleteRoutineEntry/fetchRoutineOccurrences",
+        "missing": [
+          "update_routine_entry",
+          "delete_routine_entry",
+          "get_routine_occurrences"
+        ]
+      },
+      {
+        "workflow": "Sleep tracking",
+        "operations": [
+          "log_sleep",
+          "start_sleep",
+          "end_sleep",
+          "set_sleep_start",
+          "get_sleep_stats",
+          "analyze_sleep"
+        ],
+        "missing": []
+      },
+      {
+        "workflow": "Chores",
+        "operations": [
+          "setup_chores",
+          "update_chores",
+          "get_chores",
+          "log_chore",
+          "log_chore_bonus",
+          "log_chore_payout"
+        ],
+        "missing": []
+      },
+      {
+        "workflow": "Feed participation",
+        "operations": [
+          "add_feed_post",
+          "add_feed_reaction",
+          "add_feed_comment"
+        ],
+        "missing": []
+      },
+      {
+        "workflow": "Feed management",
+        "operations": [
+          "get_feed",
+          "delete_feed_post",
+          "get_feed_reactions",
+          "remove_feed_reaction",
+          "get_feed_comments"
+        ],
+        "app": "fetchFeed/deleteFeedPost/fetchFeedReactions/removeFeedReaction/fetchFeedComments",
+        "missing": [
+          "get_feed",
+          "delete_feed_post",
+          "get_feed_reactions",
+          "remove_feed_reaction",
+          "get_feed_comments"
+        ]
+      },
+      {
+        "workflow": "Messages",
+        "operations": [
+          "send_message",
+          "get_conversations",
+          "get_messages",
+          "mark_messages_read"
+        ],
+        "app": "fetchConversations/fetchMessages/markMessagesRead; send_message only sends text",
+        "missing": [
+          "get_conversations",
+          "get_messages",
+          "mark_messages_read"
+        ]
+      },
+      {
+        "workflow": "Concierge memory",
+        "operations": [
+          "remember",
+          "get_memory",
+          "delete_memory"
+        ],
+        "app": "Backend memory endpoints exist but deletion has no native UI",
+        "missing": [
+          "get_memory",
+          "delete_memory"
+        ]
+      },
+      {
+        "workflow": "History",
+        "operations": [
+          "get_history"
+        ],
+        "missing": []
+      }
+    ],
+    "nativeHandoffsUnverified": [
+      "Camera/photo receipt capture, review and save to budget/pantry",
+      "Cook recipe selection, saved recipes, cooking mode and ingredient deduction",
+      "Device calendar import/export and permission handoff",
+      "Trip location lifecycle: Concierge-created trips must start/stop native location sharing",
+      "HealthKit consent and rivalry health sync",
+      "DM/feed image attachments and content reporting",
+      "Family/clan creation, membership, invitations and sharing outside Settings",
+      "Conversation-history resume/delete and full note retrieval",
+      "Notification/reminder scheduling after server-side writes"
+    ]
+  }
+}

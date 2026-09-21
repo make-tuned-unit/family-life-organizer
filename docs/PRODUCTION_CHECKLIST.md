@@ -1,5 +1,7 @@
 # Kinrows — Production Launch Checklist
 
+> **2026-09-21 release decision: HOLD.** The current evidence and blocking DAG are in [the release QA report](qa/RELEASE_QA_2026-09-21.md). Older checkmarks below are historical, not submission approval. In particular, user blocking, Apple authorization revocation, complete data erasure, live billing/device evidence, and ALL-workflow Concierge parity are unresolved. Run `npm run qa:release -- --native`; it fails closed on incomplete gates.
+
 **Maintained live.** This is the single source of truth for what's left before
 App Store submission. Update the checkboxes as items land. Last updated
 2026-08-31 (rebased pre-launch security PR onto main).

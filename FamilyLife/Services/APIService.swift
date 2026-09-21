@@ -439,6 +439,7 @@ final class APIService {
     }
 
     func scanReceipt(imageData: Data) async throws -> ScanResult {
+        guard AIConsentManager.hasReceiptConsent else { throw APIError.aiConsentRequired }
         guard cloudAIEnabled else { throw APIError.cloudAIDisabled }
         let base64 = imageData.base64EncodedString()
         let body: [String: Any] = ["image": base64]
@@ -506,6 +507,7 @@ final class APIService {
     }
 
     func suggestRecipes(query: String) async throws -> [RecipeSuggestion] {
+        guard AIConsentManager.hasConsented else { throw APIError.aiConsentRequired }
         guard cloudAIEnabled else { throw APIError.cloudAIDisabled }
         let body: [String: Any] = ["query": query]
         let response: CookResponse = try await post("/api/cook/suggest", body: body)
@@ -522,7 +524,7 @@ final class APIService {
     /// skipAI=true tells the server to make NO Anthropic call (the client will
     /// summarize on-device, or the user turned cloud AI off) — the household data
     /// never leaves the server for the brief.
-    func fetchConciergeBrief(forceRefresh: Bool = false, skipAI: Bool = false) async throws -> ConciergeBrief {
+    func fetchConciergeBrief(forceRefresh: Bool = false, skipAI: Bool = true) async throws -> ConciergeBrief {
         // AI-backed endpoint: allow extra headroom for the Claude round-trip.
         var params: [String: String] = [:]
         if forceRefresh { params["refresh"] = "1" }
@@ -561,6 +563,7 @@ final class APIService {
         conversationId: Int?,
         source: ConciergeMessageSource = .text
     ) async throws -> ConciergeChatResponse {
+        guard AIConsentManager.hasConciergeConsent else { throw APIError.aiConsentRequired }
         guard cloudAIEnabled else { throw APIError.cloudAIDisabled }
         var body: [String: Any] = ["message": message, "source": source.rawValue]
         if let conversationId { body["conversation_id"] = conversationId }
@@ -586,11 +589,13 @@ final class APIService {
         let base = baseURL
         let session = self.session
         let enabled = cloudAIEnabled
+        let consented = AIConsentManager.hasConciergeConsent
         let sourceValue = source.rawValue
         return AsyncThrowingStream { continuation in
             let task = Task.detached {
                 do {
                     guard enabled else { throw APIError.cloudAIDisabled }
+                    guard consented else { throw APIError.aiConsentRequired }
                     guard let url = URL(string: base + "/api/concierge/chat/stream") else { throw APIError.invalidResponse }
                     var request = URLRequest(url: url)
                     request.httpMethod = "POST"
@@ -1980,6 +1985,7 @@ enum APIError: LocalizedError {
     case serverError(Int)
     case serverMessage(Int, String)
     case cloudAIDisabled
+    case aiConsentRequired
     case streamError(String)
     case notModified
 
@@ -1989,6 +1995,7 @@ enum APIError: LocalizedError {
         case .unauthorized: "Please sign in again"
         case .serverError(let code): "Server error (\(code))"
         case .serverMessage(_, let message): message
+        case .aiConsentRequired: "Please review and allow AI data sharing before using this feature."
         case .cloudAIDisabled: "Cloud AI is off. Turn it on in Settings → Privacy to use this feature."
         case .streamError(let msg): msg
         case .notModified: "Not modified"

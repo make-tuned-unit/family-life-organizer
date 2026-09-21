@@ -287,12 +287,15 @@ struct SettingsView: View {
                         .foregroundStyle(TabAccent.home.color)
                 }
                 .tint(AccentTheme.sage.color)
+                .onChange(of: cloudAIEnabled) { _, enabled in
+                    if !enabled { AIConsentManager.revokeAll() }
+                }
             } header: {
                 Text("Privacy")
             } footer: {
                 Text(cloudAIEnabled
-                    ? "Your daily brief is summarized privately on-device when your iPhone supports it — nothing is sent. The concierge chat sends what it needs to Anthropic to answer and take actions; Anthropic doesn’t train on it."
-                    : "Cloud AI is off. The brief stays fully on-device/offline and the concierge chat is disabled, so no household data is sent to Anthropic.")
+                    ? "Daily briefs do not use cloud AI. Chat, receipt scanning and meal ideas ask for permission before sending relevant content to Anthropic. Turn this off to revoke all three permissions."
+                    : "Cloud AI is off. Chat, AI receipt scanning and meal ideas are disabled. Daily briefs still load from Kinrows without sending data to Anthropic.")
             }
 
             Section {
