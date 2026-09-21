@@ -58,3 +58,31 @@ Added full-note retrieval with owner/shared-membership authorization. Behavioral
 The registry now has 168 handlers and 29 model-facing tools. Real-provider synthetic checks pass 3/3 for receipt, health and group handoff routing. These prove chat/API action delivery, **not** completion of native permission flows. The nine native acceptance categories remain open in the fail-closed DAG; a route to a screen is not full workflow parity.
 
 Verification for this batch: 462 backend tests pass, including 19 isolated wiring scenarios; five MCP conformance scenarios pass; SEO validates 40 pages and five hubs; unsigned Release app/widget compilation passes. Native handoff button interaction and completion remain unverified.
+
+
+## Outstanding-work follow-up
+
+The preceding handoff batch deployed as `1480e9c`, Railway `cc28024a-be8d-436a-90e4-656d8a167d08`; deployment and CI succeeded and health returned 200.
+
+The next remediation batch closes further defects:
+
+- Reports and their notification jobs now commit together. Delivery failures retry and remain observable; a protected operator CLI lists/resolves reports and signals overdue/failed delivery. Removal clears queued previews. Operator staffing and production delivery are not assumed from the presence of this tooling.
+- Backup retention now expires snapshots by age after 14 days rather than counting fourteen files. A synthetic snapshot passed read-only restore, integrity and persisted-row checks. Application snapshots are not offsite disaster recovery, and restore deletion reconciliation remains an operator gate.
+- Deletion now removes owned shared health routines, authored routine entries, linked person profiles, identified trips, owned itineraries/hosting rows and generated hosting events. Other household members' records survive. New trips store only unambiguous, server-resolved member IDs; legacy name-only rows still need reconciliation.
+- Direct coverage, hosting and rivalry notifications carry server actor IDs so blocked actors are suppressed at delivery. Group member additions also reject blocked users before the owned-contact fallback. Hosting requests are transactional and idempotent, preventing repeat requests from overwriting confirmed state.
+- SQLite upgraded to 6.0.1, including the session-store dependency. `npm audit` now reports **zero vulnerabilities** across production and development dependencies. CI no longer ignores high/critical advisory failures. The upstream package is archived; a future maintained-driver migration is still prudent, not a claim that this upgrade supplies ongoing upstream support.
+- Pure native handoffs use deterministic pending instructions. Live UI testing caught the model claiming screens were already open; that claim is now prevented by ending the turn at the user-action boundary.
+- Conversation history now persists/restores action buttons without replaying completed mutations.
+- Paid-access checks refresh entitlement before deciding to show a paywall. Product loading no longer delays an existing household entitlement, and failed entitlement checks produce a retryable error instead of assuming the household is unpaid. The access-check session has an eight-second resource ceiling rather than waiting for connectivity/retry.
+
+Verification: **471 backend tests pass** after the final report-removal/status, concurrent-request, history and blocked-contact-bypass checks; 74/74 structural routing cases; five MCP conformance scenarios; zero dependency advisories; website generation validates 40 pages and five hubs. Three real-provider synthetic handoff scenarios verify truthful pending wording and persisted action readback. Debug compilation passes; final Release compilation is recorded with the deployment evidence.
+
+Native acceptance now verifies all ten handoff entry/return destinations: receipt scanner, Cook, Calendar, Trips, Rivalries, Family groups, Messages, Notes, Routines, and conversation history. History resume restored a saved button and opened Notes; the paid fixture opened chat after relaunch. These checks used only synthetic local data. They **do not** close physical-device permissions, full workflow/field parity, image moderation, StoreKit sandbox/review strategy, legacy erasure reconciliation, external backups or App Store Connect gates.
+
+[RELEASE_OPERATIONS.md](RELEASE_OPERATIONS.md) gives the concrete operator commands, retention/restore procedure, and remaining prerequisites. Sign in with Apple key availability, App Store Connect access and the launch moderation owner were requested; no answer is recorded yet. No signed iOS distribution build has been uploaded.
+
+Prepared [App Store listing and reviewer notes](APP_STORE_SUBMISSION_DRAFT.md) with explicit pending account fields. No draft credentials, approvals or distribution evidence are fabricated.
+
+Final native follow-up: the offline access check showed “Could not check your subscription. Please try again.” within the observed six-second UI action/capture, leaving the brief usable and not opening a paywall. The Concierge header mascot was enlarged from 44×52 to 64×76 and visually checked in the simulator.
+
+Final optimized arm64 iOS Simulator Release app/widget build: PASS. The app also recovered from the simulated entitlement outage and reopened chat after the QA server returned. The larger mascot remains in the QA preview for visual review.

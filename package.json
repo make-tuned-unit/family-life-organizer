@@ -4,7 +4,7 @@
   "description": "",
   "main": "database.js",
   "engines": {
-    "node": ">=20"
+    "node": ">=20.17.0"
   },
   "scripts": {
     "start": "node dashboard.js",
@@ -30,11 +30,14 @@
     "express": "^5.2.1",
     "express-session": "^1.19.0",
     "helmet": "^8.2.0",
-    "sqlite3": "^5.1.7",
+    "sqlite3": "^6.0.1",
     "zod": "^4.5.4"
   },
   "devDependencies": {
     "@modelcontextprotocol/client": "^2.0.0",
     "@modelcontextprotocol/conformance": "^0.1.16"
+  },
+  "overrides": {
+    "sqlite3": "$sqlite3"
   }
 }

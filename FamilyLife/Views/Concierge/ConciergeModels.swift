@@ -172,6 +172,7 @@ struct ConciergeConversationSummary: Codable, Identifiable {
 struct ConciergeStoredMessage: Codable {
     let role: String
     let content: String
+    let actions: [ConciergeAction]?
 }
 
 /// One "needs you" item. `kind` and `route` are stable strings from the server;

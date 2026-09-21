@@ -2,15 +2,20 @@
 // state transition commit together; retries cannot mint duplicate events.
 function fail(status, message) { const e = new Error(message); e.status = status; throw e; }
 async function requestStay({ db, userId, push }, stayId) {
-  const stay = await db.getItineraryStayById(stayId);
-  if (!stay) fail(404, 'Stay not found');
-  const itinerary = await db.getItineraryById(stay.itinerary_id);
-  if (!itinerary || itinerary.traveler_id !== userId) fail(403, 'Only the traveler can request a stay');
-  if (!stay.host_user_id) fail(400, 'Choose an app member as host first');
-  if (stay.status === 'requested') return { success: true };
-  if (stay.status === 'confirmed') fail(409, 'This stay is already confirmed');
-  await db.updateItineraryStay(stay.id, { status: 'requested' });
-  if (push) push.pushToUser(db, stay.host_user_id, `${itinerary.traveler_name || 'Someone'} wants to stay with you`, `${stay.check_in} to ${stay.check_out}${stay.notes ? ' — ' + stay.notes : ''}`, { type: 'stay_request', ref_id: stay.id });
+  let stay, itinerary, changed = false;
+  await db.transaction(async db => {
+    stay = await db.getItineraryStayById(stayId);
+    if (!stay) fail(404, 'Stay not found');
+    itinerary = await db.getItineraryById(stay.itinerary_id);
+    if (!itinerary || itinerary.traveler_id !== userId) fail(403, 'Only the traveler can request a stay');
+    if (!stay.host_user_id) fail(400, 'Choose an app member as host first');
+    if (await db.isUserBlocked(userId, stay.host_user_id)) fail(403, 'This host is unavailable');
+    if (stay.status === 'confirmed') fail(409, 'This stay is already confirmed');
+    if (stay.status === 'requested') return;
+    await db.updateItineraryStay(stay.id, { status: 'requested' });
+    changed = true;
+  });
+  if (push && changed) push.pushToUser(db, stay.host_user_id, `${itinerary.traveler_name || 'Someone'} wants to stay with you`, `${stay.check_in} to ${stay.check_out}${stay.notes ? ' — ' + stay.notes : ''}`, { actor_id: userId, type: 'stay_request', ref_id: stay.id });
   return { success: true };
 }
 async function respondToStay({ db, userId, userName, push }, stayId, approved) {
@@ -23,6 +28,7 @@ async function respondToStay({ db, userId, userName, push }, stayId, approved) {
     if (stay.status !== 'requested') fail(409, 'This stay is not awaiting a response');
     itinerary = await db.getItineraryById(stay.itinerary_id);
     if (!itinerary) fail(404, 'Itinerary not found');
+    if (await db.isUserBlocked(userId, itinerary.traveler_id)) fail(403, 'This traveler is unavailable');
     if (approved) {
       const travelerGroupId = await db.getUserHouseholdId(itinerary.traveler_id);
       const hostGroupId = await db.getUserHouseholdId(userId);
@@ -35,7 +41,7 @@ async function respondToStay({ db, userId, userName, push }, stayId, approved) {
   if (push && itinerary.traveler_id) push.pushToUser(db, itinerary.traveler_id,
     approved ? `${userName} confirmed your stay!` : `${userName} can't host ${stay.check_in} to ${stay.check_out}`,
     approved ? `${stay.check_in} to ${stay.check_out} is all set` : 'You may need to adjust your itinerary',
-    { type: approved ? 'stay_confirmed' : 'stay_declined', ref_id: stay.id });
+    { actor_id: userId, type: approved ? 'stay_confirmed' : 'stay_declined', ref_id: stay.id });
   return { success: true };
 }
 module.exports = { requestStay, respondToStay };

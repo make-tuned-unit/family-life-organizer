@@ -15,7 +15,7 @@ const BATCH_SIZE = 10;
 const MAX_BATCHES_PER_DRAIN = 20;
 const STALE_RUNNING_SECONDS = 120;
 
-const KINDS = new Set(['push_user', 'push_group', 'waitlist_welcome', 'waitlist_notify']);
+const KINDS = new Set(['push_user', 'push_group', 'waitlist_welcome', 'waitlist_notify', 'content_report']);
 
 let draining = false;
 let kickTimer = null;
@@ -68,6 +68,23 @@ function backoffSeconds(attempts) {
 async function runJob(db, job, deps) {
   const payload = job.payload && typeof job.payload === 'object' ? job.payload : {};
   switch (job.kind) {
+    case 'content_report': {
+      const reports = require('./contentReports');
+      const report = await reports.get(db, `SELECT r.id, r.content_type, r.ref_id FROM content_reports r
+        LEFT JOIN content_report_reviews v ON v.report_id = r.id WHERE r.id = ? AND v.report_id IS NULL`, [payload.reportId]);
+      if (!report) return;
+      const emailMod = deps.email || require('./email');
+      if (!emailMod.isEmailEnabled()) throw new Error('Content report email is not configured');
+      const sendEmail = deps.sendEmail || emailMod.sendEmail.bind(emailMod);
+      const result = await sendEmail({
+        to: process.env.REPORTS_TO || 'kinrows@atlasatlantic.co',
+        subject: `Kinrows content report #${report.id}`,
+        text: `Report #${report.id} (${report.content_type} #${report.ref_id}) awaits review. Inspect the protected moderation queue.`,
+        html: `<p>Report #${report.id} (${report.content_type} #${report.ref_id}) awaits review. Inspect the protected moderation queue.</p>`,
+      });
+      if (!result.ok) throw new Error(result.error || 'Content report delivery failed');
+      return;
+    }
     case 'push_user': {
       const push = deps.push || require('../push');
       await push.pushToUser(

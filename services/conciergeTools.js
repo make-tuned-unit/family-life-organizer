@@ -2313,7 +2313,7 @@ const TOOLS = [
         const rec = await ctx.db.addCoverageRecipient({ request_id: request.id, contact_id: contactId, user_id: helperId });
         recipients.push(rec);
         if (ctx.push && helperId) {
-          ctx.push.pushToUser(ctx.db, helperId, `${ctx.userName} needs your help`, input.reason, { type: 'coverage', ref_id: request.id });
+          ctx.push.pushToUser(ctx.db, helperId, `${ctx.userName} needs your help`, input.reason, { actor_id: ctx.userId, type: 'coverage', ref_id: request.id });
         }
       }
       const summary = `Created a coverage request: ${input.reason}`;
@@ -3087,7 +3087,7 @@ const TOOLS = [
       if (request && ctx.push) {
         ctx.push.pushToUser(ctx.db, request.requester_id, 'Coverage Confirmed',
           `${ctx.userName} approved ${window.start_time}–${window.end_time}`,
-          { type: 'coverage', ref_id: input.request_id });
+          { actor_id: ctx.userId, type: 'coverage', ref_id: input.request_id });
       }
       const summary = `Confirmed you can help ${request?.requester_name || 'them'} on ${window.window_date} ${window.start_time}–${window.end_time}`;
       return { result: { ok: true, summary }, action: { tool: 'approve_incoming_coverage', summary } };

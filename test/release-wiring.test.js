@@ -220,7 +220,7 @@ test('wiring: hosting request/response uses shared state and exactly one pair of
   const itinerary = await db.createItinerary({ title: 'QA visit', traveler_id: ctx.userId, traveler_name: ctx.userName, group_id: ctx.groupId, start_date: '2026-10-01', end_date: '2026-10-03' });
   const stay = await db.addItineraryStay({ itinerary_id: itinerary.id, host_user_id: host.id, host_name: host.name, check_in: '2026-10-01', check_out: '2026-10-03' });
   await denied('itineraries', { action: 'request_stay', stay_id: stay.id }, hostCtx);
-  await act('itineraries', { action: 'request_stay', stay_id: stay.id });
+  await Promise.all([act('itineraries', { action: 'request_stay', stay_id: stay.id }), act('itineraries', { action: 'request_stay', stay_id: stay.id })]);
   const pending = (await tools.run('itineraries', hostCtx, { action: 'pending_requests' })).result;
   assert.ok(pending.some(x => x.id === stay.id));
   assert.deepEqual(pending, (await outsider('GET', '/api/stays/pending')).body);
@@ -344,4 +344,26 @@ test('Native workflow handoffs require user action and never report a saved muta
     assert.deepEqual(native.action, { tool: 'open_workflow', workflow, summary: `Continue in ${ { receipt: 'Receipt scanner', cook: 'Cook', calendar: 'Calendar', trips: 'Trips', health: 'Rivalries', groups: 'Family groups', messages: 'Messages', notes: 'Notes', routines: 'Routines', history: 'Conversation history' }[workflow]}` });
   }
   assert.equal((await tools.run('get_workflow_handoff', ctx, { workflow: 'settings' })).result.ok, false);
+});
+
+test('trip ownership is derived from an unambiguous household member, not client ids', async () => {
+  const other = await db.getUserByUsername('qa_other');
+  const response = await owner('POST', '/api/trips', { traveler: 'QA Owner', traveler_id: other.id, destination: 'QA destination' });
+  assert.equal(response.status, 200);
+  const trip = (await owner('GET', '/api/trips')).body.find(row => row.id === response.body.id);
+  assert.equal(trip.traveler_id, ctx.userId);
+  await owner('PUT', `/api/trips/${trip.id}`, { traveler_id: other.id });
+  assert.equal((await owner('GET', '/api/trips')).body.find(row => row.id === trip.id).traveler_id, ctx.userId);
+});
+
+test('blocking cannot be bypassed by an owned-contact name match when adding group members', async () => {
+  const other = await db.getUserByUsername('qa_other');
+  await owner('POST', '/api/contacts', { name: other.name, relationship: 'friend' });
+  const group = await owner('POST', '/api/groups', { name: 'QA blocked-add check', group_type: 'clan' });
+  assert.equal(group.status, 200);
+  await db.setUserBlocked(ctx.userId, other.id, true);
+  try {
+    assert.equal((await owner('POST', `/api/groups/${group.body.id}/members`, { user_id: other.id })).status, 403);
+    assert.equal(await db.isGroupMember(group.body.id, other.id), false);
+  } finally { await db.setUserBlocked(ctx.userId, other.id, false); }
 });

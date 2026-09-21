@@ -41,7 +41,7 @@ final class ConciergeChatViewModel {
         defer { isLoading = false }
         do {
             let history = try await api.fetchConciergeMessages(conversationId: id)
-            messages = history.map { Message(role: $0.role == "user" ? .user : .assistant, text: $0.content) }
+            messages = history.map { Message(role: $0.role == "user" ? .user : .assistant, text: $0.content, actions: $0.actions ?? []) }
         } catch {
             errorMessage = error.localizedDescription
         }

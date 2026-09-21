@@ -194,6 +194,7 @@ CREATE INDEX IF NOT EXISTS idx_pantry_expiry ON pantry(expiry_date);
 CREATE TABLE IF NOT EXISTS trips (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     traveler TEXT NOT NULL,
+    traveler_id INTEGER REFERENCES users(id),
     origin TEXT,
     origin_lat REAL,
     origin_lng REAL,
@@ -844,6 +845,7 @@ CREATE TABLE IF NOT EXISTS concierge_messages (
     conversation_id INTEGER NOT NULL,
     role TEXT NOT NULL,          -- 'user' | 'assistant'
     content TEXT NOT NULL,
+    actions TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (conversation_id) REFERENCES concierge_conversations(id) ON DELETE CASCADE
 );
@@ -1121,3 +1123,11 @@ CREATE TABLE IF NOT EXISTS user_blocks (
   CHECK (blocker_id != blocked_id)
 );
 CREATE INDEX IF NOT EXISTS idx_user_blocks_blocked ON user_blocks(blocked_id);
+
+
+CREATE TABLE IF NOT EXISTS content_report_reviews (
+    report_id INTEGER PRIMARY KEY REFERENCES content_reports(id) ON DELETE CASCADE,
+    decision TEXT NOT NULL CHECK (decision IN ('remove', 'dismiss')),
+    operator TEXT NOT NULL,
+    resolved_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);

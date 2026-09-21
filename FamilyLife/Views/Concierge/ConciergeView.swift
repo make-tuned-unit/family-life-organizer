@@ -10,6 +10,8 @@ struct ConciergeView: View {
     @Binding var selectedTab: MainTab
 
     @State private var viewModel = ConciergeViewModel()
+    @State private var checkingAccess = false
+    @State private var accessError: String?
     @State private var showingChat = false
     @State private var showingPaywall = false
     @State private var showingAIDisclosure = false
@@ -36,6 +38,7 @@ struct ConciergeView: View {
             .flMinimizesTabBar()
             .refreshable { await viewModel.load(api: api, force: true) }
         }
+        .inlineError(accessError) { accessError = nil }
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackgroundVisibility(.hidden, for: .navigationBar)
         .toolbar {
@@ -73,6 +76,7 @@ struct ConciergeView: View {
             showingPaywall = false
         }
         .task {
+            await subscription.refresh(api: api)
             if case .idle = viewModel.state { await viewModel.load(api: api) }
             handleLaunchRequest()
         }
@@ -84,13 +88,15 @@ struct ConciergeView: View {
     private func handleLaunchRequest() {
         guard let request = launch.consume() else { return }
         guard cloudAIEnabled else { return }   // chat sends data; respect the privacy toggle
-        guard subscription.isPremium else { showingPaywall = true; return }
-        if !AIConsentManager.hasConciergeConsent {
-            pendingLaunch = request
-            showingAIDisclosure = true
-            return
+        Task {
+            guard await checkAccess() else { return }
+            if !AIConsentManager.hasConciergeConsent {
+                pendingLaunch = request
+                showingAIDisclosure = true
+                return
+            }
+            presentChat(request)
         }
-        presentChat(request)
     }
 
     private func openChat() {
@@ -117,15 +123,31 @@ struct ConciergeView: View {
         }
     }
 
+    private func checkAccess() async -> Bool {
+        guard !checkingAccess else { return false }
+        checkingAccess = true
+        accessError = nil
+        defer { checkingAccess = false }
+        await subscription.refresh(api: api)
+        if let error = subscription.entitlementError {
+            accessError = error
+            return false
+        }
+        guard subscription.isPremium else { showingPaywall = true; return false }
+        return true
+    }
+
     private var askBar: some View {
         Button {
             if !cloudAIEnabled { return }
-            if !subscription.isPremium { showingPaywall = true; return }
-            if !AIConsentManager.hasConciergeConsent { showingAIDisclosure = true; return }
-            chatPrompt = nil
-            chatAutoListen = false
-            chatAutoSend = false
-            showingChat = true
+            Task {
+                guard await checkAccess() else { return }
+                if !AIConsentManager.hasConciergeConsent { showingAIDisclosure = true; return }
+                chatPrompt = nil
+                chatAutoListen = false
+                chatAutoSend = false
+                showingChat = true
+            }
         } label: {
             HStack(spacing: 10) {
                 Image(systemName: "sparkles")
@@ -139,6 +161,8 @@ struct ConciergeView: View {
                     Image(systemName: "cloud.slash")
                         .font(.system(size: 18))
                         .foregroundStyle(WarmPalette.ink3)
+                } else if checkingAccess || !subscription.hasLoadedEntitlement {
+                    ProgressView().accessibilityLabel("Checking subscription")
                 } else if subscription.isPremium {
                     Image(systemName: "arrow.up.circle.fill")
                         .font(.system(size: 22))
@@ -158,6 +182,7 @@ struct ConciergeView: View {
             .flCard(tint: accent)
         }
         .buttonStyle(.flCardPress)
+        .disabled(checkingAccess)
     }
 
     // MARK: - Header
@@ -165,8 +190,8 @@ struct ConciergeView: View {
     // Rowan is the face of the Concierge: a small idling loop beside the title.
     private var header: some View {
         HStack(alignment: .center, spacing: DesignTokens.Spacing.chipPadding) {
-            RowanMotionView(pose: .idleSmile, loops: true, maxWidth: 44, maxHeight: 52)
-                .frame(width: 44, height: 52)
+            RowanMotionView(pose: .idleSmile, loops: true, maxWidth: 64, maxHeight: 76)
+                .frame(width: 64, height: 76)
             VStack(alignment: .leading, spacing: 2) {
                 Text("Concierge")
                     .font(.flDisplaySmall)

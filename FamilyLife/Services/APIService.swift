@@ -22,6 +22,7 @@ final class APIService {
     var baseURL: String
 
     private let session: URLSession
+    private let accessCheckSession: URLSession
     @ObservationIgnored private let inflightLock = NSLock()
     @ObservationIgnored private var inflightGets: [String: Task<Data, Error>] = [:]
 
@@ -45,6 +46,15 @@ final class APIService {
         config.timeoutIntervalForRequest = 8
         config.timeoutIntervalForResource = 60  // ceiling; AI-backed calls (concierge brief) can run long
         self.session = URLSession(configuration: config)
+        // Access checks must finish promptly even while the normal session is
+        // waiting for connectivity. Preserve the same signed-in cookie store.
+        let accessConfig = URLSessionConfiguration.default
+        accessConfig.httpCookieAcceptPolicy = .always
+        accessConfig.httpCookieStorage = .shared
+        accessConfig.waitsForConnectivity = false
+        accessConfig.timeoutIntervalForRequest = 8
+        accessConfig.timeoutIntervalForResource = 8
+        self.accessCheckSession = URLSession(configuration: accessConfig)
     }
 
     // MARK: - Auth
@@ -539,7 +549,7 @@ final class APIService {
     }
 
     func fetchSubscriptionStatus() async throws -> SubscriptionStatus {
-        try await get("/api/subscription/status")
+        try await get("/api/subscription/status", timeout: 8, failFast: true)
     }
 
     func fetchSubscriptionCatalog(currency: String? = nil) async throws -> SubscriptionCatalog {
@@ -1868,7 +1878,7 @@ final class APIService {
         let id: Int
     }
 
-    private func get<T: Decodable>(_ path: String, queryParams: [String: String] = [:], timeout: TimeInterval? = nil) async throws -> T {
+    private func get<T: Decodable>(_ path: String, queryParams: [String: String] = [:], timeout: TimeInterval? = nil, failFast: Bool = false) async throws -> T {
         guard var components = URLComponents(string: baseURL + path) else {
             throw APIError.invalidResponse
         }
@@ -1879,6 +1889,11 @@ final class APIService {
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
         if let timeout { request.timeoutInterval = timeout }
+        if failFast {
+            let (data, response) = try await accessCheckSession.data(for: request)
+            try checkResponse(response, data: data)
+            return try JSONDecoder().decode(T.self, from: data)
+        }
         let data = try await coalescedGET(url.absoluteString, request: request)
         return try JSONDecoder().decode(T.self, from: data)
     }

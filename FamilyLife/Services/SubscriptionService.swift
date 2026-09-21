@@ -40,6 +40,8 @@ final class SubscriptionService {
         "com.kinrows.app.concierge.\(tier.rawValue).\(period.rawValue)"
     }
 
+    private(set) var entitlementError: String?
+    private(set) var hasLoadedEntitlement = false
     private(set) var isPremium = false           // entitled to ANY paid tier
     private(set) var tier: Tier?                  // active tier per backend
     private(set) var products: [Product] = []
@@ -80,9 +82,11 @@ final class SubscriptionService {
             }
         }
         Task {
-            await loadProducts()
-            await loadCatalog(api: api)
+            // Product availability must not delay checking an existing household entitlement.
+            async let productLoad: Void = loadProducts()
+            async let catalogLoad: Void = loadCatalog(api: api)
             await refresh(api: api)
+            _ = await (productLoad, catalogLoad)
         }
     }
 
@@ -142,7 +146,11 @@ final class SubscriptionService {
             status = try? await api.fetchSubscriptionStatus()
         }
         if let status {
+            entitlementError = nil
+            hasLoadedEntitlement = true
             apply(status)
+        } else {
+            entitlementError = "Could not check your subscription. Please try again."
         }
         return isPremium
     }

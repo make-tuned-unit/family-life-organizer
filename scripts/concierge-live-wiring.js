@@ -52,6 +52,13 @@ async function api(method, route, body) {
         if (c.followup) { chat = await api('POST', '/api/concierge/chat', { message: c.followup, conversation_id: chat.conversation_id }); actions.push(...(chat.actions || [])); }
         assert.ok(await c.verify(chat), `persisted native HTTP state disagrees with response: ${chat.reply}`);
         assert.ok(actions.length, 'successful writes publish refresh actions');
+        if (c.native) {
+          const history = await api('GET', `/api/concierge/conversations/${chat.conversation_id}/messages`);
+          assert.deepEqual(history.at(-1).actions, chat.actions, 'resuming the conversation preserves its buttons');
+          assert.match(chat.reply, /Tap .* to open the workflow/);
+          assert.doesNotMatch(chat.reply, /is now open|are now open/);
+        }
+
         const row = { scenario: c.name, status: 'PASS', actions: actions.map(a => a.tool) }; results.push(row); console.log(JSON.stringify(row));
       } catch (e) { const row = { scenario: c.name, status: 'FAIL', error: e.message }; results.push(row); console.log(JSON.stringify(row)); }
     }

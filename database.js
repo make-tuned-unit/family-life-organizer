@@ -152,6 +152,7 @@ class FamilyDB {
         this.db.run('ALTER TABLE groups ADD COLUMN profile_image TEXT', () => {});
         // DM image support
         this.db.run('ALTER TABLE direct_messages ADD COLUMN image_data TEXT', () => {});
+        this.db.run('ALTER TABLE concierge_messages ADD COLUMN actions TEXT', () => {});
         this.db.run('CREATE INDEX IF NOT EXISTS idx_feed_posts_group ON feed_posts(group_id, id DESC)', () => {});
         // Data isolation: add group_id to household-scoped tables
         this.db.run('ALTER TABLE appointments ADD COLUMN group_id INTEGER REFERENCES groups(id)', () => {});
@@ -196,6 +197,7 @@ class FamilyDB {
         this.db.run('ALTER TABLE project_expenses ADD COLUMN group_id INTEGER REFERENCES groups(id)', () => {});
         this.db.run('ALTER TABLE pantry ADD COLUMN group_id INTEGER REFERENCES groups(id)', () => {});
         this.db.run('ALTER TABLE trips ADD COLUMN group_id INTEGER REFERENCES groups(id)', () => {});
+        this.db.run('ALTER TABLE trips ADD COLUMN traveler_id INTEGER REFERENCES users(id)', () => {});
         this.db.run('ALTER TABLE gift_people ADD COLUMN group_id INTEGER REFERENCES groups(id)', () => {});
         this.db.run('ALTER TABLE gift_ideas ADD COLUMN group_id INTEGER REFERENCES groups(id)', () => {});
         this.db.run('ALTER TABLE special_events ADD COLUMN group_id INTEGER REFERENCES groups(id)', () => {});
@@ -1369,14 +1371,21 @@ class FamilyDB {
   }
 
   // Trip operations
-  createTrip(trip) {
+  async createTrip(trip) {
+    // Resolve only an unambiguous member of this household. Never trust an id
+    // supplied by a client or guess by first-name prefix.
+    const matches = await new Promise((resolve, reject) => this.db.all(`SELECT DISTINCT u.id FROM users u
+      JOIN group_members gm ON gm.user_id = u.id WHERE gm.group_id = ?
+      AND (u.name = ? COLLATE NOCASE OR u.username = ? COLLATE NOCASE)`,
+      [trip.group_id, trip.traveler, trip.traveler], (e, rows) => e ? reject(e) : resolve(rows)));
+    const travelerId = matches.length === 1 ? matches[0].id : null;
     return new Promise((resolve, reject) => {
       this.db.run(
-        'INSERT INTO trips (traveler, origin, origin_lat, origin_lng, destination, destination_lat, destination_lng, purpose, status, eta_minutes, group_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        [trip.traveler, trip.origin || null, trip.origin_lat || null, trip.origin_lng || null, trip.destination, trip.destination_lat || null, trip.destination_lng || null, trip.purpose || null, 'active', trip.eta_minutes || null, trip.group_id || null],
+        'INSERT INTO trips (traveler, origin, origin_lat, origin_lng, destination, destination_lat, destination_lng, purpose, status, eta_minutes, group_id, traveler_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [trip.traveler, trip.origin || null, trip.origin_lat || null, trip.origin_lng || null, trip.destination, trip.destination_lat || null, trip.destination_lng || null, trip.purpose || null, 'active', trip.eta_minutes || null, trip.group_id || null, travelerId],
         function(err) {
           if (err) reject(err);
-          else resolve({ id: this.lastID, ...trip });
+          else resolve({ id: this.lastID, ...trip, traveler_id: travelerId });
         }
       );
     });
@@ -3065,8 +3074,8 @@ class FamilyDB {
           // This connection disables FK cascades, so erase private health data
           // and its children explicitly, even when the household survives.
           await run(`DELETE FROM routine_entries WHERE routine_id IN
-            (SELECT id FROM routines WHERE created_by = ? AND COALESCE(shared_scope, 'private') != 'household')`, [uid]);
-          await run("DELETE FROM routines WHERE created_by = ? AND COALESCE(shared_scope, 'private') != 'household'", [uid]);
+            (SELECT id FROM routines WHERE created_by = ?)`, [uid]);
+          await run("DELETE FROM routines WHERE created_by = ?", [uid]);
           await run("DELETE FROM special_events WHERE created_by = ? AND shared_scope = 'private'", [uid]);
           await run("DELETE FROM milestones WHERE created_by = ? AND shared_scope = 'private'", [uid]);
           for (const table of ['synced_calendar_events', 'oauth_authorization_codes',
@@ -3076,6 +3085,10 @@ class FamilyDB {
           // Authored social content and its stored photos are personal UGC.
           // Remove child rows explicitly because this private erase connection
           // deliberately disables FK cascades.
+          await run(`DELETE FROM content_report_reviews WHERE report_id IN (
+            SELECT id FROM content_reports WHERE reporter_id = ?
+            OR (content_type = 'feed' AND ref_id IN (SELECT id FROM feed_posts WHERE author_id = ?))
+            OR (content_type = 'message' AND ref_id IN (SELECT id FROM direct_messages WHERE sender_id = ? OR recipient_id = ?)))`, [uid, uid, uid, uid]);
           await run(`DELETE FROM content_reports WHERE reporter_id = ?
             OR (content_type = 'feed' AND ref_id IN (SELECT id FROM feed_posts WHERE author_id = ?))
             OR (content_type = 'message' AND ref_id IN (SELECT id FROM direct_messages WHERE sender_id = ? OR recipient_id = ?))`, [uid, uid, uid, uid]);
@@ -3087,10 +3100,31 @@ class FamilyDB {
           await run(`DELETE FROM jobs WHERE json_valid(payload) AND (
             CAST(json_extract(payload, '$.userId') AS INTEGER) = ? OR
             CAST(json_extract(payload, '$.excludeUserId') AS INTEGER) = ? OR
-            (json_extract(payload, '$.data.type') = 'message' AND CAST(json_extract(payload, '$.data.ref_id') AS INTEGER) = ?))`, [uid, uid, uid]);
+            CAST(json_extract(payload, '$.data.actor_id') AS INTEGER) = ? OR
+            (json_extract(payload, '$.data.type') = 'message' AND CAST(json_extract(payload, '$.data.ref_id') AS INTEGER) = ?))`, [uid, uid, uid, uid]);
+          // Health entries and account-linked profiles remain personal even
+          // when the owner previously shared them with a household.
+          await run('DELETE FROM routine_entries WHERE created_by = ?', [uid]);
+          for (const table of ['gift_ideas', 'special_events', 'milestones']) {
+            await run(`DELETE FROM ${table} WHERE person_id IN (SELECT id FROM gift_people WHERE user_id = ?)`, [uid]);
+          }
+          await run('UPDATE decisions SET person_id = NULL WHERE person_id IN (SELECT id FROM gift_people WHERE user_id = ?)', [uid]);
+          await run('DELETE FROM gift_people WHERE user_id = ?', [uid]);
+          // Location trails must not survive by merely detaching traveler_id.
+          await run('DELETE FROM trips WHERE traveler_id = ?', [uid]);
+          const stays = await all(`SELECT calendar_event_id, host_calendar_event_id FROM itinerary_stays
+            WHERE host_user_id = ? OR itinerary_id IN (SELECT id FROM itineraries WHERE traveler_id = ?)`, [uid, uid]);
+          for (const stay of stays) {
+            for (const eventId of [stay.calendar_event_id, stay.host_calendar_event_id].filter(Boolean)) {
+              await run('DELETE FROM event_attachments WHERE appointment_id = ?', [eventId]);
+              await run('DELETE FROM appointments WHERE id = ?', [eventId]);
+            }
+          }
+          await run('DELETE FROM itinerary_stays WHERE host_user_id = ? OR itinerary_id IN (SELECT id FROM itineraries WHERE traveler_id = ?)', [uid, uid]);
+          await run('UPDATE receipts SET itinerary_id = NULL WHERE itinerary_id IN (SELECT id FROM itineraries WHERE traveler_id = ?)', [uid]);
+          await run('DELETE FROM itineraries WHERE traveler_id = ?', [uid]);
           // Detach authorship from shared household planning records.
-          for (const [table, col] of [['appointments', 'created_by'],
-            ['trips', 'traveler_id'], ['itinerary_stays', 'host_user_id']]) {
+          for (const [table, col] of [['appointments', 'created_by']]) {
             const cols = await all(`PRAGMA table_info(${table})`);
             if (cols.some(c => c.name === col)) {
               await run(`UPDATE ${table} SET ${col} = NULL WHERE ${col} = ?`, [uid]);
@@ -4649,18 +4683,22 @@ class FamilyDB {
   getConciergeMessages(conversationId, limit = 20) {
     return new Promise((resolve, reject) => {
       this.db.all(
-        'SELECT role, content FROM concierge_messages WHERE conversation_id = ? ORDER BY id DESC LIMIT ?',
+        'SELECT role, content, actions FROM concierge_messages WHERE conversation_id = ? ORDER BY id DESC LIMIT ?',
         [conversationId, limit],
-        (err, rows) => err ? reject(err) : resolve((rows || []).reverse())
+        (err, rows) => err ? reject(err) : resolve((rows || []).reverse().map(row => {
+          let actions = [];
+          try { const parsed = JSON.parse(row.actions || '[]'); if (Array.isArray(parsed)) actions = parsed; } catch {}
+          return { role: row.role, content: row.content, actions };
+        }))
       );
     });
   }
 
-  addConciergeMessage(conversationId, role, content) {
+  addConciergeMessage(conversationId, role, content, actions = []) {
     return new Promise((resolve, reject) => {
       this.db.run(
-        'INSERT INTO concierge_messages (conversation_id, role, content) VALUES (?, ?, ?)',
-        [conversationId, role, content],
+        'INSERT INTO concierge_messages (conversation_id, role, content, actions) VALUES (?, ?, ?, ?)',
+        [conversationId, role, content, JSON.stringify(actions)],
         function(err) { err ? reject(err) : resolve({ id: this.lastID }); }
       );
     });

@@ -49,3 +49,13 @@ test('action-limit fallback separates saved changes from native user action', ()
   assert.match(mixed, /Saved changes: Added shopping task\./);
   assert.match(mixed, /Still requires your action: Continue in Receipt scanner\./);
 });
+
+
+test('native handoff responses use pending instructions without model completion claims', () => {
+  const { pendingHandoffReply } = require('../services/conciergeChat');
+  const next = { content: JSON.stringify({ status: 'requires_user_action', instruction: 'Tap Continue to open the scanner.' }) };
+  assert.equal(pendingHandoffReply([next]), 'Tap Continue to open the scanner.');
+  assert.equal(pendingHandoffReply([]), null);
+  assert.equal(pendingHandoffReply([next, { content: '{"ok":true}' }]), null);
+  assert.equal(pendingHandoffReply([{ content: 'invalid JSON' }]), null);
+});

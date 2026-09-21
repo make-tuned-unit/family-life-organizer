@@ -70,14 +70,14 @@ async function announceRivalryCompletion(db, push, result, authorId) {
       const loser = winner_name === rivalry.initiator_name ? rivalry.opponent_name : rivalry.initiator_name;
       const winnerId = await db.getUserIdByName(winner_name, rivalry.group_id);
       const loserId = await db.getUserIdByName(loser, rivalry.group_id);
-      if (winnerId) push.pushToUser(db, winnerId, 'You Won!', pick(WINNER_PUSH)(loser), { type: 'rivalry', ref_id: rivalry.id });
-      if (loserId) push.pushToUser(db, loserId, 'Better Luck Next Time', pick(LOSER_PUSH)(winner_name), { type: 'rivalry', ref_id: rivalry.id });
+      if (winnerId) push.pushToUser(db, winnerId, 'You Won!', pick(WINNER_PUSH)(loser), { actor_id: authorId, type: 'rivalry', ref_id: rivalry.id });
+      if (loserId) push.pushToUser(db, loserId, 'Better Luck Next Time', pick(LOSER_PUSH)(winner_name), { actor_id: authorId, type: 'rivalry', ref_id: rivalry.id });
     } else {
       const id1 = await db.getUserIdByName(rivalry.initiator_name, rivalry.group_id);
       const id2 = await db.getUserIdByName(rivalry.opponent_name, rivalry.group_id);
       const tieMsg = `It's a tie in "${rivalry.title}"! Run it back?`;
-      if (id1) push.pushToUser(db, id1, 'Rivalry Tied!', tieMsg, { type: 'rivalry', ref_id: rivalry.id });
-      if (id2) push.pushToUser(db, id2, 'Rivalry Tied!', tieMsg, { type: 'rivalry', ref_id: rivalry.id });
+      if (id1) push.pushToUser(db, id1, 'Rivalry Tied!', tieMsg, { actor_id: authorId, type: 'rivalry', ref_id: rivalry.id });
+      if (id2) push.pushToUser(db, id2, 'Rivalry Tied!', tieMsg, { actor_id: authorId, type: 'rivalry', ref_id: rivalry.id });
     }
   } catch (e) { console.error('Rivalry push error:', e.message); }
   return message;

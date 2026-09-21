@@ -38,7 +38,7 @@ function createTools({ assertHousehold, assertListAccess, assertRoutineAccess, r
     input_schema: { type: 'object', properties: { workflow: { type: 'string', enum: Object.keys(destinations) } }, required: ['workflow'] },
     async run(c, i) {
       const summary = `Continue in ${destinations[i.workflow]}`;
-      const result = { status: 'requires_user_action', workflow: i.workflow, instruction: `${summary} in the app. Nothing has been changed; follow the native prompts to complete the workflow.` };
+      const result = { status: 'requires_user_action', workflow: i.workflow, instruction: c.nativeHandoffs === true ? `Tap “${summary}” to open the workflow. It has not opened yet, and nothing has been changed. Follow the native prompts to finish.` : `${summary} in the app. Nothing has been opened or changed; follow the native prompts to finish.` };
       return c.nativeHandoffs === true ? { result, action: { tool: 'open_workflow', workflow: i.workflow, summary } } : { result };
     },
   });
