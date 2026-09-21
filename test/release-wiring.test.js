@@ -220,7 +220,7 @@ test('wiring: hosting request/response uses shared state and exactly one pair of
   const itinerary = await db.createItinerary({ title: 'QA visit', traveler_id: ctx.userId, traveler_name: ctx.userName, group_id: ctx.groupId, start_date: '2026-10-01', end_date: '2026-10-03' });
   const stay = await db.addItineraryStay({ itinerary_id: itinerary.id, host_user_id: host.id, host_name: host.name, check_in: '2026-10-01', check_out: '2026-10-03' });
   await denied('itineraries', { action: 'request_stay', stay_id: stay.id }, hostCtx);
-  await act('itineraries', { action: 'request_stay', stay_id: stay.id });
+  await Promise.all([act('itineraries', { action: 'request_stay', stay_id: stay.id }), act('itineraries', { action: 'request_stay', stay_id: stay.id })]);
   const pending = (await tools.run('itineraries', hostCtx, { action: 'pending_requests' })).result;
   assert.ok(pending.some(x => x.id === stay.id));
   assert.deepEqual(pending, (await outsider('GET', '/api/stays/pending')).body);
@@ -315,4 +315,55 @@ test('privacy: a legacy private-note attachment never exposes its title or body 
     assert.equal(viaTool.result.error, undefined);
     assert.ok(!JSON.stringify(viaTool).includes('Private body'));
   } finally { await runSql('DELETE FROM group_members WHERE group_id = ? AND user_id = ?', [ctx.groupId, other.id]); }
+});
+
+test('Concierge full note reads preserve private and shared visibility', async () => {
+  const body = 'Complete note content beyond the preview. '.repeat(30);
+  await act('notes', { action: 'add', title: 'Full private note', body });
+  const note = await new Promise((resolve, reject) => db.db.get('SELECT id FROM notes WHERE title = ?', ['Full private note'], (e, r) => e ? reject(e) : resolve(r)));
+  assert.equal((await act('notes', { action: 'get', id: note.id })).body, body);
+  const other = await db.getUserByUsername('qa_other');
+  const denied = await tools.run('notes', { ...ctx, userId: other.id }, { action: 'get', id: note.id });
+  assert.equal(denied.result.ok, false);
+  await act('notes', { action: 'update', id: note.id, shared: true });
+  assert.equal((await act('notes', { action: 'get', id: note.id })).body, body);
+  assert.equal((await tools.run('notes', { ...ctx, userId: other.id }, { action: 'get', id: note.id })).result.ok, false);
+  await db.addGroupMember(ctx.groupId, { user_id: other.id, role: 'member', added_by: ctx.userId });
+  assert.equal((await tools.run('notes', { ...ctx, userId: other.id }, { action: 'get', id: note.id })).result.body, body);
+  await act('notes', { action: 'update', id: note.id, shared: false });
+  assert.equal((await tools.run('notes', { ...ctx, userId: other.id }, { action: 'get', id: note.id })).result.ok, false, 'privatising retracts access immediately');
+});
+
+test('Native workflow handoffs require user action and never report a saved mutation', async () => {
+  for (const workflow of ['receipt', 'cook', 'calendar', 'trips', 'health', 'groups', 'messages', 'notes', 'routines', 'history']) {
+    const legacy = await tools.run('get_workflow_handoff', ctx, { workflow });
+    assert.equal(legacy.result.status, 'requires_user_action');
+    assert.equal(legacy.action, undefined, 'old clients receive instructions without a saved-changes card');
+    const native = await tools.run('get_workflow_handoff', { ...ctx, nativeHandoffs: true }, { workflow });
+    assert.equal(native.result.status, 'requires_user_action');
+    assert.deepEqual(native.action, { tool: 'open_workflow', workflow, summary: `Continue in ${ { receipt: 'Receipt scanner', cook: 'Cook', calendar: 'Calendar', trips: 'Trips', health: 'Rivalries', groups: 'Family groups', messages: 'Messages', notes: 'Notes', routines: 'Routines', history: 'Conversation history' }[workflow]}` });
+  }
+  assert.equal((await tools.run('get_workflow_handoff', ctx, { workflow: 'settings' })).result.ok, false);
+});
+
+test('trip ownership is derived from an unambiguous household member, not client ids', async () => {
+  const other = await db.getUserByUsername('qa_other');
+  const response = await owner('POST', '/api/trips', { traveler: 'QA Owner', traveler_id: other.id, destination: 'QA destination' });
+  assert.equal(response.status, 200);
+  const trip = (await owner('GET', '/api/trips')).body.find(row => row.id === response.body.id);
+  assert.equal(trip.traveler_id, ctx.userId);
+  await owner('PUT', `/api/trips/${trip.id}`, { traveler_id: other.id });
+  assert.equal((await owner('GET', '/api/trips')).body.find(row => row.id === trip.id).traveler_id, ctx.userId);
+});
+
+test('blocking cannot be bypassed by an owned-contact name match when adding group members', async () => {
+  const other = await db.getUserByUsername('qa_other');
+  await owner('POST', '/api/contacts', { name: other.name, relationship: 'friend' });
+  const group = await owner('POST', '/api/groups', { name: 'QA blocked-add check', group_type: 'clan' });
+  assert.equal(group.status, 200);
+  await db.setUserBlocked(ctx.userId, other.id, true);
+  try {
+    assert.equal((await owner('POST', `/api/groups/${group.body.id}/members`, { user_id: other.id })).status, 403);
+    assert.equal(await db.isGroupMember(group.body.id, other.id), false);
+  } finally { await db.setUserBlocked(ctx.userId, other.id, false); }
 });

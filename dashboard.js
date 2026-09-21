@@ -1645,16 +1645,8 @@ app.post('/api/content/report', requireAuth, reportLimiter, async (req, res) => 
       }
     }
 
-    await dbRun(db, 'INSERT INTO content_reports (reporter_id, content_type, ref_id, reason) VALUES (?, ?, ?, ?)',
-      [userId, type, refId, reason]);
-
-    const to = process.env.REPORTS_TO || 'kinrows@atlasatlantic.co';
-    email.sendEmail({
-      to,
-      subject: `Kinrows content report (${type} #${refId})`,
-      text: `Reporter user id ${userId} reported ${type} ${refId}. Reason: ${reason}`,
-      html: `<p>Reporter user id ${userId} reported <code>${type}</code> ${refId}.</p><p>Reason: ${email.escapeHtml(reason)}</p>`,
-    }).catch(() => {});
+    await require('./services/contentReports').create(db, { reporterId: userId, type, refId, reason });
+    jobs.kick();
 
     res.json({ success: true });
   } catch (err) {
@@ -4771,6 +4763,7 @@ app.post('/api/concierge/chat', requireAuth, conciergeLimiter, requirePremium, c
       message,
       conversationId: req.body.conversation_id || null,
       source: req.body.source || 'text',
+      nativeHandoffs: req.body.native_handoffs === true,
     });
     res.json(result);
   } catch (err) {
@@ -4811,6 +4804,7 @@ app.post('/api/concierge/chat/stream', requireAuth, conciergeLimiter, requirePre
         message,
         conversationId: req.body.conversation_id || null,
         source: req.body.source || 'text',
+        nativeHandoffs: req.body.native_handoffs === true,
       }, {
         onText: (t) => send('delta', { text: t }),
         onAction: (action) => send('action', action),
@@ -5356,7 +5350,7 @@ app.post('/api/rivalries', requireAuth, async (req, res) => {
       if (opId) {
         jobs.pushToUser(db, opId, `${senderName} challenged you!`,
           pick(RIVALRY_CHALLENGE_PUSH)(senderName, ct),
-          { type: 'rivalry', ref_id: result.id });
+          { actor_id: req.session.user.id, type: 'rivalry', ref_id: result.id });
       }
     }
   } catch (err) {
@@ -5464,16 +5458,16 @@ app.post('/api/rivalries/:id/entries', requireAuth, async (req, res) => {
 
           if (theirTotal > myTotal && diff > 0) {
             // They pulled ahead of this participant
-            jobs.pushToUser(db, pId, rivalry.title, pick(RIVALRY_AHEAD_PUSH)(loggerName, fmtDiff, ct), { type: 'rivalry', ref_id: rivalryId });
+            jobs.pushToUser(db, pId, rivalry.title, pick(RIVALRY_AHEAD_PUSH)(loggerName, fmtDiff, ct), { actor_id: req.session.user.id, type: 'rivalry', ref_id: rivalryId });
           } else if (myTotal > theirTotal) {
             // This participant is still ahead
-            jobs.pushToUser(db, pId, rivalry.title, pick(RIVALRY_BEHIND_PUSH)(loggerName, ct), { type: 'rivalry', ref_id: rivalryId });
+            jobs.pushToUser(db, pId, rivalry.title, pick(RIVALRY_BEHIND_PUSH)(loggerName, ct), { actor_id: req.session.user.id, type: 'rivalry', ref_id: rivalryId });
           } else if (diff === 0 && myTotal > 0) {
             // Tied
-            jobs.pushToUser(db, pId, rivalry.title, `It's a dead tie with ${loggerName}! ${fmt(myTotal)} ${ct} each`, { type: 'rivalry', ref_id: rivalryId });
+            jobs.pushToUser(db, pId, rivalry.title, `It's a dead tie with ${loggerName}! ${fmt(myTotal)} ${ct} each`, { actor_id: req.session.user.id, type: 'rivalry', ref_id: rivalryId });
           } else if (diff > 0 && diff <= myTotal * 0.1) {
             // Very close
-            jobs.pushToUser(db, pId, rivalry.title, pick(RIVALRY_CLOSE_PUSH)(loggerName, fmtDiff, ct), { type: 'rivalry', ref_id: rivalryId });
+            jobs.pushToUser(db, pId, rivalry.title, pick(RIVALRY_CLOSE_PUSH)(loggerName, fmtDiff, ct), { actor_id: req.session.user.id, type: 'rivalry', ref_id: rivalryId });
           }
         }
       }
@@ -6329,6 +6323,9 @@ app.post('/api/groups/:id/members', requireAuth, async (req, res) => {
       return res.status(403).json({ error: 'You can only add your own contacts' });
     }
     if (addUserId) {
+      if (await db.isUserBlocked(userId, addUserId)) {
+        return res.status(403).json({ error: 'This member is unavailable' });
+      }
       // Sharing a group is the robust consent link; the owned-contact name
       // match remains as a fallback for people not yet in any shared group.
       const known = (await usersShareGroup(db, userId, addUserId))
@@ -7992,7 +7989,7 @@ app.post('/api/coverage', requireAuth, async (req, res) => {
       if (spec.user_id) {
         jobs.pushToUser(db, spec.user_id, `${senderName} needs your help`,
           eventTitle ? `${reason || 'Coverage'} · ${eventTitle}` : (reason || 'Coverage request'), {
-          type: 'coverage', ref_id: request.id
+          actor_id: req.session.user.id, type: 'coverage', ref_id: request.id
         });
       }
     }
@@ -8233,7 +8230,7 @@ app.post('/api/coverage/approve/:token', async (req, res) => {
       const requesterName = recipient.requester_name || 'Family';
       const timeDesc = approved_start && approved_end ? `${approved_start}–${approved_end}` : 'a time block';
       jobs.pushToUser(db, request.requester_id, 'Coverage Confirmed', `${helperName} approved ${timeDesc}`, {
-        type: 'coverage', ref_id: recipient.request_id
+        actor_id: recipient.user_id || null, type: 'coverage', ref_id: recipient.request_id
       });
 
       // Add coverage block to helper's calendar (if helper is an app user)
@@ -8293,7 +8290,7 @@ app.post('/api/coverage/incoming/:id/approve', requireAuth, async (req, res) => 
       const helperName = req.session.user?.name || 'Your care team';
       const timeDesc = approved_start && approved_end ? `${approved_start}–${approved_end}` : 'a time block';
       jobs.pushToUser(db, request.requester_id, 'Coverage Confirmed', `${helperName} approved ${timeDesc}`, {
-        type: 'coverage', ref_id: requestId
+        actor_id: req.session.user.id, type: 'coverage', ref_id: requestId
       });
 
       // Add to helper's calendar
@@ -8565,26 +8562,14 @@ initializeDatabase().then(() => {
 // bad migrations and corruption. Note: backups live on the same volume as the
 // DB — offsite copies still need a disk snapshot or external sync.
 function startNightlyBackups() {
-  const fs = require('fs');
   const BACKUP_DIR = path.join(FamilyDB.DB_DIR, 'backups');
-  const RETAIN = 14;
   const runBackup = async () => {
     const db = new FamilyDB();
     try {
-      fs.mkdirSync(BACKUP_DIR, { recursive: true });
-      const stamp = new Date().toISOString().slice(0, 10);
-      const dest = path.join(BACKUP_DIR, `family-${stamp}.db`);
-      if (!fs.existsSync(dest)) {
-        await db.backupTo(dest);
-        console.log('DB backup written:', dest);
-      }
+      const { destination } = await require('./services/backups').createSnapshot(db, BACKUP_DIR);
+      console.log('DB backup ready:', destination);
       const { purged } = await db.purgeDeletedSyncedEvents(30);
       if (purged) console.log(`Purged ${purged} soft-deleted synced calendar events`);
-      const files = fs.readdirSync(BACKUP_DIR)
-        .filter(f => /^family-\d{4}-\d{2}-\d{2}\.db$/.test(f)).sort();
-      for (const f of files.slice(0, Math.max(0, files.length - RETAIN))) {
-        fs.unlinkSync(path.join(BACKUP_DIR, f));
-      }
     } catch (err) {
       console.error('DB backup failed:', err.message);
     } finally {

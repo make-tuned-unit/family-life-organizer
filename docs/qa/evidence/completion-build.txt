@@ -1,0 +1,4 @@
+Release command: xcodebuild -project FamilyLife.xcodeproj -scheme FamilyLife -configuration Release -sdk iphonesimulator -destination platform=iOS Simulator,id=4CA89B40-EA21-4A95-B26D-E090021A1FE8 -derivedDataPath /tmp/kinrows-release-qa-build ONLY_ACTIVE_ARCH=YES CODE_SIGNING_ALLOWED=NO build
+Result: BUILD SUCCEEDED
+Final Debug app/widget build: BUILD SUCCEEDED
+Signing: disabled; no App Store distribution claim.

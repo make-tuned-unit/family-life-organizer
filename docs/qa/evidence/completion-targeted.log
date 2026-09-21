@@ -1,0 +1,33 @@
+✔ reports persist with retryable delivery; resolved reports never send stale notifications (57.816042ms)
+✔ operator removal erases reported content and photos without exposing an unauthenticated endpoint (5.2555ms)
+✔ dated backup expiry is age-based, isolated to owned files, and snapshot restores SQLite correctly (43.697958ms)
+✔ blocked actors cannot deliver coverage, hosting or rivalry notifications (21.4805ms)
+✔ conversation resume preserves handoff actions without replaying mutations (6.932792ms)
+✔ wiring: pantry Concierge create/edit/delete reaches iOS HTTP reads and stays isolated (2539.330083ms)
+✔ wiring: notes Concierge create/edit/delete reaches iOS HTTP reads and stays isolated (39.060917ms)
+✔ wiring: contacts Concierge create/edit/delete reaches iOS HTTP reads and stays isolated (41.684542ms)
+✔ wiring: recurring_payments Concierge create/edit/delete reaches iOS HTTP reads and stays isolated (28.795375ms)
+✔ wiring: calendar recurrence and reverse API edit are visible to Concierge (57.549417ms)
+✔ wiring: automatic briefs stay cloud-free even when a client requests AI (188.450208ms)
+✔ wiring: saved addresses CRUD, range validation and household guards (44.598625ms)
+✔ wiring: list pin, reorder and attachment lifecycle (61.699958ms)
+✔ wiring: routine lifecycle, private sharing, corrected sleep and calendar occurrences (80.566583ms)
+✔ wiring: feed discussion and author-only deletion (40.599041ms)
+✔ wiring: message reads require shared membership and mark only the caller inbox (22.533375ms)
+✔ wiring: decisions, rivalry results, budget stats, expenses and memory (87.070083ms)
+✔ wiring: hosting request/response uses shared state and exactly one pair of calendar events (53.544083ms)
+✔ wiring: coverage detail checks recipient identity and never returns invite tokens to the model (16.903917ms)
+✔ safety: blocking holds across native HTTP, Concierge/history, images, unread counts and notifications (43.329375ms)
+✔ safety: prohibited threats are rejected consistently by API and Concierge before persistence (8.656417ms)
+✔ privacy: a legacy private-note attachment never exposes its title or body to household members (16.270042ms)
+✔ Concierge full note reads preserve private and shared visibility (2.320959ms)
+✔ Native workflow handoffs require user action and never report a saved mutation (0.367958ms)
+✔ trip ownership is derived from an unambiguous household member, not client ids (15.925916ms)
+ℹ tests 25
+ℹ suites 0
+ℹ pass 25
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3924.963583

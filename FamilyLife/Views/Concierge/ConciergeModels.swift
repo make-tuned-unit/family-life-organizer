@@ -136,9 +136,10 @@ struct ConciergeAction: Codable, Hashable {
     let entityId: Int?
     let personId: Int?
     let personName: String?
+    let workflow: String?
 
     enum CodingKeys: String, CodingKey {
-        case tool, summary
+        case tool, summary, workflow
         case entityId = "entity_id"
         case personId = "person_id"
         case personName = "person_name"
@@ -171,6 +172,7 @@ struct ConciergeConversationSummary: Codable, Identifiable {
 struct ConciergeStoredMessage: Codable {
     let role: String
     let content: String
+    let actions: [ConciergeAction]?
 }
 
 /// One "needs you" item. `kind` and `route` are stable strings from the server;

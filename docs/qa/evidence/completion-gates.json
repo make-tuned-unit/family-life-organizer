@@ -1,0 +1,100 @@
+{
+  "checkedAt": "2026-09-21T23:25:35.840316+00:00",
+  "decision": "HOLD",
+  "evidenceMode": "Assembled from the individual commands and observed UI session; not a claim that every node was executed by one runner invocation.",
+  "nodes": [
+    {
+      "id": "A",
+      "deps": [],
+      "status": "PASS",
+      "evidence": "wiring-evidence.json: native literal routes matched"
+    },
+    {
+      "id": "B",
+      "deps": [
+        "A"
+      ],
+      "status": "PASS",
+      "scope": "Automated backend tests only; remaining privacy/operations acceptance is not certified.",
+      "tests": 471,
+      "evidence": "evidence/completion-tests.log"
+    },
+    {
+      "id": "C",
+      "deps": [
+        "A"
+      ],
+      "status": "PASS",
+      "scope": "Unsigned arm64 simulator Release app and widget; Debug simulator exercised. Not signed distribution."
+    },
+    {
+      "id": "D",
+      "deps": [
+        "A"
+      ],
+      "status": "NOT_VERIFIED",
+      "entrypointsVerified": 10,
+      "remaining": "Nine native completion categories, field-level/pagination and full non-Settings workflow acceptance"
+    },
+    {
+      "id": "E",
+      "deps": [
+        "A"
+      ],
+      "status": "PASS",
+      "scope": "Source/generation consistency: 40 pages and five hubs. Final App Store metadata still pending."
+    },
+    {
+      "id": "P",
+      "deps": [
+        "B"
+      ],
+      "status": "PASS",
+      "scenarios": 5
+    },
+    {
+      "id": "R",
+      "deps": [
+        "A"
+      ],
+      "status": "PASS",
+      "scope": "74 structural cases; three live handoff/persistence cases, not exhaustive natural-language acceptance"
+    },
+    {
+      "id": "F",
+      "deps": [
+        "B",
+        "C",
+        "D",
+        "E",
+        "P",
+        "R"
+      ],
+      "status": "BLOCKED",
+      "blockedBy": [
+        "D"
+      ],
+      "additionalBlocks": [
+        "Comprehensive moderation and operator acceptance",
+        "Apple revocation configuration/client rollout",
+        "Legacy erasure and external backup policy"
+      ]
+    },
+    {
+      "id": "G",
+      "deps": [
+        "F"
+      ],
+      "status": "BLOCKED",
+      "remaining": "Physical device, accessibility and live StoreKit/Apple/APNs acceptance"
+    },
+    {
+      "id": "H",
+      "deps": [
+        "G"
+      ],
+      "status": "BLOCKED",
+      "remaining": "App Store Connect access, distribution signing, metadata and reviewer evidence"
+    }
+  ]
+}

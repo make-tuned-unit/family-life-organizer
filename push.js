@@ -199,7 +199,8 @@ async function pushToTokens(tokens, title, body, data = {}, db = null) {
  */
 async function pushToUser(db, userId, title, body, data = {}, opts = {}) {
   try {
-    if (data.type === 'message' && data.ref_id && await db.isUserBlocked(userId, data.ref_id)) return { sent: 0, total: 0, skipped: true };
+    const actorId = Number(data.actor_id || (data.type === 'message' ? data.ref_id : 0));
+    if (actorId && await db.isUserBlocked(userId, actorId)) return { sent: 0, total: 0, skipped: true };
     const tokens = await db.getDeviceTokens(userId);
     const result = await pushToTokens(tokens, title, body, data, db);
     if (opts.throwOnError && result && result.total > 0 && result.sent === 0 && !result.skipped) {

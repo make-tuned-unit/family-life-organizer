@@ -1,42 +1,362 @@
 {
   "scope": "All non-Settings workflows; presence, media capture and Apple permissions require explicit native handoff, not silent server execution.",
   "requirements": [
-    { "workflow": "Home card priorities", "operations": ["get_home_cards", "set_home_cards"] },
-    { "workflow": "Calendar event lifecycle", "operations": ["get_calendar", "add_appointment", "update_appointment", "delete_appointment"] },
-    { "workflow": "Calendar attachments", "operations": ["get_event_attachments", "add_event_attachment", "delete_event_attachment"], "app": "fetchEventAttachments/addEventAttachment/deleteEventAttachment" },
-    { "workflow": "Tasks", "operations": ["list_tasks", "add_task", "update_task", "complete_task", "delete_task"] },
-    { "workflow": "Lists and items", "operations": ["get_lists", "get_list", "create_list", "rename_list", "delete_list", "add_list_item", "check_off_item", "update_list_item", "delete_list_item", "move_list_item"] },
-    { "workflow": "List presentation and ordering", "operations": ["pin_list", "unpin_list", "reorder_list_items"], "app": "pinList/unpinList/reorderListItems; updateList also supports more fields than rename" },
-    { "workflow": "Budget and expenses", "operations": ["get_budget", "list_receipts", "add_expense", "delete_receipt", "add_budget_category", "update_budget_category", "delete_budget_category"] },
-    { "workflow": "Budget history", "operations": ["get_budget_stats"], "app": "fetchBudgetStats" },
-    { "workflow": "Recurring payments", "operations": ["get_recurring_payments", "add_recurring_payment", "update_recurring_payment", "delete_recurring_payment"] },
-    { "workflow": "Budget projects", "operations": ["get_projects", "add_project", "delete_project", "add_project_expense", "delete_project_expense"] },
-    { "workflow": "Read project expenses", "operations": ["get_project_expenses"], "app": "fetchProjectExpenses" },
-    { "workflow": "Pantry", "operations": ["list_pantry", "add_pantry_item", "update_pantry_item", "delete_pantry_item"] },
-    { "workflow": "Decisions voting", "operations": ["list_decisions", "add_decision", "vote_decision", "comment_decision", "delete_decision"] },
-    { "workflow": "Decision management and discussion", "operations": ["update_decision", "get_decision_reactions", "get_decision_comments"], "app": "updateDecision/fetchDecisionReactions/fetchDecisionComments" },
-    { "workflow": "Trips", "operations": ["get_trips", "add_trip", "update_trip", "arrive_trip", "cancel_trip", "delete_trip"] },
-    { "workflow": "Saved family addresses", "operations": ["get_addresses", "add_address", "update_address", "delete_address"], "app": "fetchFamilyAddresses/addFamilyAddress/updateFamilyAddress/deleteFamilyAddress" },
-    { "workflow": "Itinerary lifecycle", "operations": ["get_itineraries", "add_itinerary", "update_itinerary", "delete_itinerary", "get_itinerary_stays", "add_itinerary_stay", "update_itinerary_stay", "delete_itinerary_stay", "add_itinerary_expense"] },
-    { "workflow": "Itinerary hosting approvals and expense review", "operations": ["request_stay", "respond_to_stay", "get_pending_stay_requests", "get_itinerary_expenses"], "app": "requestStay/respondToStay/fetchPendingStayRequests/fetchItineraryExpenses" },
-    { "workflow": "Rivalries", "operations": ["get_rivalries", "create_rivalry", "log_rivalry_score", "complete_rivalry", "delete_rivalry"] },
-    { "workflow": "Rivalry configuration and results", "operations": ["update_rivalry", "get_rivalry_entries", "get_rivalry_leaderboard"], "app": "updateRivalry/fetchRivalryEntries/fetchRivalryLeaderboard" },
-    { "workflow": "Gifts", "operations": ["get_gift_people", "add_gift_person", "get_gift_ideas", "add_gift_idea", "update_gift_idea", "delete_gift_idea"] },
-    { "workflow": "People and milestones", "operations": ["list_people", "add_person", "update_person", "delete_person", "list_milestones", "log_milestone", "update_milestone", "delete_milestone"] },
-    { "workflow": "Key dates", "operations": ["get_special_events", "add_special_event", "update_special_event", "delete_special_event"] },
-    { "workflow": "Contacts", "operations": ["get_contacts", "add_contact", "update_contact", "delete_contact"] },
-    { "workflow": "Coverage", "operations": ["get_coverage", "create_coverage_request", "cancel_coverage_request", "get_incoming_coverage", "approve_incoming_coverage"] },
-    { "workflow": "Coverage detail and blocks", "operations": ["get_coverage_detail", "get_coverage_blocks"], "app": "fetchCoverageDetail/fetchCoverageBlocks" },
-    { "workflow": "Notes", "operations": ["list_notes", "add_note", "update_note", "delete_note"] },
-    { "workflow": "Routine lifecycle", "operations": ["list_routines", "get_routine", "create_routine", "update_routine", "delete_routine", "set_routine_shared", "archive_routine", "restore_routine"], "app": "addRoutine/updateRoutine/deleteRoutine/setRoutineShared" },
-    { "workflow": "Routine entries", "operations": ["log_routine_entry", "update_routine_entry", "delete_routine_entry", "get_routine_occurrences"], "app": "updateRoutineEntry/deleteRoutineEntry/fetchRoutineOccurrences" },
-    { "workflow": "Sleep tracking", "operations": ["log_sleep", "start_sleep", "end_sleep", "set_sleep_start", "get_sleep_stats", "analyze_sleep"] },
-    { "workflow": "Chores", "operations": ["setup_chores", "update_chores", "get_chores", "log_chore", "log_chore_bonus", "log_chore_payout"] },
-    { "workflow": "Feed participation", "operations": ["add_feed_post", "add_feed_reaction", "add_feed_comment"] },
-    { "workflow": "Feed management", "operations": ["get_feed", "delete_feed_post", "get_feed_reactions", "remove_feed_reaction", "get_feed_comments"], "app": "fetchFeed/deleteFeedPost/fetchFeedReactions/removeFeedReaction/fetchFeedComments" },
-    { "workflow": "Messages", "operations": ["send_message", "get_conversations", "get_messages", "mark_messages_read"], "app": "fetchConversations/fetchMessages/markMessagesRead; send_message only sends text" },
-    { "workflow": "Concierge memory", "operations": ["remember", "get_memory", "delete_memory"], "app": "Backend memory endpoints exist but deletion has no native UI" },
-    { "workflow": "History", "operations": ["get_history"] }
+    {
+      "workflow": "Home card priorities",
+      "operations": [
+        "get_home_cards",
+        "set_home_cards"
+      ]
+    },
+    {
+      "workflow": "Calendar event lifecycle",
+      "operations": [
+        "get_calendar",
+        "add_appointment",
+        "update_appointment",
+        "delete_appointment"
+      ]
+    },
+    {
+      "workflow": "Calendar attachments",
+      "operations": [
+        "get_event_attachments",
+        "add_event_attachment",
+        "delete_event_attachment"
+      ],
+      "app": "fetchEventAttachments/addEventAttachment/deleteEventAttachment"
+    },
+    {
+      "workflow": "Tasks",
+      "operations": [
+        "list_tasks",
+        "add_task",
+        "update_task",
+        "complete_task",
+        "delete_task"
+      ]
+    },
+    {
+      "workflow": "Lists and items",
+      "operations": [
+        "get_lists",
+        "get_list",
+        "create_list",
+        "rename_list",
+        "delete_list",
+        "add_list_item",
+        "check_off_item",
+        "update_list_item",
+        "delete_list_item",
+        "move_list_item"
+      ]
+    },
+    {
+      "workflow": "List presentation and ordering",
+      "operations": [
+        "pin_list",
+        "unpin_list",
+        "reorder_list_items"
+      ],
+      "app": "pinList/unpinList/reorderListItems; updateList also supports more fields than rename"
+    },
+    {
+      "workflow": "Budget and expenses",
+      "operations": [
+        "get_budget",
+        "list_receipts",
+        "add_expense",
+        "delete_receipt",
+        "add_budget_category",
+        "update_budget_category",
+        "delete_budget_category"
+      ]
+    },
+    {
+      "workflow": "Budget history",
+      "operations": [
+        "get_budget_stats"
+      ],
+      "app": "fetchBudgetStats"
+    },
+    {
+      "workflow": "Recurring payments",
+      "operations": [
+        "get_recurring_payments",
+        "add_recurring_payment",
+        "update_recurring_payment",
+        "delete_recurring_payment"
+      ]
+    },
+    {
+      "workflow": "Budget projects",
+      "operations": [
+        "get_projects",
+        "add_project",
+        "delete_project",
+        "add_project_expense",
+        "delete_project_expense"
+      ]
+    },
+    {
+      "workflow": "Read project expenses",
+      "operations": [
+        "get_project_expenses"
+      ],
+      "app": "fetchProjectExpenses"
+    },
+    {
+      "workflow": "Pantry",
+      "operations": [
+        "list_pantry",
+        "add_pantry_item",
+        "update_pantry_item",
+        "delete_pantry_item"
+      ]
+    },
+    {
+      "workflow": "Decisions voting",
+      "operations": [
+        "list_decisions",
+        "add_decision",
+        "vote_decision",
+        "comment_decision",
+        "delete_decision"
+      ]
+    },
+    {
+      "workflow": "Decision management and discussion",
+      "operations": [
+        "update_decision",
+        "get_decision_reactions",
+        "get_decision_comments"
+      ],
+      "app": "updateDecision/fetchDecisionReactions/fetchDecisionComments"
+    },
+    {
+      "workflow": "Trips",
+      "operations": [
+        "get_trips",
+        "add_trip",
+        "update_trip",
+        "arrive_trip",
+        "cancel_trip",
+        "delete_trip"
+      ]
+    },
+    {
+      "workflow": "Saved family addresses",
+      "operations": [
+        "get_addresses",
+        "add_address",
+        "update_address",
+        "delete_address"
+      ],
+      "app": "fetchFamilyAddresses/addFamilyAddress/updateFamilyAddress/deleteFamilyAddress"
+    },
+    {
+      "workflow": "Itinerary lifecycle",
+      "operations": [
+        "get_itineraries",
+        "add_itinerary",
+        "update_itinerary",
+        "delete_itinerary",
+        "get_itinerary_stays",
+        "add_itinerary_stay",
+        "update_itinerary_stay",
+        "delete_itinerary_stay",
+        "add_itinerary_expense"
+      ]
+    },
+    {
+      "workflow": "Itinerary hosting approvals and expense review",
+      "operations": [
+        "request_stay",
+        "respond_to_stay",
+        "get_pending_stay_requests",
+        "get_itinerary_expenses"
+      ],
+      "app": "requestStay/respondToStay/fetchPendingStayRequests/fetchItineraryExpenses"
+    },
+    {
+      "workflow": "Rivalries",
+      "operations": [
+        "get_rivalries",
+        "create_rivalry",
+        "log_rivalry_score",
+        "complete_rivalry",
+        "delete_rivalry"
+      ]
+    },
+    {
+      "workflow": "Rivalry configuration and results",
+      "operations": [
+        "update_rivalry",
+        "get_rivalry_entries",
+        "get_rivalry_leaderboard"
+      ],
+      "app": "updateRivalry/fetchRivalryEntries/fetchRivalryLeaderboard"
+    },
+    {
+      "workflow": "Gifts",
+      "operations": [
+        "get_gift_people",
+        "add_gift_person",
+        "get_gift_ideas",
+        "add_gift_idea",
+        "update_gift_idea",
+        "delete_gift_idea"
+      ]
+    },
+    {
+      "workflow": "People and milestones",
+      "operations": [
+        "list_people",
+        "add_person",
+        "update_person",
+        "delete_person",
+        "list_milestones",
+        "log_milestone",
+        "update_milestone",
+        "delete_milestone"
+      ]
+    },
+    {
+      "workflow": "Key dates",
+      "operations": [
+        "get_special_events",
+        "add_special_event",
+        "update_special_event",
+        "delete_special_event"
+      ]
+    },
+    {
+      "workflow": "Contacts",
+      "operations": [
+        "get_contacts",
+        "add_contact",
+        "update_contact",
+        "delete_contact"
+      ]
+    },
+    {
+      "workflow": "Coverage",
+      "operations": [
+        "get_coverage",
+        "create_coverage_request",
+        "cancel_coverage_request",
+        "get_incoming_coverage",
+        "approve_incoming_coverage"
+      ]
+    },
+    {
+      "workflow": "Coverage detail and blocks",
+      "operations": [
+        "get_coverage_detail",
+        "get_coverage_blocks"
+      ],
+      "app": "fetchCoverageDetail/fetchCoverageBlocks"
+    },
+    {
+      "workflow": "Notes",
+      "operations": [
+        "get_note",
+        "list_notes",
+        "add_note",
+        "update_note",
+        "delete_note"
+      ]
+    },
+    {
+      "workflow": "Routine lifecycle",
+      "operations": [
+        "list_routines",
+        "get_routine",
+        "create_routine",
+        "update_routine",
+        "delete_routine",
+        "set_routine_shared",
+        "archive_routine",
+        "restore_routine"
+      ],
+      "app": "addRoutine/updateRoutine/deleteRoutine/setRoutineShared"
+    },
+    {
+      "workflow": "Routine entries",
+      "operations": [
+        "log_routine_entry",
+        "update_routine_entry",
+        "delete_routine_entry",
+        "get_routine_occurrences"
+      ],
+      "app": "updateRoutineEntry/deleteRoutineEntry/fetchRoutineOccurrences"
+    },
+    {
+      "workflow": "Sleep tracking",
+      "operations": [
+        "log_sleep",
+        "start_sleep",
+        "end_sleep",
+        "set_sleep_start",
+        "get_sleep_stats",
+        "analyze_sleep"
+      ]
+    },
+    {
+      "workflow": "Chores",
+      "operations": [
+        "setup_chores",
+        "update_chores",
+        "get_chores",
+        "log_chore",
+        "log_chore_bonus",
+        "log_chore_payout"
+      ]
+    },
+    {
+      "workflow": "Feed participation",
+      "operations": [
+        "add_feed_post",
+        "add_feed_reaction",
+        "add_feed_comment"
+      ]
+    },
+    {
+      "workflow": "Feed management",
+      "operations": [
+        "get_feed",
+        "delete_feed_post",
+        "get_feed_reactions",
+        "remove_feed_reaction",
+        "get_feed_comments"
+      ],
+      "app": "fetchFeed/deleteFeedPost/fetchFeedReactions/removeFeedReaction/fetchFeedComments"
+    },
+    {
+      "workflow": "Messages",
+      "operations": [
+        "send_message",
+        "get_conversations",
+        "get_messages",
+        "mark_messages_read"
+      ],
+      "app": "fetchConversations/fetchMessages/markMessagesRead; send_message only sends text"
+    },
+    {
+      "workflow": "Concierge memory",
+      "operations": [
+        "remember",
+        "get_memory",
+        "delete_memory"
+      ],
+      "app": "Backend memory endpoints exist but deletion has no native UI"
+    },
+    {
+      "workflow": "History",
+      "operations": [
+        "get_history"
+      ]
+    }
   ],
   "native_handoffs_unverified": [
     "Camera/photo receipt capture, review and save to budget/pantry",
@@ -46,7 +366,7 @@
     "HealthKit consent and rivalry health sync",
     "DM/feed image attachments and content reporting",
     "Family/clan creation, membership, invitations and sharing outside Settings",
-    "Conversation-history resume/delete and full note retrieval",
+    "Conversation-history resume/delete (full note retrieval now has an authorized server handler)",
     "Notification/reminder scheduling after server-side writes"
   ],
   "limitations": [
@@ -54,5 +374,23 @@
     "Proposed names for missing operations are acceptance IDs, not assertions that implementation must use these exact names. Update the mapping when an equivalent verified handler is implemented.",
     "Existing tools often return capped/previews of records. Field-level parity and pagination need behavioral acceptance tests.",
     "Actions that communicate, share private information or start device services need the same consent and confirmation as their native workflow."
-  ]
+  ],
+  "native_entrypoints_verified": {
+    "date": "2026-09-21",
+    "environment": "Isolated iPhone 17 Pro simulator, Debug build, synthetic household, live Anthropic routing",
+    "destinations": [
+      "receipt",
+      "cook",
+      "calendar",
+      "trips",
+      "health (Rivalries screen)",
+      "groups",
+      "messages",
+      "notes",
+      "routines",
+      "history"
+    ],
+    "history_resume": "Stored handoff button restored and opened Notes after rebuild/relaunch",
+    "limits": "Entry and return paths verified. Permission flows, device integrations, all field-level actions and full workflow completion remain separate acceptance gates."
+  }
 }

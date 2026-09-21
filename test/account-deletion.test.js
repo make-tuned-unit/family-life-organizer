@@ -177,3 +177,29 @@ test('deletion erases authored feed photos, reports and queued previews in a sur
     assert.ok(await get('SELECT id FROM groups WHERE id = ?', [gid]), 'shared household survives');
   } finally { raw.close(); }
 });
+
+test('deletion removes shared owned health and account-linked location/profile data without deleting housemate data', async () => {
+  const owner = makeClient(), member = makeClient();
+  const reg = await owner('POST', '/api/auth/register', { username: 'del_shared_health', password: 'password123', name: 'Shared Health' });
+  const joined = await member('POST', '/api/auth/register', { username: 'del_shared_housemate', password: 'password123', name: 'Housemate', invite_code: reg.body.household.invite_code });
+  let uid, otherId, routineId, otherRoutine, tripId, personId;
+  await inspectDB(async ({ run, get }) => {
+    uid = (await get("SELECT id FROM users WHERE username='del_shared_health'")).id;
+    otherId = (await get("SELECT id FROM users WHERE username='del_shared_housemate'")).id;
+    routineId = (await run("INSERT INTO routines(group_id,created_by,name,routine_type,shared_scope) VALUES (?,?,'Shared cycle','period','household')", [reg.body.household.id, uid])).lastID;
+    otherRoutine = (await run("INSERT INTO routines(group_id,created_by,name,routine_type,shared_scope) VALUES (?,?,'Housemate log','custom','household')", [reg.body.household.id, otherId])).lastID;
+    await run("INSERT INTO routine_entries(routine_id,entry_date,created_by,value) VALUES (?,'2026-09-21',?,'personal entry')", [otherRoutine, uid]);
+    await run("INSERT INTO routine_entries(routine_id,entry_date,created_by,value) VALUES (?,'2026-09-21',?,'housemate entry')", [otherRoutine, otherId]);
+    tripId = (await run("INSERT INTO trips(traveler,destination,traveler_id,group_id,current_lat,current_lng) VALUES ('Shared Health','QA destination',?,?,44.6,-63.5)", [uid, reg.body.household.id])).lastID;
+    personId = (await get('SELECT id FROM gift_people WHERE user_id = ?', [uid]))?.id;
+  });
+  assert.equal((await owner('POST', '/api/account/delete', { current_password: 'password123' })).status, 200);
+  await inspectDB(async ({ get }) => {
+    assert.equal(await get('SELECT id FROM routines WHERE id=?', [routineId]), undefined);
+    assert.equal(await get('SELECT id FROM trips WHERE id=?', [tripId]), undefined);
+    assert.equal(await get('SELECT id FROM gift_people WHERE user_id=?', [uid]), undefined);
+    assert.equal(await get('SELECT id FROM routine_entries WHERE created_by=?', [uid]), undefined);
+    assert.ok(await get('SELECT id FROM routines WHERE id=?', [otherRoutine]));
+    assert.ok(await get('SELECT id FROM routine_entries WHERE created_by=?', [otherId]));
+  });
+});
