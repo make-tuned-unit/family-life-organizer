@@ -277,6 +277,7 @@ struct ConversationView: View {
             await loadDecisions()
             try? await api.markMessagesRead(partnerId: partnerId)
         }
+        .onConciergeDataChange { await refreshMessages() }
         .onAppear {
             pollTimer = Timer.scheduledTimer(withTimeInterval: 15, repeats: true) { _ in
                 Task { @MainActor in

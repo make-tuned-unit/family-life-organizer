@@ -70,7 +70,7 @@ async function stripeRequest(method, path, params) {
     ? `${url}?${flatten(params, '', []).map(([k, v]) =>
         `${encodeURIComponent(k)}=${encodeURIComponent(v)}`).join('&')}`
     : url;
-  const res = await fetch(method === 'GET' ? getUrl : url, { method, headers, body });
+  const res = await fetch(method === 'GET' ? getUrl : url, { method, headers, body, signal: AbortSignal.timeout(15000) });
   const data = await res.json();
   if (!res.ok) {
     const msg = data?.error?.message || `Stripe ${method} ${path} failed (${res.status})`;
@@ -80,6 +80,20 @@ async function stripeRequest(method, path, params) {
     throw err;
   }
   return data;
+}
+
+// Deletion must stop if we cannot prove billing has stopped. Retrieve first so
+// retrying after a partially completed account deletion is safe.
+async function cancelForAccountDeletion(db, userId, request = stripeRequest) {
+  const transactions = await db.listSoleHouseholdStripeSubs(userId);
+  for (const txn of new Set(transactions)) {
+    const id = stripeSubscriptionIdFromTxn(txn);
+    if (!id || !/^sub_[a-zA-Z0-9_]+$/.test(id)) throw new Error('Invalid subscription reference');
+    const current = await request('GET', `/subscriptions/${id}`);
+    if (current.status === 'canceled' || current.status === 'incomplete_expired') continue;
+    const canceled = await request('DELETE', `/subscriptions/${id}`);
+    if (canceled.status !== 'canceled') throw new Error('Subscription cancellation was not confirmed');
+  }
 }
 
 // Resolve a Kinrows product id to a Stripe Price id: env override, then lookup_key.
@@ -360,6 +374,7 @@ module.exports = {
   isStripeTxn,
   stripeSubscriptionIdFromTxn,
   stripeRequest,
+  cancelForAccountDeletion,
   priceIdForProduct,
   productIdForPrice,
   periodEndUnix,

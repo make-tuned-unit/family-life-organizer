@@ -1,0 +1,9 @@
+Concierge surface: 28 model-facing tools
+
+STRUCTURAL: 1/1 intents expressible & routable
+
+LIVE (claude-haiku-4-5):
+  FAIL  "Pin list 4 to the top."
+        expected lists (pin), got lists (list_all)
+
+LIVE: 0/1 routed correctly

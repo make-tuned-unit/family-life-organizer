@@ -306,6 +306,14 @@ struct RivalryDetailView: View {
                 await loadEntries()
             }
         }
+        .onConciergeDataChange {
+            do {
+                if let updated = try await api.fetchRivalries().first(where: { $0.id == currentRivalry.id }) {
+                    currentRivalry = updated
+                    await loadEntries()
+                } else { dismiss() }
+            } catch { self.error = error.localizedDescription }
+        }
         .inlineError(error) { error = nil }
         .task {
             await loadEntries()

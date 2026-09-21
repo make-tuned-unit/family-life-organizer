@@ -1550,16 +1550,10 @@ app.post('/api/account/delete', requireAuth, loginLimiter, async (req, res) => {
     }
 
     // Sole-owner households: cancel Stripe so billing does not outlive the wipe.
-    if (stripeBilling.isConfigured()) {
-      try {
-        const txns = await db.listSoleHouseholdStripeSubs(req.session.user.id);
-        for (const txn of txns) {
-          const sid = stripeBilling.stripeSubscriptionIdFromTxn(txn);
-          if (sid) {
-            await stripeBilling.stripeRequest('POST', `/subscriptions/${sid}/cancel`).catch(() => {});
-          }
-        }
-      } catch { /* deletion still proceeds */ }
+    try {
+      await stripeBilling.cancelForAccountDeletion(db, req.session.user.id);
+    } catch {
+      return res.status(503).json({ error: 'We could not confirm subscription cancellation. Your account has not been deleted. Please retry or contact support@kinrows.com.' });
     }
     await eraseUserSessions(req.session.user.id);
     await db.deleteUserAccount(req.session.user.id);
@@ -3657,43 +3651,7 @@ app.get('/api/budget/stats', requireAuth, async (req, res) => {
         projectedMonthEnd: 0, recurringMonthly: 0, variableThisMonth: 0, overBudget: [],
       });
     }
-    const months = parseInt(req.query.months) || 6;
-    const stats = await db.getSpendingStats(groupId, months);
-    const budgetVsActual = await db.getBudgetSummary(stats.thisMonth, groupId);
-
-    // Derived figures the iOS Stats view renders as insight cards.
-    const series = stats.monthly;
-    const curr = series.length ? series[series.length - 1].total : 0;
-    const prev = series.length > 1 ? series[series.length - 2].total : 0;
-    const momPct = prev > 0 ? Math.round(((curr - prev) / prev) * 100) : null;
-    const avg = series.length ? series.reduce((s, m) => s + m.total, 0) / series.length : 0;
-
-    // Run-rate projection for the current month + remaining fixed commitments.
-    const now = new Date();
-    const dayOfMonth = now.getDate();
-    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-    const runRate = dayOfMonth > 0 ? (curr / dayOfMonth) * daysInMonth : curr;
-    const projectedMonthEnd = Math.round(Math.max(runRate, curr));
-
-    const overBudget = budgetVsActual.filter(b => b.monthly_limit > 0 && b.spent > b.monthly_limit)
-      .map(b => ({ category: b.category, spent: b.spent, limit: b.monthly_limit }));
-    const fixed = Math.round(stats.recurringMonthly);
-    const variable = Math.round(Math.max(0, curr - fixed));
-
-    res.json({
-      month: stats.thisMonth,
-      monthly: series,                 // [{ ym, total }] oldest -> newest
-      byCategory: stats.byCategory,    // [{ category, spent }] current month, desc
-      budgetVsActual,                  // [{ category, monthly_limit, color, spent }]
-      currentTotal: Math.round(curr),
-      previousTotal: Math.round(prev),
-      momPct,
-      trailingAvg: Math.round(avg),
-      projectedMonthEnd,
-      recurringMonthly: fixed,
-      variableThisMonth: variable,
-      overBudget,
-    });
+    res.json(await require('./services/budgetStats').getBudgetStats(db, groupId, Math.min(24, Math.max(1, parseInt(req.query.months) || 6))));
   } catch (err) {
     sendServerError(res, err);
   } finally {
@@ -5708,120 +5666,22 @@ app.delete('/api/itineraries/:id/stays/:stayId', requireAuth, async (req, res) =
 app.post('/api/stays/:stayId/request', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
-    const stay = await db.getItineraryStayById(req.params.stayId);
-    if (!stay) return res.status(404).json({ error: 'Stay not found' });
-
-    const itinerary = await db.getItineraryById(stay.itinerary_id);
-    if (!itinerary || itinerary.traveler_id !== req.session.user.id) {
-      return res.status(403).json({ error: 'Forbidden' });
-    }
-
-    await db.updateItineraryStay(stay.id, { status: 'requested' });
-
-    // Push notification to host if they're an app user
-    if (stay.host_user_id) {
-      const itinerary = await db.getItineraryById(stay.itinerary_id);
-      const traveler = itinerary?.traveler_name || 'Someone';
-      jobs.pushToUser(db, stay.host_user_id,
-        `${traveler} wants to stay with you`,
-        `${stay.check_in} to ${stay.check_out}${stay.notes ? ' — ' + stay.notes : ''}`,
-        { type: 'stay_request', ref_id: stay.id }
-      );
-    }
-
-    res.json({ success: true });
+    res.json(await require('./services/stayWorkflow').requestStay({ db, userId: req.session.user.id, userName: req.session.user.name, push: jobs }, Number(req.params.stayId)));
   } catch (err) {
-    sendServerError(res, err);
-  } finally {
-    db.close();
-  }
+    if (err.status) res.status(err.status).json({ error: err.message });
+    else sendServerError(res, err);
+  } finally { db.close(); }
 });
 
 // Host responds to stay request
 app.post('/api/stays/:stayId/respond', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
-    const stay = await db.getItineraryStayById(req.params.stayId);
-    if (!stay) return res.status(404).json({ error: 'Stay not found' });
-
-    if (stay.host_user_id !== req.session.user.id) {
-      return res.status(403).json({ error: 'Forbidden' });
-    }
-
-    // Only a requested stay can be responded to — a retried/duplicated POST
-    // would otherwise create a second pair of calendar events.
-    if (stay.status !== 'requested') {
-      return res.status(409).json({ error: `Stay is ${stay.status || 'draft'}, not awaiting a response` });
-    }
-
-    const { approved } = req.body;
-    const itinerary = await db.getItineraryById(stay.itinerary_id);
-    const travelerName = itinerary?.traveler_name || 'Visitor';
-    const hostName = req.session.user.name;
-
-    if (approved) {
-      // Create calendar event for traveler — scope to the TRAVELER's household,
-      // not the itinerary's group. Itineraries can live in a clan group, but
-      // appointments are only read/edited through household-scoped queries, so a
-      // clan-scoped event would be invisible and permanently uneditable.
-      const travelerGroupId = itinerary?.traveler_id
-        ? await db.getUserHouseholdId(itinerary.traveler_id)
-        : null;
-      const travelerEvent = await db.addAppointment({
-        title: `Staying at ${hostName}'s`,
-        appointment_date: stay.check_in,
-        description: `${stay.check_in} to ${stay.check_out}${stay.location_name ? ' · ' + stay.location_name : ''}`,
-        location: stay.address || stay.location_name || null,
-        category: 'social',
-        with_person: hostName,
-        group_id: travelerGroupId
-      });
-
-      // Create calendar event for host
-      const hostGroupId = await db.getUserHouseholdId(req.session.user.id);
-      const hostEvent = await db.addAppointment({
-        title: `${travelerName} visiting`,
-        appointment_date: stay.check_in,
-        description: `${stay.check_in} to ${stay.check_out}`,
-        location: stay.address || stay.location_name || null,
-        category: 'social',
-        with_person: travelerName,
-        group_id: hostGroupId
-      });
-
-      await db.updateItineraryStay(stay.id, {
-        status: 'confirmed',
-        calendar_event_id: travelerEvent.id,
-        host_calendar_event_id: hostEvent.id
-      });
-
-      // Notify traveler
-      if (itinerary?.traveler_id) {
-        jobs.pushToUser(db, itinerary.traveler_id,
-          `${hostName} confirmed your stay!`,
-          `${stay.check_in} to ${stay.check_out} is all set`,
-          { type: 'stay_confirmed', ref_id: stay.id }
-        );
-      }
-    } else {
-      await db.updateItineraryStay(stay.id, { status: 'declined' });
-
-      // Notify traveler
-      if (itinerary?.traveler_id) {
-        jobs.pushToUser(db, itinerary.traveler_id,
-          `${hostName} can't host ${stay.check_in} to ${stay.check_out}`,
-          'You may need to adjust your itinerary',
-          { type: 'stay_declined', ref_id: stay.id }
-        );
-      }
-    }
-
-    res.json({ success: true });
+    res.json(await require('./services/stayWorkflow').respondToStay({ db, userId: req.session.user.id, userName: req.session.user.name, push: jobs }, Number(req.params.stayId), req.body.approved));
   } catch (err) {
-    sendServerError(res, err);
-  } finally {
-    db.close();
-  }
+    if (err.status) res.status(err.status).json({ error: err.message });
+    else sendServerError(res, err);
+  } finally { db.close(); }
 });
 
 // Get pending stay requests for current user (as host)
@@ -7546,52 +7406,7 @@ app.get('/api/routines/:id/occurrences', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
     if (!(await requireRoutineAccess(db, req.params.id, req, res))) return;
-    const routine = await db.getRoutineById(req.params.id);
-    let cfg = {};
-    try { cfg = JSON.parse(routine.config || '{}'); } catch {}
-    const keyword = (cfg.calendar_keyword || '').trim();
-    if (!keyword) return res.json({ keyword: null, occurrences: [], scheduled: 0, attended: 0 });
-
-    const groupId = await db.getUserHouseholdId(req.session.user?.id);
-    const today = todayLocal();
-    const windowStart = fromLocalDate(-90);  // look back ~3 months
-    const windowEnd = fromLocalDate(30);     // and ~1 month ahead
-    const base = await db.getAppointmentsMatching(groupId, keyword, null, windowEnd);
-
-    // Expand each matching event's occurrences within the window.
-    const rangeStart = new Date(windowStart + 'T00:00:00');
-    const rangeEnd = new Date(windowEnd + 'T00:00:00');
-    const dates = new Set();
-    for (const appt of base) {
-      const origin = new Date(appt.appointment_date + 'T00:00:00');
-      if (appt.appointment_date >= windowStart && appt.appointment_date <= windowEnd) {
-        dates.add(appt.appointment_date);
-      }
-      if (appt.recurrence_rule) {
-        const endDate = appt.recurrence_end ? new Date(appt.recurrence_end + 'T00:00:00') : null;
-        for (const d of expandRecurrence(appt.recurrence_rule, origin, rangeStart, rangeEnd, endDate)) {
-          dates.add(d.toLocaleDateString('en-CA'));
-        }
-      }
-    }
-
-    // Which dates already have a logged session.
-    const entries = await db.getRoutineEntries(req.params.id, {});
-    const confirmed = new Set(entries
-      .filter(e => e.entry_type === 'session' || e.entry_type === 'attended')
-      .map(e => e.entry_date));
-
-    const occurrences = [...dates].sort().map(d => ({
-      date: d, confirmed: confirmed.has(d), past: d < today, today: d === today,
-    }));
-    const pending = occurrences.filter(o => o.past && !o.confirmed);
-    res.json({
-      keyword,
-      occurrences,
-      scheduled: occurrences.length,
-      attended: occurrences.filter(o => o.confirmed).length,
-      pending,
-    });
+    res.json(await require('./services/routineOccurrences').getRoutineOccurrences(db, Number(req.params.id), req.session.user.id));
   } catch (err) { sendServerError(res, err); }
   finally { db.close(); }
 });

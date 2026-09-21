@@ -1,11 +1,11 @@
 {
-  "checkedAt": "2026-09-21T18:56:52.100Z",
+  "checkedAt": "2026-09-21T22:12:45.293Z",
   "clientCalls": 217,
   "serverRoutes": 267,
   "missingRoutes": [],
   "concierge": {
-    "handlers": 123,
-    "modelTools": 25,
+    "handlers": 163,
+    "modelTools": 28,
     "workflows": [
       {
         "workflow": "Home card priorities",
@@ -33,11 +33,7 @@
           "delete_event_attachment"
         ],
         "app": "fetchEventAttachments/addEventAttachment/deleteEventAttachment",
-        "missing": [
-          "get_event_attachments",
-          "add_event_attachment",
-          "delete_event_attachment"
-        ]
+        "missing": []
       },
       {
         "workflow": "Tasks",
@@ -74,11 +70,7 @@
           "reorder_list_items"
         ],
         "app": "pinList/unpinList/reorderListItems; updateList also supports more fields than rename",
-        "missing": [
-          "pin_list",
-          "unpin_list",
-          "reorder_list_items"
-        ]
+        "missing": []
       },
       {
         "workflow": "Budget and expenses",
@@ -99,9 +91,7 @@
           "get_budget_stats"
         ],
         "app": "fetchBudgetStats",
-        "missing": [
-          "get_budget_stats"
-        ]
+        "missing": []
       },
       {
         "workflow": "Recurring payments",
@@ -130,9 +120,7 @@
           "get_project_expenses"
         ],
         "app": "fetchProjectExpenses",
-        "missing": [
-          "get_project_expenses"
-        ]
+        "missing": []
       },
       {
         "workflow": "Pantry",
@@ -163,11 +151,7 @@
           "get_decision_comments"
         ],
         "app": "updateDecision/fetchDecisionReactions/fetchDecisionComments",
-        "missing": [
-          "update_decision",
-          "get_decision_reactions",
-          "get_decision_comments"
-        ]
+        "missing": []
       },
       {
         "workflow": "Trips",
@@ -190,11 +174,7 @@
           "delete_address"
         ],
         "app": "fetchFamilyAddresses/addFamilyAddress/updateFamilyAddress/deleteFamilyAddress",
-        "missing": [
-          "add_address",
-          "update_address",
-          "delete_address"
-        ]
+        "missing": []
       },
       {
         "workflow": "Itinerary lifecycle",
@@ -220,12 +200,7 @@
           "get_itinerary_expenses"
         ],
         "app": "requestStay/respondToStay/fetchPendingStayRequests/fetchItineraryExpenses",
-        "missing": [
-          "request_stay",
-          "respond_to_stay",
-          "get_pending_stay_requests",
-          "get_itinerary_expenses"
-        ]
+        "missing": []
       },
       {
         "workflow": "Rivalries",
@@ -246,11 +221,7 @@
           "get_rivalry_leaderboard"
         ],
         "app": "updateRivalry/fetchRivalryEntries/fetchRivalryLeaderboard",
-        "missing": [
-          "update_rivalry",
-          "get_rivalry_entries",
-          "get_rivalry_leaderboard"
-        ]
+        "missing": []
       },
       {
         "workflow": "Gifts",
@@ -316,10 +287,7 @@
           "get_coverage_blocks"
         ],
         "app": "fetchCoverageDetail/fetchCoverageBlocks",
-        "missing": [
-          "get_coverage_detail",
-          "get_coverage_blocks"
-        ]
+        "missing": []
       },
       {
         "workflow": "Notes",
@@ -344,12 +312,7 @@
           "restore_routine"
         ],
         "app": "addRoutine/updateRoutine/deleteRoutine/setRoutineShared",
-        "missing": [
-          "create_routine",
-          "update_routine",
-          "delete_routine",
-          "set_routine_shared"
-        ]
+        "missing": []
       },
       {
         "workflow": "Routine entries",
@@ -360,11 +323,7 @@
           "get_routine_occurrences"
         ],
         "app": "updateRoutineEntry/deleteRoutineEntry/fetchRoutineOccurrences",
-        "missing": [
-          "update_routine_entry",
-          "delete_routine_entry",
-          "get_routine_occurrences"
-        ]
+        "missing": []
       },
       {
         "workflow": "Sleep tracking",
@@ -409,13 +368,7 @@
           "get_feed_comments"
         ],
         "app": "fetchFeed/deleteFeedPost/fetchFeedReactions/removeFeedReaction/fetchFeedComments",
-        "missing": [
-          "get_feed",
-          "delete_feed_post",
-          "get_feed_reactions",
-          "remove_feed_reaction",
-          "get_feed_comments"
-        ]
+        "missing": []
       },
       {
         "workflow": "Messages",
@@ -426,11 +379,7 @@
           "mark_messages_read"
         ],
         "app": "fetchConversations/fetchMessages/markMessagesRead; send_message only sends text",
-        "missing": [
-          "get_conversations",
-          "get_messages",
-          "mark_messages_read"
-        ]
+        "missing": []
       },
       {
         "workflow": "Concierge memory",
@@ -440,10 +389,7 @@
           "delete_memory"
         ],
         "app": "Backend memory endpoints exist but deletion has no native UI",
-        "missing": [
-          "get_memory",
-          "delete_memory"
-        ]
+        "missing": []
       },
       {
         "workflow": "History",

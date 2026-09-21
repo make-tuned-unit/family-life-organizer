@@ -23,6 +23,21 @@ const MODEL = 'claude-haiku-4-5';
 // action(s). For update/complete/delete intents the model may legitimately read
 // first (look up the id), so those accept the domain's list action too.
 const CASES = [
+  { say: 'Show me the attachments on event 5.', tool: 'calendar', actions: ['attachments'] },
+  { say: 'Pin list 4 to the top.', tool: 'lists', actions: ['pin'] },
+  { say: 'Show my budget history for the last six months.', tool: 'budget', actions: ['stats'] },
+  { say: 'Read the expenses on project 3.', tool: 'projects', actions: ['expenses'] },
+  { say: 'Read the comments on decision 2.', tool: 'decisions', actions: ['comments'] },
+  { say: 'Save a household address called Cabin at 10 Fictional Road.', tool: 'addresses', actions: ['add'] },
+  { say: 'Show me hosting requests awaiting my reply.', tool: 'itineraries', actions: ['pending_requests'] },
+  { say: 'Show the score history for rivalry 3.', tool: 'rivalries', actions: ['entries'] },
+  { say: 'Show the full details of my coverage request 3.', tool: 'coverage', actions: ['detail'] },
+  { say: 'Create a private custom routine named Daily reading.', tool: 'routines', actions: ['create'] },
+  { say: 'Correct entry 4 in routine 2: sleep began at 23:00 and ended at 06:00.', tool: 'routines', actions: ['update_entry'] },
+  { say: 'Read my household feed.', tool: 'feed', actions: ['list'] },
+  { say: 'Read my messages with member 2.', tool: 'messages', actions: ['list'] },
+  { say: 'Show everything you remember about my household so I can choose what to forget.', tool: 'memory', actions: ['list'] },
+
   { say: 'Where did we go for date night back in July?', tool: 'history', actions: ['search'] },
   { say: 'What did I buy last week at Costco, did I get lemons?', tool: 'history', actions: ['search'] },
   { say: 'Pin Budget and Trips to my Home, with Budget first.', tool: 'home', actions: ['get', 'set'] },
@@ -86,6 +101,13 @@ const CASES = [
   { say: 'end the step competition and call the winner', tool: 'rivalries', actions: ['complete', 'list'] },
 ];
 
+const filterArg = process.argv.find(a => a.startsWith('--filter='));
+if (filterArg) {
+  const pattern = new RegExp(filterArg.slice('--filter='.length), 'i');
+  const matching = CASES.filter(c => pattern.test(c.say));
+  CASES.splice(0, CASES.length, ...matching);
+  if (!CASES.length) throw new Error('No routing cases match filter');
+}
 const defs = tools.definitions();
 const byName = new Map(defs.map(d => [d.name, d]));
 

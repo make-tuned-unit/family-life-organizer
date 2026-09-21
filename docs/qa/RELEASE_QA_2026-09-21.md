@@ -1,5 +1,7 @@
 # Kinrows release QA — 2026-09-21
 
+> Follow-up work and deployments are tracked in [PRODUCTION_FOLLOWUP.md](PRODUCTION_FOLLOWUP.md). The findings below preserve the original audit baseline.
+
 **Release decision: HOLD. Do not submit this as an App Store-ready release yet.**
 
 The QA session found and fixed meaningful defects, but **the requested ALL-workflow Concierge requirement is not satisfied**. The current registry exposes 123 handlers through 25 model-facing tools; the app-workflow inventory identifies **40 missing operations in 14 areas**, plus nine native handoffs requiring acceptance evidence. Passing the existing tool contracts never established complete app coverage.

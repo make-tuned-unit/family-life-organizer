@@ -494,3 +494,18 @@ test('app return pages and blocked checkout record Permagent sale events', async
   const ret = events.find((ev) => ev.name === 'sale_return_success' && ev.properties?.via === 'app');
   assert.ok(ret, 'app return success event');
 });
+
+test('account deletion cancels via DELETE and safely retries canceled subscriptions', async () => {
+  const calls = [];
+  const db = { listSoleHouseholdStripeSubs: async () => ['stripe:sub_active', 'stripe:sub_canceled', 'stripe:sub_active'] };
+  await stripe.cancelForAccountDeletion(db, 1, async (method, path) => {
+    calls.push([method, path]);
+    return { status: method === 'DELETE' || path.endsWith('sub_canceled') ? 'canceled' : 'active' };
+  });
+  assert.deepEqual(calls, [['GET', '/subscriptions/sub_active'], ['DELETE', '/subscriptions/sub_active'], ['GET', '/subscriptions/sub_canceled']]);
+});
+test('account deletion propagates billing failures and unconfirmed cancellation', async () => {
+  const db = { listSoleHouseholdStripeSubs: async () => ['stripe:sub_active'] };
+  await assert.rejects(stripe.cancelForAccountDeletion(db, 1, async () => { throw new Error('network'); }), /network/);
+  await assert.rejects(stripe.cancelForAccountDeletion(db, 1, async () => ({ status: 'active' })), /not confirmed/);
+});

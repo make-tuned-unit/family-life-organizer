@@ -85,6 +85,7 @@ struct BudgetStatsView: View {
         .padding(.horizontal, DesignTokens.Spacing.horizontalMargin)
         .padding(.bottom, 14)
         .task { await store.load(api: api) }
+        .onConciergeDataChange { await store.load(api: api) }
     }
 
     // MARK: Hero — this month, MoM delta, projected month-end

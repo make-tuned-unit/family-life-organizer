@@ -88,3 +88,161 @@ test('wiring: automatic briefs stay cloud-free even when a client requests AI', 
     assert.ok(Array.isArray(r.body.cards));
   }
 });
+
+const get = (sql, args = []) => new Promise((r, j) => db.db.get(sql, args, (e, x) => e ? j(e) : r(x)));
+const runSql = (sql, args = []) => new Promise((r, j) => db.db.run(sql, args, function(e) { e ? j(e) : r(this.lastID); }));
+async function denied(domain, input, context) {
+  const output = await tools.run(domain, context || { ...ctx, userId: (await db.getUserByUsername('qa_other')).id, groupId: await db.getUserHouseholdId((await db.getUserByUsername('qa_other')).id) }, input);
+  assert.equal(output.result.ok, false, JSON.stringify(output));
+}
+
+test('wiring: saved addresses CRUD, range validation and household guards', async () => {
+  const created = await act('addresses', { action: 'add', name: 'QA cabin', address: '10 Fictional Road', lat: 44, lng: -63 });
+  assert.ok((await owner('GET', '/api/addresses')).body.some(r => r.id === created.id));
+  await denied('addresses', { action: 'update', id: created.id, name: 'Forbidden' });
+  await denied('addresses', { action: 'delete', id: created.id });
+  await denied('addresses', { action: 'update', id: created.id, lat: 100 }, ctx);
+  await act('addresses', { action: 'update', id: created.id, address: '11 Fictional Road' });
+  assert.equal((await owner('GET', '/api/addresses')).body.find(r => r.id === created.id).address, '11 Fictional Road');
+  await act('addresses', { action: 'delete', id: created.id });
+  assert.ok(!(await owner('GET', '/api/addresses')).body.some(r => r.id === created.id));
+});
+
+test('wiring: list pin, reorder and attachment lifecycle', async () => {
+  const list = (await owner('POST', '/api/lists', { name: 'QA packing' })).body.id;
+  const a = (await owner('POST', `/api/lists/${list}/items`, { title: 'Alpha' })).body.id;
+  const b = (await owner('POST', `/api/lists/${list}/items`, { title: 'Beta' })).body.id;
+  assert.ok(a && b);
+  await act('lists', { action: 'pin', list_id: list });
+  assert.equal((await get('SELECT pinned FROM lists WHERE id = ?', [list])).pinned, 1);
+  await act('lists', { action: 'reorder', list_id: list, ordered_ids: [b, a] });
+  assert.equal((await get('SELECT sort_order FROM list_items WHERE id = ?', [b])).sort_order, 0);
+  await denied('lists', { action: 'reorder', list_id: list, ordered_ids: [a, b] });
+  await act('lists', { action: 'unpin', list_id: list });
+  assert.equal((await get('SELECT pinned FROM lists WHERE id = ?', [list])).pinned, 0);
+  const event = await act('calendar', { action: 'add', title: 'Packing party', appointment_date: '2026-10-01' });
+  await act('calendar', { action: 'attach', appointment_id: event.id, attachment_id: list, attachment_type: 'list' });
+  const attached = await act('calendar', { action: 'attachments', appointment_id: event.id });
+  assert.equal(attached[0].attachment_id, list);
+  assert.deepEqual((await owner('GET', `/api/appointments/${event.id}/attachments`)).body, attached);
+  await denied('calendar', { action: 'attachments', appointment_id: event.id });
+  await denied('calendar', { action: 'detach', appointment_id: event.id, attachment_id: attached[0].id });
+  await act('calendar', { action: 'detach', appointment_id: event.id, attachment_id: attached[0].id });
+  assert.equal((await owner('GET', `/api/appointments/${event.id}/attachments`)).body.length, 0);
+});
+
+test('wiring: routine lifecycle, private sharing, corrected sleep and calendar occurrences', async () => {
+  const member = await db.getUserByUsername('qa_other');
+  await runSql('INSERT OR IGNORE INTO group_members (group_id, user_id, role) VALUES (?, ?, ?)', [ctx.groupId, member.id, 'member']);
+  const memberCtx = { ...ctx, userId: member.id };
+  try {
+    const r = await act('routines', { action: 'create', name: 'QA sleep', routine_type: 'baby_sleep', subject_name: 'Child', config: { calendar_keyword: 'Packing' } });
+    assert.equal((await owner('GET', `/api/routines/${r.id}`)).status, 200);
+    await denied('routines', { action: 'get', routine_id: r.id }, memberCtx);
+    await act('routines', { action: 'update', id: r.id, name: 'QA revised sleep' });
+    assert.equal((await db.getRoutineById(r.id)).name, 'QA revised sleep');
+    await act('routines', { action: 'share', id: r.id, shared: true });
+    assert.equal((await tools.run('routines', memberCtx, { action: 'get', routine_id: r.id })).result.id, r.id);
+    await denied('routines', { action: 'share', id: r.id, shared: false }, memberCtx);
+    await denied('routines', { action: 'delete', id: r.id }, memberCtx);
+    const e = await act('routines', { action: 'log_entry', routine_id: r.id, entry_type: 'sleep', date: '2026-09-21' });
+    await act('routines', { action: 'update_entry', routine_id: r.id, entry_id: e.id, start_time: '23:00', end_time: '06:00', wake_count: 2 });
+    const entries = (await owner('GET', `/api/routines/${r.id}/entries`)).body;
+    assert.equal(JSON.parse(entries.find(x => x.id === e.id).value).duration_minutes, 420);
+    assert.deepEqual(await act('routines', { action: 'occurrences', id: r.id }), (await owner('GET', `/api/routines/${r.id}/occurrences`)).body);
+    const other = await act('routines', { action: 'create', name: 'Other routine', routine_type: 'custom' });
+    await denied('routines', { action: 'delete_entry', routine_id: other.id, entry_id: e.id }, ctx);
+    await act('routines', { action: 'delete_entry', routine_id: r.id, entry_id: e.id });
+    assert.equal((await owner('GET', `/api/routines/${r.id}/entries`)).body.length, 0);
+    await act('routines', { action: 'share', id: r.id, shared: false });
+    assert.equal(await get("SELECT id FROM feed_posts WHERE reference_type = 'routine' AND reference_id = ?", [r.id]), undefined);
+    await act('routines', { action: 'delete', id: r.id });
+    assert.equal((await owner('GET', `/api/routines/${r.id}`)).status, 404);
+  } finally { await runSql('DELETE FROM group_members WHERE group_id = ? AND user_id = ?', [ctx.groupId, member.id]); }
+});
+
+test('wiring: feed discussion and author-only deletion', async () => {
+  const p = await act('feed', { action: 'post', title: 'QA feed', body: 'An update' });
+  await act('feed', { action: 'react', post_id: p.id, reaction_type: 'like' });
+  await act('feed', { action: 'comment', post_id: p.id, text: 'Comment' });
+  assert.ok((await act('feed', { action: 'list' })).some(x => x.id === p.id));
+  assert.deepEqual(await act('feed', { action: 'reactions', post_id: p.id }), (await owner('GET', `/api/feed/${p.id}/reactions`)).body);
+  assert.deepEqual(await act('feed', { action: 'comments', post_id: p.id }), (await owner('GET', `/api/feed/${p.id}/comments`)).body);
+  for (const action of ['reactions', 'comments', 'delete', 'unreact']) await denied('feed', { action, post_id: p.id });
+  await act('feed', { action: 'unreact', post_id: p.id });
+  assert.equal((await owner('GET', `/api/feed/${p.id}/reactions`)).body.length, 0);
+  await act('feed', { action: 'delete', post_id: p.id });
+  assert.ok(!(await owner('GET', `/api/groups/${ctx.groupId}/feed`)).body.some(x => x.id === p.id));
+});
+
+test('wiring: message reads require shared membership and mark only the caller inbox', async () => {
+  const member = await db.getUserByUsername('qa_other');
+  await runSql('INSERT OR IGNORE INTO group_members (group_id, user_id, role) VALUES (?, ?, ?)', [ctx.groupId, member.id, 'member']);
+  try {
+    const m = await db.sendMessage({ sender_id: member.id, recipient_id: ctx.userId, text: 'Message fixture' });
+    assert.deepEqual(await act('messages', { action: 'list', partner_id: member.id }), (await owner('GET', `/api/messages/${member.id}`)).body);
+    assert.ok((await act('messages', { action: 'conversations' })).some(x => x.partner_id === member.id));
+    await act('messages', { action: 'read', partner_id: member.id });
+    assert.ok((await get('SELECT read_at FROM direct_messages WHERE id = ?', [m.id])).read_at);
+  } finally { await runSql('DELETE FROM group_members WHERE group_id = ? AND user_id = ?', [ctx.groupId, member.id]); }
+  await denied('messages', { action: 'list', partner_id: member.id }, ctx);
+  assert.ok(!(await act('messages', { action: 'conversations' })).some(x => x.partner_id === member.id));
+});
+
+test('wiring: decisions, rivalry results, budget stats, expenses and memory', async () => {
+  const d = (await owner('POST', '/api/decisions', { title: 'QA poll', decision_type: 'poll', poll_options: ['A', 'B'] })).body.id;
+  await act('decisions', { action: 'update', id: d, title: 'Revised poll' });
+  assert.equal((await owner('GET', `/api/decisions/${d}`)).body.title, 'Revised poll');
+  for (const [action, endpoint] of [['reactions', 'reactions'], ['comments', 'comments']]) {
+    assert.deepEqual(await act('decisions', { action, id: d }), (await owner('GET', `/api/decisions/${d}/${endpoint}`)).body);
+    await denied('decisions', { action, id: d });
+  }
+  const r = (await act('rivalries', { action: 'create', title: 'QA challenge', participants: ['QA Owner', 'QA Other'], challenge_type: 'steps', start_date: '2026-09-21', end_date: '2026-09-28' })).id;
+  await act('rivalries', { action: 'update', id: r, title: 'Revised challenge', participants: ['QA Owner', 'QA Other'] });
+  assert.equal((await owner('GET', '/api/rivalries')).body.find(x => x.id === r).title, 'Revised challenge');
+  assert.deepEqual(await act('rivalries', { action: 'entries', id: r }), (await owner('GET', `/api/rivalries/${r}/entries`)).body);
+  assert.deepEqual(await act('rivalries', { action: 'leaderboard' }), (await owner('GET', '/api/rivalries/leaderboard')).body);
+  await denied('rivalries', { action: 'update', id: r, title: 'Forbidden' });
+  assert.deepEqual(await act('budget', { action: 'stats', months: 6 }), (await owner('GET', '/api/budget/stats?months=6')).body);
+  const p = (await owner('POST', '/api/projects', { name: 'QA project', budget: 100 })).body.id;
+  assert.deepEqual(await act('projects', { action: 'expenses', project_id: p }), (await owner('GET', `/api/projects/${p}/expenses`)).body);
+  await denied('projects', { action: 'expenses', project_id: p });
+  const memory = await runSql('INSERT INTO concierge_memory (group_id, user_id, content) VALUES (?, ?, ?)', [ctx.groupId, ctx.userId, 'QA remembered fact']);
+  assert.ok((await act('memory', { action: 'list' })).some(x => x.id === memory));
+  await denied('memory', { action: 'delete', id: memory });
+  await act('memory', { action: 'delete', id: memory });
+  assert.ok(!(await act('memory', { action: 'list' })).some(x => x.id === memory));
+});
+
+test('wiring: hosting request/response uses shared state and exactly one pair of calendar events', async () => {
+  const host = await db.getUserByUsername('qa_other');
+  const hostCtx = { ...ctx, userId: host.id, userName: host.name, groupId: await db.getUserHouseholdId(host.id) };
+  const itinerary = await db.createItinerary({ title: 'QA visit', traveler_id: ctx.userId, traveler_name: ctx.userName, group_id: ctx.groupId, start_date: '2026-10-01', end_date: '2026-10-03' });
+  const stay = await db.addItineraryStay({ itinerary_id: itinerary.id, host_user_id: host.id, host_name: host.name, check_in: '2026-10-01', check_out: '2026-10-03' });
+  await denied('itineraries', { action: 'request_stay', stay_id: stay.id }, hostCtx);
+  await act('itineraries', { action: 'request_stay', stay_id: stay.id });
+  const pending = (await tools.run('itineraries', hostCtx, { action: 'pending_requests' })).result;
+  assert.ok(pending.some(x => x.id === stay.id));
+  assert.deepEqual(pending, (await outsider('GET', '/api/stays/pending')).body);
+  await denied('itineraries', { action: 'respond_stay', stay_id: stay.id, approved: true }, ctx);
+  const responses = await Promise.all([tools.run('itineraries', hostCtx, { action: 'respond_stay', stay_id: stay.id, approved: true }), tools.run('itineraries', hostCtx, { action: 'respond_stay', stay_id: stay.id, approved: true })]);
+  assert.equal(responses.filter(r => r.result.ok).length, 1);
+  const saved = await db.getItineraryStayById(stay.id);
+  assert.equal(saved.status, 'confirmed');
+  assert.equal((await owner('GET', `/api/appointments/id/${saved.calendar_event_id}`)).status, 200);
+  assert.equal((await outsider('GET', `/api/appointments/id/${saved.host_calendar_event_id}`)).status, 200);
+  assert.equal((await get('SELECT COUNT(*) n FROM appointments WHERE id IN (?, ?)', [saved.calendar_event_id, saved.host_calendar_event_id])).n, 2);
+  await denied('itineraries', { action: 'request_stay', stay_id: stay.id }, ctx);
+  assert.deepEqual(await act('itineraries', { action: 'expenses', itinerary_id: itinerary.id }), (await owner('GET', `/api/itineraries/${itinerary.id}/expenses`)).body);
+  await denied('itineraries', { action: 'expenses', itinerary_id: itinerary.id }, hostCtx);
+});
+
+test('wiring: coverage detail checks recipient identity and never returns invite tokens to the model', async () => {
+  const request = await db.createCoverageRequest({ requester_id: ctx.userId, reason: 'QA coverage', child_name: 'Child' });
+  const detail = await act('coverage', { action: 'detail', id: request.id });
+  assert.equal(detail.id, request.id);
+  assert.equal((await owner('GET', `/api/coverage/${request.id}`)).status, 200);
+  await denied('coverage', { action: 'detail', id: request.id });
+  assert.deepEqual(await act('coverage', { action: 'blocks', date_from: '2026-09-01', date_to: '2026-10-01' }), (await owner('GET', '/api/coverage/blocks?date_from=2026-09-01&date_to=2026-10-01')).body);
+  assert.ok(detail.recipients.every(r => !Object.hasOwn(r, 'invite_token')));
+});

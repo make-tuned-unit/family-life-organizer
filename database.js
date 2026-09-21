@@ -91,6 +91,24 @@ class FamilyDB {
     this._ownsConnection = false;
   }
 
+  // Transactions must not use the process-wide connection: unrelated requests
+  // could otherwise be committed or rolled back with this workflow.
+  async transaction(work) {
+    const tx = Object.create(FamilyDB.prototype);
+    tx.db = new sqlite3.Database(DB_PATH);
+    const run = sql => new Promise((resolve, reject) => tx.db.run(sql, e => e ? reject(e) : resolve()));
+    try {
+      await run('PRAGMA busy_timeout = 10000');
+      await run('PRAGMA foreign_keys = ON');
+      await run('BEGIN IMMEDIATE');
+      try {
+        const result = await work(tx);
+        await run('COMMIT');
+        return result;
+      } catch (e) { await run('ROLLBACK'); throw e; }
+    } finally { await new Promise(resolve => tx.db.close(resolve)); }
+  }
+
   parseJSONList(value) {
     if (!value) return [];
     try {
@@ -4634,7 +4652,7 @@ class FamilyDB {
   getConciergeMemory(groupId) {
     return new Promise((resolve, reject) => {
       this.db.all(
-        'SELECT content FROM concierge_memory WHERE group_id IS ? ORDER BY created_at DESC LIMIT 50',
+        'SELECT id, content, created_at FROM concierge_memory WHERE group_id IS ? ORDER BY created_at DESC, id DESC LIMIT 50',
         [groupId || null],
         (err, rows) => err ? reject(err) : resolve(rows || [])
       );

@@ -474,7 +474,7 @@ const TOOLS = [
     input_schema: { type: 'object', properties: {} },
     async run(ctx) {
       const lists = await ctx.db.getLists(ctx.userId);
-      const result = lists.map(l => ({ name: l.name, type: l.list_type || 'standard', items: l.active_count }));
+      const result = lists.map(l => ({ id: l.id, name: l.name, type: l.list_type || 'standard', items: l.active_count }));
       result.unshift({ name: 'Tasks', type: 'tasks' });
       return { result };
     },
@@ -1362,7 +1362,7 @@ const TOOLS = [
         entries: entries.map(e => {
           let value = null;
           try { value = e.value ? JSON.parse(e.value) : null; } catch {}
-          return { date: e.entry_date, time: e.entry_time, type: e.entry_type, notes: e.notes, ...(value || {}) };
+          return { id: e.id, date: e.entry_date, time: e.entry_time, type: e.entry_type, notes: e.notes, ...(value || {}) };
         }),
       } };
     },
@@ -2413,6 +2413,7 @@ const TOOLS = [
       if (input.end_date) requireDate(input.end_date, 'end_date');
       let participants = Array.isArray(input.participants) ? input.participants.filter(Boolean) : [];
       if (!participants.includes(ctx.userName)) participants = [ctx.userName, ...participants];
+      if (new Set(participants).size < 2) return { result: { ok: false, error: 'Choose at least one other participant before starting a rivalry' } };
       const r = await ctx.db.addRivalry({
         title: input.title, challenge_type: input.challenge_type || 'challenge',
         initiator_name: ctx.userName, opponent_name: participants.find(p => p !== ctx.userName) || null,
@@ -3149,6 +3150,8 @@ const TOOLS = [
   },
 ];
 
+TOOLS.push(...require('./conciergeWorkflows').createTools({ assertHousehold, assertListAccess, assertRoutineAccess, requireDate }));
+
 // Fail fast on duplicate tool names — Anthropic 400-rejects a tools array with
 // duplicates, which would break every concierge chat turn (silent until runtime).
 {
@@ -3230,6 +3233,23 @@ const GROUPS = {
 
 // Distinct enough to stay on their own rather than wrap in a one-action domain.
 const STANDALONE = ['get_addresses', 'remember', 'update_my_name', 'send_message'];
+
+const extendedActions = {
+  budget: { stats: 'get_budget_stats' },
+  calendar: { attachments: 'get_event_attachments', attach: 'add_event_attachment', detach: 'delete_event_attachment' },
+  lists: { pin: 'pin_list', unpin: 'unpin_list', reorder: 'reorder_list_items' },
+  projects: { expenses: 'get_project_expenses' },
+  decisions: { update: 'update_decision', reactions: 'get_decision_reactions', comments: 'get_decision_comments' },
+  itineraries: { request_stay: 'request_stay', respond_stay: 'respond_to_stay', pending_requests: 'get_pending_stay_requests', expenses: 'get_itinerary_expenses' },
+  rivalries: { update: 'update_rivalry', entries: 'get_rivalry_entries', leaderboard: 'get_rivalry_leaderboard' },
+  coverage: { detail: 'get_coverage_detail', blocks: 'get_coverage_blocks' },
+  routines: { occurrences: 'get_routine_occurrences', create: 'create_routine', update: 'update_routine', delete: 'delete_routine', share: 'set_routine_shared', update_entry: 'update_routine_entry', delete_entry: 'delete_routine_entry' },
+  feed: { list: 'get_feed', delete: 'delete_feed_post', reactions: 'get_feed_reactions', unreact: 'remove_feed_reaction', comments: 'get_feed_comments' },
+};
+for (const [domain, actions] of Object.entries(extendedActions)) Object.assign(GROUPS[domain].actions, actions);
+GROUPS.addresses = { desc: 'Save, edit and remove household addresses.', actions: { add: 'add_address', update: 'update_address', delete: 'delete_address' } };
+GROUPS.messages = { desc: 'Read your direct messages and mark them read.', actions: { conversations: 'get_conversations', list: 'get_messages', read: 'mark_messages_read' } };
+GROUPS.memory = { desc: 'Review or forget remembered household facts.', actions: { list: 'get_memory', delete: 'delete_memory' } };
 
 // Reverse index: underlying handler name -> where it now lives in the model
 // surface. Used to rewrite "Use get_calendar first…" style references (which

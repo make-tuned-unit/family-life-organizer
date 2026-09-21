@@ -124,6 +124,10 @@ struct ItineraryDetailView: View {
                 await loadStays()
             }
         }
+        .onConciergeDataChange {
+            await loadStays()
+            await loadTripExpenses()
+        }
         .refreshable {
             await loadStays()
             await loadTripExpenses()

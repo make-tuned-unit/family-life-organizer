@@ -278,13 +278,13 @@ struct DecisionDetailView: View {
             Text("This will permanently remove the decision and all its reactions and comments.")
         }
         .inlineError(error) { error = nil }
-        .task {
-            await reload()
-        }
+        .task { await reload() }
+        .onConciergeDataChange { await reload() }
     }
 
     private func reload() async {
         do {
+            currentDecision = try await api.fetchDecision(id: currentDecision.id)
             async let fetchedReactions = api.fetchDecisionReactions(id: currentDecision.id)
             async let fetchedComments = api.fetchDecisionComments(id: currentDecision.id)
             reactions = try await fetchedReactions

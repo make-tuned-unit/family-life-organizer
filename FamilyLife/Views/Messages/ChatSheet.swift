@@ -394,6 +394,7 @@ struct GroupChatView: View {
             await loadPosts()
             await loadDecisions()
         }
+        .onConciergeDataChange { await loadPosts() }
         .onAppear {
             pollTimer = Timer.scheduledTimer(withTimeInterval: 15, repeats: true) { _ in
                 Task { @MainActor in await pollNewPosts() }

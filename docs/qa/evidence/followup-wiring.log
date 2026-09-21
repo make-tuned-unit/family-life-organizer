@@ -1,0 +1,22 @@
+✔ wiring: pantry Concierge create/edit/delete reaches iOS HTTP reads and stays isolated (835.799667ms)
+✔ wiring: notes Concierge create/edit/delete reaches iOS HTTP reads and stays isolated (26.931583ms)
+✔ wiring: contacts Concierge create/edit/delete reaches iOS HTTP reads and stays isolated (19.329458ms)
+✔ wiring: recurring_payments Concierge create/edit/delete reaches iOS HTTP reads and stays isolated (18.92175ms)
+✔ wiring: calendar recurrence and reverse API edit are visible to Concierge (17.377ms)
+✔ wiring: automatic briefs stay cloud-free even when a client requests AI (36.321666ms)
+✔ wiring: saved addresses CRUD, range validation and household guards (11.224625ms)
+✔ wiring: list pin, reorder and attachment lifecycle (27.745833ms)
+✔ wiring: routine lifecycle, private sharing, corrected sleep and calendar occurrences (29.322125ms)
+✔ wiring: feed discussion and author-only deletion (13.760417ms)
+✔ wiring: message reads require shared membership and mark only the caller inbox (4.380666ms)
+✔ wiring: decisions, rivalry results, budget stats, expenses and memory (35.109333ms)
+✔ wiring: hosting request/response uses shared state and exactly one pair of calendar events (18.445958ms)
+✔ wiring: coverage detail checks recipient identity and never returns invite tokens to the model (7.058417ms)
+ℹ tests 14
+ℹ suites 0
+ℹ pass 14
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1314.56875
