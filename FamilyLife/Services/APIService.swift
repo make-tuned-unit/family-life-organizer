@@ -1483,11 +1483,12 @@ final class APIService {
 
     /// Permanently delete the signed-in account. Re-auth with the password
     /// and/or a fresh Sign in with Apple identity token.
-    func deleteAccount(currentPassword: String? = nil, identityToken: String? = nil, nonce: String? = nil) async throws {
+    func deleteAccount(currentPassword: String? = nil, identityToken: String? = nil, nonce: String? = nil, authorizationCode: String? = nil) async throws {
         var body: [String: Any] = [:]
         if let currentPassword, !currentPassword.isEmpty { body["current_password"] = currentPassword }
         if let identityToken, !identityToken.isEmpty { body["identity_token"] = identityToken }
         if let nonce, !nonce.isEmpty { body["nonce"] = nonce }
+        if let authorizationCode, !authorizationCode.isEmpty { body["authorization_code"] = authorizationCode }
         let _: SuccessResponse = try await post("/api/account/delete", body: body)
     }
 

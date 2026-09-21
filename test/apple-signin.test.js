@@ -70,7 +70,7 @@ async function waitForHealth(timeoutMs = 15000) {
 
 before(async () => {
   tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'fl-apple-'));
-  server = spawn('node', ['dashboard.js'], {
+  server = spawn('node', ['--require', path.join(__dirname, 'fixtures/apple-revocation-provider.cjs'), 'dashboard.js'], {
     cwd: path.join(__dirname, '..'),
     env: {
       ...process.env,
@@ -267,7 +267,7 @@ test('apple-only delete rejects a password guess and a wrong Apple sub', async (
   assert.equal((await c('GET', '/api/auth/me')).status, 200, 'session lives after wrong Apple token');
 });
 
-test('apple-only delete succeeds with a matching identity token', async () => {
+test('apple-only delete requires code exchange and revocation for the matching identity', async () => {
   const c = makeClient();
   const createNonce = 'nonce-del-ok-create';
   const signin = await c('POST', '/api/auth/apple', {
@@ -280,8 +280,22 @@ test('apple-only delete succeeds with a matching identity token', async () => {
   const delNonce = 'nonce-del-ok-confirm';
   const del = await c('POST', '/api/account/delete', {
     identity_token: appleToken({ sub: 'apple-sub-del-ok', nonce: delNonce }),
+    authorization_code: appleToken({ sub: 'apple-sub-del-ok', nonce: delNonce }),
     nonce: delNonce,
   });
   assert.equal(del.status, 200, JSON.stringify(del.body));
   assert.equal((await c('GET', '/api/auth/me')).status, 401);
+});
+
+test('Apple deletion preserves account on missing code and failed provider revocation', async () => {
+  const c = makeClient(), nonce = 'nonce-revocation-failure';
+  const token = appleToken({ sub: 'apple-failure', nonce, email: 'revocation-fixture@example.invalid' });
+  assert.equal((await c('POST', '/api/auth/apple', { identity_token: token, nonce, name: 'Revoke Fixture' })).status, 200);
+  assert.equal((await c('POST', '/api/account/delete', { identity_token: token, nonce })).status, 409);
+  assert.equal((await c('GET', '/api/auth/me')).status, 200);
+  assert.equal((await c('POST', '/api/account/delete', { identity_token: token, nonce, authorization_code: 'fail-revoke:' + token })).status, 503);
+  assert.equal((await c('GET', '/api/auth/me')).status, 200);
+  const wrongCode = appleToken({ sub: 'another-account', nonce });
+  assert.equal((await c('POST', '/api/account/delete', { identity_token: token, nonce, authorization_code: wrongCode })).status, 503);
+  assert.equal((await c('GET', '/api/auth/me')).status, 200);
 });

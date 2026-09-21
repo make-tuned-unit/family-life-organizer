@@ -539,12 +539,13 @@ private struct DeleteAccountSheet: View {
 
     var body: some View {
         NavigationStack {
+            ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 Text("This permanently deletes your account and your personal data (messages, concierge history, contacts). Shared household data stays with the family. This can't be undone.")
                     .font(.flSubheadline)
                     .foregroundStyle(WarmPalette.ink2)
 
-                if hasPassword {
+                if hasPassword && !appleLinked {
                     SecureField("Your password", text: $password)
                         .textContentType(.password)
                         .padding(16)
@@ -559,14 +560,8 @@ private struct DeleteAccountSheet: View {
                 }
 
                 if appleLinked {
-                    if hasPassword {
-                        Text("or confirm with Apple")
-                            .font(.flCaption)
-                            .foregroundStyle(WarmPalette.ink3)
-                            .frame(maxWidth: .infinity)
-                    }
-                    AppleSignInButton(label: .signIn, onIdentity: { token, nonce in
-                        Task { await delete(identityToken: token, nonce: nonce) }
+                    AppleSignInButton(label: .signIn, onIdentity: { token, nonce, code in
+                        Task { await delete(identityToken: token, nonce: nonce, authorizationCode: code) }
                     }, onError: { appleError = $0 })
                     .disabled(isWorking)
                 }
@@ -577,9 +572,13 @@ private struct DeleteAccountSheet: View {
                         .foregroundStyle(WarmPalette.bad)
                 }
 
-                Spacer()
+                Text("Deleting your account does not cancel an App Store subscription. Manage any Apple subscription separately to stop future renewals.")
+                    .font(.flFootnote)
+                    .foregroundStyle(WarmPalette.ink2)
+                Link("Manage Apple subscriptions", destination: URL(string: "https://apps.apple.com/account/subscriptions")!)
             }
             .padding(24)
+            }
             .background { AmbientBackground(style: .settings) }
             .navigationTitle("Delete Account")
             .navigationBarTitleDisplayMode(.inline)
@@ -593,11 +592,11 @@ private struct DeleteAccountSheet: View {
         .presentationDetents([.medium, .large])
     }
 
-    private func delete(password: String? = nil, identityToken: String? = nil, nonce: String? = nil) async {
+    private func delete(password: String? = nil, identityToken: String? = nil, nonce: String? = nil, authorizationCode: String? = nil) async {
         isWorking = true
         appleError = nil
         do {
-            try await api.deleteAccount(currentPassword: password, identityToken: identityToken, nonce: nonce)
+            try await api.deleteAccount(currentPassword: password, identityToken: identityToken, nonce: nonce, authorizationCode: authorizationCode)
             dismiss()
             onDeleted()
         } catch {
