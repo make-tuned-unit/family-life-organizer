@@ -8,6 +8,7 @@ const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
+const socialSafety = require('./services/socialSafety');
 
 // DB location. Set FAMILY_DB_DIR to an explicit path in production — on the
 // current host (Railway) it MUST point at a mounted persistent volume, or the
@@ -1060,7 +1061,7 @@ class FamilyDB {
   // Event attachments (polymorphic links from an appointment to other entities)
   // Resolves a display title/subtitle for each attached entity in one pass so the
   // client can render previews without a fetch per item.
-  getEventAttachments(appointmentId) {
+  getEventAttachments(appointmentId, viewerId = null) {
     return new Promise((resolve, reject) => {
       this.db.all(
         'SELECT * FROM event_attachments WHERE appointment_id = ? ORDER BY created_at',
@@ -1068,7 +1069,7 @@ class FamilyDB {
         async (err, rows) => {
           if (err) return reject(err);
           try {
-            const enriched = await Promise.all((rows || []).map(r => this._resolveAttachment(r)));
+            const enriched = await Promise.all((rows || []).map(r => this._resolveAttachment(r, viewerId)));
             resolve(enriched);
           } catch (e) { reject(e); }
         }
@@ -1078,7 +1079,7 @@ class FamilyDB {
 
   // Look up the source entity for one attachment row and attach title/subtitle.
   // If the source was deleted, the attachment still returns with a fallback label.
-  _resolveAttachment(row) {
+  _resolveAttachment(row, viewerId = null) {
     const specs = {
       list:      { table: 'lists',       title: 'name',        subtitle: 'list_type' },
       note:      { table: 'notes',       title: 'title',       subtitle: 'body' },
@@ -1099,8 +1100,8 @@ class FamilyDB {
     if (!spec) return Promise.resolve({ ...base, title: row.attachment_type, subtitle: null, missing: true });
     return new Promise((resolve) => {
       this.db.get(
-        `SELECT ${spec.title} AS _title, ${spec.subtitle} AS _subtitle FROM ${spec.table} WHERE id = ?`,
-        [row.attachment_id],
+        `SELECT ${spec.title} AS _title, ${spec.subtitle} AS _subtitle FROM ${spec.table} WHERE id = ?${row.attachment_type === 'note' ? " AND (user_id = ? OR (shared_scope != 'private' AND group_id IN (SELECT group_id FROM group_members WHERE user_id = ?)))" : ''}`,
+        row.attachment_type === 'note' ? [row.attachment_id, viewerId, viewerId] : [row.attachment_id],
         (err, item) => {
           if (err || !item) return resolve({ ...base, title: `(deleted ${row.attachment_type})`, subtitle: null, missing: true });
           let subtitle = item._subtitle != null ? String(item._subtitle) : null;
@@ -3072,8 +3073,23 @@ class FamilyDB {
             'developer_api_audit', 'oauth_tokens', 'home_preferences', 'onboarding_emails']) {
             await run(`DELETE FROM ${table} WHERE user_id = ?`, [uid]);
           }
-          // Detach authorship from shared content the FAMILY keeps.
-          for (const [table, col] of [['feed_posts', 'author_id'], ['appointments', 'created_by'],
+          // Authored social content and its stored photos are personal UGC.
+          // Remove child rows explicitly because this private erase connection
+          // deliberately disables FK cascades.
+          await run(`DELETE FROM content_reports WHERE reporter_id = ?
+            OR (content_type = 'feed' AND ref_id IN (SELECT id FROM feed_posts WHERE author_id = ?))
+            OR (content_type = 'message' AND ref_id IN (SELECT id FROM direct_messages WHERE sender_id = ? OR recipient_id = ?))`, [uid, uid, uid, uid]);
+          await run('DELETE FROM feed_reactions WHERE post_id IN (SELECT id FROM feed_posts WHERE author_id = ?)', [uid]);
+          await run('DELETE FROM feed_comments WHERE post_id IN (SELECT id FROM feed_posts WHERE author_id = ?)', [uid]);
+          await run('DELETE FROM feed_posts WHERE author_id = ?', [uid]);
+          // Outbox payloads contain notification previews. Erase messages to or
+          // from this account before they can be retried after deletion.
+          await run(`DELETE FROM jobs WHERE json_valid(payload) AND (
+            CAST(json_extract(payload, '$.userId') AS INTEGER) = ? OR
+            CAST(json_extract(payload, '$.excludeUserId') AS INTEGER) = ? OR
+            (json_extract(payload, '$.data.type') = 'message' AND CAST(json_extract(payload, '$.data.ref_id') AS INTEGER) = ?))`, [uid, uid, uid]);
+          // Detach authorship from shared household planning records.
+          for (const [table, col] of [['appointments', 'created_by'],
             ['trips', 'traveler_id'], ['itinerary_stays', 'host_user_id']]) {
             const cols = await all(`PRAGMA table_info(${table})`);
             if (cols.some(c => c.name === col)) {
@@ -3105,6 +3121,7 @@ class FamilyDB {
               ]) {
                 await run(`DELETE FROM ${child} WHERE ${foreignKey} IN (SELECT id FROM ${parent} WHERE group_id = ?)`, [h.id]);
               }
+              await run("DELETE FROM jobs WHERE json_valid(payload) AND CAST(json_extract(payload, '$.groupId') AS INTEGER) = ?", [h.id]);
               for (const t of FamilyDB.HOUSEHOLD_TABLES) {
                 const cols = await all(`PRAGMA table_info(${t})`);
                 if (!cols.some(c => c.name === 'group_id')) continue;
@@ -3133,6 +3150,7 @@ class FamilyDB {
             await run('DELETE FROM coverage_requests WHERE id = ?', [r.id]);
           }
           // Credentials, devices, membership.
+          await run('DELETE FROM user_blocks WHERE blocker_id = ? OR blocked_id = ?', [uid, uid]);
           await run('DELETE FROM auth_tokens WHERE user_id = ?', [uid]);
           await run('DELETE FROM device_tokens WHERE user_id = ?', [uid]);
           await run('DELETE FROM login_challenges WHERE user_id = ?', [uid]);
@@ -3528,6 +3546,7 @@ class FamilyDB {
   // ============================================
 
   addFeedPost(post) {
+    socialSafety.assertAcceptableText(post.title, post.body);
     return new Promise((resolve, reject) => {
       this.db.run(
         `INSERT INTO feed_posts (group_id, author_id, post_type, title, body, link_url, photo_url, reference_type, reference_id)
@@ -3541,7 +3560,7 @@ class FamilyDB {
     });
   }
 
-  getFeedPosts(groupId, { limit = 50, before_id, after_id } = {}) {
+  getFeedPosts(groupId, { limit = 50, before_id, after_id, userId } = {}) {
     const all = (sql, p) => new Promise((res, rej) => this.db.all(sql, p, (e, rows) => e ? rej(e) : res(rows || [])));
     return (async () => {
       let sql = `
@@ -3551,6 +3570,7 @@ class FamilyDB {
         FROM feed_posts fp
         JOIN users u ON u.id = fp.author_id
         WHERE fp.group_id = ?
+          ${userId ? 'AND ' + socialSafety.visibleAuthor('fp.author_id', userId) : ''}
       `;
       const params = [groupId];
       if (after_id) {
@@ -3623,18 +3643,22 @@ class FamilyDB {
     });
   }
 
-  getFeedReactions(postId) {
+  getFeedReactions(postId, userId = null) {
     return new Promise((resolve, reject) => {
       this.db.all(`
         SELECT fr.*, u.name as user_name
         FROM feed_reactions fr
         JOIN users u ON u.id = fr.user_id
         WHERE fr.post_id = ?
+          ${userId ? 'AND ' + socialSafety.visibleAuthor('fr.user_id', userId) : ''}
       `, [postId], (err, rows) => err ? reject(err) : resolve(rows));
     });
   }
 
-  addFeedComment(postId, userId, text) {
+  async addFeedComment(postId, userId, text) {
+    socialSafety.assertAcceptableText(text);
+    const post = await new Promise((r, j) => this.db.get('SELECT author_id FROM feed_posts WHERE id = ?', [postId], (e, x) => e ? j(e) : r(x)));
+    if (!post || await this.isUserBlocked(userId, post.author_id)) { const e = new Error('This post is unavailable'); e.code = 'USER_BLOCKED'; throw e; }
     return new Promise((resolve, reject) => {
       this.db.run(
         'INSERT INTO feed_comments (post_id, user_id, text) VALUES (?, ?, ?)',
@@ -3647,13 +3671,14 @@ class FamilyDB {
     });
   }
 
-  getFeedComments(postId) {
+  getFeedComments(postId, userId = null) {
     return new Promise((resolve, reject) => {
       this.db.all(`
         SELECT fc.*, u.name as user_name, u.avatar as user_avatar
         FROM feed_comments fc
         JOIN users u ON u.id = fc.user_id
         WHERE fc.post_id = ?
+          ${userId ? 'AND ' + socialSafety.visibleAuthor('fc.user_id', userId) : ''}
         ORDER BY fc.created_at ASC
       `, [postId], (err, rows) => err ? reject(err) : resolve(rows));
     });
@@ -3745,7 +3770,7 @@ class FamilyDB {
       const myGroups = uid
         ? `SELECT group_id FROM group_members WHERE user_id = ${uid}`
         : `SELECT id FROM groups`;
-      const sql = `
+      const sql = `SELECT * FROM (
         SELECT 'decision' as feed_type, d.id as ref_id, d.title, NULL as body,
           d.creator_name as author, d.status, d.created_at as created_at,
           0 as reaction_count, 0 as comment_count, NULL as author_id, d.group_id, g.name as group_name, 0 as has_photo, 0 as is_private,
@@ -3850,6 +3875,7 @@ class FamilyDB {
         LEFT JOIN groups g2 ON g2.id = fp2.group_id
         WHERE fc.created_at >= datetime('now', '-7 days')
           AND fp2.group_id IN (${myGroups})
+          ${uid ? 'AND ' + socialSafety.visibleAuthor('fp2.author_id', uid) : ''}
           AND fp2.post_type != 'text'
         UNION ALL
         SELECT 'reaction' as feed_type, fr.post_id as ref_id,
@@ -3866,6 +3892,7 @@ class FamilyDB {
         WHERE fr.created_at >= datetime('now', '-7 days')
           AND fp3.post_type != 'text'
           AND fp3.group_id IN (${myGroups})
+          ${uid ? 'AND ' + socialSafety.visibleAuthor('fp3.author_id', uid) : ''}
         ${uid ? `UNION ALL
         -- Key dates (birthdays, anniversaries) entering their two-week run-up.
         -- The timestamp is the START of that window, not the date itself: a
@@ -3901,6 +3928,7 @@ class FamilyDB {
             AND (COALESCE(se.shared_scope, 'household') != 'private' OR se.created_by = ${uid})
         )
         WHERE occurs_on BETWEEN date('now', 'localtime') AND date('now', 'localtime', '+14 days')` : ''}
+        ) WHERE ${uid ? socialSafety.visibleAuthor('author_id', uid) : '1=1'}
         ORDER BY created_at DESC
         LIMIT ?
       `;
@@ -4380,11 +4408,32 @@ class FamilyDB {
     });
   }
 
+  isUserBlocked(userA, userB) {
+    return new Promise((resolve, reject) => this.db.get(
+      'SELECT 1 FROM user_blocks WHERE (blocker_id = ? AND blocked_id = ?) OR (blocker_id = ? AND blocked_id = ?) LIMIT 1',
+      [userA, userB, userB, userA], (e, row) => e ? reject(e) : resolve(!!row)));
+  }
+
+  setUserBlocked(userId, blockedId, blocked) {
+    if (Number(userId) === Number(blockedId)) return Promise.reject(new Error('Cannot block yourself'));
+    return new Promise((resolve, reject) => this.db.run(
+      blocked ? 'INSERT OR IGNORE INTO user_blocks (blocker_id, blocked_id) VALUES (?, ?)' : 'DELETE FROM user_blocks WHERE blocker_id = ? AND blocked_id = ?',
+      [userId, blockedId], e => e ? reject(e) : resolve({ success: true })));
+  }
+
+  getBlockedUsers(userId) {
+    return new Promise((resolve, reject) => this.db.all(
+      'SELECT u.id, u.name, b.created_at FROM user_blocks b JOIN users u ON u.id = b.blocked_id WHERE b.blocker_id = ? ORDER BY b.created_at DESC',
+      [userId], (e, rows) => e ? reject(e) : resolve(rows || [])));
+  }
+
   // ============================================
   // Direct Messages
   // ============================================
 
-  sendMessage({ sender_id, recipient_id, text, reference_type, reference_id, reference_title, image_data }) {
+  async sendMessage({ sender_id, recipient_id, text, reference_type, reference_id, reference_title, image_data }) {
+    if (await this.isUserBlocked(sender_id, recipient_id)) { const e = new Error('This conversation is unavailable'); e.code = 'USER_BLOCKED'; throw e; }
+    socialSafety.assertAcceptableText(text, reference_title);
     return new Promise((resolve, reject) => {
       this.db.run(
         'INSERT INTO direct_messages (sender_id, recipient_id, text, reference_type, reference_id, reference_title, image_data) VALUES (?, ?, ?, ?, ?, ?, ?)',
@@ -4408,7 +4457,7 @@ class FamilyDB {
            AND dm2.recipient_id = ? AND dm2.read_at IS NULL) as unread_count
         FROM direct_messages dm
         JOIN users u ON u.id = CASE WHEN dm.sender_id = ? THEN dm.recipient_id ELSE dm.sender_id END
-        WHERE dm.id IN (
+        WHERE ${socialSafety.visibleAuthor("CASE WHEN dm.sender_id = " + safeUid(userId) + " THEN dm.recipient_id ELSE dm.sender_id END", userId)} AND dm.id IN (
           SELECT MAX(id) FROM direct_messages
           WHERE sender_id = ? OR recipient_id = ?
           GROUP BY CASE WHEN sender_id = ? THEN recipient_id ELSE sender_id END
@@ -4418,7 +4467,8 @@ class FamilyDB {
     });
   }
 
-  getMessages(userId, partnerId, { limit = 50, before_id, after_id } = {}) {
+  async getMessages(userId, partnerId, { limit = 50, before_id, after_id } = {}) {
+    if (await this.isUserBlocked(userId, partnerId)) return [];
     return new Promise((resolve, reject) => {
       let sql = `
         SELECT dm.id, dm.sender_id, dm.recipient_id, dm.text, dm.reference_type,
@@ -4442,7 +4492,7 @@ class FamilyDB {
     return new Promise((resolve, reject) => {
       // Only the sender or recipient of the message may fetch its image.
       const sql = userId != null
-        ? 'SELECT image_data FROM direct_messages WHERE id = ? AND (sender_id = ? OR recipient_id = ?)'
+        ? `SELECT image_data FROM direct_messages WHERE id = ? AND (sender_id = ? OR recipient_id = ?) AND ${socialSafety.visibleAuthor('sender_id', userId)} AND ${socialSafety.visibleAuthor('recipient_id', userId)}`
         : 'SELECT image_data FROM direct_messages WHERE id = ?';
       const params = userId != null ? [messageId, userId, userId] : [messageId];
       this.db.get(sql, params, (err, row) => err ? reject(err) : resolve(row?.image_data || null));
@@ -4460,7 +4510,7 @@ class FamilyDB {
 
   getUnreadCount(userId) {
     return new Promise((resolve, reject) => {
-      this.db.get('SELECT COUNT(*) as count FROM direct_messages WHERE recipient_id = ? AND read_at IS NULL', [userId],
+      this.db.get(`SELECT COUNT(*) as count FROM direct_messages WHERE recipient_id = ? AND read_at IS NULL AND ${socialSafety.visibleAuthor('sender_id', userId)}`, [userId],
         (err, row) => err ? reject(err) : resolve(row?.count || 0));
     });
   }
@@ -5206,7 +5256,7 @@ class FamilyDB {
   markJobDone(id) {
     return new Promise((resolve, reject) => {
       this.db.run(
-        `UPDATE jobs SET status = 'done', finished_at = CURRENT_TIMESTAMP, last_error = NULL
+        `UPDATE jobs SET status = 'done', finished_at = CURRENT_TIMESTAMP, last_error = NULL, payload = '{}'
          WHERE id = ?`,
         [id],
         (err) => err ? reject(err) : resolve()

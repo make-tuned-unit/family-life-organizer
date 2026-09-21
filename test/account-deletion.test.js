@@ -154,3 +154,26 @@ test('deletion invalidates another device cookie as well as refresh tokens', asy
   assert.equal((await otherDevice('GET', '/api/notes')).status, 401);
   assert.equal((await otherDevice('POST', '/api/notes', { body: 'must not create orphan personal data' })).status, 401);
 });
+
+test('deletion erases authored feed photos, reports and queued previews in a surviving household', async () => {
+  const owner = makeClient(), member = makeClient();
+  const reg = await owner('POST', '/api/auth/register', { username: 'del_social', password: 'password123', name: 'Social Owner' });
+  await member('POST', '/api/auth/register', { username: 'del_social_member', password: 'password123', name: 'Social Member', invite_code: reg.body.household.invite_code });
+  const sqlite3 = require('sqlite3');
+  const raw = new sqlite3.Database(path.join(tmpDir, 'family.db'));
+  const run = (s, p = []) => new Promise((r, j) => raw.run(s, p, function(e) { e ? j(e) : r(this.lastID); }));
+  const get = (s, p = []) => new Promise((r, j) => raw.get(s, p, (e, x) => e ? j(e) : r(x)));
+  try {
+    const uid = reg.body.user.id, gid = reg.body.household.id;
+    const post = await run("INSERT INTO feed_posts (group_id, author_id, post_type, body, photo_url) VALUES (?, ?, 'photo', 'Private photo caption', 'data:image/png;base64,fixture')", [gid, uid]);
+    await run("INSERT INTO feed_comments (post_id, user_id, text) VALUES (?, ?, 'Discussion')", [post, uid]);
+    await run("INSERT INTO content_reports (reporter_id, content_type, ref_id, reason) VALUES (?, 'feed', ?, 'objectionable')", [uid, post]);
+    const job = await run("INSERT INTO jobs (kind, payload) VALUES ('push_group', ?)", [JSON.stringify({ groupId: gid, excludeUserId: uid, body: 'Personal preview' })]);
+    assert.equal((await owner('POST', '/api/account/delete', { current_password: 'password123' })).status, 200);
+    assert.equal(await get('SELECT id FROM feed_posts WHERE id = ?', [post]), undefined);
+    assert.equal(await get('SELECT id FROM feed_comments WHERE post_id = ?', [post]), undefined);
+    assert.equal(await get('SELECT id FROM content_reports WHERE reporter_id = ?', [uid]), undefined);
+    assert.equal(await get('SELECT id FROM jobs WHERE id = ?', [job]), undefined);
+    assert.ok(await get('SELECT id FROM groups WHERE id = ?', [gid]), 'shared household survives');
+  } finally { raw.close(); }
+});

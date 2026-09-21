@@ -1,12 +1,13 @@
 // Search retained records, with the same household/owner/group boundaries as
 // their normal screens. Never search photos, raw tokens or another user's DMs.
+const { visibleAuthor } = require('./socialSafety');
 const SOURCES = ['calendar', 'receipts', 'lists', 'tasks', 'notes', 'routines', 'itineraries', 'milestones', 'decisions', 'special_events', 'messages', 'contacts', 'trips', 'pantry', 'gifts', 'project_expenses'];
 const all = (db, sql, params) => new Promise((resolve, reject) => db.db.all(sql, params, (err, rows) => err ? reject(err) : resolve(rows)));
 async function searchHistory(ctx, input) {
   if (!ctx.userId || !ctx.groupId) throw new Error('A household is required');
   const h = ctx.groupId, u = ctx.userId;
   const sources = {
-    messages: ["SELECT d.id, 'Message: ' || sender.name || ' to ' || recipient.name AS title, d.created_at AS date, d.text AS detail, 'Your direct-message history' AS evidence FROM direct_messages d JOIN users sender ON sender.id = d.sender_id JOIN users recipient ON recipient.id = d.recipient_id WHERE d.sender_id = ? OR d.recipient_id = ?", [u, u]],
+    messages: [`SELECT d.id, 'Message: ' || sender.name || ' to ' || recipient.name AS title, d.created_at AS date, d.text AS detail, 'Your direct-message history' AS evidence FROM direct_messages d JOIN users sender ON sender.id = d.sender_id JOIN users recipient ON recipient.id = d.recipient_id WHERE (d.sender_id = ? OR d.recipient_id = ?) AND ${visibleAuthor('d.sender_id', u)} AND ${visibleAuthor('d.recipient_id', u)}`, [u, u]],
     contacts: ["SELECT id, name AS title, created_at AS date, COALESCE(relationship,'') || ' ' || COALESCE(notes,'') AS detail, 'Your saved contact' AS evidence FROM contacts WHERE added_by = ?", [u]],
     trips: ["SELECT id, traveler || ': ' || destination AS title, started_at AS date, COALESCE(origin,'') || ' ' || COALESCE(purpose,'') || ' Status: ' || status AS detail, 'Household trip record' AS evidence FROM trips WHERE group_id = ?", [h]],
     pantry: ["SELECT id, item AS title, created_at AS date, COALESCE(quantity,'') || ' ' || COALESCE(location,'') AS detail, 'Current pantry record, not purchase proof' AS evidence FROM pantry WHERE group_id = ?", [h]],

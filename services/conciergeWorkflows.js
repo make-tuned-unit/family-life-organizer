@@ -11,9 +11,11 @@ const sqlRun = (c, sql, p = []) => new Promise((r, j) => c.db.db.run(sql, p, fun
 async function groupRow(c, table, rowId) {
   const row = await sqlGet(c, `SELECT * FROM ${table} WHERE id = ?`, [rowId]);
   if (!row || !row.group_id || !await c.db.isGroupMember(row.group_id, c.userId)) throw new Error('Not found');
+  if (table === 'feed_posts' && await c.db.isUserBlocked(c.userId, row.author_id)) throw new Error('Not found');
   return row;
 }
 async function partner(c, partnerId) {
+  if (await c.db.isUserBlocked(c.userId, partnerId)) throw new Error('No accessible conversation');
   const row = await sqlGet(c, `SELECT 1 FROM group_members a JOIN group_members b ON a.group_id = b.group_id WHERE a.user_id = ? AND b.user_id = ? LIMIT 1`, [c.userId, partnerId]);
   if (!row || partnerId === c.userId) throw new Error('No accessible conversation');
 }
@@ -37,7 +39,7 @@ function createTools({ assertHousehold, assertListAccess, assertRoutineAccess, r
   };
   add('get_event_attachments', 'Read attachments for a calendar event.', { appointment_id: id }, ['appointment_id'], async (c, i) => {
     await assertHousehold(c, 'appointments', i.appointment_id);
-    return c.db.getEventAttachments(i.appointment_id);
+    return c.db.getEventAttachments(i.appointment_id, c.userId);
   });
   add('add_event_attachment', 'Attach an existing item to a shared calendar event. Ask before sharing a private note.', { appointment_id: id, attachment_id: id, attachment_type: { type: 'string', enum: ['list', 'note', 'decision', 'receipt', 'trip', 'itinerary', 'task'] } }, ['appointment_id', 'attachment_id', 'attachment_type'], async (c, i) => {
     await assertHousehold(c, 'appointments', i.appointment_id);
@@ -157,14 +159,14 @@ function createTools({ assertHousehold, assertListAccess, assertRoutineAccess, r
   add('get_feed', 'Read household or clan feed with pagination.', { group_id: id, ...page }, [], async (c, i) => {
     const gid = i.group_id || c.groupId;
     if (!gid || !await c.db.isGroupMember(gid, c.userId)) throw new Error('Not found');
-    return c.db.getFeedPosts(gid, i);
+    return c.db.getFeedPosts(gid, { ...i, userId: c.userId });
   });
   add('delete_feed_post', 'Delete a post you authored.', { post_id: id }, ['post_id'], async (c, i) => {
     const post = await groupRow(c, 'feed_posts', i.post_id);
     if (post.author_id !== c.userId) throw new Error('Only the author can delete a post');
     return c.db.deleteFeedPost(i.post_id);
   }, true);
-  for (const [name, method] of [['get_feed_reactions', 'getFeedReactions'], ['get_feed_comments', 'getFeedComments']]) add(name, 'Read reactions or comments on an accessible feed post.', { post_id: id }, ['post_id'], async (c, i) => { await groupRow(c, 'feed_posts', i.post_id); return c.db[method](i.post_id); });
+  for (const [name, method] of [['get_feed_reactions', 'getFeedReactions'], ['get_feed_comments', 'getFeedComments']]) add(name, 'Read reactions or comments on an accessible feed post.', { post_id: id }, ['post_id'], async (c, i) => { await groupRow(c, 'feed_posts', i.post_id); return c.db[method](i.post_id, c.userId); });
   add('remove_feed_reaction', 'Remove your reaction from a feed post.', { post_id: id }, ['post_id'], async (c, i) => { await groupRow(c, 'feed_posts', i.post_id); return c.db.removeFeedReaction(i.post_id, c.userId); }, true);
   add('get_conversations', 'Read your direct message conversation list.', {}, [], async c => {
     const visible = [];
@@ -179,6 +181,14 @@ function createTools({ assertHousehold, assertListAccess, assertRoutineAccess, r
   add('get_routine_occurrences', 'Read calendar occurrences and attendance for a routine.', { id }, ['id'], async (c, i) => { await assertRoutineAccess(c, i.id); return require('./routineOccurrences').getRoutineOccurrences(c.db, i.id, c.userId); });
   add('request_stay', 'Send a hosting request for your itinerary stay. Confirm host and dates before sending.', { stay_id: id }, ['stay_id'], (c, i) => require('./stayWorkflow').requestStay(c, i.stay_id), true);
   add('respond_to_stay', 'As the host, approve or decline a requested stay; approval adds both calendar events. Confirm first.', { stay_id: id, approved: { type: 'boolean' } }, ['stay_id', 'approved'], (c, i) => require('./stayWorkflow').respondToStay(c, i.stay_id, i.approved), true);
+  add('get_blocked_users', 'Review members you have blocked.', {}, [], c => c.db.getBlockedUsers(c.userId));
+  add('block_user', 'Block a group member from messaging you and hide their posts. Confirm which person first.', { user_id: id }, ['user_id'], async (c, i) => {
+    if (i.user_id === c.userId) throw new Error('Cannot block yourself');
+    const shared = await sqlGet(c, 'SELECT 1 FROM group_members a JOIN group_members b ON a.group_id = b.group_id WHERE a.user_id = ? AND b.user_id = ?', [c.userId, i.user_id]);
+    if (!shared) throw new Error('Member not found');
+    return c.db.setUserBlocked(c.userId, i.user_id, true);
+  }, true);
+  add('unblock_user', 'Remove your block on a member. Their own block, if any, remains effective.', { user_id: id }, ['user_id'], (c, i) => c.db.setUserBlocked(c.userId, i.user_id, false), true);
   return out;
 }
 module.exports = { createTools };

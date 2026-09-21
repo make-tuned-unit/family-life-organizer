@@ -1481,6 +1481,25 @@ final class APIService {
         let _: SuccessResponse = try await post("/api/account/delete", body: body)
     }
 
+    struct BlockedMember: Codable, Identifiable {
+        let id: Int
+        let name: String
+    }
+
+    func fetchBlockedMembers() async throws -> [BlockedMember] {
+        try await get("/api/blocked-users")
+    }
+
+    func blockMember(id: Int) async throws {
+        let _: SuccessResponse = try await post("/api/users/\(id)/block", body: [:])
+        await MainActor.run { NotificationCenter.default.post(name: Self.conciergeDataDidChange, object: nil) }
+    }
+
+    func unblockMember(id: Int) async throws {
+        let _: SuccessResponse = try await delete("/api/users/\(id)/block")
+        await MainActor.run { NotificationCenter.default.post(name: Self.conciergeDataDidChange, object: nil) }
+    }
+
     func reportContent(type: String, refId: Int, reason: String) async throws {
         let _: SuccessResponse = try await post("/api/content/report", body: [
             "content_type": type,

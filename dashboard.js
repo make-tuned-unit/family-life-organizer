@@ -766,6 +766,10 @@ function escapeHtml(value) {
 // Log the real error server-side; return an opaque 500 to the client so SQL/
 // schema/stack details never leak. Used by every route's terminal catch.
 function sendServerError(res, err) {
+  if (err?.code === 'CONTENT_REJECTED' || err?.code === 'USER_BLOCKED') {
+    if (!res.headersSent) res.status(err.code === 'USER_BLOCKED' ? 403 : 422).json({ error: err.message });
+    return;
+  }
   console.error('[error]', err && err.stack ? err.stack : err);
   if (!res.headersSent) res.status(500).json({ error: 'Internal server error' });
 }
@@ -876,6 +880,7 @@ async function userOwnsContact(db, contactId, userId) {
 
 // Two users are "known" to each other when they share any group membership.
 async function usersShareGroup(db, userA, userB) {
+  if (await db.isUserBlocked(userA, userB)) return false;
   return !!(await dbGet(db, `SELECT 1 FROM group_members a
     JOIN group_members b ON a.group_id = b.group_id
     WHERE a.user_id = ? AND b.user_id = ? LIMIT 1`, [userA, userB]));
@@ -996,8 +1001,8 @@ async function requireHouseholdRow(db, table, id, req, res) {
 // Authorization guard for feed routes keyed by post id: the caller must belong
 // to the group that owns the post. Sends 404/403 and returns false on failure.
 async function requireFeedPostMember(db, postId, req, res) {
-  const post = await dbGet(db, 'SELECT group_id FROM feed_posts WHERE id = ?', [postId]);
-  if (!post) { res.status(404).json({ error: 'Not found' }); return false; }
+  const post = await dbGet(db, 'SELECT group_id, author_id FROM feed_posts WHERE id = ?', [postId]);
+  if (!post || await db.isUserBlocked(req.session.user?.id, post.author_id)) { res.status(404).json({ error: 'Not found' }); return false; }
   if (!(await db.isGroupMember(post.group_id, req.session.user?.id))) {
     res.status(403).json({ error: 'Not a member of this group' }); return false;
   }
@@ -1563,6 +1568,32 @@ app.post('/api/account/delete', requireAuth, loginLimiter, async (req, res) => {
   } finally {
     db.close();
   }
+});
+
+// Blocks can be reviewed and reversed without exposing who blocked the caller.
+app.get('/api/blocked-users', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try { res.json(await db.getBlockedUsers(req.session.user.id)); }
+  catch (err) { sendServerError(res, err); } finally { db.close(); }
+});
+app.post('/api/users/:id/block', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const id = Number(req.params.id), userId = req.session.user.id;
+    if (!Number.isSafeInteger(id) || id < 1 || id === userId) return res.status(400).json({ error: 'Choose another member' });
+    // Allow idempotent blocking even if a previous block already exists.
+    const shared = await dbGet(db, 'SELECT 1 FROM group_members a JOIN group_members b ON a.group_id = b.group_id WHERE a.user_id = ? AND b.user_id = ?', [userId, id]);
+    if (!shared) return res.status(404).json({ error: 'Member not found' });
+    res.json(await db.setUserBlocked(userId, id, true));
+  } catch (err) { sendServerError(res, err); } finally { db.close(); }
+});
+app.delete('/api/users/:id/block', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isSafeInteger(id) || id < 1) return res.status(400).json({ error: 'Invalid member' });
+    res.json(await db.setUserBlocked(req.session.user.id, id, false));
+  } catch (err) { sendServerError(res, err); } finally { db.close(); }
 });
 
 // Report household UGC (Guideline 1.2). The reporter must already be able to
@@ -3424,7 +3455,7 @@ app.get('/api/appointments/:id/attachments', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
     if (!(await requireHouseholdRow(db, 'appointments', req.params.id, req, res))) return;
-    const attachments = await db.getEventAttachments(req.params.id);
+    const attachments = await db.getEventAttachments(req.params.id, req.session.user.id);
     res.json(attachments);
   } catch (err) {
     sendServerError(res, err);
@@ -6432,6 +6463,7 @@ app.get('/api/groups/:id/feed', requireAuth, async (req, res) => {
       return res.status(403).json({ error: 'Not a member of this group' });
     }
     const posts = await db.getFeedPosts(req.params.id, {
+      userId: req.session.user.id,
       limit: clampLimit(req.query.limit, 50),
       before_id: req.query.before_id ? parseInt(req.query.before_id) : undefined,
       after_id: req.query.after_id ? parseInt(req.query.after_id) : undefined,
@@ -6540,7 +6572,7 @@ app.get('/api/feed/:id/reactions', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
     if (!(await requireFeedPostMember(db, req.params.id, req, res))) return;
-    const reactions = await db.getFeedReactions(req.params.id);
+    const reactions = await db.getFeedReactions(req.params.id, req.session.user.id);
     res.json(reactions);
   } catch (err) {
     sendServerError(res, err);
@@ -6553,7 +6585,7 @@ app.get('/api/feed/:id/comments', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
     if (!(await requireFeedPostMember(db, req.params.id, req, res))) return;
-    const comments = await db.getFeedComments(req.params.id);
+    const comments = await db.getFeedComments(req.params.id, req.session.user.id);
     res.json(comments);
   } catch (err) {
     sendServerError(res, err);

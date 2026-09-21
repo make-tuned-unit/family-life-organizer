@@ -114,7 +114,7 @@
         <ul>
           <li>Open the app → <strong>Settings → Account → Developer API</strong> → <strong>Create key</strong>. Copy it — it is shown once.</li>
           <li>Send it as <code>Authorization: Bearer kr_live_…</code> to the <code>/v1</code> endpoints below, or point any MCP-capable agent at <code>/v1/mcp</code>.</li>
-          <li>Your agent gets <strong>28 focused MCP tools covering 163 Concierge actions</strong> — tasks, lists, calendar, budget, pantry, polls, trips, messages, baby sleep, and more.</li>
+          <li>Your agent gets <strong>focused MCP tools covering 160+ Concierge actions</strong> — tasks, lists, calendar, budget, pantry, polls, trips, messages, baby sleep, and more.</li>
           <li>A key only ever acts on <strong>your</strong> household. Choose <strong>read-only</strong> if you just want your agent to see, not touch.</li>
           <li>Revoke a key any time; lapsed subscriptions switch keys off instantly.</li>
         </ul>
@@ -206,7 +206,7 @@
           <div class="tbl-wrap"><table>
             <thead><tr><th>Capability</th><th>Available through Kinrows MCP</th></tr></thead>
             <tbody>
-              <tr><td>Tools</td><td>28 model-friendly tools covering 163 internal Concierge actions. Related operations are grouped behind a required <code>action</code> field.</td></tr>
+              <tr><td>Tools</td><td>domain tools covering 160+ internal Concierge actions. Related operations are grouped behind a required <code>action</code> field.</td></tr>
               <tr><td>Resources</td><td><code>kinrows://account/me</code>, <code>kinrows://household/snapshot</code>, <code>kinrows://developer/audit</code>, and <code>kinrows://household/snapshot/{section}</code>.</td></tr>
               <tr><td>Prompts</td><td><code>morning-brief</code>, <code>plan-week</code>, <code>household-check-in</code>, <code>trip-readiness</code>, and <code>chores-review</code>.</td></tr>
               <tr><td>Results</td><td>Every tool returns human-readable content plus structured JSON in <code>structuredContent.result</code>.</td></tr>

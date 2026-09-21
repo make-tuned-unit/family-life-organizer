@@ -69,6 +69,10 @@ function dbGet(ctx, sql, params) {
 async function assertHousehold(ctx, table, id) {
   const row = await dbGet(ctx, `SELECT group_id FROM ${table} WHERE id = ?`, [id]);
   if (!row) throw new Error(`No ${table} #${id} found`);
+  if (table === 'feed_posts') {
+    const post = await dbGet(ctx, 'SELECT author_id FROM feed_posts WHERE id = ?', [id]);
+    if (await ctx.db.isUserBlocked(ctx.userId, post.author_id)) throw new Error('Not found');
+  }
   if (ctx.groupId == null || row.group_id !== ctx.groupId) {
     throw new Error(`#${id} is not in your household`);
   }
@@ -3248,7 +3252,7 @@ const extendedActions = {
 };
 for (const [domain, actions] of Object.entries(extendedActions)) Object.assign(GROUPS[domain].actions, actions);
 GROUPS.addresses = { desc: 'Save, edit and remove household addresses.', actions: { add: 'add_address', update: 'update_address', delete: 'delete_address' } };
-GROUPS.messages = { desc: 'Read your direct messages and mark them read.', actions: { conversations: 'get_conversations', list: 'get_messages', read: 'mark_messages_read' } };
+GROUPS.messages = { desc: 'Read your direct messages and mark them read.', actions: { conversations: 'get_conversations', list: 'get_messages', read: 'mark_messages_read', blocked: 'get_blocked_users', block: 'block_user', unblock: 'unblock_user' } };
 GROUPS.memory = { desc: 'Review or forget remembered household facts.', actions: { list: 'get_memory', delete: 'delete_memory' } };
 
 // Reverse index: underlying handler name -> where it now lives in the model

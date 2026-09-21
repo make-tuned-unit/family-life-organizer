@@ -199,6 +199,7 @@ async function pushToTokens(tokens, title, body, data = {}, db = null) {
  */
 async function pushToUser(db, userId, title, body, data = {}, opts = {}) {
   try {
+    if (data.type === 'message' && data.ref_id && await db.isUserBlocked(userId, data.ref_id)) return { sent: 0, total: 0, skipped: true };
     const tokens = await db.getDeviceTokens(userId);
     const result = await pushToTokens(tokens, title, body, data, db);
     if (opts.throwOnError && result && result.total > 0 && result.sent === 0 && !result.skipped) {
@@ -225,9 +226,13 @@ async function pushToUser(db, userId, title, body, data = {}, opts = {}) {
 async function pushToGroup(db, groupId, excludeUserId, title, body, data = {}, opts = {}) {
   try {
     const members = await db.getGroupMembers(groupId);
-    const userIds = members
+    let userIds = members
       .filter(m => m.user_id && m.user_id !== excludeUserId)
       .map(m => m.user_id);
+    if (excludeUserId && db.isUserBlocked) {
+      const allowed = await Promise.all(userIds.map(async uid => await db.isUserBlocked(uid, excludeUserId) ? null : uid));
+      userIds = allowed.filter(uid => uid != null);
+    }
     if (userIds.length === 0) return { sent: 0, total: 0 };
 
     const tokenRows = await db.getDeviceTokensForUsers(userIds);

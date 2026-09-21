@@ -246,3 +246,73 @@ test('wiring: coverage detail checks recipient identity and never returns invite
   assert.deepEqual(await act('coverage', { action: 'blocks', date_from: '2026-09-01', date_to: '2026-10-01' }), (await owner('GET', '/api/coverage/blocks?date_from=2026-09-01&date_to=2026-10-01')).body);
   assert.ok(detail.recipients.every(r => !Object.hasOwn(r, 'invite_token')));
 });
+
+test('safety: blocking holds across native HTTP, Concierge/history, images, unread counts and notifications', async () => {
+  const other = await db.getUserByUsername('qa_other');
+  const otherCtx = { ...ctx, userId: other.id, userName: other.name };
+  await runSql('INSERT OR IGNORE INTO group_members (group_id, user_id, role) VALUES (?, ?, ?)', [ctx.groupId, other.id, 'member']);
+  try {
+    const dm = await db.sendMessage({ sender_id: other.id, recipient_id: ctx.userId, text: 'Safety fixture secret', image_data: 'data:image/png;base64,iVBORw0KGgo=' });
+    const post = await db.addFeedPost({ group_id: ctx.groupId, author_id: other.id, post_type: 'photo', title: 'Safety fixture', body: 'Safety fixture secret', photo_url: 'data:image/png;base64,iVBORw0KGgo=' });
+    assert.equal((await owner('POST', `/api/users/${other.id}/block`, {})).status, 200);
+    assert.ok((await owner('GET', '/api/blocked-users')).body.some(x => x.id === other.id));
+    for (const [a, b] of [[owner, other.id], [outsider, ctx.userId]]) {
+      assert.equal((await a('GET', `/api/messages/${b}`)).status, 403);
+      assert.equal((await a('POST', '/api/messages', { recipient_id: b, text: 'Should be blocked' })).status, 403);
+    }
+    assert.equal((await owner('GET', `/api/messages/${other.id}/${dm.id}/image`)).status, 404);
+    assert.equal((await owner('GET', `/api/feed/${post.id}/photo`)).status, 404);
+    assert.ok(!(await owner('GET', `/api/groups/${ctx.groupId}/feed`)).body.some(x => x.id === post.id));
+    assert.ok(!(await db.getActivityFeed(100, ctx.userId)).some(x => x.ref_id === post.id && x.feed_type === 'post'));
+    assert.equal((await owner('GET', '/api/messages/unread-count')).body.count, 0);
+    for (const action of ['list', 'read']) await denied('messages', { action, partner_id: other.id }, ctx);
+    await denied('send_message', { to: other.name, text: 'Blocked via model' }, ctx);
+    await denied('feed', { action: 'comments', post_id: post.id }, ctx);
+    const history = await tools.run('history', ctx, { action: 'search', query: 'Safety fixture secret', source: 'messages' });
+    assert.equal(history.result.error, undefined, JSON.stringify(history));
+    assert.ok(!JSON.stringify(history.result).includes('Safety fixture secret'), JSON.stringify(history));
+    const push = require('../push');
+    let tokenReads = 0;
+    const fakeDb = { isUserBlocked: db.isUserBlocked.bind(db), getDeviceTokens: async () => { tokenReads++; return []; }, getGroupMembers: async () => [{ user_id: other.id }, { user_id: ctx.userId }], getDeviceTokensForUsers: async ids => { assert.ok(!ids.includes(ctx.userId)); return []; } };
+    await push.pushToUser(fakeDb, ctx.userId, 'Message', 'Hidden', { type: 'message', ref_id: other.id }, { throwOnError: true });
+    assert.equal(tokenReads, 0, 'blocked message never reaches APNs token lookup');
+    await push.pushToGroup(fakeDb, ctx.groupId, other.id, 'Post', 'Hidden', {}, { throwOnError: true });
+    assert.ok((await tools.run('messages', ctx, { action: 'blocked' })).result.some(x => x.id === other.id));
+    await act('messages', { action: 'unblock', user_id: other.id });
+    assert.equal((await owner('GET', `/api/messages/${other.id}`)).status, 200);
+    await tools.run('messages', otherCtx, { action: 'block', user_id: ctx.userId });
+    await act('messages', { action: 'unblock', user_id: other.id });
+    assert.equal((await owner('GET', `/api/messages/${other.id}`)).status, 403, 'cannot remove someone else’s block');
+  } finally {
+    await db.setUserBlocked(ctx.userId, other.id, false);
+    await db.setUserBlocked(other.id, ctx.userId, false);
+    await runSql('DELETE FROM group_members WHERE group_id = ? AND user_id = ?', [ctx.groupId, other.id]);
+  }
+});
+
+test('safety: prohibited threats are rejected consistently by API and Concierge before persistence', async () => {
+  const before = (await get('SELECT COUNT(*) n FROM feed_posts')).n;
+  const rejected = await owner('POST', `/api/groups/${ctx.groupId}/feed`, { body: 'I will kill you' });
+  assert.equal(rejected.status, 422);
+  await denied('feed', { action: 'post', body: 'I will kill you' }, ctx);
+  assert.equal((await get('SELECT COUNT(*) n FROM feed_posts')).n, before);
+  assert.equal((await owner('POST', `/api/groups/${ctx.groupId}/feed`, { body: 'Please remember the school play tonight.' })).status, 200);
+});
+
+test('privacy: a legacy private-note attachment never exposes its title or body to household members', async () => {
+  const other = await db.getUserByUsername('qa_other');
+  await runSql('INSERT OR IGNORE INTO group_members (group_id, user_id, role) VALUES (?, ?, ?)', [ctx.groupId, other.id, 'member']);
+  try {
+    const note = (await owner('POST', '/api/notes', { title: 'Private title', body: 'Private body', shared_scope: 'private' })).body.id;
+    const event = await act('calendar', { action: 'add', title: 'Shared event', appointment_date: '2026-10-04' });
+    await db.addEventAttachment({ appointment_id: event.id, attachment_type: 'note', attachment_id: note, group_id: ctx.groupId, added_by: ctx.userId });
+    const own = (await owner('GET', `/api/appointments/${event.id}/attachments`)).body;
+    assert.equal(own[0].title, 'Private title');
+    const theirs = (await outsider('GET', `/api/appointments/${event.id}/attachments`)).body;
+    assert.ok(!JSON.stringify(theirs).includes('Private title'));
+    assert.ok(!JSON.stringify(theirs).includes('Private body'));
+    const viaTool = await tools.run('calendar', { ...ctx, userId: other.id }, { action: 'attachments', appointment_id: event.id });
+    assert.equal(viaTool.result.error, undefined);
+    assert.ok(!JSON.stringify(viaTool).includes('Private body'));
+  } finally { await runSql('DELETE FROM group_members WHERE group_id = ? AND user_id = ?', [ctx.groupId, other.id]); }
+});

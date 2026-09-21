@@ -1,10 +1,10 @@
 {
-  "checkedAt": "2026-09-21T22:12:45.293Z",
-  "clientCalls": 217,
-  "serverRoutes": 267,
+  "checkedAt": "2026-09-21T22:28:43.491Z",
+  "clientCalls": 220,
+  "serverRoutes": 270,
   "missingRoutes": [],
   "concierge": {
-    "handlers": 163,
+    "handlers": 166,
     "modelTools": 28,
     "workflows": [
       {

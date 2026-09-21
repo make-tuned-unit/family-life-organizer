@@ -51,14 +51,19 @@ enum ChatConciergeHandoff {
 
 extension View {
     @ViewBuilder
-    func messageActionsMenu(onAsk: (() -> Void)?, onReport: (() -> Void)?) -> some View {
-        if onAsk == nil && onReport == nil {
+    func messageActionsMenu(onAsk: (() -> Void)?, onReport: (() -> Void)?, onBlock: (() -> Void)? = nil) -> some View {
+        if onAsk == nil && onReport == nil && onBlock == nil {
             self
         } else {
             self.contextMenu {
                 if let onAsk {
                     Button(action: onAsk) {
                         Label("Ask Concierge to capture this", systemImage: "sparkles")
+                    }
+                }
+                if let onBlock {
+                    Button(role: .destructive, action: onBlock) {
+                        Label("Block member", systemImage: "person.crop.circle.badge.xmark")
                     }
                 }
                 if let onReport {
@@ -97,6 +102,8 @@ struct ConversationView: View {
     @State private var reachedOldEnd = false
     @State private var sendError: String?
     @State private var reportError: String?
+    @State private var confirmingBlock = false
+    @State private var conversationUnavailable = false
     private let messagePageSize = 50
 
     private var messages: [APIService.DirectMessageResponse] {
@@ -259,6 +266,24 @@ struct ConversationView: View {
         .background { AmbientBackground(style: .home) }
         .inlineError(sendError) { sendError = nil }
         .inlineError(reportError) { reportError = nil }
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button("Block member", systemImage: "person.crop.circle.badge.xmark") { confirmingBlock = true }
+            }
+        }
+        .confirmationDialog("Block \(partnerName)?", isPresented: $confirmingBlock, titleVisibility: .visible) {
+            Button("Block member", role: .destructive) {
+                Task {
+                    do {
+                        try await api.blockMember(id: partnerId)
+                        messageCache.clear()
+                        dismiss()
+                    } catch { reportError = error.localizedDescription }
+                }
+            }
+        } message: {
+            Text("Messages between you will stop and their posts will be hidden. You can unblock them from Blocked members in Chat.")
+        }
         .navigationTitle(partnerName)
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $showingNewDecision) {
@@ -292,13 +317,19 @@ struct ConversationView: View {
     }
 
     private var canSend: Bool {
-        !newMessage.trimmingCharacters(in: .whitespaces).isEmpty || pendingImageData != nil
+        !conversationUnavailable && (!newMessage.trimmingCharacters(in: .whitespaces).isEmpty || pendingImageData != nil)
     }
 
     private func refreshMessages() async {
         do {
             let fetched = try await api.fetchMessages(partnerId: partnerId, limit: messagePageSize)
             messageCache.mergeNewest(fetched, for: partnerId)
+            if conversationUnavailable { sendError = nil }
+            conversationUnavailable = false
+        } catch APIError.serverMessage(let status, _) where status == 403 {
+            messageCache.setMessages([], for: partnerId)
+            conversationUnavailable = true
+            sendError = "This conversation is unavailable. Check Blocked members in Chat."
         } catch {}
     }
 

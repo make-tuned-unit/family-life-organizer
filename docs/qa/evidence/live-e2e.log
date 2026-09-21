@@ -1,0 +1,6 @@
+{"scenario":"saved address create","status":"PASS","actions":["add_address"]}
+{"scenario":"list pin after lookup","status":"PASS","actions":["pin_list"]}
+{"scenario":"private routine creation","status":"PASS","actions":["create_routine"]}
+{"scenario":"feed post","status":"PASS","actions":["add_feed_post"]}
+{"scenario":"memory create and selective deletion","status":"PASS","actions":["remember","delete_memory"]}
+{"passed":5,"total":5}

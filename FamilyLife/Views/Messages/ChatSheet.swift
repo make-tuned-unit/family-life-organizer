@@ -10,6 +10,7 @@ struct ChatSheet: View {
     @Environment(ProfileImageCache.self) private var profileCache
     @Environment(\.dismiss) private var dismiss
 
+    @State private var showingBlockedMembers = false
     @State private var conversations: [APIService.ConversationResponse] = []
     @State private var groups: [APIService.GroupResponse] = []
     @State private var selectedThread: ChatThread?
@@ -159,7 +160,12 @@ struct ChatSheet: View {
             .background { AmbientBackground(style: .home) }
             .navigationTitle(threadTitle)
             .navigationBarTitleDisplayMode(.inline)
+            .sheet(isPresented: $showingBlockedMembers) { BlockedMembersView() }
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Blocked") { showingBlockedMembers = true }
+                        .accessibilityLabel("Blocked members")
+                }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Done") { dismiss() }
                         .foregroundStyle(WarmPalette.ink2)
@@ -247,6 +253,7 @@ struct GroupChatView: View {
     @State private var fullscreenImage: UIImage?
     @State private var sendError: String?
     @State private var reportError: String?
+    @State private var blockingMember: Int?
 
     private var canSend: Bool {
         !newMessage.trimmingCharacters(in: .whitespaces).isEmpty || pendingImageData != nil
@@ -288,12 +295,13 @@ struct GroupChatView: View {
                         ForEach(posts.reversed()) { post in
                             GroupMessageBubble(
                                 post: post,
-                                isOwn: post.author_name == auth.currentUser?.name,
+                                isOwn: post.author_id == auth.currentUser?.id,
                                 onImageTap: { image in fullscreenImage = image },
                                 onAskConcierge: captureHandler(for: post),
-                                onReport: post.author_name == auth.currentUser?.name ? nil : {
+                                onReport: post.author_id == auth.currentUser?.id ? nil : {
                                     Task { await reportPost(post) }
-                                }
+                                },
+                                onBlock: post.author_id == auth.currentUser?.id ? nil : { blockingMember = post.author_id }
                             )
                             .id(post.id)
                         }
@@ -377,6 +385,18 @@ struct GroupChatView: View {
             .background(.ultraThinMaterial)
         }
         .inlineError(sendError) { sendError = nil }
+        .confirmationDialog("Block this member?", isPresented: Binding(get: { blockingMember != nil }, set: { if !$0 { blockingMember = nil } }), titleVisibility: .visible) {
+            Button("Block member", role: .destructive) {
+                if let id = blockingMember {
+                    Task {
+                        do { try await api.blockMember(id: id); await loadPosts() }
+                        catch { reportError = error.localizedDescription }
+                    }
+                }
+            }
+        } message: {
+            Text("Their posts will be hidden and messages between you will stop. Manage blocks from Chat.")
+        }
         .inlineError(reportError) { reportError = nil }
         .sheet(isPresented: $showingNewDecision) {
             NewDecisionView(preselectedGroupId: groupId) {
@@ -624,6 +644,7 @@ struct GroupMessageBubble: View {
     var onImageTap: ((UIImage) -> Void)?
     var onAskConcierge: (() -> Void)?
     var onReport: (() -> Void)?
+    var onBlock: (() -> Void)?
 
     var body: some View {
         HStack {
@@ -686,7 +707,7 @@ struct GroupMessageBubble: View {
                 isOwn ? AnyShapeStyle(KinrowsBrand.evergreen) : AnyShapeStyle(WarmPalette.cardSurface),
                 in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.tile)
             )
-            .messageActionsMenu(onAsk: onAskConcierge, onReport: onReport)
+            .messageActionsMenu(onAsk: onAskConcierge, onReport: onReport, onBlock: onBlock)
             if !isOwn { Spacer(minLength: 60) }
         }
         .accessibilityHint(onAskConcierge == nil ? "" : "Tap to ask your concierge to capture plans from this message")
@@ -705,4 +726,41 @@ struct GroupMessageBubble: View {
         .environment(HouseholdService())
         .environment(ProfileImageCache())
         .environment(ConciergeLaunch())
+}
+
+
+/// Safety controls remain available in Chat even after a conversation is hidden.
+struct BlockedMembersView: View {
+    @Environment(APIService.self) private var api
+    @Environment(\.dismiss) private var dismiss
+    @State private var members: [APIService.BlockedMember] = []
+    @State private var error: String?
+
+    var body: some View {
+        NavigationStack {
+            List {
+                if members.isEmpty { Text("No blocked members") }
+                ForEach(members) { member in
+                    HStack {
+                        Text(member.name)
+                        Spacer()
+                        Button("Unblock") {
+                            Task {
+                                do { try await api.unblockMember(id: member.id); await load() }
+                                catch { self.error = error.localizedDescription }
+                            }
+                        }
+                    }
+                }
+            }
+            .navigationTitle("Blocked members")
+            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
+            .task { await load() }
+            .inlineError(error) { error = nil }
+        }
+    }
+    private func load() async {
+        do { members = try await api.fetchBlockedMembers() }
+        catch { self.error = error.localizedDescription }
+    }
 }

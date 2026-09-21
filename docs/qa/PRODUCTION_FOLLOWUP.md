@@ -27,3 +27,17 @@ Initial live routing: **65/74 first-tool matches** with fictional prompts only. 
 Production configuration inspection printed key names only: no `APPLE_SIGNIN_*` revocation signing credentials are configured. Apple revocation remains blocked on provisioning the correct Sign in with Apple key and implementing/verifying the code exchange. APNs credentials are not assumed interchangeable.
 
 Other unresolved gates: user blocking/content filtering; complete retention/erasure and backup policy; real StoreKit/Apple/APNs/device acceptance; App Store Connect metadata/products/privacy/signing/reviewer access. See the original release DAG for the full requirements.
+
+## Safety and erasure batch
+
+The Concierge/billing expansion deployed successfully as commit `23dbf81`, Railway `d8a4941c-2767-49fa-81e4-0ee938a9e63a`; GitHub CI passed and public health remained 200.
+
+The next batch adds mutual user blocking, enforced in DMs, images, conversation lists, unread counts, feed reads, comments/reactions, Home activity, Concierge history/tools and notification delivery. Native Chat now provides block confirmation and a reversible blocked-members list. A conservative local text check rejects explicit threats and prohibited sexual-content phrases before storage. This is **not comprehensive image/text moderation**; the report-monitoring and image-review gates remain open.
+
+Account deletion now removes authored feed content/photos, related reactions/comments/reports, and queued notification previews addressed to or authored by the departing account. Completed delivery jobs discard payload text. Shared planning records, legacy name-only authorship and backup handling still need the policy/acceptance work described in the baseline.
+
+A newly found attachment leak is fixed: legacy private-note attachments cannot reveal their title/body to another household member. Read-time authorization applies even if the attachment was created before this fix.
+
+Evidence: 457 full-suite tests pass, including 17 isolated wiring/safety/privacy scenarios. Five MCP smoke scenarios pass. Unsigned Release app/widget and Debug simulator builds pass. In the isolated simulator, block → conversation unavailable → blocked-member list → unblock was exercised; raw test DB confirmed the block. Small follow-up UI fixes label the block-management control and clear stale unavailable state after unblocking. No real users/messages/pushes were involved.
+
+Live end-to-end follow-up: **5/5** synthetic scenarios pass using the real provider, real Concierge loop and handlers, isolated SQLite, and authenticated native HTTP readback: save address, pin an existing list after lookup, create a private routine, post to feed, remember then selectively forget. Each mutation emitted native refresh actions. `scripts/concierge-live-wiring.js` reproduces these checks with an explicitly supplied provider key and no production account data. These scenarios resolve the list-pin first-call ambiguity but do not certify all natural-language workflows. Final safety Release build passes after the UI follow-ups.
