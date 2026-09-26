@@ -107,6 +107,7 @@
 		AA000092 /* SubscriptionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000092 /* SubscriptionService.swift */; };
 		AA000093 /* PaywallView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000093 /* PaywallView.swift */; };
 		AA000094 /* AskButlerButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000094 /* AskButlerButton.swift */; };
+		AA00030D /* ConciergeLauncherPress.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00030D /* ConciergeLauncherPress.swift */; };
 		AA000095 /* OnDeviceSummarizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000095 /* OnDeviceSummarizer.swift */; };
 		AA000096 /* BudgetStatsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000096 /* BudgetStatsView.swift */; };
 		AA000097 /* RecurringPaymentsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000097 /* RecurringPaymentsView.swift */; };
@@ -287,6 +288,7 @@
 		BB000092 /* SubscriptionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubscriptionService.swift; sourceTree = "<group>"; };
 		BB000093 /* PaywallView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaywallView.swift; sourceTree = "<group>"; };
 		BB000094 /* AskButlerButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AskButlerButton.swift; sourceTree = "<group>"; };
+		BB00030D /* ConciergeLauncherPress.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConciergeLauncherPress.swift; sourceTree = "<group>"; };
 		BB000095 /* OnDeviceSummarizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnDeviceSummarizer.swift; sourceTree = "<group>"; };
 		BB000096 /* BudgetStatsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BudgetStatsView.swift; sourceTree = "<group>"; };
 		BB000097 /* RecurringPaymentsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecurringPaymentsView.swift; sourceTree = "<group>"; };
@@ -647,6 +649,7 @@
 				BB000103 /* ConciergeSpeechRecognizer.swift */,
 				BB000093 /* PaywallView.swift */,
 				BB000094 /* AskButlerButton.swift */,
+				BB00030D /* ConciergeLauncherPress.swift */,
 				BB000095 /* OnDeviceSummarizer.swift */,
 			);
 			path = Concierge;
@@ -892,6 +895,7 @@
 				AA000092 /* SubscriptionService.swift in Sources */,
 				AA000093 /* PaywallView.swift in Sources */,
 				AA000094 /* AskButlerButton.swift in Sources */,
+				AA00030D /* ConciergeLauncherPress.swift in Sources */,
 				AA000095 /* OnDeviceSummarizer.swift in Sources */,
 				AA00001A /* SettingsView.swift in Sources */,
 				AA00001B /* AddTaskView.swift in Sources */,

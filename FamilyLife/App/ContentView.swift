@@ -263,6 +263,10 @@ struct MainTabView: View {
                         ConciergeLauncherButton(ptt: ptt) {
                             loadedTabs.insert(.concierge)
                             switchTab(to: .concierge)
+                        } onListen: {
+                            // ConciergeView consumes this: disclosure if needed,
+                            // then the chat opens already listening.
+                            conciergeLaunch.listen()
                         }
                         .scaleEffect(tabChrome.isMinimized ? 0.84 : 1)
                         .opacity(tabChrome.isMinimized ? 0.7 : 1)

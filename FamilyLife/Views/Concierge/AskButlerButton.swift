@@ -180,14 +180,19 @@ final class PushToTalkController {
 
 /// Floating concierge launcher. A quick tap opens the concierge tab; press and
 /// hold turns it into a walkie-talkie — dictate while held, release to send.
+/// Holding before the user has granted Concierge AI consent routes to the
+/// Concierge in listening mode (disclosure first) rather than doing nothing.
+/// Press semantics live in `ConciergeLauncherPress` so they're testable.
 struct ConciergeLauncherButton: View {
     @Environment(APIService.self) private var api
     let ptt: PushToTalkController
     /// Quick tap (no hold) → open the concierge tab.
     let onOpen: () -> Void
+    /// Hold without consent → open the concierge straight into listening,
+    /// via its AI disclosure.
+    let onListen: () -> Void
 
-    @State private var pressStart: Date?
-    @State private var listening = false
+    @State private var press = ConciergeLauncherPress()
 
     private var isListening: Bool { ptt.phase == .listening || ptt.phase == .starting }
 
@@ -204,40 +209,34 @@ struct ConciergeLauncherButton: View {
             .gesture(
                 DragGesture(minimumDistance: 0)
                     .onChanged { _ in
-                        guard pressStart == nil else { return }
-                        guard AIConsentManager.hasConciergeConsent else { return }
-                        let start = Date()
-                        pressStart = start
+                        let consent = AIConsentManager.hasConciergeConsent
+                        guard let token = press.pressBegan(hasConsent: consent) else { return }
                         // Warm the mic immediately so a hold starts capturing fast.
-                        ptt.prewarm(api: api)
-                        // Promote to dictation once held past a tap.
+                        if consent { ptt.prewarm(api: api) }
+                        // Promote to a hold once pressed past a tap.
                         Task { @MainActor in
-                            try? await Task.sleep(for: .seconds(0.3))
-                            if pressStart == start, !listening {
-                                listening = true
+                            try? await Task.sleep(for: ConciergeLauncherPress.holdThreshold)
+                            switch press.holdElapsed(pressID: token) {
+                            case .beginPushToTalk:
                                 ptt.begin()
+                            case .awaitRelease:
+                                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                            case nil:
+                                break
                             }
                         }
                     }
                     .onEnded { _ in
-                        if !AIConsentManager.hasConciergeConsent {
-                            pressStart = nil
-                            listening = false
-                            onOpen()
-                            return
-                        }
-                        let held = listening
-                        pressStart = nil
-                        listening = false
-                        if held {
-                            ptt.end(api: api)
-                        } else {
-                            onOpen()
+                        switch press.pressEnded() {
+                        case .open: onOpen()
+                        case .endPushToTalk: ptt.end(api: api)
+                        case .listenAfterConsent: onListen()
                         }
                     }
             )
             .accessibilityLabel("AI concierge")
             .accessibilityHint("Tap to open, or touch and hold to speak a quick note")
+            .accessibilityAction(named: "Speak a quick note") { onListen() }
     }
 }
 
