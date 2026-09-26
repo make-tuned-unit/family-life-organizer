@@ -59,6 +59,7 @@
 		AA000033 /* PersonGiftListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000033 /* PersonGiftListView.swift */; };
 		AA000034 /* AddGiftPersonView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000034 /* AddGiftPersonView.swift */; };
 		AA000035 /* AddGiftIdeaView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000035 /* AddGiftIdeaView.swift */; };
+		AA00030E /* MarkGiftBoughtSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00030E /* MarkGiftBoughtSheet.swift */; };
 		AA000036 /* AddSpecialEventView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000036 /* AddSpecialEventView.swift */; };
 		AA000037 /* EditAppointmentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000037 /* EditAppointmentView.swift */; };
 		AA000038 /* EditPantryItemView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000038 /* EditPantryItemView.swift */; };
@@ -240,6 +241,7 @@
 		BB000033 /* PersonGiftListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersonGiftListView.swift; sourceTree = "<group>"; };
 		BB000034 /* AddGiftPersonView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddGiftPersonView.swift; sourceTree = "<group>"; };
 		BB000035 /* AddGiftIdeaView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddGiftIdeaView.swift; sourceTree = "<group>"; };
+		BB00030E /* MarkGiftBoughtSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkGiftBoughtSheet.swift; sourceTree = "<group>"; };
 		BB000036 /* AddSpecialEventView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddSpecialEventView.swift; sourceTree = "<group>"; };
 		BB000037 /* EditAppointmentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditAppointmentView.swift; sourceTree = "<group>"; };
 		BB000038 /* EditPantryItemView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditPantryItemView.swift; sourceTree = "<group>"; };
@@ -601,6 +603,7 @@
 				BB000033 /* PersonGiftListView.swift */,
 				BB000034 /* AddGiftPersonView.swift */,
 				BB000035 /* AddGiftIdeaView.swift */,
+				BB00030E /* MarkGiftBoughtSheet.swift */,
 				BB000036 /* AddSpecialEventView.swift */,
 			);
 			path = Gifts;
@@ -945,6 +948,7 @@
 				AA000033 /* PersonGiftListView.swift in Sources */,
 				AA000034 /* AddGiftPersonView.swift in Sources */,
 				AA000035 /* AddGiftIdeaView.swift in Sources */,
+				AA00030E /* MarkGiftBoughtSheet.swift in Sources */,
 				AA000036 /* AddSpecialEventView.swift in Sources */,
 				AA000037 /* EditAppointmentView.swift in Sources */,
 				AA000038 /* EditPantryItemView.swift in Sources */,

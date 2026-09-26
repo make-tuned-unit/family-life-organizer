@@ -5,6 +5,8 @@ import PhotosUI
 /// dates, and the decisions the household has tagged to them.
 struct PersonDetailView: View {
     @Environment(APIService.self) private var api
+    @Environment(AuthService.self) private var auth
+    @Environment(HouseholdService.self) private var household
     @Environment(\.dismiss) private var dismiss
     let person: PersonResponse
     var onChanged: (() async -> Void)?
@@ -25,6 +27,7 @@ struct PersonDetailView: View {
     @State private var showingAddMilestone = false
     @State private var showingAddKeyDate = false
     @State private var showingAddGift = false
+    @State private var buyingGift: GiftIdeaResponse?
     @State private var showingEditPerson = false
     @State private var showingDeleteConfirm = false
     /// The child's chores routine, when one exists — chores live in Routines
@@ -99,7 +102,13 @@ struct PersonDetailView: View {
             }
         }
         .sheet(isPresented: $showingAddGift) {
-            AddGiftIdeaView(personID: person.id, personName: display.name) {
+            AddGiftIdeaView(personID: person.id, personName: display.name, recipientUserId: display.user_id) {
+                await load()
+                await onChanged?()
+            }
+        }
+        .sheet(item: $buyingGift) { idea in
+            MarkGiftBoughtSheet(idea: idea, personName: display.name, recipientUserId: display.user_id) {
                 await load()
                 await onChanged?()
             }
@@ -380,8 +389,23 @@ struct PersonDetailView: View {
                 }
                 .font(.flCaption)
                 .foregroundStyle(WarmPalette.ink3)
+                if let audience = giftAudienceLabel(idea) {
+                    Label(audience.text, systemImage: audience.icon)
+                        .font(.flCaption2.weight(.medium))
+                        .foregroundStyle(WarmPalette.ink3)
+                }
             }
             Spacer()
+            if status == .idea {
+                Button { buyingGift = idea } label: {
+                    Image(systemName: "bag")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(giftStatusColor(.purchased))
+                        .frame(width: 32, height: 32)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Mark \(idea.title) as bought")
+            }
             if let url = idea.link_url, !url.isEmpty, let parsed = URL(string: url) {
                 Link(destination: parsed) {
                     Image(systemName: "link")
@@ -393,7 +417,11 @@ struct PersonDetailView: View {
         .padding(13)
         .flCard()
         .contextMenu {
-            if status != .given, let next = giftNextStatus(status) {
+            if status == .idea {
+                Button { buyingGift = idea } label: {
+                    Label("Mark as bought…", systemImage: giftStatusIcon(.purchased))
+                }
+            } else if status != .given, let next = giftNextStatus(status) {
                 Button {
                     Task {
                         try? await api.updateGiftIdea(id: idea.id, data: ["status": next.rawValue])
@@ -413,6 +441,23 @@ struct PersonDetailView: View {
             } label: {
                 Label("Delete gift idea", systemImage: "trash")
             }
+        }
+    }
+
+    /// "Just you" / "You & Sam" for ideas not visible to the whole household.
+    private func giftAudienceLabel(_ idea: GiftIdeaResponse) -> (text: String, icon: String)? {
+        let me = auth.currentUser?.id
+        func name(_ id: Int?) -> String {
+            household.householdUsers.first { $0.id == id }?.name ?? "one other"
+        }
+        switch idea.visibilityValue {
+        case .household:
+            return nil
+        case .private:
+            return ("Just you", "lock.fill")
+        case .shared:
+            let other = idea.created_by == me ? idea.shared_with_user_id : idea.created_by
+            return ("You & \(name(other))", "person.2.fill")
         }
     }
 
@@ -1127,4 +1172,6 @@ struct EditPersonSheet: View {
             milestone_count: 3, decision_count: 1, key_date_count: 1))
     }
     .environment(APIService())
+    .environment(AuthService())
+    .environment(HouseholdService())
 }

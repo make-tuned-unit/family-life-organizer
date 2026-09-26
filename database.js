@@ -200,6 +200,12 @@ class FamilyDB {
         this.db.run('ALTER TABLE trips ADD COLUMN traveler_id INTEGER REFERENCES users(id)', () => {});
         this.db.run('ALTER TABLE gift_people ADD COLUMN group_id INTEGER REFERENCES groups(id)', () => {});
         this.db.run('ALTER TABLE gift_ideas ADD COLUMN group_id INTEGER REFERENCES groups(id)', () => {});
+        // Gift privacy: who saved it, who may see it, and who bought it.
+        this.db.run('ALTER TABLE gift_ideas ADD COLUMN created_by INTEGER REFERENCES users(id)', () => {});
+        this.db.run("ALTER TABLE gift_ideas ADD COLUMN visibility TEXT DEFAULT 'household'", () => {});
+        this.db.run('ALTER TABLE gift_ideas ADD COLUMN shared_with_user_id INTEGER REFERENCES users(id)', () => {});
+        this.db.run('ALTER TABLE gift_ideas ADD COLUMN purchased_by INTEGER REFERENCES users(id)', () => {});
+        this.db.run('ALTER TABLE gift_ideas ADD COLUMN purchased_at DATETIME', () => {});
         this.db.run('ALTER TABLE special_events ADD COLUMN group_id INTEGER REFERENCES groups(id)', () => {});
         this.db.run('ALTER TABLE family_addresses ADD COLUMN group_id INTEGER REFERENCES groups(id)', () => {});
         this.db.run('CREATE INDEX IF NOT EXISTS idx_receipts_group ON receipts(group_id)', () => {});
@@ -2105,12 +2111,37 @@ class FamilyDB {
     });
   }
 
+  // Gift ideas are surprise-protected. A viewer sees an idea only if:
+  //   - they saved it, OR
+  //   - it isn't for them (the recipient's linked account never sees ideas
+  //     others saved for them) AND its visibility admits them:
+  //     'household' → everyone at home, 'shared' → just shared_with_user_id,
+  //     'private' → creator only.
+  // Returns [sqlFragment, params] for an alias of gift_ideas.
+  static giftIdeaVisibleSql(alias, userId) {
+    const a = alias;
+    return [`(${a}.created_by = ? OR (
+      NOT EXISTS (SELECT 1 FROM gift_people gp WHERE gp.id = ${a}.person_id AND gp.user_id = ?)
+      AND (COALESCE(${a}.visibility, 'household') = 'household'
+        OR (${a}.visibility = 'shared' AND ${a}.shared_with_user_id = ?))))`, [userId, userId, userId]];
+  }
+
+  getVisibleGiftIdea(id, userId) {
+    const [vis, vp] = FamilyDB.giftIdeaVisibleSql('g', userId);
+    return new Promise((resolve, reject) => {
+      this.db.get(`SELECT g.* FROM gift_ideas g WHERE g.id = ? AND ${vis}`, [id, ...vp],
+        (err, row) => err ? reject(err) : resolve(row || null));
+    });
+  }
+
   addGiftIdea(idea) {
     return new Promise((resolve, reject) => {
       this.db.run(
-        `INSERT INTO gift_ideas (person_id, title, notes, link_url, estimated_price, status, for_event, group_id)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-        [idea.person_id, idea.title, idea.notes || null, idea.link_url || null, idea.estimated_price || null, idea.status || 'idea', idea.for_event || null, idea.group_id || null],
+        `INSERT INTO gift_ideas (person_id, title, notes, link_url, estimated_price, status, for_event, group_id,
+                                 created_by, visibility, shared_with_user_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [idea.person_id, idea.title, idea.notes || null, idea.link_url || null, idea.estimated_price || null, idea.status || 'idea', idea.for_event || null, idea.group_id || null,
+         idea.created_by || null, idea.visibility || 'household', idea.shared_with_user_id || null],
         function(err) {
           if (err) reject(err);
           else resolve({ id: this.lastID, ...idea });
@@ -2119,26 +2150,26 @@ class FamilyDB {
     });
   }
 
-  getGiftIdeas(personId = null, groupId = null) {
+  // viewerId is required: without it nothing is returned (fail closed), since
+  // an unfiltered read would spoil surprises for the recipient.
+  getGiftIdeas(personId = null, groupId = null, viewerId = null) {
     return new Promise((resolve, reject) => {
-      if (groupId == null) return resolve([]);
-      let sql = 'SELECT * FROM gift_ideas WHERE 1=1';
-      const params = [];
-      if (groupId != null) {
-        sql += ' AND group_id = ?';
-        params.push(groupId);
-      }
+      if (groupId == null || viewerId == null) return resolve([]);
+      const [vis, vp] = FamilyDB.giftIdeaVisibleSql('g', viewerId);
+      let sql = `SELECT g.* FROM gift_ideas g WHERE g.group_id = ? AND ${vis}`;
+      const params = [groupId, ...vp];
       if (personId != null) {
-        sql += ' AND person_id = ?';
+        sql += ' AND g.person_id = ?';
         params.push(personId);
       }
-      sql += ' ORDER BY datetime(created_at) DESC LIMIT 1000'; // safety cap (household-scoped); full pagination deferred
+      sql += ' ORDER BY datetime(g.created_at) DESC LIMIT 1000'; // safety cap (household-scoped); full pagination deferred
       this.db.all(sql, params, (err, rows) => err ? reject(err) : resolve(rows));
     });
   }
 
   updateGiftIdea(id, updates) {
-    const ALLOWED = new Set(['title', 'notes', 'link_url', 'estimated_price', 'status', 'for_event']);
+    const ALLOWED = new Set(['title', 'notes', 'link_url', 'estimated_price', 'status', 'for_event',
+      'visibility', 'shared_with_user_id', 'purchased_by', 'purchased_at', 'created_by']);
     return new Promise((resolve, reject) => {
       const fields = [];
       const params = [];
@@ -2230,17 +2261,20 @@ class FamilyDB {
   // tagged decisions all hang off one person id.
   // ==========================================================================
 
-  getPeople(groupId) {
+  // viewerId scopes gift_idea_count to ideas the viewer may see (no count
+  // leaks surprises to the recipient); omitted → count of the viewer-less set.
+  getPeople(groupId, viewerId = null) {
+    const [vis, vp] = FamilyDB.giftIdeaVisibleSql('g', viewerId);
     return new Promise((resolve, reject) => {
       this.db.all(
         `SELECT p.*,
-           (SELECT COUNT(*) FROM gift_ideas g WHERE g.person_id = p.id) AS gift_idea_count,
+           (SELECT COUNT(*) FROM gift_ideas g WHERE g.person_id = p.id AND ${vis}) AS gift_idea_count,
            (SELECT COUNT(*) FROM milestones m WHERE m.person_id = p.id) AS milestone_count,
            (SELECT COUNT(*) FROM decisions d WHERE d.person_id = p.id) AS decision_count,
            (SELECT COUNT(*) FROM special_events s WHERE s.person_id = p.id) AS key_date_count
          FROM gift_people p WHERE p.group_id = ?
          ORDER BY p.is_dependent DESC, p.name`,
-        [groupId],
+        [...vp, groupId],
         (err, rows) => err ? reject(err) : resolve(rows || [])
       );
     });
@@ -3105,6 +3139,10 @@ class FamilyDB {
           // Health entries and account-linked profiles remain personal even
           // when the owner previously shared them with a household.
           await run('DELETE FROM routine_entries WHERE created_by = ?', [uid]);
+          // Gift ideas they kept private (or shared with one person) go with
+          // them; ideas shared WITH them fall back to private for the saver.
+          await run("DELETE FROM gift_ideas WHERE created_by = ? AND COALESCE(visibility,'household') != 'household'", [uid]);
+          await run("UPDATE gift_ideas SET visibility = 'private', shared_with_user_id = NULL WHERE shared_with_user_id = ?", [uid]);
           for (const table of ['gift_ideas', 'special_events', 'milestones']) {
             await run(`DELETE FROM ${table} WHERE person_id IN (SELECT id FROM gift_people WHERE user_id = ?)`, [uid]);
           }
@@ -3278,7 +3316,11 @@ class FamilyDB {
       trips: await scoped('trips'),
       decisions: await scoped('decisions'),
       gift_people: await scoped('gift_people'),
-      gift_ideas: await scoped('gift_ideas'),
+      // Same surprise rule as the app: never export ideas saved for you by others.
+      gift_ideas: householdIds.length
+        ? await (() => { const [vis, vp] = FamilyDB.giftIdeaVisibleSql('g', uid);
+            return all(`SELECT g.* FROM gift_ideas g WHERE g.group_id IN (${hidPlace}) AND ${vis}`, [...householdIds, ...vp]); })()
+        : [],
       milestones: await scoped('milestones'),
       routines: await scoped('routines'),
       coverage_requests: await all('SELECT id, reason, note, status, created_at FROM coverage_requests WHERE requester_id = ?', [uid]),

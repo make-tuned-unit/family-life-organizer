@@ -5751,12 +5751,53 @@ app.post('/api/gifts/people', requireAuth, async (req, res) => {
   }
 });
 
+// Gift ideas are surprise-protected (see FamilyDB.giftIdeaVisibleSql): the
+// recipient never sees ideas others saved for them, and each idea is visible
+// to the household, to its saver only ('private'), or to its saver plus one
+// household member ('shared') — e.g. parents planning a child's birthday.
+const GIFT_VISIBILITIES = new Set(['household', 'private', 'shared']);
+
+// The linked account (if any) a gift is for — they may never be let in on it.
+async function giftRecipientUserId(db, personId) {
+  const row = await dbGet(db, 'SELECT user_id FROM gift_people WHERE id = ?', [personId]);
+  return row?.user_id ?? null;
+}
+
+// Validates a partner to share with / notify: a different member of the same
+// household who isn't the gift's recipient. Returns an error string or null.
+async function giftPartnerError(db, partnerId, { userId, groupId, personId }) {
+  if (!Number.isInteger(partnerId)) return 'Choose who to share with';
+  if (partnerId === userId) return "You can't share a gift with yourself";
+  if (!(await db.isHouseholdMember(groupId, partnerId))) return 'They need to be in your household';
+  if (partnerId === await giftRecipientUserId(db, personId)) return "That would spoil the surprise — they're who it's for";
+  return null;
+}
+
+// Normalises { visibility, shared_with_user_id } from a request body.
+async function resolveGiftVisibility(db, body, ctx) {
+  const visibility = body.visibility == null ? 'household' : String(body.visibility);
+  if (!GIFT_VISIBILITIES.has(visibility)) return { error: 'Invalid visibility' };
+  if (visibility !== 'shared') return { visibility, shared_with_user_id: null };
+  const partnerId = Number(body.shared_with_user_id);
+  const error = await giftPartnerError(db, partnerId, ctx);
+  return error ? { error } : { visibility, shared_with_user_id: partnerId };
+}
+
+// Loads a gift idea the caller may see, or sends 404/403 and returns null.
+// An idea hidden from the caller is a 404 — its existence is the surprise.
+async function requireVisibleGiftIdea(db, id, req, res) {
+  if (!(await requireHouseholdRow(db, 'gift_ideas', id, req, res))) return null;
+  const idea = await db.getVisibleGiftIdea(id, req.session.user.id);
+  if (!idea) { res.status(404).json({ error: 'Not found' }); return null; }
+  return idea;
+}
+
 app.get('/api/gifts/ideas', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
     const groupId = await db.getUserHouseholdId(req.session.user?.id);
     if (!groupId) return res.json([]);
-    const ideas = await db.getGiftIdeas(req.query.person_id ? Number(req.query.person_id) : null, groupId);
+    const ideas = await db.getGiftIdeas(req.query.person_id ? Number(req.query.person_id) : null, groupId, req.session.user.id);
     res.json(ideas);
   } catch (err) {
     sendServerError(res, err);
@@ -5768,10 +5809,58 @@ app.get('/api/gifts/ideas', requireAuth, async (req, res) => {
 app.post('/api/gifts/ideas', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
-    const groupId = await db.getUserHouseholdId(req.session.user?.id);
+    const userId = req.session.user.id;
+    const groupId = await db.getUserHouseholdId(userId);
     if (!groupId) return res.status(403).json({ error: 'Join a household first' });
-    const result = await db.addGiftIdea({ ...req.body, group_id: groupId });
+    const personId = Number(req.body.person_id);
+    if (!(await personBelongsToCallerHousehold(db, userId, personId))) return res.status(403).json({ error: 'Forbidden' });
+    const scope = await resolveGiftVisibility(db, req.body, { userId, groupId, personId });
+    if (scope.error) return res.status(400).json({ error: scope.error });
+    const status = ['idea', 'purchased', 'wrapped', 'given'].includes(req.body.status) ? req.body.status : 'idea';
+    const result = await db.addGiftIdea({
+      person_id: personId, title: req.body.title, notes: req.body.notes, link_url: req.body.link_url,
+      estimated_price: req.body.estimated_price, for_event: req.body.for_event, status,
+      group_id: groupId, created_by: userId, ...scope,
+    });
     res.json({ success: true, id: result.id });
+  } catch (err) {
+    sendServerError(res, err);
+  } finally {
+    db.close();
+  }
+});
+
+// Mark a gift bought and (optionally) tell one household member privately —
+// a push to just them, never a feed post. Notifying someone who can't yet see
+// a private idea shares it with them, but only if the caller saved it.
+app.post('/api/gifts/ideas/:id/purchased', requireAuth, async (req, res) => {
+  const db = new FamilyDB();
+  try {
+    const userId = req.session.user.id;
+    const idea = await requireVisibleGiftIdea(db, req.params.id, req, res);
+    if (!idea) return;
+    const updates = { status: 'purchased', purchased_by: userId, purchased_at: new Date().toISOString() };
+    let notifyId = null;
+    if (req.body.notify_user_id != null) {
+      notifyId = Number(req.body.notify_user_id);
+      const error = await giftPartnerError(db, notifyId, { userId, groupId: idea.group_id, personId: idea.person_id });
+      if (error) return res.status(400).json({ error });
+      if (!(await db.getVisibleGiftIdea(idea.id, notifyId))) {
+        if (idea.created_by !== userId) return res.status(403).json({ error: "They can't see this gift — ask whoever saved it to share it" });
+        updates.visibility = 'shared';
+        updates.shared_with_user_id = notifyId;
+      }
+    }
+    await db.updateGiftIdea(idea.id, updates);
+    if (notifyId) {
+      const person = await dbGet(db, 'SELECT name FROM gift_people WHERE id = ?', [idea.person_id]);
+      const buyer = req.session.user.name || 'Someone';
+      const occasion = idea.for_event ? `'s ${idea.for_event}` : '';
+      jobs.pushToUser(db, notifyId, 'Gift bought 🎁',
+        `${buyer} bought ${idea.title} for ${person?.name || 'the family'}${occasion}`,
+        { type: 'gift', ref_id: idea.person_id, actor_id: userId });
+    }
+    res.json({ success: true, notified: !!notifyId });
   } catch (err) {
     sendServerError(res, err);
   } finally {
@@ -5782,8 +5871,24 @@ app.post('/api/gifts/ideas', requireAuth, async (req, res) => {
 app.put('/api/gifts/ideas/:id', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
-    if (!(await requireHouseholdRow(db, 'gift_ideas', req.params.id, req, res))) return;
-    await db.updateGiftIdea(req.params.id, req.body);
+    const userId = req.session.user.id;
+    const idea = await requireVisibleGiftIdea(db, req.params.id, req, res);
+    if (!idea) return;
+    // Server-managed fields are never taken from the body.
+    const { visibility, shared_with_user_id, purchased_by, purchased_at, created_by, ...updates } = req.body;
+    if (visibility !== undefined || shared_with_user_id !== undefined) {
+      // Only the saver decides who's in on it (legacy rows have no saver).
+      if (idea.created_by != null && idea.created_by !== userId) return res.status(403).json({ error: 'Only whoever saved this gift can change who sees it' });
+      const scope = await resolveGiftVisibility(db, { visibility: visibility ?? idea.visibility, shared_with_user_id },
+        { userId, groupId: idea.group_id, personId: idea.person_id });
+      if (scope.error) return res.status(400).json({ error: scope.error });
+      Object.assign(updates, scope);
+      if (idea.created_by == null) updates.created_by = userId;
+    }
+    if (updates.status === 'purchased' && idea.status !== 'purchased') {
+      Object.assign(updates, { purchased_by: userId, purchased_at: new Date().toISOString() });
+    }
+    await db.updateGiftIdea(idea.id, updates);
     res.json({ success: true });
   } catch (err) {
     sendServerError(res, err);
@@ -5795,8 +5900,9 @@ app.put('/api/gifts/ideas/:id', requireAuth, async (req, res) => {
 app.delete('/api/gifts/ideas/:id', requireAuth, async (req, res) => {
   const db = new FamilyDB();
   try {
-    if (!(await requireHouseholdRow(db, 'gift_ideas', req.params.id, req, res))) return;
-    await db.deleteGiftIdea(req.params.id);
+    const idea = await requireVisibleGiftIdea(db, req.params.id, req, res);
+    if (!idea) return;
+    await db.deleteGiftIdea(idea.id);
     res.json({ success: true });
   } catch (err) {
     sendServerError(res, err);
@@ -5910,7 +6016,7 @@ app.get('/api/people', requireAuth, async (req, res) => {
     const groupId = await db.getUserHouseholdId(req.session.user?.id);
     if (!groupId) return res.json([]);
     await db.ensureHouseholdUserPeople(groupId);
-    res.json(await db.getPeople(groupId));
+    res.json(await db.getPeople(groupId, req.session.user.id));
   } catch (err) {
     sendServerError(res, err);
   } finally {

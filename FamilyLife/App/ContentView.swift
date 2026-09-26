@@ -191,6 +191,8 @@ struct MainTabView: View {
     @State private var deepRivalry: RivalryResponse?
     @State private var deepDecision: DecisionResponse?
     @State private var deepEvent: AppointmentResponse?
+    /// "Gift bought" pushes open the gift's person card.
+    @State private var deepPerson: PersonResponse?
     @State private var showingDeepCoverage = false
     @State private var showingDeepTravel = false
     @AppStorage("aiConciergeEnabled") private var aiConciergeEnabled = false
@@ -302,6 +304,9 @@ struct MainTabView: View {
         }
         .sheet(item: $deepRivalry) { rivalry in
             NavigationStack { RivalryDetailView(rivalry: rivalry) }
+        }
+        .sheet(item: $deepPerson) { person in
+            NavigationStack { PersonDetailView(person: person) }
         }
         .sheet(item: $deepDecision) { decision in
             NavigationStack { DecisionDetailView(decision: decision) }
@@ -575,6 +580,12 @@ struct MainTabView: View {
                 if let rivalry = rivalries.first(where: { $0.id == refId }) {
                     deepRivalry = rivalry
                 }
+            }
+            switchTab(to: .home)
+        case "gift":
+            if let refId,
+               let person = (try? await api.fetchPeople())?.first(where: { $0.id == refId }) {
+                deepPerson = person
             }
             switchTab(to: .home)
         case "decision":

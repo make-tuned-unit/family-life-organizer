@@ -959,6 +959,16 @@ final class APIService {
         let _: SuccessResponse = try await put("/api/gifts/ideas/\(id)", body: data)
     }
 
+    /// Mark a gift bought; `notifyUserId` gets a private push (and, if the idea
+    /// was private to you, is let in on it). Returns whether anyone was notified.
+    @discardableResult
+    func markGiftBought(id: Int, notifyUserId: Int?) async throws -> Bool {
+        var body: [String: Any] = [:]
+        if let notifyUserId { body["notify_user_id"] = notifyUserId }
+        let response: GiftPurchasedResponse = try await post("/api/gifts/ideas/\(id)/purchased", body: body)
+        return response.notified
+    }
+
     func deleteGiftIdea(id: Int) async throws {
         let _: SuccessResponse = try await delete("/api/gifts/ideas/\(id)")
     }

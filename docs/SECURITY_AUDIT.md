@@ -416,3 +416,18 @@ The system moved on substantially since the 2026-06-25 log. Current state:
 See [release QA evidence](qa/RELEASE_QA_2026-09-21.md). Fixed automatic cloud briefs without consent, cross-account consent carryover, credential-cookie survival after password change/deletion, private-health and selected child-row retention during deletion, and the runtime qs advisory. Added storage-level and second-device cookie regressions. Existing sessions reauthenticate once after deployment to acquire a credential stamp.
 
 Still blocking: UGC blocking/filtering, Sign in with Apple authorization revocation, full shared-content/backups/outbox erasure policy and failed Stripe-cancellation handling. Seven install-chain dependency advisories remain. No production configuration or secrets were changed.
+
+## 2026-09-25 — gift idea privacy
+
+Gift ideas were household-wide with no per-viewer filter, so a spouse (or teen)
+with an account could read the ideas saved for them. They now follow a
+surprise rule, `FamilyDB.giftIdeaVisibleSql`: the saver always sees an idea;
+anyone else sees it only if it isn't for their linked person row AND its
+`visibility` admits them (`household` / `shared` with one `shared_with_user_id`
+/ `private`). Enforced on list, per-person counts, PUT/DELETE (hidden → 404),
+`POST /api/gifts/ideas/:id/purchased`, Concierge `gifts` actions, history
+search and data export. `POST` now validates `person_id` belongs to the
+caller's household. The purchased endpoint's notification is a direct push to
+one validated household member (never the recipient, never a feed post).
+Account deletion removes the user's non-household ideas and reverts ideas
+shared with them to private. Regression suite: `test/gift-privacy.test.js`.

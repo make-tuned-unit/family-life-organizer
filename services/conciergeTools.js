@@ -78,6 +78,13 @@ async function assertHousehold(ctx, table, id) {
   }
 }
 
+// Guard for gift ideas: household scope PLUS the surprise rule — ideas saved
+// for the caller, or kept private by someone else, read as not found.
+async function assertGiftIdeaVisible(ctx, id) {
+  await assertHousehold(ctx, 'gift_ideas', id);
+  if (!(await ctx.db.getVisibleGiftIdea(id, ctx.userId))) throw new Error(`No gift_ideas #${id} found`);
+}
+
 // Guard for lists (no group_id column — visible to creator + household members).
 async function assertListAccess(ctx, listId) {
   const row = await dbGet(ctx,
@@ -983,10 +990,11 @@ const TOOLS = [
       properties: { person_id: { type: 'integer' } },
     },
     async run(ctx, input) {
-      const rows = await ctx.db.getGiftIdeas(input.person_id || null, ctx.groupId);
+      const rows = await ctx.db.getGiftIdeas(input.person_id || null, ctx.groupId, ctx.userId);
       return { result: rows.map(g => ({
         id: g.id, person_id: g.person_id, title: g.title, price: g.estimated_price,
         status: g.status, for_event: g.for_event, link: g.link_url,
+        visibility: g.visibility || 'household',
       })) };
     },
   },
@@ -1003,6 +1011,7 @@ const TOOLS = [
         link_url: { type: 'string' },
         estimated_price: { type: 'number' },
         for_event: { type: 'string' },
+        visibility: { type: 'string', enum: ['household', 'private'], description: "'private' keeps it to the user alone (surprises). Default household — the recipient never sees ideas saved for them either way." },
       },
       required: ['person_id', 'title'],
     },
@@ -1012,7 +1021,8 @@ const TOOLS = [
         person_id: input.person_id, title: input.title, notes: input.notes || null,
         link_url: input.link_url || null, estimated_price: input.estimated_price || null,
         status: 'idea', for_event: input.for_event || null,
-        group_id: ctx.groupId,
+        group_id: ctx.groupId, created_by: ctx.userId,
+        visibility: input.visibility === 'private' ? 'private' : 'household',
       });
       const summary = `Added gift idea "${input.title}"`;
       return { result: { ok: true, summary }, action: { tool: 'add_gift_idea', summary } };
@@ -2966,9 +2976,10 @@ const TOOLS = [
       required: ['id'],
     },
     async run(ctx, input) {
-      await assertHousehold(ctx, 'gift_ideas', input.id);
+      await assertGiftIdeaVisible(ctx, input.id);
       const { id, ...updates } = input;
       if (!Object.keys(updates).length) return { result: { ok: false, error: 'Nothing to change' } };
+      if (updates.status === 'purchased') Object.assign(updates, { purchased_by: ctx.userId, purchased_at: new Date().toISOString() });
       await ctx.db.updateGiftIdea(id, updates);
       const summary = updates.status ? `Marked gift idea #${id} as ${updates.status}` : `Updated gift idea #${id}`;
       return { result: { ok: true, summary }, action: { tool: 'update_gift_idea', summary } };
@@ -2984,7 +2995,7 @@ const TOOLS = [
       required: ['id'],
     },
     async run(ctx, input) {
-      await assertHousehold(ctx, 'gift_ideas', input.id);
+      await assertGiftIdeaVisible(ctx, input.id);
       await ctx.db.deleteGiftIdea(input.id);
       const summary = `Deleted gift idea #${input.id}`;
       return { result: { ok: true, summary }, action: { tool: 'delete_gift_idea', summary } };
