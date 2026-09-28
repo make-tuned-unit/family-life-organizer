@@ -1554,11 +1554,31 @@ app.post('/api/account/delete', requireAuth, loginLimiter, async (req, res) => {
       return res.status(401).json({ error: hint });
     }
 
+    // Linked accounts need a fresh code from the same Apple authorization as
+    // the identity token. A password alone cannot revoke Apple's grant.
+    if (appleLinked && (!appleOk || !req.body.authorization_code)) {
+      return res.status(409).json({ error: 'Confirm with Sign in with Apple in the latest Kinrows app to revoke access and delete your account.' });
+    }
+    if (appleLinked && !require('./services/appleRevocation').isConfigured()) {
+      return res.status(503).json({ error: 'Apple account deletion is temporarily unavailable. Your account has not been deleted. Contact support@kinrows.com for help.' });
+    }
+
     // Sole-owner households: cancel Stripe so billing does not outlive the wipe.
     try {
       await stripeBilling.cancelForAccountDeletion(db, req.session.user.id);
     } catch {
       return res.status(503).json({ error: 'We could not confirm subscription cancellation. Your account has not been deleted. Please retry or contact support@kinrows.com.' });
+    }
+    if (appleLinked) {
+      try {
+        await require('./services/appleRevocation').revokeAuthorization({
+          authorizationCode: req.body.authorization_code,
+          nonce: req.body.nonce,
+          expectedSub: full.apple_user_id,
+        });
+      } catch {
+        return res.status(503).json({ error: 'Apple could not confirm access revocation. Your account has not been deleted. Sign in with Apple again to retry.' });
+      }
     }
     await eraseUserSessions(req.session.user.id);
     await db.deleteUserAccount(req.session.user.id);

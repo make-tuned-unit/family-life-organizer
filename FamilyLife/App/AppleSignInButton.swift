@@ -37,7 +37,7 @@ struct AppleSignInButton: View {
     var inviteCode: String? = nil
     var householdName: String? = nil
     /// When set, the identity token is handed to the caller instead of signing in.
-    var onIdentity: ((String, String) -> Void)? = nil
+    var onIdentity: ((String, String, String) -> Void)? = nil
     var onError: (String) -> Void
 
     @Environment(AuthService.self) private var auth
@@ -83,7 +83,13 @@ struct AppleSignInButton: View {
                 auth.rememberAppleUserID(credential.user)
             }
             if let onIdentity {
-                onIdentity(identityToken, rawNonce)
+                guard let codeData = credential.authorizationCode,
+                      let authorizationCode = String(data: codeData, encoding: .utf8),
+                      !authorizationCode.isEmpty else {
+                    onError("Apple did not return an authorization code. Please try again.")
+                    return
+                }
+                onIdentity(identityToken, rawNonce, authorizationCode)
                 return
             }
             let name: String? = {
