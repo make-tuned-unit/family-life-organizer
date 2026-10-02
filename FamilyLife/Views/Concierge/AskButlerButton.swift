@@ -12,11 +12,24 @@ final class ConciergeLaunch {
     private(set) var pendingPrompt: String?
     private(set) var pendingAutoListen = false
     private(set) var pendingAutoSend = false
+    private(set) var pendingConversationId: Int?
 
     struct Request {
         let prompt: String?
         let autoListen: Bool
         let autoSend: Bool
+        /// Reopen this existing thread instead of starting a fresh one.
+        let conversationId: Int?
+    }
+
+    /// Open the concierge chat on an existing conversation (e.g. the one a
+    /// push-to-talk note just landed in) so the user can keep going in-session.
+    func continueConversation(_ id: Int) {
+        pendingPrompt = nil
+        pendingAutoListen = false
+        pendingAutoSend = false
+        pendingConversationId = id
+        requestID += 1
     }
 
     /// Open the concierge chat seeded with `prompt`. When `autoSend` is true the
@@ -25,6 +38,7 @@ final class ConciergeLaunch {
         pendingPrompt = prompt
         pendingAutoListen = false
         pendingAutoSend = autoSend
+        pendingConversationId = nil
         requestID += 1
     }
 
@@ -33,14 +47,16 @@ final class ConciergeLaunch {
         pendingPrompt = nil
         pendingAutoListen = true
         pendingAutoSend = false
+        pendingConversationId = nil
         requestID += 1
     }
 
     /// Read and clear the pending request.
     func consume() -> Request? {
         guard requestID != 0 else { return nil }
-        let request = Request(prompt: pendingPrompt, autoListen: pendingAutoListen, autoSend: pendingAutoSend)
+        let request = Request(prompt: pendingPrompt, autoListen: pendingAutoListen, autoSend: pendingAutoSend, conversationId: pendingConversationId)
         pendingPrompt = nil
+        pendingConversationId = nil
         pendingAutoListen = false
         pendingAutoSend = false
         requestID = 0
@@ -64,6 +80,9 @@ final class PushToTalkController {
     /// Bumped after a note lands successfully so surfaces like Home can
     /// silently refresh — the concierge may have just added tasks/events/items.
     private(set) var completedSends = 0
+    /// Thread the last note landed in; non-nil while the confirmation banner is
+    /// up so tapping it can continue the same conversation in the chat.
+    private(set) var continuableConversationId: Int?
 
     private let recognizer = ConciergeSpeechRecognizer()
     /// Chains repeated dictations into one running thread within a session.
@@ -96,6 +115,7 @@ final class PushToTalkController {
         phase = .starting
         transcript = ""
         banner = nil
+        continuableConversationId = nil
         Task {
             await recognizer.start { [weak self] in
                 guard let self else { return }
@@ -166,14 +186,20 @@ final class PushToTalkController {
             } else if liveActions.isEmpty {
                 banner = response.reply
             }
+            // Surface the reply itself (not just "Task complete") so a clarifying
+            // question is visible, and offer to carry on in the same thread.
+            if !response.reply.isEmpty { banner = response.reply }
+            continuableConversationId = response.conversationId
             completedSends += 1
         } catch {
             banner = "Couldn't send — try again"
+            continuableConversationId = nil
         }
         phase = .idle
+        let hadThread = continuableConversationId != nil
         Task {
-            try? await Task.sleep(for: .seconds(2.5))
-            if phase == .idle { banner = nil }
+            try? await Task.sleep(for: .seconds(hadThread ? 7 : 2.5))
+            if phase == .idle { banner = nil; continuableConversationId = nil }
         }
     }
 }
@@ -244,6 +270,8 @@ struct ConciergeLauncherButton: View {
 /// spinner while sending, and a brief confirmation/error banner after.
 struct PushToTalkOverlay: View {
     let ptt: PushToTalkController
+    /// Open the chat on the conversation the last note went into.
+    var onContinue: (Int) -> Void = { _ in }
 
     var body: some View {
         VStack {
@@ -252,7 +280,7 @@ struct PushToTalkOverlay: View {
                 .padding(.bottom, 150)
         }
         .frame(maxWidth: .infinity)
-        .allowsHitTesting(false)
+        .allowsHitTesting(ptt.phase == .idle && ptt.continuableConversationId != nil)
         .animation(.spring(response: 0.32, dampingFraction: 0.85), value: ptt.phase)
         .animation(.easeInOut(duration: 0.2), value: ptt.transcript)
     }
@@ -292,9 +320,22 @@ struct PushToTalkOverlay: View {
         case .idle:
             if let banner = ptt.banner {
                 card {
-                    Text(banner)
-                        .foregroundStyle(WarmPalette.ink1)
-                        .font(.flSubheadline.weight(.medium))
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(banner)
+                            .foregroundStyle(WarmPalette.ink1)
+                            .font(.flSubheadline.weight(.medium))
+                            .lineLimit(5)
+                        if let id = ptt.continuableConversationId {
+                            Label("Tap to continue this conversation", systemImage: "bubble.left.and.text.bubble.right")
+                                .foregroundStyle(WarmPalette.ink3)
+                                .font(.flCaption)
+                                .accessibilityHint("Opens the concierge chat on this conversation")
+                                .accessibilityIdentifier("ptt-continue-\(id)")
+                        }
+                    }
+                }
+                .onTapGesture {
+                    if let id = ptt.continuableConversationId { onContinue(id) }
                 }
             }
         }

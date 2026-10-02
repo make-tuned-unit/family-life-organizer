@@ -279,7 +279,11 @@ struct MainTabView: View {
                 }
 
                 // Push-to-talk feedback (live transcript / sending / confirmation).
-                PushToTalkOverlay(ptt: ptt)
+                PushToTalkOverlay(ptt: ptt) { id in
+                    loadedTabs.insert(.concierge)
+                    switchTab(to: .concierge)
+                    conciergeLaunch.continueConversation(id)
+                }
             }
         }
         .ignoresSafeArea(.keyboard)

@@ -18,6 +18,7 @@ struct ConciergeView: View {
     @State private var chatPrompt: String?
     @State private var chatAutoListen = false
     @State private var chatAutoSend = false
+    @State private var chatConversationId: Int?
     @State private var pendingLaunch: ConciergeLaunch.Request?
     @AppStorage("cloudAIEnabled") private var cloudAIEnabled = true
 
@@ -52,7 +53,7 @@ struct ConciergeView: View {
             }
         }
         .sheet(isPresented: $showingChat) {
-            ConciergeChatView(initialPrompt: chatPrompt, autoListen: chatAutoListen, autoSend: chatAutoSend)
+            ConciergeChatView(initialPrompt: chatPrompt, autoListen: chatAutoListen, autoSend: chatAutoSend, resumeConversationId: chatConversationId)
         }
         .sheet(isPresented: $showingPaywall) {
             PaywallView()
@@ -108,6 +109,7 @@ struct ConciergeView: View {
         chatPrompt = nil
         chatAutoListen = false
         chatAutoSend = false
+        chatConversationId = nil
         showingChat = true
     }
 
@@ -115,6 +117,7 @@ struct ConciergeView: View {
         chatPrompt = request.prompt
         chatAutoListen = request.autoListen
         chatAutoSend = request.autoSend
+        chatConversationId = request.conversationId
         let delay: Duration = showingChat || request.autoSend ? .milliseconds(400) : .milliseconds(50)
         showingChat = false
         Task { @MainActor in

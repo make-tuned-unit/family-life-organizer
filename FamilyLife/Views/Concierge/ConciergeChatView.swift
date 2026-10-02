@@ -12,6 +12,8 @@ struct ConciergeChatView: View {
     var autoListen: Bool = false
     /// When true, `initialPrompt` is sent immediately (chat-bubble handoff).
     var autoSend: Bool = false
+    /// Reopen this existing conversation (e.g. after a push-to-talk note).
+    var resumeConversationId: Int? = nil
 
     @State private var viewModel = ConciergeChatViewModel()
     @State private var speech = ConciergeSpeechRecognizer()
@@ -86,6 +88,9 @@ struct ConciergeChatView: View {
                     names.append(contentsOf: lists.map(\.name))
                 }
                 speech.setContextualStrings(names)
+                if let resumeConversationId, viewModel.conversationId != resumeConversationId {
+                    await viewModel.resume(conversationId: resumeConversationId, api: api)
+                }
                 if autoSend, let initialPrompt, !initialPrompt.isEmpty, !didAutoSend {
                     didAutoSend = true
                     await viewModel.send(initialPrompt, api: api, source: .chatExtract, reduceMotion: reduceMotion)
